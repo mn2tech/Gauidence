@@ -2,11 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  Check,
   ChevronDown,
   Download,
   FileImage,
   FileText,
   Loader2,
+  Pencil,
+  Search,
   Sparkles,
   Trash2,
   UploadCloud,
@@ -14,6 +17,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { SOURCE_LABELS, type Fact, type FactSource } from "@/lib/analysis";
+import { DOCUMENT_CATEGORIES } from "@/lib/categories";
 
 type DocumentRow = {
   id: string;
@@ -22,7 +26,17 @@ type DocumentRow = {
   mime_type: string;
   size_bytes: number;
   created_at: string;
+  category: string | null;
 };
+
+type SortKey = "newest" | "oldest" | "name" | "largest";
+
+const SORT_OPTIONS: { value: SortKey; label: string }[] = [
+  { value: "newest", label: "Newest first" },
+  { value: "oldest", label: "Oldest first" },
+  { value: "name", label: "Name A–Z" },
+  { value: "largest", label: "Largest first" },
+];
 
 type Analysis = {
   summary: string;
@@ -77,12 +91,19 @@ export default function DocumentManager({ userId }: { userId: string }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [analyzingId, setAnalyzingId] = useState<string | null>(null);
 
+  const [query, setQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<SortKey>("newest");
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [savingRename, setSavingRename] = useState(false);
+
   const loadDocuments = useCallback(async () => {
     if (!supabase) return;
     const [docsRes, analysesRes] = await Promise.all([
       supabase
         .from("documents")
-        .select("id, file_name, file_path, mime_type, size_bytes, created_at")
+        .select("id, file_name, file_path, mime_type, size_bytes, created_at, category")
         .order("created_at", { ascending: false }),
       supabase.from("extracted_data").select("document_id, summary, facts, model"),
     ]);
@@ -227,6 +248,53 @@ export default function DocumentManager({ userId }: { userId: string }) {
     setConfirmDeleteId(null);
   }
 
+  function startRename(doc: DocumentRow) {
+    setRenamingId(doc.id);
+    setRenameValue(doc.file_name);
+  }
+
+  async function handleRename(doc: DocumentRow) {
+    if (!supabase) return;
+    const newName = renameValue.trim();
+    if (!newName || newName === doc.file_name) {
+      setRenamingId(null);
+      return;
+    }
+    setSavingRename(true);
+    const { error: renameError } = await supabase
+      .from("documents")
+      .update({ file_name: newName })
+      .eq("id", doc.id);
+    if (renameError) {
+      setError("We couldn't rename the document. Please try again.");
+    } else {
+      setDocuments((docs) =>
+        docs.map((d) => (d.id === doc.id ? { ...d, file_name: newName } : d))
+      );
+    }
+    setSavingRename(false);
+    setRenamingId(null);
+  }
+
+  async function handleSetCategory(doc: DocumentRow, category: string) {
+    if (!supabase) return;
+    const value = category === "" ? null : category;
+    const previous = doc.category;
+    setDocuments((docs) =>
+      docs.map((d) => (d.id === doc.id ? { ...d, category: value } : d))
+    );
+    const { error: categoryError } = await supabase
+      .from("documents")
+      .update({ category: value })
+      .eq("id", doc.id);
+    if (categoryError) {
+      setDocuments((docs) =>
+        docs.map((d) => (d.id === doc.id ? { ...d, category: previous } : d))
+      );
+      setError("We couldn't save the category. Please try again.");
+    }
+  }
+
   async function handleAnalyze(doc: DocumentRow) {
     setError(null);
     setAnalyzingId(doc.id);
@@ -244,6 +312,11 @@ export default function DocumentManager({ userId }: { userId: string }) {
           ...prev,
           [doc.id]: { summary: body.summary, facts: body.facts, model: body.model },
         }));
+        if (body.category && !doc.category) {
+          setDocuments((docs) =>
+            docs.map((d) => (d.id === doc.id ? { ...d, category: body.category } : d))
+          );
+        }
         setExpandedId(doc.id);
         notifyAlertsUpdated();
       }
@@ -252,6 +325,41 @@ export default function DocumentManager({ userId }: { userId: string }) {
     }
     setAnalyzingId(null);
   }
+
+  const categoriesInUse = DOCUMENT_CATEGORIES.filter((c) =>
+    documents.some((d) => d.category === c)
+  );
+  const hasUncategorized = documents.some((d) => !d.category);
+
+  const visibleDocuments = documents
+    .filter((d) => {
+      if (query && !d.file_name.toLowerCase().includes(query.toLowerCase().trim()))
+        return false;
+      if (categoryFilter === "all") return true;
+      if (categoryFilter === "uncategorized") return !d.category;
+      return d.category === categoryFilter;
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case "oldest":
+          return a.created_at.localeCompare(b.created_at);
+        case "name":
+          return a.file_name.localeCompare(b.file_name, undefined, {
+            sensitivity: "base",
+          });
+        case "largest":
+          return b.size_bytes - a.size_bytes;
+        default:
+          return b.created_at.localeCompare(a.created_at);
+      }
+    });
+
+  const chipClass = (active: boolean) =>
+    `rounded-full border px-3 py-1 text-xs font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${
+      active
+        ? "border-brand bg-brand text-white"
+        : "border-stone-300 bg-white text-ink-muted hover:border-stone-400 hover:text-foreground"
+    }`;
 
   return (
     <div className="rounded-2xl border border-stone-200 bg-white p-6">
@@ -312,6 +420,67 @@ export default function DocumentManager({ userId }: { userId: string }) {
         </p>
       )}
 
+      {/* Toolbar: search, category filter, sort */}
+      {!loading && documents.length > 0 && (
+        <div className="mt-6 space-y-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative min-w-0 flex-1 basis-56">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" />
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search documents…"
+                aria-label="Search documents by name"
+                className="w-full rounded-full border border-stone-300 bg-white py-2 pl-9 pr-4 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+              />
+            </div>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortKey)}
+              aria-label="Sort documents"
+              className="rounded-full border border-stone-300 bg-white px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+            >
+              {SORT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          {(categoriesInUse.length > 0 || hasUncategorized) && (
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setCategoryFilter("all")}
+                className={chipClass(categoryFilter === "all")}
+              >
+                All
+              </button>
+              {categoriesInUse.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setCategoryFilter(c)}
+                  className={chipClass(categoryFilter === c)}
+                >
+                  {c}
+                </button>
+              ))}
+              {hasUncategorized && categoriesInUse.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setCategoryFilter("uncategorized")}
+                  className={chipClass(categoryFilter === "uncategorized")}
+                >
+                  Uncategorized
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Document list */}
       {loading ? (
         <div className="mt-6 flex items-center justify-center gap-2 py-6 text-sm text-ink-muted">
@@ -322,9 +491,13 @@ export default function DocumentManager({ userId }: { userId: string }) {
         <p className="mt-6 py-4 text-center text-sm text-ink-muted">
           Nothing here yet. Your uploads are private to you.
         </p>
+      ) : visibleDocuments.length === 0 ? (
+        <p className="mt-6 py-4 text-center text-sm text-ink-muted">
+          No documents match your search.
+        </p>
       ) : (
-        <ul className="mt-6 divide-y divide-stone-100">
-          {documents.map((doc) => {
+        <ul className="mt-4 divide-y divide-stone-100">
+          {visibleDocuments.map((doc) => {
             const analysis = analyses[doc.id];
             const expanded = expandedId === doc.id;
             return (
@@ -338,11 +511,68 @@ export default function DocumentManager({ userId }: { userId: string }) {
                     )}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{doc.file_name}</p>
-                    <p className="text-xs text-ink-muted">
-                      {ACCEPTED_TYPES[doc.mime_type] ?? doc.mime_type} ·{" "}
-                      {formatSize(doc.size_bytes)} · {formatDate(doc.created_at)}
-                    </p>
+                    {renamingId === doc.id ? (
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="text"
+                          value={renameValue}
+                          onChange={(e) => setRenameValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleRename(doc);
+                            if (e.key === "Escape") setRenamingId(null);
+                          }}
+                          autoFocus
+                          aria-label="New document name"
+                          className="w-full min-w-0 rounded-lg border border-stone-300 bg-white px-2 py-1 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRename(doc)}
+                          disabled={savingRename}
+                          aria-label="Save name"
+                          className="rounded-full p-1.5 text-brand transition hover:bg-brand-light focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
+                        >
+                          {savingRename ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Check className="h-3.5 w-3.5" />
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setRenamingId(null)}
+                          aria-label="Cancel rename"
+                          className="rounded-full p-1.5 text-ink-muted transition hover:bg-stone-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="truncate text-sm font-medium">{doc.file_name}</p>
+                    )}
+                    <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-muted">
+                      <span>
+                        {ACCEPTED_TYPES[doc.mime_type] ?? doc.mime_type} ·{" "}
+                        {formatSize(doc.size_bytes)} · {formatDate(doc.created_at)}
+                      </span>
+                      <select
+                        value={doc.category ?? ""}
+                        onChange={(e) => handleSetCategory(doc, e.target.value)}
+                        aria-label={`Category for ${doc.file_name}`}
+                        className={`max-w-36 cursor-pointer rounded-full border px-2 py-0.5 text-[11px] font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand ${
+                          doc.category
+                            ? "border-brand/30 bg-brand-light text-brand-dark"
+                            : "border-stone-300 bg-white text-ink-muted"
+                        }`}
+                      >
+                        <option value="">Uncategorized</option>
+                        {DOCUMENT_CATEGORIES.map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                   {confirmDeleteId === doc.id ? (
                     <div className="flex items-center gap-2">
@@ -395,6 +625,14 @@ export default function DocumentManager({ userId }: { userId: string }) {
                             className={`h-3.5 w-3.5 transition-transform ${expanded ? "rotate-180" : ""}`}
                           />
                         )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => startRename(doc)}
+                        aria-label={`Rename ${doc.file_name}`}
+                        className="rounded-full p-2 text-ink-muted transition hover:bg-stone-100 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                      >
+                        <Pencil className="h-4 w-4" />
                       </button>
                       <button
                         type="button"

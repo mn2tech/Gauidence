@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { createClient } from "@/lib/supabase/server";
 import type { Fact } from "@/lib/analysis";
+import { DOCUMENT_CATEGORIES, isDocumentCategory } from "@/lib/categories";
 
 const MODEL = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
 const MAX_ANALYZE_BYTES = 15 * 1024 * 1024;
@@ -48,8 +49,14 @@ const EXTRACTION_SCHEMA = {
           "1-3 practical suggestions for the document owner. These are AI-generated advice, not document content.",
         items: { type: "string" },
       },
+      category: {
+        type: "string",
+        enum: [...DOCUMENT_CATEGORIES],
+        description:
+          "The single category that best fits this document. Use 'Other' when nothing fits well.",
+      },
     },
-    required: ["summary", "facts", "recommendations"],
+    required: ["summary", "facts", "recommendations", "category"],
   },
 } as const;
 
@@ -112,7 +119,7 @@ export async function POST(request: Request) {
   // RLS limits this to the caller's own documents.
   const { data: doc } = await supabase
     .from("documents")
-    .select("id, file_name, file_path, mime_type, size_bytes")
+    .select("id, file_name, file_path, mime_type, size_bytes, category")
     .eq("id", documentId)
     .maybeSingle();
   if (!doc) {
@@ -152,7 +159,12 @@ export async function POST(request: Request) {
           { type: "image_url", image_url: { url: dataUrl } },
         ];
 
-  let parsed: { summary: string; facts: ModelFact[]; recommendations: string[] };
+  let parsed: {
+    summary: string;
+    facts: ModelFact[];
+    recommendations: string[];
+    category?: string;
+  };
   try {
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const completion = await openai.chat.completions.create({
@@ -220,6 +232,17 @@ export async function POST(request: Request) {
     );
   }
 
+  // Suggest a category only when the user hasn't set one — a manual choice
+  // is never overwritten.
+  let suggestedCategory: string | null = null;
+  if (!doc.category && parsed.category && isDocumentCategory(parsed.category)) {
+    const { error: categoryError } = await supabase
+      .from("documents")
+      .update({ category: parsed.category })
+      .eq("id", doc.id);
+    if (!categoryError) suggestedCategory = parsed.category;
+  }
+
   // Replace this document's alerts with the fresh set.
   await supabase.from("alerts").delete().eq("document_id", doc.id);
   if (deadlines.length > 0) {
@@ -239,5 +262,6 @@ export async function POST(request: Request) {
     facts,
     model: MODEL,
     analyzedAt: new Date().toISOString(),
+    category: suggestedCategory,
   });
 }
