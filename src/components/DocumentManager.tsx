@@ -97,7 +97,11 @@ export default function DocumentManager({ userId }: { userId: string }) {
         .from("documents")
         .upload(path, file, { contentType: file.type });
       if (uploadError) {
-        setError("The upload didn't finish. Check your connection and try again.");
+        setError(
+          uploadError.message?.includes("Bucket not found")
+            ? "Document storage isn't set up yet on this project — the site owner needs to run the latest database migration."
+            : "The upload didn't finish. Check your connection and try again."
+        );
         setUploading(false);
         return;
       }
