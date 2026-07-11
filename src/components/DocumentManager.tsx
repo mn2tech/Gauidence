@@ -408,7 +408,34 @@ export default function DocumentManager({ userId }: { userId: string }) {
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         }),
       });
-      const body = await res.json();
+      let body: {
+        error?: string;
+        summary?: string;
+        facts?: Analysis["facts"];
+        model?: string;
+        title?: string;
+        documentType?: string;
+        guardianStatus?: string;
+        overallConfidence?: number;
+        classificationConfidence?: number;
+        category?: string | null;
+        analysisStatus?: AnalysisStatus;
+      } = {};
+      try {
+        body = await res.json();
+      } catch {
+        setError(
+          res.ok
+            ? "Analysis finished but returned an unexpected response. Please try again."
+            : "The analysis service failed. Please try again in a moment."
+        );
+        setDocuments((docs) =>
+          docs.map((d) =>
+            d.id === doc.id ? { ...d, analysis_status: "failed" } : d
+          )
+        );
+        return;
+      }
       if (!res.ok) {
         setError(body.error ?? "Analysis failed. Please try again.");
         setDocuments((docs) =>
@@ -420,23 +447,24 @@ export default function DocumentManager({ userId }: { userId: string }) {
         setAnalyses((prev) => ({
           ...prev,
           [doc.id]: {
-            summary: body.summary,
-            facts: body.facts,
-            model: body.model,
+            summary: body.summary ?? "",
+            facts: body.facts ?? [],
+            model: body.model ?? null,
             title: body.title,
             documentType: body.documentType,
-            guardianStatus: body.guardianStatus,
+            guardianStatus: body.guardianStatus as GuardianStatus | undefined,
             overallConfidence: body.overallConfidence,
             classificationConfidence: body.classificationConfidence,
           },
         }));
         if (body.category && !doc.category) {
+          const category = body.category;
           setDocuments((docs) =>
             docs.map((d) =>
               d.id === doc.id
                 ? {
                     ...d,
-                    category: body.category,
+                    category,
                     analysis_status: body.analysisStatus ?? "completed",
                   }
                 : d
@@ -461,10 +489,11 @@ export default function DocumentManager({ userId }: { userId: string }) {
           d.id === doc.id ? { ...d, analysis_status: "failed" } : d
         )
       );
+    } finally {
+      window.clearInterval(progressTimer);
+      setProgressLabel(null);
+      setAnalyzingId(null);
     }
-    window.clearInterval(progressTimer);
-    setProgressLabel(null);
-    setAnalyzingId(null);
   }
 
   const categoriesInUse = DOCUMENT_CATEGORIES.filter((c) =>

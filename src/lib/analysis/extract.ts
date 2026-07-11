@@ -1,6 +1,6 @@
 import "server-only";
 
-import { PDFParse } from "pdf-parse";
+import { extractText, getDocumentProxy } from "unpdf";
 import {
   isAnalysisDebugEnabled,
   previewText,
@@ -22,34 +22,9 @@ export type ExtractionResult = {
 
 export { scoreExtractionQuality, previewText, isAnalysisDebugEnabled };
 
-function formatTables(tables: unknown): string {
-  if (!tables || typeof tables !== "object") return "";
-  const pages = (tables as { pages?: unknown }).pages;
-  if (!Array.isArray(pages)) return "";
-  const blocks: string[] = [];
-  for (const page of pages) {
-    const pageTables = (page as { tables?: unknown }).tables;
-    if (!Array.isArray(pageTables)) continue;
-    for (const table of pageTables) {
-      const rows = Array.isArray(table) ? table : (table as { rows?: unknown }).rows;
-      if (!Array.isArray(rows)) continue;
-      blocks.push("TABLE:");
-      for (const row of rows) {
-        if (!Array.isArray(row)) continue;
-        blocks.push(
-          row
-            .map((cell) => String(cell ?? "").replace(/\s+/g, " ").trim())
-            .join(" | ")
-        );
-      }
-      blocks.push("");
-    }
-  }
-  return blocks.join("\n").trim();
-}
-
 /**
- * Prefer native PDF text (+ tables). Do not OCR text-layer PDFs.
+ * Prefer native PDF text. Uses unpdf (serverless-safe PDF.js) — not pdf-parse,
+ * which crashes on Vercel without native canvas/worker setup.
  * Images have no native text here — quality 0, vision fallback later.
  */
 export async function extractDocumentText(args: {
@@ -57,43 +32,27 @@ export async function extractDocumentText(args: {
   base64: string;
   fileName: string;
 }): Promise<ExtractionResult> {
-  const buffer = Buffer.from(args.base64, "base64");
-
   if (args.mimeType === "application/pdf") {
-    const parser = new PDFParse({ data: buffer });
     try {
-      const textResult = await parser.getText();
-      let tablesText = "";
-      try {
-        const tableResult = await parser.getTable();
-        tablesText = formatTables(tableResult);
-      } catch {
-        // Tables are optional enhancement.
-      }
-      await parser.destroy();
-
-      const text = (textResult.text ?? "").replace(/\r\n/g, "\n").trim();
-      const combined = tablesText
-        ? `${text}\n\n--- EXTRACTED TABLES (preserve columns) ---\n${tablesText}`
-        : text;
-      const quality = Math.max(
-        scoreExtractionQuality(text),
-        tablesText ? Math.min(1, scoreExtractionQuality(text) + 0.1) : 0
-      );
-      const pageCount =
-        typeof textResult.total === "number"
-          ? textResult.total
-          : Array.isArray(textResult.pages)
-            ? textResult.pages.length
-            : null;
+      const bytes = Uint8Array.from(Buffer.from(args.base64, "base64"));
+      const pdf = await getDocumentProxy(bytes);
+      const { totalPages, text: rawText } = await extractText(pdf, {
+        mergePages: true,
+      });
+      // Preserve line breaks / reading order from PDF.js text layer
+      const text = String(rawText ?? "")
+        .replace(/\r\n/g, "\n")
+        .replace(/[ \t]+\n/g, "\n")
+        .trim();
+      const quality = scoreExtractionQuality(text);
 
       return {
-        text: combined,
-        tablesText,
-        method: tablesText ? "native_pdf_tables" : "native_pdf",
+        text,
+        tablesText: "",
+        method: "native_pdf",
         quality,
-        pageCount,
-        charCount: combined.length,
+        pageCount: typeof totalPages === "number" ? totalPages : null,
+        charCount: text.length,
         reason:
           quality >= 0.45
             ? "Native PDF text layer scored usable; OCR skipped."
@@ -102,11 +61,6 @@ export async function extractDocumentText(args: {
               : "Native PDF text is partial; model may also receive the file.",
       };
     } catch {
-      try {
-        await parser.destroy();
-      } catch {
-        // ignore
-      }
       return {
         text: "",
         tablesText: "",
