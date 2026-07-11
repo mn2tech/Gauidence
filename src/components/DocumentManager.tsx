@@ -5,6 +5,7 @@ import {
   Check,
   ChevronDown,
   Download,
+  Eye,
   FileImage,
   FileText,
   Loader2,
@@ -88,6 +89,12 @@ export default function DocumentManager({ userId }: { userId: string }) {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [viewingId, setViewingId] = useState<string | null>(null);
+  const [viewer, setViewer] = useState<{
+    url: string;
+    fileName: string;
+    mimeType: string;
+  } | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [analyzingId, setAnalyzingId] = useState<string | null>(null);
 
@@ -207,6 +214,38 @@ export default function DocumentManager({ userId }: { userId: string }) {
     }
     setDownloadingId(null);
   }
+
+  async function handleView(doc: DocumentRow) {
+    if (!supabase) return;
+    setError(null);
+    setViewingId(doc.id);
+    try {
+      const { data, error } = await supabase.storage
+        .from("documents")
+        .createSignedUrl(doc.file_path, 60);
+      if (error || !data?.signedUrl) {
+        setError("We couldn't open the document. Please try again.");
+      } else {
+        setViewer({
+          url: data.signedUrl,
+          fileName: doc.file_name,
+          mimeType: doc.mime_type,
+        });
+      }
+    } catch {
+      setError("We couldn't open the document. Check your connection and try again.");
+    }
+    setViewingId(null);
+  }
+
+  useEffect(() => {
+    if (!viewer) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setViewer(null);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [viewer]);
 
   async function handleDelete(doc: DocumentRow) {
     if (!supabase) return;
@@ -502,7 +541,7 @@ export default function DocumentManager({ userId }: { userId: string }) {
             const expanded = expandedId === doc.id;
             return (
               <li key={doc.id} className="py-3">
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-light text-brand">
                     {doc.mime_type === "application/pdf" ? (
                       <FileText className="h-4 w-4" />
@@ -599,7 +638,7 @@ export default function DocumentManager({ userId }: { userId: string }) {
                       </button>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-1">
+                    <div className="flex flex-wrap items-center gap-1">
                       <button
                         type="button"
                         onClick={() =>
@@ -636,6 +675,19 @@ export default function DocumentManager({ userId }: { userId: string }) {
                       </button>
                       <button
                         type="button"
+                        onClick={() => handleView(doc)}
+                        disabled={viewingId === doc.id}
+                        aria-label={`View ${doc.file_name}`}
+                        className="rounded-full p-2 text-ink-muted transition hover:bg-stone-100 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
+                      >
+                        {viewingId === doc.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => handleDownload(doc)}
                         disabled={downloadingId === doc.id}
                         aria-label={`Download ${doc.file_name}`}
@@ -661,7 +713,7 @@ export default function DocumentManager({ userId }: { userId: string }) {
 
                 {/* Analysis panel */}
                 {expanded && analysis && (
-                  <div className="ml-12 mt-3 rounded-xl border border-stone-200 bg-stone-50/60 p-4">
+                  <div className="mt-3 rounded-xl border border-stone-200 bg-stone-50/60 p-4 sm:ml-12">
                     <p className="text-sm leading-relaxed">{analysis.summary}</p>
                     {analysis.facts.length > 0 && (
                       <ul className="mt-3 space-y-2">
@@ -701,6 +753,52 @@ export default function DocumentManager({ userId }: { userId: string }) {
             );
           })}
         </ul>
+      )}
+
+      {viewer && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={viewer.fileName}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/60 p-4"
+          onClick={() => setViewer(null)}
+        >
+          <div
+            className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3 border-b border-stone-200 px-4 py-3">
+              <p className="truncate text-sm font-semibold">{viewer.fileName}</p>
+              <button
+                type="button"
+                onClick={() => setViewer(null)}
+                aria-label="Close viewer"
+                className="rounded-full p-2 text-ink-muted transition hover:bg-stone-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-auto bg-stone-100 p-2">
+              {viewer.mimeType === "application/pdf" ? (
+                <iframe
+                  title={viewer.fileName}
+                  src={viewer.url}
+                  className="h-[75vh] w-full rounded-lg bg-white"
+                />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={viewer.url}
+                  alt={viewer.fileName}
+                  className="mx-auto max-h-[75vh] max-w-full object-contain"
+                />
+              )}
+            </div>
+            <p className="border-t border-stone-200 px-4 py-2 text-xs text-ink-muted">
+              This preview link expires in about a minute. Download the file to keep a copy.
+            </p>
+          </div>
+        </div>
       )}
     </div>
   );

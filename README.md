@@ -15,7 +15,7 @@ Marketing landing page for **Guardian**, a private vault for the documents you c
 - `/` — landing page with hero, features, and the "Built for the information you cannot afford to lose" security section
 - `/security` — Security Principles: what data is collected, how auth and access separation work, where files are stored, how AI processing works, what is not yet implemented, deletion, and how to report a concern
 - `/login` and `/signup` — email/password plus "Continue with Google" via Supabase Auth
-- `/dashboard` — protected document vault: upload, download, search, category filters, sorting, rename, AI analysis with source-labeled facts (including an AI-suggested category that never overrides a manual choice), deadline alerts, and safe deletion
+- `/dashboard` — protected document vault: upload, view in-browser, download, search, category filters, sorting, rename, AI analysis with source-labeled facts (including an AI-suggested category that never overrides a manual choice; limited to 10 analyses per user per hour), deadline alerts, and safe deletion
 - `/settings` — edit profile name, change/set password, toggle email deadline reminders, and permanently delete your account with all data (requires `SUPABASE_SERVICE_ROLE_KEY`, server-side only)
 - `/auth/callback` — OAuth and email-confirmation callback
 
@@ -35,6 +35,15 @@ never exposed to the browser). Facts are labeled by source — from the
 document, calculated, or AI-generated — and future deadline dates become
 dismissible alerts on the dashboard. Without the key configured, the Analyze
 button returns a friendly "not set up yet" message.
+
+Each signed-in user can run up to **10 analyses per hour**. Further requests
+return a clear "try again later" message so OpenAI usage stays bounded.
+
+## Error monitoring
+
+Optional [Sentry](https://sentry.io) reporting via `NEXT_PUBLIC_SENTRY_DSN`.
+When the DSN is unset, the app runs normally and does not send events. Create
+a free Sentry project, copy the DSN into `.env.local` and Vercel, then redeploy.
 
 ## Email deadline reminders
 

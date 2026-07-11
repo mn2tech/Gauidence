@@ -6,6 +6,7 @@ import { DOCUMENT_CATEGORIES, isDocumentCategory } from "@/lib/categories";
 
 const MODEL = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
 const MAX_ANALYZE_BYTES = 15 * 1024 * 1024;
+const ANALYZE_LIMIT_PER_HOUR = 10;
 
 const EXTRACTION_SCHEMA = {
   name: "document_extraction",
@@ -129,6 +130,38 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: "This document is too large to analyze." },
       { status: 413 }
+    );
+  }
+
+  const hourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const { count, error: countError } = await supabase
+    .from("analysis_events")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id)
+    .gte("created_at", hourAgo);
+  if (countError) {
+    return NextResponse.json(
+      { error: "We couldn't start the analysis. Please try again." },
+      { status: 502 }
+    );
+  }
+  if ((count ?? 0) >= ANALYZE_LIMIT_PER_HOUR) {
+    return NextResponse.json(
+      {
+        error:
+          "You've reached the analysis limit for now. Try again in about an hour.",
+      },
+      { status: 429 }
+    );
+  }
+
+  const { error: eventError } = await supabase.from("analysis_events").insert({
+    user_id: user.id,
+  });
+  if (eventError) {
+    return NextResponse.json(
+      { error: "We couldn't start the analysis. Please try again." },
+      { status: 502 }
     );
   }
 
