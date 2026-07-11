@@ -20,7 +20,7 @@ export default async function SettingsPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, avatar_url, email")
+    .select("full_name, avatar_url, email, email_reminders_enabled")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -38,6 +38,7 @@ export default async function SettingsPage() {
             email={user.email ?? ""}
             initialFullName={profile?.full_name ?? ""}
             avatarUrl={profile?.avatar_url ?? null}
+            initialRemindersEnabled={profile?.email_reminders_enabled !== false}
           />
         </section>
       </main>

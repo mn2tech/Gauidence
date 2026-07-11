@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Check, Loader2, UserRound } from "lucide-react";
+import { AlertTriangle, BellRing, Check, Loader2, UserRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 type Props = {
@@ -11,6 +11,7 @@ type Props = {
   email: string;
   initialFullName: string;
   avatarUrl: string | null;
+  initialRemindersEnabled: boolean;
 };
 
 export default function SettingsForm({
@@ -18,6 +19,7 @@ export default function SettingsForm({
   email,
   initialFullName,
   avatarUrl,
+  initialRemindersEnabled,
 }: Props) {
   const supabase = createClient();
   const router = useRouter();
@@ -32,6 +34,10 @@ export default function SettingsForm({
   const [savingPassword, setSavingPassword] = useState(false);
   const [passwordSaved, setPasswordSaved] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
+
+  const [remindersEnabled, setRemindersEnabled] = useState(initialRemindersEnabled);
+  const [savingReminders, setSavingReminders] = useState(false);
+  const [remindersError, setRemindersError] = useState<string | null>(null);
 
   const [confirmText, setConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
@@ -83,6 +89,26 @@ export default function SettingsForm({
       setConfirmPassword("");
     }
     setSavingPassword(false);
+  }
+
+  async function handleToggleReminders() {
+    if (!supabase || savingReminders) return;
+    const next = !remindersEnabled;
+    setRemindersError(null);
+    setRemindersEnabled(next);
+    setSavingReminders(true);
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        email_reminders_enabled: next,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", userId);
+    if (error) {
+      setRemindersEnabled(!next);
+      setRemindersError("We couldn't save that change. Please try again.");
+    }
+    setSavingReminders(false);
   }
 
   const deleteConfirmed = confirmText.trim() === "DELETE";
@@ -230,6 +256,45 @@ export default function SettingsForm({
             Update password
           </button>
         </form>
+      </section>
+
+      {/* Email reminders */}
+      <section className="rounded-2xl border border-stone-200 bg-white p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <BellRing className="h-5 w-5 text-brand" />
+              <h2 className="text-base font-semibold">Email reminders</h2>
+            </div>
+            <p className="mt-2 text-sm leading-relaxed text-ink-muted">
+              We email {email} when a deadline from your documents is a week
+              away, and again the day before it&apos;s due. Dismissed alerts
+              are never emailed.
+            </p>
+            {remindersError && (
+              <p role="alert" className="mt-2 text-sm text-red-700">
+                {remindersError}
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={remindersEnabled}
+            aria-label="Email reminders"
+            onClick={handleToggleReminders}
+            disabled={savingReminders}
+            className={`relative mt-1 inline-flex h-6 w-11 shrink-0 items-center rounded-full transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-60 ${
+              remindersEnabled ? "bg-brand" : "bg-stone-300"
+            }`}
+          >
+            <span
+              className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
+                remindersEnabled ? "translate-x-[22px]" : "translate-x-0.5"
+              }`}
+            />
+          </button>
+        </div>
       </section>
 
       {/* Danger zone */}

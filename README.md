@@ -16,7 +16,7 @@ Marketing landing page for **Guardian**, a private vault for the documents you c
 - `/security` — Security Principles: what data is collected, how auth and access separation work, where files are stored, how AI processing works, what is not yet implemented, deletion, and how to report a concern
 - `/login` and `/signup` — email/password plus "Continue with Google" via Supabase Auth
 - `/dashboard` — protected document vault: upload, download, AI analysis with source-labeled facts, deadline alerts, and safe deletion
-- `/settings` — edit profile name, change/set password, and permanently delete your account with all data (requires `SUPABASE_SERVICE_ROLE_KEY`, server-side only)
+- `/settings` — edit profile name, change/set password, toggle email deadline reminders, and permanently delete your account with all data (requires `SUPABASE_SERVICE_ROLE_KEY`, server-side only)
 - `/auth/callback` — OAuth and email-confirmation callback
 
 ## Authentication
@@ -35,6 +35,25 @@ never exposed to the browser). Facts are labeled by source — from the
 document, calculated, or AI-generated — and future deadline dates become
 dismissible alerts on the dashboard. Without the key configured, the Analyze
 button returns a friendly "not set up yet" message.
+
+## Email deadline reminders
+
+A daily Vercel Cron job (`vercel.json`, schedule `0 12 * * *` UTC) calls
+`/api/cron/reminders`, which emails each user their upcoming deadlines via
+[Resend](https://resend.com): once when a deadline is within 7 days, and again
+the day before (or day of). Dismissed alerts are never emailed, and users can
+turn reminders off in Settings.
+
+Setup:
+
+1. Create a free Resend account and API key; set `RESEND_API_KEY`.
+2. Set `CRON_SECRET` to a long random string (the route rejects requests
+   without `Authorization: Bearer <CRON_SECRET>`; Vercel Cron adds it
+   automatically when the env var exists).
+3. Run `supabase/migrations/0004_reminders.sql`.
+4. Optional: verify a domain in Resend and set `REMINDER_FROM_EMAIL`. Without
+   it, emails send from `onboarding@resend.dev` and Resend only delivers to
+   the account owner's own email (fine for testing).
 
 ## Getting started
 
