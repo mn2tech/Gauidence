@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test src/lib/analysis/__tests__/router.test.ts"
+    "test": "tsx --test src/lib/analysis/__tests__/*.test.ts"
   },
   "dependencies": {
     "@sentry/nextjs": "^10.65.0",

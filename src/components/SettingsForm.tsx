@@ -10,6 +10,7 @@ type Props = {
   userId: string;
   email: string;
   initialFullName: string;
+  initialCompanyName: string;
   avatarUrl: string | null;
   initialRemindersEnabled: boolean;
 };
@@ -18,6 +19,7 @@ export default function SettingsForm({
   userId,
   email,
   initialFullName,
+  initialCompanyName,
   avatarUrl,
   initialRemindersEnabled,
 }: Props) {
@@ -25,6 +27,7 @@ export default function SettingsForm({
   const router = useRouter();
 
   const [fullName, setFullName] = useState(initialFullName);
+  const [companyName, setCompanyName] = useState(initialCompanyName);
   const [savingName, setSavingName] = useState(false);
   const [nameSaved, setNameSaved] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
@@ -51,7 +54,11 @@ export default function SettingsForm({
     setSavingName(true);
     const { error } = await supabase
       .from("profiles")
-      .update({ full_name: fullName.trim(), updated_at: new Date().toISOString() })
+      .update({
+        full_name: fullName.trim(),
+        company_name: companyName.trim() || null,
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", userId);
     if (error) {
       setNameError("We couldn't save your name. Please try again.");
@@ -165,36 +172,57 @@ export default function SettingsForm({
             </p>
           </div>
         </div>
-        <form onSubmit={handleSaveName} className="mt-4">
-          <label htmlFor="fullName" className="block text-sm font-medium">
-            Full name
-          </label>
-          <input
-            id="fullName"
-            type="text"
-            value={fullName}
-            onChange={(e) => {
-              setFullName(e.target.value);
-              setNameSaved(false);
-            }}
-            className={inputClass}
-          />
+        <form onSubmit={handleSaveName} className="mt-4 space-y-4">
+          <div>
+            <label htmlFor="fullName" className="block text-sm font-medium">
+              Full name
+            </label>
+            <input
+              id="fullName"
+              type="text"
+              value={fullName}
+              onChange={(e) => {
+                setFullName(e.target.value);
+                setNameSaved(false);
+              }}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label htmlFor="companyName" className="block text-sm font-medium">
+              Company or organization name
+            </label>
+            <input
+              id="companyName"
+              type="text"
+              value={companyName}
+              onChange={(e) => {
+                setCompanyName(e.target.value);
+                setNameSaved(false);
+              }}
+              placeholder="Optional — used to tell if an invoice is payable or receivable"
+              className={inputClass}
+            />
+            <p className="mt-1 text-xs text-ink-muted">
+              When you analyze invoices, Guardian compares this to the issuer and billed party.
+            </p>
+          </div>
           {nameError && (
-            <p role="alert" className="mt-2 text-sm text-red-700">
+            <p role="alert" className="text-sm text-red-700">
               {nameError}
             </p>
           )}
           <button
             type="submit"
             disabled={savingName}
-            className="mt-3 inline-flex items-center gap-2 rounded-full bg-brand px-5 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-full bg-brand px-5 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
           >
             {savingName ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : nameSaved ? (
               <Check className="h-4 w-4" />
             ) : null}
-            {nameSaved ? "Saved" : "Save name"}
+            {nameSaved ? "Saved" : "Save profile"}
           </button>
         </form>
       </section>

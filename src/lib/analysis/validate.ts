@@ -34,27 +34,56 @@ export function validateAnalysis(result: GuardianAnalysis): GuardianAnalysis {
       ? (specialist.line_items as Record<string, unknown>[])
       : [];
 
+    let lineItemVerificationWarned = false;
     for (const item of lineItems) {
       const qty = asNumber(item.quantity) ?? asNumber(item.hours);
       const rate = asNumber(item.unit_rate);
       const lineTotal = asNumber(item.line_total);
-      if (qty != null && rate != null && lineTotal != null) {
-        const expected = Math.round(qty * rate * 100) / 100;
-        if (!approxEqual(expected, lineTotal)) {
-          warnings.push(
-            `A line item total (${lineTotal}) does not match quantity/hours × rate (${expected}).`
-          );
-          overall = Math.min(overall, 0.7);
+      const itemConfidence = asNumber(item.confidence) ?? 0;
+      // Only run math when extraction confidence is high enough.
+      if (itemConfidence < CONFIDENCE_MEDIUM) {
+        if (
+          (qty != null || rate != null || lineTotal != null) &&
+          !lineItemVerificationWarned
+        ) {
+          warnings.push("Line item values need verification.");
+          lineItemVerificationWarned = true;
         }
+        continue;
+      }
+      if (qty == null || rate == null || lineTotal == null) {
+        if (
+          (qty != null || rate != null || lineTotal != null) &&
+          !lineItemVerificationWarned
+        ) {
+          warnings.push("Line item values need verification.");
+          lineItemVerificationWarned = true;
+        }
+        continue;
+      }
+      const expected = Math.round(qty * rate * 100) / 100;
+      if (!approxEqual(expected, lineTotal)) {
+        warnings.push(
+          `A line item total (${lineTotal}) does not match quantity/hours × rate (${expected}).`
+        );
+        overall = Math.min(overall, 0.7);
       }
     }
 
-    const lineSum = lineItems.reduce((sum, item) => {
+    const confidentLines = lineItems.filter(
+      (item) => (asNumber(item.confidence) ?? 0) >= CONFIDENCE_MEDIUM
+    );
+    const lineSum = confidentLines.reduce((sum, item) => {
       const t = asNumber(item.line_total);
       return t == null ? sum : sum + t;
     }, 0);
     const subtotal = asNumber(specialist.subtotal);
-    if (lineItems.length > 0 && subtotal != null && !approxEqual(lineSum, subtotal)) {
+    if (
+      confidentLines.length > 0 &&
+      confidentLines.every((i) => asNumber(i.line_total) != null) &&
+      subtotal != null &&
+      !approxEqual(lineSum, subtotal)
+    ) {
       warnings.push(
         `Sum of line totals (${lineSum.toFixed(2)}) does not approximately equal subtotal (${subtotal}).`
       );
@@ -64,7 +93,13 @@ export function validateAnalysis(result: GuardianAnalysis): GuardianAnalysis {
     const tax = asNumber(specialist.tax) ?? 0;
     const discount = asNumber(specialist.discount) ?? 0;
     const total = asNumber(specialist.total_amount_due);
-    if (subtotal != null && total != null) {
+    const totalConf = asNumber(specialist.total_amount_due_confidence) ?? 1;
+    if (
+      subtotal != null &&
+      total != null &&
+      totalConf >= CONFIDENCE_MEDIUM &&
+      !Boolean(specialist.total_amount_due_needs_verification)
+    ) {
       const expected = Math.round((subtotal + tax - discount) * 100) / 100;
       if (!approxEqual(expected, total)) {
         warnings.push(

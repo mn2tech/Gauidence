@@ -119,7 +119,7 @@ export async function POST(request: Request) {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, email")
+    .select("full_name, email, company_name")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -133,6 +133,7 @@ export async function POST(request: Request) {
       {
         fullName: profile?.full_name ?? null,
         email: profile?.email ?? user.email ?? null,
+        companyName: profile?.company_name ?? null,
         timeZone: timeZone ?? null,
       },
       setStatus

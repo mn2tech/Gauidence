@@ -14,6 +14,7 @@ export type FilePayload = {
 export type UserContext = {
   fullName?: string | null;
   email?: string | null;
+  companyName?: string | null;
   timeZone?: string | null;
 };
 

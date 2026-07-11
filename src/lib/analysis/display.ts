@@ -1,13 +1,21 @@
 import type { Fact, ExtractedFact, GuardianAnalysis } from "./types";
 import { CONFIDENCE_MEDIUM, mapSourceType } from "./types";
 import { formatDateRelativeLabel } from "./dates";
+import { buildInvoiceCanonicalFacts } from "./invoiceDisplay";
 
 function shouldShow(fact: ExtractedFact): boolean {
   if (fact.needs_verification || fact.confidence < CONFIDENCE_MEDIUM) {
-    // Show with verification flag rather than omit entirely when we have a value
     return Boolean(fact.value?.trim());
   }
   return Boolean(fact.value?.trim());
+}
+
+function canonicalKey(label: string): string {
+  return label
+    .toLowerCase()
+    .replace(/\s*\(needs verification\)\s*/gi, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 }
 
 function toDisplayFact(
@@ -29,7 +37,9 @@ function toDisplayFact(
   }
 
   if (fact.needs_verification || fact.confidence < CONFIDENCE_MEDIUM) {
-    label = `${label} (Needs verification)`;
+    if (!/\(needs verification\)/i.test(label)) {
+      label = `${label} (Needs verification)`;
+    }
   }
 
   return {
@@ -44,36 +54,57 @@ function toDisplayFact(
   };
 }
 
+function dedupeFacts(facts: Fact[]): Fact[] {
+  const seen = new Set<string>();
+  const out: Fact[] = [];
+  for (const f of facts) {
+    const key = canonicalKey(f.label);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(f);
+  }
+  return out;
+}
+
 /** Flatten rich analysis into dashboard Fact[] (facts, dates, suggestions separate). */
 export function toDisplayFacts(
   analysis: GuardianAnalysis,
   timeZone?: string
 ): Fact[] {
-  const out: Fact[] = [];
   const now = new Date();
+  const out: Fact[] = [];
 
-  for (const f of analysis.facts) {
+  // Invoices: specialist fields are canonical — avoid duplicates from generic arrays.
+  const sourceFacts: ExtractedFact[] =
+    analysis.document_type === "invoice"
+      ? buildInvoiceCanonicalFacts(analysis.specialist)
+      : [
+          ...analysis.facts,
+          ...analysis.important_dates,
+          ...analysis.amounts,
+        ];
+
+  for (const f of sourceFacts) {
     const d = toDisplayFact(f, timeZone, now);
     if (d) out.push(d);
   }
-  for (const f of analysis.important_dates) {
-    const d = toDisplayFact(f, timeZone, now);
-    if (d) out.push(d);
-  }
-  for (const f of analysis.amounts) {
-    const d = toDisplayFact(f, timeZone, now);
-    if (d) out.push(d);
-  }
+
+  const deduped = dedupeFacts(out);
+
   for (const action of analysis.suggested_actions) {
-    out.push({
+    deduped.push({
       label: "Suggestion",
       value: action,
       source: "ai_generated",
       date: null,
     });
   }
+  // Deduplicate identical warning messages
+  const seenWarnings = new Set<string>();
   for (const warning of analysis.warnings) {
-    out.push({
+    if (seenWarnings.has(warning)) continue;
+    seenWarnings.add(warning);
+    deduped.push({
       label: "Warning",
       value: warning,
       source: "calculated",
@@ -82,7 +113,7 @@ export function toDisplayFacts(
     });
   }
 
-  return out;
+  return deduped;
 }
 
 export function collectDeadlines(
@@ -95,7 +126,12 @@ export function collectDeadlines(
   const deadlines: { title: string; due_date: string }[] = [];
   const seen = new Set<string>();
 
-  for (const f of [...analysis.important_dates, ...analysis.facts]) {
+  const dateFacts =
+    analysis.document_type === "invoice"
+      ? buildInvoiceCanonicalFacts(analysis.specialist)
+      : [...analysis.important_dates, ...analysis.facts];
+
+  for (const f of dateFacts) {
     if (!f.is_deadline || !f.date) continue;
     if (f.needs_verification || f.confidence < CONFIDENCE_MEDIUM) continue;
     if (seen.has(f.date + f.label)) continue;
