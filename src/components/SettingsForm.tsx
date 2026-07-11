@@ -85,8 +85,10 @@ export default function SettingsForm({
     setSavingPassword(false);
   }
 
+  const deleteConfirmed = confirmText.trim() === "DELETE";
+
   async function handleDeleteAccount() {
-    if (!supabase || confirmText !== "DELETE") return;
+    if (!supabase || !deleteConfirmed) return;
     setDeleteError(null);
     setDeleting(true);
     try {
@@ -259,7 +261,7 @@ export default function SettingsForm({
         <button
           type="button"
           onClick={handleDeleteAccount}
-          disabled={confirmText !== "DELETE" || deleting}
+          disabled={!deleteConfirmed || deleting}
           className="mt-4 inline-flex items-center gap-2 rounded-full bg-red-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {deleting && <Loader2 className="h-4 w-4 animate-spin" />}
