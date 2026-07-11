@@ -7,6 +7,7 @@ import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 import SignOutButton from "@/components/SignOutButton";
 import DocumentManager from "@/components/DocumentManager";
+import AlertsPanel from "@/components/AlertsPanel";
 
 export const metadata: Metadata = {
   title: "Dashboard — Guardian",
@@ -66,6 +67,7 @@ export default async function DashboardPage() {
           </div>
 
           <div className="mt-10 space-y-6">
+            <AlertsPanel />
             <DocumentManager userId={user.id} />
             <div className="flex items-start gap-3 rounded-2xl border border-stone-200 bg-white p-5">
               <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-light text-brand">

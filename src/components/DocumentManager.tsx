@@ -2,15 +2,18 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ChevronDown,
   Download,
   FileImage,
   FileText,
   Loader2,
+  Sparkles,
   Trash2,
   UploadCloud,
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { SOURCE_LABELS, type Fact, type FactSource } from "@/lib/analysis";
 
 type DocumentRow = {
   id: string;
@@ -21,6 +24,12 @@ type DocumentRow = {
   created_at: string;
 };
 
+type Analysis = {
+  summary: string;
+  facts: Fact[];
+  model: string | null;
+};
+
 const ACCEPTED_TYPES: Record<string, string> = {
   "application/pdf": "PDF",
   "image/jpeg": "JPG",
@@ -28,6 +37,12 @@ const ACCEPTED_TYPES: Record<string, string> = {
   "image/webp": "WebP",
 };
 const MAX_SIZE_BYTES = 15 * 1024 * 1024;
+
+const SOURCE_BADGE_STYLES: Record<FactSource, string> = {
+  document: "bg-brand-light text-brand-dark",
+  calculated: "bg-sky-50 text-sky-700",
+  ai_generated: "bg-violet-50 text-violet-700",
+};
 
 function formatSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -43,10 +58,15 @@ function formatDate(iso: string) {
   });
 }
 
+export function notifyAlertsUpdated() {
+  window.dispatchEvent(new Event("guardian:alerts-updated"));
+}
+
 export default function DocumentManager({ userId }: { userId: string }) {
   const supabase = createClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [documents, setDocuments] = useState<DocumentRow[]>([]);
+  const [analyses, setAnalyses] = useState<Record<string, Analysis>>({});
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
@@ -54,17 +74,31 @@ export default function DocumentManager({ userId }: { userId: string }) {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [analyzingId, setAnalyzingId] = useState<string | null>(null);
 
   const loadDocuments = useCallback(async () => {
     if (!supabase) return;
-    const { data, error } = await supabase
-      .from("documents")
-      .select("id, file_name, file_path, mime_type, size_bytes, created_at")
-      .order("created_at", { ascending: false });
-    if (error) {
+    const [docsRes, analysesRes] = await Promise.all([
+      supabase
+        .from("documents")
+        .select("id, file_name, file_path, mime_type, size_bytes, created_at")
+        .order("created_at", { ascending: false }),
+      supabase.from("extracted_data").select("document_id, summary, facts, model"),
+    ]);
+    if (docsRes.error) {
       setError("We couldn't load your documents. Refresh the page to try again.");
     } else {
-      setDocuments(data ?? []);
+      setDocuments(docsRes.data ?? []);
+      const map: Record<string, Analysis> = {};
+      for (const row of analysesRes.data ?? []) {
+        map[row.document_id] = {
+          summary: row.summary ?? "",
+          facts: (row.facts as Fact[]) ?? [],
+          model: row.model,
+        };
+      }
+      setAnalyses(map);
     }
     setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -159,6 +193,7 @@ export default function DocumentManager({ userId }: { userId: string }) {
     setDeletingId(doc.id);
     try {
       // Remove the stored file first so nothing lingers, then the record.
+      // extracted_data and alerts cascade-delete with the record.
       const { error: storageError } = await supabase.storage
         .from("documents")
         .remove([doc.file_path]);
@@ -178,12 +213,44 @@ export default function DocumentManager({ userId }: { userId: string }) {
         );
       } else {
         setDocuments((docs) => docs.filter((d) => d.id !== doc.id));
+        setAnalyses((prev) => {
+          const next = { ...prev };
+          delete next[doc.id];
+          return next;
+        });
+        notifyAlertsUpdated();
       }
     } catch {
       setError("Something went wrong while deleting. Please try again.");
     }
     setDeletingId(null);
     setConfirmDeleteId(null);
+  }
+
+  async function handleAnalyze(doc: DocumentRow) {
+    setError(null);
+    setAnalyzingId(doc.id);
+    try {
+      const res = await fetch("/api/documents/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ documentId: doc.id }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        setError(body.error ?? "Analysis failed. Please try again.");
+      } else {
+        setAnalyses((prev) => ({
+          ...prev,
+          [doc.id]: { summary: body.summary, facts: body.facts, model: body.model },
+        }));
+        setExpandedId(doc.id);
+        notifyAlertsUpdated();
+      }
+    } catch {
+      setError("We couldn't reach the analysis service. Check your connection and try again.");
+    }
+    setAnalyzingId(null);
   }
 
   return (
@@ -257,73 +324,144 @@ export default function DocumentManager({ userId }: { userId: string }) {
         </p>
       ) : (
         <ul className="mt-6 divide-y divide-stone-100">
-          {documents.map((doc) => (
-            <li key={doc.id} className="flex items-center gap-3 py-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-light text-brand">
-                {doc.mime_type === "application/pdf" ? (
-                  <FileText className="h-4 w-4" />
-                ) : (
-                  <FileImage className="h-4 w-4" />
+          {documents.map((doc) => {
+            const analysis = analyses[doc.id];
+            const expanded = expandedId === doc.id;
+            return (
+              <li key={doc.id} className="py-3">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-light text-brand">
+                    {doc.mime_type === "application/pdf" ? (
+                      <FileText className="h-4 w-4" />
+                    ) : (
+                      <FileImage className="h-4 w-4" />
+                    )}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{doc.file_name}</p>
+                    <p className="text-xs text-ink-muted">
+                      {ACCEPTED_TYPES[doc.mime_type] ?? doc.mime_type} ·{" "}
+                      {formatSize(doc.size_bytes)} · {formatDate(doc.created_at)}
+                    </p>
+                  </div>
+                  {confirmDeleteId === doc.id ? (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(doc)}
+                        disabled={deletingId === doc.id}
+                        className="inline-flex items-center gap-1.5 rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 disabled:opacity-50"
+                      >
+                        {deletingId === doc.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-3.5 w-3.5" />
+                        )}
+                        Delete permanently
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteId(null)}
+                        aria-label="Cancel delete"
+                        className="rounded-full border border-stone-300 p-1.5 text-ink-muted transition hover:bg-stone-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          analysis
+                            ? setExpandedId(expanded ? null : doc.id)
+                            : handleAnalyze(doc)
+                        }
+                        disabled={analyzingId === doc.id}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-brand/30 bg-brand-light px-3 py-1.5 text-xs font-semibold text-brand-dark transition hover:border-brand focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
+                      >
+                        {analyzingId === doc.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Sparkles className="h-3.5 w-3.5" />
+                        )}
+                        {analyzingId === doc.id
+                          ? "Analyzing…"
+                          : analysis
+                            ? "Analysis"
+                            : "Analyze"}
+                        {analysis && (
+                          <ChevronDown
+                            className={`h-3.5 w-3.5 transition-transform ${expanded ? "rotate-180" : ""}`}
+                          />
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDownload(doc)}
+                        disabled={downloadingId === doc.id}
+                        aria-label={`Download ${doc.file_name}`}
+                        className="rounded-full p-2 text-ink-muted transition hover:bg-stone-100 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
+                      >
+                        {downloadingId === doc.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Download className="h-4 w-4" />
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteId(doc.id)}
+                        aria-label={`Delete ${doc.file_name}`}
+                        className="rounded-full p-2 text-ink-muted transition hover:bg-red-50 hover:text-red-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Analysis panel */}
+                {expanded && analysis && (
+                  <div className="ml-12 mt-3 rounded-xl border border-stone-200 bg-stone-50/60 p-4">
+                    <p className="text-sm leading-relaxed">{analysis.summary}</p>
+                    {analysis.facts.length > 0 && (
+                      <ul className="mt-3 space-y-2">
+                        {analysis.facts.map((fact, i) => (
+                          <li
+                            key={`${fact.label}-${i}`}
+                            className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm"
+                          >
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${SOURCE_BADGE_STYLES[fact.source]}`}
+                            >
+                              {SOURCE_LABELS[fact.source]}
+                            </span>
+                            <span className="font-medium">{fact.label}:</span>
+                            <span className="text-ink-muted">{fact.value}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-xs text-ink-muted">
+                        AI can make mistakes — verify important details against the
+                        original document.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => handleAnalyze(doc)}
+                        disabled={analyzingId === doc.id}
+                        className="text-xs font-semibold text-brand hover:text-brand-dark focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
+                      >
+                        Re-analyze
+                      </button>
+                    </div>
+                  </div>
                 )}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">{doc.file_name}</p>
-                <p className="text-xs text-ink-muted">
-                  {ACCEPTED_TYPES[doc.mime_type] ?? doc.mime_type} ·{" "}
-                  {formatSize(doc.size_bytes)} · {formatDate(doc.created_at)}
-                </p>
-              </div>
-              {confirmDeleteId === doc.id ? (
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(doc)}
-                    disabled={deletingId === doc.id}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 disabled:opacity-50"
-                  >
-                    {deletingId === doc.id ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-3.5 w-3.5" />
-                    )}
-                    Delete permanently
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setConfirmDeleteId(null)}
-                    aria-label="Cancel delete"
-                    className="rounded-full border border-stone-300 p-1.5 text-ink-muted transition hover:bg-stone-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => handleDownload(doc)}
-                    disabled={downloadingId === doc.id}
-                    aria-label={`Download ${doc.file_name}`}
-                    className="rounded-full p-2 text-ink-muted transition hover:bg-stone-100 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
-                  >
-                    {downloadingId === doc.id ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Download className="h-4 w-4" />
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setConfirmDeleteId(doc.id)}
-                    aria-label={`Delete ${doc.file_name}`}
-                    className="rounded-full p-2 text-ink-muted transition hover:bg-red-50 hover:text-red-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              )}
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

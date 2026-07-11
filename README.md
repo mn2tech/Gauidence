@@ -15,17 +15,25 @@ Marketing landing page for **Guardian**, a private vault for the documents you c
 - `/` — landing page with hero, features, and the "Built for the information you cannot afford to lose" security section
 - `/security` — Security Principles: what data is collected, how auth and access separation work, where files are stored, how AI processing works, what is not yet implemented, deletion, and how to report a concern
 - `/login` and `/signup` — email/password plus "Continue with Google" via Supabase Auth
-- `/dashboard` — protected page for signed-in users
+- `/dashboard` — protected document vault: upload, download, AI analysis with source-labeled facts, deadline alerts, and safe deletion
 - `/auth/callback` — OAuth and email-confirmation callback
 
 ## Authentication
 
 Auth is powered by Supabase (email/password + Google OAuth). Setup guide:
 [docs/GOOGLE_AUTH_SETUP.md](docs/GOOGLE_AUTH_SETUP.md). Copy `.env.example`
-to `.env.local` and fill in the Supabase URL and anon key; run
-`supabase/migrations/0001_profiles.sql` in the Supabase SQL Editor. Until the
+to `.env.local` and fill in the Supabase URL and anon key; run the SQL files
+in `supabase/migrations/` (in order) in the Supabase SQL Editor. Until the
 env vars are configured, auth pages show a friendly notice and the rest of the
 site works normally.
+
+## AI analysis
+
+Document analysis uses OpenAI (server-side via `OPENAI_API_KEY`; the key is
+never exposed to the browser). Facts are labeled by source — from the
+document, calculated, or AI-generated — and future deadline dates become
+dismissible alerts on the dashboard. Without the key configured, the Analyze
+button returns a friendly "not set up yet" message.
 
 ## Getting started
 
