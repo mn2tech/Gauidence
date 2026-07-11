@@ -10,6 +10,7 @@
     "test": "tsx --test src/lib/analysis/__tests__/*.test.ts"
   },
   "dependencies": {
+    "@napi-rs/canvas": "^0.1.100",
     "@sentry/nextjs": "^10.65.0",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.110.2",

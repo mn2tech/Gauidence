@@ -190,7 +190,8 @@ export default function SettingsForm({
           </div>
           <div>
             <label htmlFor="companyName" className="block text-sm font-medium">
-              Company or organization name
+              Company or organization name{" "}
+              <span className="font-normal text-ink-muted">(optional)</span>
             </label>
             <input
               id="companyName"
@@ -200,11 +201,12 @@ export default function SettingsForm({
                 setCompanyName(e.target.value);
                 setNameSaved(false);
               }}
-              placeholder="Optional — used to tell if an invoice is payable or receivable"
+              placeholder="e.g. NM2TECH LLC"
               className={inputClass}
             />
             <p className="mt-1 text-xs text-ink-muted">
-              When you analyze invoices, Guardian compares this to the issuer and billed party.
+              Leave blank if you use Guardian as an individual. If you add a company
+              name, invoice analysis can tell whether you are the payer or the recipient.
             </p>
           </div>
           {nameError && (

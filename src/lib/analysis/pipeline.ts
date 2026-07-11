@@ -17,11 +17,15 @@ import { analyzeReceipt } from "./analyzers/receipt";
 import { analyzeGeneral } from "./analyzers/general";
 import { ANALYSIS_MODEL, type FilePayload, type UserContext } from "./openai";
 import {
+  assessExtractionQuality,
   extractDocumentText,
   isAnalysisDebugEnabled,
   previewText,
   type AnalysisDiagnostic,
+  type ExtractionResult,
 } from "./extract";
+import { transcribeDocument } from "./ocr";
+import { parseInvoiceFromText } from "./invoiceText";
 
 export type PipelineProgress = (status: AnalysisStatus) => Promise<void> | void;
 
@@ -56,9 +60,61 @@ async function runSpecialist(
   }
 }
 
+async function maybeOcrFallback(
+  openai: OpenAI,
+  file: FilePayload,
+  extraction: ExtractionResult
+): Promise<{ extraction: ExtractionResult; ocrText?: string }> {
+  if (extraction.quality >= 0.45) {
+    return { extraction };
+  }
+
+  // Image uploads: treat as OCR source via pageImages empty → file/image path in OCR
+  const ocr = await transcribeDocument({
+    openai,
+    fileName: file.fileName,
+    mimeType: file.mimeType,
+    base64: file.base64,
+    pageImages: extraction.pageImages,
+  });
+
+  const nativeScore = extraction.quality;
+  const ocrScore = ocr.quality;
+  if (ocrScore > nativeScore) {
+    const report = assessExtractionQuality(ocr.text);
+    return {
+      ocrText: ocr.text,
+      extraction: {
+        ...extraction,
+        text: ocr.text,
+        method: "vision_ocr",
+        quality: ocrScore,
+        charCount: ocr.text.length,
+        issues: [...new Set([...extraction.issues, ...ocr.issues, ...report.issues])],
+        estimatedLineRows: report.estimatedLineRows,
+        reason:
+          nativeScore < 0.2
+            ? "Native text layer empty/unusable; used vision OCR transcription of page images."
+            : "Vision OCR scored higher than native extraction; using OCR text.",
+        // Keep page images only if OCR still weak (analyzer may need them)
+        pageImages: ocrScore >= 0.45 ? [] : extraction.pageImages,
+      },
+    };
+  }
+
+  return {
+    ocrText: ocr.text,
+    extraction: {
+      ...extraction,
+      issues: [...extraction.issues, "ocr_not_better_than_native", ...ocr.issues],
+      reason: `${extraction.reason} OCR attempted but did not improve quality.`,
+    },
+  };
+}
+
 /**
- * Extract text → classify → specialist → validate.
- * Does not log document text in production.
+ * Extract text → OCR if needed → classify → specialist → validate.
+ * Does not log full document text in production.
  */
 export async function runAnalysisPipeline(
   file: FilePayload,
@@ -68,22 +124,31 @@ export async function runAnalysisPipeline(
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
   await onProgress?.("extracting");
-  const extraction = await extractDocumentText({
+  let extraction = await extractDocumentText({
     mimeType: file.mimeType,
     base64: file.base64,
     fileName: file.fileName,
   });
 
+  let ocrText: string | undefined;
+  if (extraction.quality < 0.45) {
+    const fallback = await maybeOcrFallback(openai, file, extraction);
+    extraction = fallback.extraction;
+    ocrText = fallback.ocrText;
+  }
+
+  const invoiceAnchors =
+    extraction.text.trim().length > 0
+      ? parseInvoiceFromText(extraction.text)
+      : null;
+
   const enriched: FilePayload = {
     ...file,
     extractedText: extraction.text,
     extraction,
+    pageImages: extraction.pageImages,
+    invoiceAnchors,
   };
-
-  if (extraction.quality < 0.2 && file.mimeType === "application/pdf") {
-    // Continue with file fallback — do not silently pretend extraction is fine.
-    // Specialist still receives the PDF binary via buildFileContent.
-  }
 
   await onProgress?.("classifying");
   const classification = await classifyDocument(openai, enriched);
@@ -109,12 +174,21 @@ export async function runAnalysisPipeline(
     );
   }
 
-  if (extraction.quality > 0 && extraction.quality < 0.45) {
+  if (extraction.quality < 0.45) {
     analysis.warnings.push(
       "Document text extraction quality was low — verify all numbers and dates against the original file."
     );
     analysis.overall_confidence = Math.min(analysis.overall_confidence, 0.7);
+    analysis.guardian_status = "needs_verification";
   }
+
+  // Stash extraction row estimate for completeness checks
+  analysis.specialist = {
+    ...analysis.specialist,
+    __extraction_estimated_line_rows: extraction.estimatedLineRows,
+    __extraction_quality: extraction.quality,
+    __source_text_excerpt: extraction.text.slice(0, 4000),
+  };
 
   const beforeValidation = structuredClone(analysis);
 
@@ -126,8 +200,14 @@ export async function runAnalysisPipeline(
   }
 
   // Strip internal debug payload from specialist before save/display
-  if (analysis.specialist && "__raw_model" in analysis.specialist) {
-    const { __raw_model: _, ...rest } = analysis.specialist;
+  if (analysis.specialist) {
+    const {
+      __raw_model: _r,
+      __extraction_estimated_line_rows: _e,
+      __extraction_quality: _q,
+      __source_text_excerpt: _s,
+      ...rest
+    } = analysis.specialist as Record<string, unknown>;
     analysis.specialist = rest;
   }
 
@@ -139,10 +219,15 @@ export async function runAnalysisPipeline(
   };
 
   if (isAnalysisDebugEnabled()) {
+    const { pageImages, ...extractionSafe } = extraction;
     result.diagnostic = {
-      extraction,
-      classifierInputPreview: previewText(extraction.text || "[no native text]"),
-      specialistInputPreview: previewText(extraction.text || "[file/vision fallback]"),
+      extraction: {
+        ...extractionSafe,
+        pageImageCount: pageImages.length,
+      },
+      classifierInputPreview: previewText(extraction.text || "[no text]"),
+      specialistInputPreview: previewText(extraction.text || "[vision fallback]"),
+      ocrTextPreview: ocrText ? previewText(ocrText) : undefined,
       rawModelJson: rawModelJson ?? beforeValidation.specialist,
       finalJson: {
         document_type: analysis.document_type,

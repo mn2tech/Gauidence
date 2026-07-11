@@ -2,7 +2,8 @@ import "server-only";
 
 import OpenAI from "openai";
 import type { DocumentType } from "./types";
-import type { ExtractionResult } from "./extract";
+import type { ExtractionResult, PageImage } from "./extract";
+import type { ParsedInvoiceAnchors } from "./invoiceText";
 
 export const ANALYSIS_MODEL = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
 
@@ -10,9 +11,12 @@ export type FilePayload = {
   mimeType: string;
   fileName: string;
   base64: string;
-  /** Native-extracted text (preferred for text-layer PDFs). */
+  /** Native or OCR-extracted text (preferred for analysis). */
   extractedText?: string;
   extraction?: ExtractionResult;
+  pageImages?: PageImage[];
+  /** Deterministic anchors parsed from extracted text (invoice). */
+  invoiceAnchors?: ParsedInvoiceAnchors | null;
 };
 
 export type UserContext = {
@@ -23,10 +27,9 @@ export type UserContext = {
 };
 
 /**
- * Prefer native extracted text when quality is good.
- * For PDFs with usable text, do NOT also attach the binary file (avoids
- * digit-loss from the model re-reading a rendered PDF).
- * For images / failed extraction, fall back to file/vision.
+ * Prefer extracted text when quality is good.
+ * For image-only PDFs after OCR, send text only (do not re-send PDF — causes digit loss).
+ * If text is still poor, send page images (preferred) or file/vision fallback.
  */
 export function buildFileContent(
   file: FilePayload,
@@ -41,30 +44,49 @@ export function buildFileContent(
         type: "text",
         text: `${instruction}
 
---- DOCUMENT TEXT (native extraction; preserve numbers, leading zeros, and table columns exactly) ---
+--- DOCUMENT TEXT (preserve numbers, leading zeros, and table columns exactly) ---
 ${text}
 --- END DOCUMENT TEXT ---`,
       },
     ];
   }
 
-  const dataUrl = `data:${file.mimeType};base64,${file.base64}`;
-  const preface = text
-    ? `${instruction}
+  const parts: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [
+    {
+      type: "text",
+      text: text
+        ? `${instruction}
 
-Partial native text (may be incomplete — also inspect the attached file):\n${text.slice(0, 4000)}`
-    : instruction;
-
-  if (file.mimeType === "application/pdf") {
-    return [
-      { type: "text", text: preface },
-      { type: "file", file: { filename: file.fileName, file_data: dataUrl } },
-    ];
-  }
-  return [
-    { type: "text", text: preface },
-    { type: "image_url", image_url: { url: dataUrl } },
+Partial extracted text (may be incomplete — also inspect the attached pages):\n${text.slice(0, 4000)}`
+        : instruction,
+    },
   ];
+
+  const images = file.pageImages?.length
+    ? file.pageImages
+    : file.extraction?.pageImages ?? [];
+
+  if (images.length > 0) {
+    for (const img of images) {
+      parts.push({ type: "text", text: `--- Page ${img.page} ---` });
+      parts.push({
+        type: "image_url",
+        image_url: { url: img.dataUrl, detail: "high" },
+      });
+    }
+    return parts;
+  }
+
+  const dataUrl = `data:${file.mimeType};base64,${file.base64}`;
+  if (file.mimeType === "application/pdf") {
+    parts.push({
+      type: "file",
+      file: { filename: file.fileName, file_data: dataUrl },
+    });
+    return parts;
+  }
+  parts.push({ type: "image_url", image_url: { url: dataUrl, detail: "high" } });
+  return parts;
 }
 
 export async function runStructuredJson<T>(
@@ -90,6 +112,7 @@ export async function runStructuredJson<T>(
         schema: args.schema,
       },
     },
+    temperature: 0,
   });
   return JSON.parse(completion.choices[0].message.content ?? "{}") as T;
 }

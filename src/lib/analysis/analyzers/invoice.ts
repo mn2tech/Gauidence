@@ -91,7 +91,7 @@ const SCHEMA = {
 } as const;
 
 const SYSTEM = `You are Guardian's Invoice Analyzer.
-You receive NATIVE DOCUMENT TEXT when available. Trust that text's digits exactly — do not drop digits (e.g. 16128 must not become 1628).
+You receive DOCUMENT TEXT (native or OCR transcription) when available. Trust that text's digits exactly — do not drop digits (e.g. 16128 must not become 1628; 71628 must not become 712.62).
 
 Critical rules:
 1) Invoice number: ONLY values next to "Invoice #", "Invoice No.", "Invoice Number", or "Invoice ID".
@@ -100,13 +100,16 @@ Critical rules:
    If unreliable, return null.
 2) Dates: Prefer explicitly labeled "Date" / "Invoice Date" and "Due" / "Due Date". ISO YYYY-MM-DD.
    Do NOT invent or recalculate a due date when an explicit due date exists.
+   Do NOT derive due date from invoice date + payment terms when an explicit Due date is present.
 3) Line items: Keep columns aligned — contractor | description | hours | rate | amount.
    Never shift values between columns. amount is the line total for that row.
+   Extract EVERY line-item row present in the text. Do not omit contractors.
 4) total_amount_due: ONLY from "Total Due", "Total Amount Due", "Amount Due", "Balance Due", "Grand Total", or final Total.
    NEVER use a single line amount or rate as the invoice total.
 5) Leave facts/important_dates/amounts empty — specialist fields are authoritative.
 6) payment_status stays "unknown" unless explicitly stated.
 7) Do NOT invent payment_direction.`;
+
 
 function asNumber(v: unknown): number | null {
   if (typeof v === "number" && Number.isFinite(v)) return v;
@@ -144,6 +147,90 @@ function normalizeLineItems(raw: unknown): Record<string, unknown>[] {
   });
 }
 
+/**
+ * Prefer deterministic labeled values from extracted/OCR text over AI guesses
+ * when the text anchors are present. Does not hardcode fixture values.
+ */
+function reconcileWithAnchors(
+  specialist: Record<string, unknown>,
+  anchors: NonNullable<FilePayload["invoiceAnchors"]>
+): { specialist: Record<string, unknown>; warnings: string[] } {
+  const warnings: string[] = [];
+  const next = { ...specialist };
+
+  if (anchors.invoice_number) {
+    next.invoice_number = anchors.invoice_number;
+    next.invoice_number_confidence = Math.max(
+      Number(next.invoice_number_confidence) || 0,
+      0.95
+    );
+    next.invoice_number_needs_verification = false;
+  }
+
+  // Explicit document dates always win — never keep a calculated substitute
+  if (anchors.explicit_invoice_date && anchors.invoice_date) {
+    if (next.invoice_date && next.invoice_date !== anchors.invoice_date) {
+      warnings.push(
+        `Invoice date from document text (${anchors.invoice_date}) preferred over model value.`
+      );
+    }
+    next.invoice_date = anchors.invoice_date;
+    next.dates_from_explicit_labels = true;
+  }
+  if (anchors.explicit_due_date && anchors.due_date) {
+    if (next.due_date && next.due_date !== anchors.due_date) {
+      warnings.push(
+        `Due date from document text (${anchors.due_date}) preferred over calculated/model value.`
+      );
+    }
+    next.due_date = anchors.due_date;
+    next.dates_from_explicit_labels = true;
+  }
+
+  if (anchors.issuer) {
+    next.issuer = anchors.issuer;
+    next.issuer_confidence = Math.max(Number(next.issuer_confidence) || 0, 0.9);
+  }
+  if (anchors.billed_to) {
+    next.billed_to = anchors.billed_to;
+    next.billed_to_confidence = Math.max(Number(next.billed_to_confidence) || 0, 0.9);
+  }
+
+  if (anchors.subtotal != null) {
+    next.subtotal = anchors.subtotal;
+  }
+  if (anchors.total_amount_due != null) {
+    next.total_amount_due = anchors.total_amount_due;
+    next.total_amount_due_confidence = Math.max(
+      Number(next.total_amount_due_confidence) || 0,
+      0.95
+    );
+  }
+
+  if (anchors.line_items.length > 0) {
+    const modelItems = Array.isArray(next.line_items)
+      ? (next.line_items as Record<string, unknown>[])
+      : [];
+    // Prefer anchor rows when they look more complete
+    if (anchors.line_items.length >= modelItems.length) {
+      next.line_items = anchors.line_items.map((row) => ({
+        contractor: row.contractor,
+        description: row.description,
+        hours: row.hours,
+        rate: row.rate,
+        amount: row.amount,
+        quantity: row.hours,
+        unit_rate: row.rate,
+        line_total: row.amount,
+        person_or_service: row.contractor,
+        confidence: 0.95,
+      }));
+    }
+  }
+
+  return { specialist: next, warnings };
+}
+
 export async function analyzeInvoice(
   openai: OpenAI,
   file: FilePayload,
@@ -153,22 +240,22 @@ export async function analyzeInvoice(
     system: SYSTEM,
     userContent: buildFileContent(
       file,
-      "Analyze this invoice from the provided document text/tables. Copy numbers exactly; do not drop digits."
+      "Analyze this invoice from the provided document text/tables. Copy numbers exactly; do not drop digits. Include every line-item row."
     ),
     schemaName: "invoice_analysis",
     schema: SCHEMA as unknown as Record<string, unknown>,
   });
 
-  const invoiceDate =
+  let invoiceDate =
     typeof parsed.invoice_date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(parsed.invoice_date)
       ? parsed.invoice_date
       : null;
-  const dueDate =
+  let dueDate =
     typeof parsed.due_date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(parsed.due_date)
       ? parsed.due_date
       : null;
 
-  const lineItems = normalizeLineItems(parsed.line_items);
+  let lineItems = normalizeLineItems(parsed.line_items);
 
   const inv = sanitizeInvoiceNumber(
     parsed.invoice_number,
@@ -176,19 +263,12 @@ export async function analyzeInvoice(
     invoiceDate
   );
 
-  const issuer = String(parsed.issuer ?? "");
-  const billedTo = String(parsed.billed_to ?? "");
-  const issuerConf = Number(parsed.issuer_confidence) || 0.8;
-  const billedConf = Number(parsed.billed_to_confidence) || 0.8;
+  let issuer = String(parsed.issuer ?? "");
+  let billedTo = String(parsed.billed_to ?? "");
+  let issuerConf = Number(parsed.issuer_confidence) || 0.8;
+  let billedConf = Number(parsed.billed_to_confidence) || 0.8;
 
-  const direction = resolvePaymentDirection({
-    issuer,
-    billedTo,
-    companyName: user.companyName ?? null,
-    fullName: user.fullName ?? null,
-  });
-
-  const specialist: Record<string, unknown> = {
+  let specialist: Record<string, unknown> = {
     __raw_model: parsed,
     invoice_number: inv.value,
     invoice_number_confidence: inv.confidence,
@@ -213,9 +293,37 @@ export async function analyzeInvoice(
     total_amount_due_label: parsed.total_amount_due_label ?? "",
     currency: parsed.currency ?? "USD",
     line_items: lineItems,
-    payment_direction: direction,
     payment_status: parsed.payment_status ?? "unknown",
   };
+
+  const anchorWarnings: string[] = [];
+  if (file.invoiceAnchors && (file.extraction?.quality ?? 0) >= 0.45) {
+    const reconciled = reconcileWithAnchors(specialist, file.invoiceAnchors);
+    specialist = reconciled.specialist;
+    anchorWarnings.push(...reconciled.warnings);
+    invoiceDate = asDateString(specialist.invoice_date);
+    dueDate = asDateString(specialist.due_date);
+    issuer = String(specialist.issuer ?? "");
+    billedTo = String(specialist.billed_to ?? "");
+    issuerConf = Number(specialist.issuer_confidence) || issuerConf;
+    billedConf = Number(specialist.billed_to_confidence) || billedConf;
+    lineItems = normalizeLineItems(specialist.line_items);
+    specialist.line_items = lineItems;
+  }
+
+  const direction = resolvePaymentDirection({
+    issuer,
+    billedTo,
+    companyName: user.companyName ?? null,
+    fullName: user.fullName ?? null,
+  });
+  specialist.payment_direction = direction;
+  specialist.issuer = issuer;
+  specialist.billed_to = billedTo;
+  specialist.issuer_confidence = issuerConf;
+  specialist.billed_to_confidence = billedConf;
+  specialist.issuer_needs_verification = issuerConf < 0.75;
+  specialist.billed_to_needs_verification = billedConf < 0.75;
 
   const analysis = fromModelBase(
     "invoice",
@@ -229,13 +337,11 @@ export async function analyzeInvoice(
     specialist
   );
 
-  // Canonical facts rebuilt after validation (pipeline calls validate next, then
-  // route rebuilds display facts). Seed here for completeness.
   analysis.facts = buildInvoiceCanonicalFacts(specialist);
   analysis.suggested_actions = [suggestionForPaymentDirection(direction)];
 
-  const warnings = [...analysis.warnings];
-  if (inv.warning) warnings.push(inv.warning);
+  const warnings = [...analysis.warnings, ...anchorWarnings];
+  if (inv.warning && !specialist.invoice_number) warnings.push(inv.warning);
   if (issuerConf < 0.75) {
     warnings.push("Issuer name needs verification.");
   }
@@ -244,6 +350,10 @@ export async function analyzeInvoice(
   }
 
   return { ...analysis, warnings };
+}
+
+function asDateString(v: unknown): string | null {
+  return typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
 }
 
 /** Exported for unit tests — pure line-item math helpers live in validate. */

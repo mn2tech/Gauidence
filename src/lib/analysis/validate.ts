@@ -141,6 +141,20 @@ export function validateAnalysis(result: GuardianAnalysis): GuardianAnalysis {
       overall = Math.min(overall, 0.65);
     }
 
+    // Completeness: extracted rows vs estimated rows in source text
+    const estimatedRows = asNumber(specialist.__extraction_estimated_line_rows);
+    if (
+      estimatedRows != null &&
+      estimatedRows >= 3 &&
+      lineItems.length > 0 &&
+      lineItems.length < estimatedRows
+    ) {
+      warnings.push(
+        "Some invoice line items may not have been extracted completely."
+      );
+      overall = Math.min(overall, 0.65);
+    }
+
     // Rebuild invoice facts: document fields + calculated line math (never mix).
     const guardian_status = deriveGuardianStatus(
       { ...result, warnings, overall_confidence: overall, specialist },
