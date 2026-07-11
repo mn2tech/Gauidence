@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import { redirect } from "next/navigation";
-import { ShieldCheck, UserRound } from "lucide-react";
+import Link from "next/link";
+import { Settings, ShieldCheck, UserRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
@@ -63,7 +64,16 @@ export default async function DashboardPage() {
                 <p className="text-sm text-ink-muted">{user.email}</p>
               </div>
             </div>
-            <SignOutButton />
+            <div className="flex items-center gap-3">
+              <Link
+                href="/settings"
+                className="inline-flex items-center gap-2 rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-foreground transition hover:border-stone-400 hover:bg-stone-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+              >
+                <Settings className="h-4 w-4" />
+                Settings
+              </Link>
+              <SignOutButton />
+            </div>
           </div>
 
           <div className="mt-10 space-y-6">

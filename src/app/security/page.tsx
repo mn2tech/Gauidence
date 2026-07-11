@@ -71,8 +71,8 @@ const sections = [
     id: "deleting-data",
     title: "How you can delete your data",
     paragraphs: [
-      "You can delete any document from within the app. Deleting a document removes both its database record and the stored file itself. As document analysis features arrive (extracted data and alerts), they are tied to the document so they are removed along with it.",
-      "If you want your entire account and all associated data removed, contact us at the address below and we will process the request.",
+      "You can delete any document from within the app. Deleting a document removes its database record, the stored file, and the extracted data and alerts tied to it.",
+      "You can also delete your entire account from the Settings page. That permanently removes your account, profile, all uploaded documents and stored files, extracted data, and alerts.",
     ],
   },
   {

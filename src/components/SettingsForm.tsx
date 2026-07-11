@@ -1,0 +1,271 @@
+"use client";
+
+import { useState } from "react";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { AlertTriangle, Check, Loader2, UserRound } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+
+type Props = {
+  userId: string;
+  email: string;
+  initialFullName: string;
+  avatarUrl: string | null;
+};
+
+export default function SettingsForm({
+  userId,
+  email,
+  initialFullName,
+  avatarUrl,
+}: Props) {
+  const supabase = createClient();
+  const router = useRouter();
+
+  const [fullName, setFullName] = useState(initialFullName);
+  const [savingName, setSavingName] = useState(false);
+  const [nameSaved, setNameSaved] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
+
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [savingPassword, setSavingPassword] = useState(false);
+  const [passwordSaved, setPasswordSaved] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+
+  const [confirmText, setConfirmText] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  async function handleSaveName(e: React.FormEvent) {
+    e.preventDefault();
+    if (!supabase) return;
+    setNameError(null);
+    setNameSaved(false);
+    setSavingName(true);
+    const { error } = await supabase
+      .from("profiles")
+      .update({ full_name: fullName.trim(), updated_at: new Date().toISOString() })
+      .eq("id", userId);
+    if (error) {
+      setNameError("We couldn't save your name. Please try again.");
+    } else {
+      setNameSaved(true);
+      router.refresh();
+    }
+    setSavingName(false);
+  }
+
+  async function handleChangePassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (!supabase) return;
+    setPasswordError(null);
+    setPasswordSaved(false);
+    if (newPassword.length < 8) {
+      setPasswordError("Your password needs at least 8 characters.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError("The two passwords don't match.");
+      return;
+    }
+    setSavingPassword(true);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) {
+      setPasswordError(
+        /reauthentication|recent/i.test(error.message)
+          ? "For security, please sign out and sign back in, then try changing your password again."
+          : error.message
+      );
+    } else {
+      setPasswordSaved(true);
+      setNewPassword("");
+      setConfirmPassword("");
+    }
+    setSavingPassword(false);
+  }
+
+  async function handleDeleteAccount() {
+    if (!supabase || confirmText !== "DELETE") return;
+    setDeleteError(null);
+    setDeleting(true);
+    try {
+      const res = await fetch("/api/account/delete", { method: "POST" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setDeleteError(
+          body.error ?? "We couldn't delete your account. Please try again."
+        );
+        setDeleting(false);
+        return;
+      }
+      await supabase.auth.signOut();
+      window.location.assign("/?deleted=1");
+    } catch {
+      setDeleteError("We couldn't reach the server. Check your connection and try again.");
+      setDeleting(false);
+    }
+  }
+
+  const inputClass =
+    "mt-1.5 w-full rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand";
+
+  return (
+    <div className="mt-8 space-y-6">
+      {/* Profile */}
+      <section className="rounded-2xl border border-stone-200 bg-white p-6">
+        <h2 className="text-base font-semibold">Profile</h2>
+        <div className="mt-4 flex items-center gap-4">
+          {avatarUrl ? (
+            <Image
+              src={avatarUrl}
+              alt=""
+              width={48}
+              height={48}
+              className="h-12 w-12 rounded-full border border-stone-200 object-cover"
+              unoptimized
+            />
+          ) : (
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-light text-brand">
+              <UserRound className="h-6 w-6" />
+            </span>
+          )}
+          <div className="text-sm text-ink-muted">
+            <p>{email}</p>
+            <p className="text-xs">
+              Your photo comes from your sign-in provider.
+            </p>
+          </div>
+        </div>
+        <form onSubmit={handleSaveName} className="mt-4">
+          <label htmlFor="fullName" className="block text-sm font-medium">
+            Full name
+          </label>
+          <input
+            id="fullName"
+            type="text"
+            value={fullName}
+            onChange={(e) => {
+              setFullName(e.target.value);
+              setNameSaved(false);
+            }}
+            className={inputClass}
+          />
+          {nameError && (
+            <p role="alert" className="mt-2 text-sm text-red-700">
+              {nameError}
+            </p>
+          )}
+          <button
+            type="submit"
+            disabled={savingName}
+            className="mt-3 inline-flex items-center gap-2 rounded-full bg-brand px-5 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
+          >
+            {savingName ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : nameSaved ? (
+              <Check className="h-4 w-4" />
+            ) : null}
+            {nameSaved ? "Saved" : "Save name"}
+          </button>
+        </form>
+      </section>
+
+      {/* Password */}
+      <section className="rounded-2xl border border-stone-200 bg-white p-6">
+        <h2 className="text-base font-semibold">Password</h2>
+        <p className="mt-1 text-sm text-ink-muted">
+          Change your password — or set one if you signed up with Google, so
+          you can log in either way.
+        </p>
+        <form onSubmit={handleChangePassword} className="mt-4 space-y-4">
+          <div>
+            <label htmlFor="newPassword" className="block text-sm font-medium">
+              New password
+            </label>
+            <input
+              id="newPassword"
+              type="password"
+              autoComplete="new-password"
+              minLength={8}
+              required
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label htmlFor="confirmPassword" className="block text-sm font-medium">
+              Confirm new password
+            </label>
+            <input
+              id="confirmPassword"
+              type="password"
+              autoComplete="new-password"
+              minLength={8}
+              required
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className={inputClass}
+            />
+          </div>
+          {passwordError && (
+            <p role="alert" className="text-sm text-red-700">
+              {passwordError}
+            </p>
+          )}
+          {passwordSaved && (
+            <p role="status" className="text-sm text-brand-dark">
+              Your password has been updated.
+            </p>
+          )}
+          <button
+            type="submit"
+            disabled={savingPassword}
+            className="inline-flex items-center gap-2 rounded-full bg-brand px-5 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
+          >
+            {savingPassword && <Loader2 className="h-4 w-4 animate-spin" />}
+            Update password
+          </button>
+        </form>
+      </section>
+
+      {/* Danger zone */}
+      <section className="rounded-2xl border border-red-200 bg-red-50/40 p-6">
+        <div className="flex items-center gap-2">
+          <AlertTriangle className="h-5 w-5 text-red-600" />
+          <h2 className="text-base font-semibold text-red-800">Delete account</h2>
+        </div>
+        <p className="mt-2 text-sm leading-relaxed text-red-900/80">
+          This permanently removes your account, profile, all uploaded
+          documents and stored files, extracted data, and alerts. It cannot be
+          undone.
+        </p>
+        <label htmlFor="confirmDelete" className="mt-4 block text-sm font-medium text-red-900">
+          Type <span className="font-mono font-bold">DELETE</span> to confirm
+        </label>
+        <input
+          id="confirmDelete"
+          type="text"
+          value={confirmText}
+          onChange={(e) => setConfirmText(e.target.value)}
+          className="mt-1.5 w-full rounded-xl border border-red-300 bg-white px-4 py-2.5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
+        />
+        {deleteError && (
+          <p role="alert" className="mt-2 text-sm text-red-700">
+            {deleteError}
+          </p>
+        )}
+        <button
+          type="button"
+          onClick={handleDeleteAccount}
+          disabled={confirmText !== "DELETE" || deleting}
+          className="mt-4 inline-flex items-center gap-2 rounded-full bg-red-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {deleting && <Loader2 className="h-4 w-4 animate-spin" />}
+          {deleting ? "Deleting your account…" : "Delete my account permanently"}
+        </button>
+      </section>
+    </div>
+  );
+}
