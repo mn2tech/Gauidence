@@ -17,7 +17,14 @@ import {
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { SOURCE_LABELS, type Fact, type FactSource } from "@/lib/analysis";
+import {
+  SOURCE_LABELS,
+  ANALYSIS_STATUS_LABELS,
+  GUARDIAN_STATUS_LABELS,
+  type Fact,
+  type AnalysisStatus,
+  type GuardianStatus,
+} from "@/lib/analysis";
 import { DOCUMENT_CATEGORIES } from "@/lib/categories";
 
 type DocumentRow = {
@@ -28,6 +35,7 @@ type DocumentRow = {
   size_bytes: number;
   created_at: string;
   category: string | null;
+  analysis_status: AnalysisStatus;
 };
 
 type SortKey = "newest" | "oldest" | "name" | "largest";
@@ -43,6 +51,11 @@ type Analysis = {
   summary: string;
   facts: Fact[];
   model: string | null;
+  title?: string | null;
+  documentType?: string | null;
+  guardianStatus?: GuardianStatus | null;
+  overallConfidence?: number | null;
+  classificationConfidence?: number | null;
 };
 
 const ACCEPTED_TYPES: Record<string, string> = {
@@ -53,7 +66,7 @@ const ACCEPTED_TYPES: Record<string, string> = {
 };
 const MAX_SIZE_BYTES = 15 * 1024 * 1024;
 
-const SOURCE_BADGE_STYLES: Record<FactSource, string> = {
+const SOURCE_BADGE_STYLES: Record<Fact["source"], string> = {
   document: "bg-brand-light text-brand-dark",
   calculated: "bg-sky-50 text-sky-700",
   ai_generated: "bg-violet-50 text-violet-700",
@@ -97,6 +110,7 @@ export default function DocumentManager({ userId }: { userId: string }) {
   } | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [analyzingId, setAnalyzingId] = useState<string | null>(null);
+  const [progressLabel, setProgressLabel] = useState<string | null>(null);
 
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -110,20 +124,36 @@ export default function DocumentManager({ userId }: { userId: string }) {
     const [docsRes, analysesRes] = await Promise.all([
       supabase
         .from("documents")
-        .select("id, file_name, file_path, mime_type, size_bytes, created_at, category")
+        .select(
+          "id, file_name, file_path, mime_type, size_bytes, created_at, category, analysis_status"
+        )
         .order("created_at", { ascending: false }),
-      supabase.from("extracted_data").select("document_id, summary, facts, model"),
+      supabase
+        .from("extracted_data")
+        .select(
+          "document_id, summary, facts, model, title, document_type, guardian_status, overall_confidence, classification_confidence"
+        ),
     ]);
     if (docsRes.error) {
       setError("We couldn't load your documents. Refresh the page to try again.");
     } else {
-      setDocuments(docsRes.data ?? []);
+      setDocuments(
+        (docsRes.data ?? []).map((d) => ({
+          ...d,
+          analysis_status: (d.analysis_status as AnalysisStatus) ?? "uploaded",
+        }))
+      );
       const map: Record<string, Analysis> = {};
       for (const row of analysesRes.data ?? []) {
         map[row.document_id] = {
           summary: row.summary ?? "",
           facts: (row.facts as Fact[]) ?? [],
           model: row.model,
+          title: row.title,
+          documentType: row.document_type,
+          guardianStatus: row.guardian_status as GuardianStatus | null,
+          overallConfidence: row.overall_confidence,
+          classificationConfidence: row.classification_confidence,
         };
       }
       setAnalyses(map);
@@ -168,14 +198,19 @@ export default function DocumentManager({ userId }: { userId: string }) {
         return;
       }
 
-      const { error: insertError } = await supabase.from("documents").insert({
-        user_id: userId,
-        file_name: file.name,
-        file_path: path,
-        mime_type: file.type,
-        size_bytes: file.size,
-      });
-      if (insertError) {
+      const { data: inserted, error: insertError } = await supabase
+        .from("documents")
+        .insert({
+          user_id: userId,
+          file_name: file.name,
+          file_path: path,
+          mime_type: file.type,
+          size_bytes: file.size,
+          analysis_status: "uploaded",
+        })
+        .select("id, file_name, file_path, mime_type, size_bytes, created_at, category, analysis_status")
+        .single();
+      if (insertError || !inserted) {
         // Don't leave an orphaned file behind if the record failed.
         await supabase.storage.from("documents").remove([path]);
         setError("We couldn't save the document record. Please try again.");
@@ -184,6 +219,14 @@ export default function DocumentManager({ userId }: { userId: string }) {
       }
 
       await loadDocuments();
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      // Auto-analyze once after upload — not on every page load.
+      void handleAnalyze({
+        ...inserted,
+        analysis_status: (inserted.analysis_status as AnalysisStatus) ?? "uploaded",
+      });
+      return;
     } catch {
       setError("Something went wrong during upload. Check your connection and try again.");
     }
@@ -337,23 +380,75 @@ export default function DocumentManager({ userId }: { userId: string }) {
   async function handleAnalyze(doc: DocumentRow) {
     setError(null);
     setAnalyzingId(doc.id);
+    setProgressLabel(ANALYSIS_STATUS_LABELS.extracting);
+    setDocuments((docs) =>
+      docs.map((d) =>
+        d.id === doc.id ? { ...d, analysis_status: "extracting" } : d
+      )
+    );
+
+    const stages: AnalysisStatus[] = [
+      "extracting",
+      "classifying",
+      "analyzing",
+      "validating",
+    ];
+    let stageIdx = 0;
+    const progressTimer = window.setInterval(() => {
+      stageIdx = Math.min(stageIdx + 1, stages.length - 1);
+      setProgressLabel(ANALYSIS_STATUS_LABELS[stages[stageIdx]]);
+    }, 2500);
+
     try {
       const res = await fetch("/api/documents/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ documentId: doc.id }),
+        body: JSON.stringify({
+          documentId: doc.id,
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        }),
       });
       const body = await res.json();
       if (!res.ok) {
         setError(body.error ?? "Analysis failed. Please try again.");
+        setDocuments((docs) =>
+          docs.map((d) =>
+            d.id === doc.id ? { ...d, analysis_status: "failed" } : d
+          )
+        );
       } else {
         setAnalyses((prev) => ({
           ...prev,
-          [doc.id]: { summary: body.summary, facts: body.facts, model: body.model },
+          [doc.id]: {
+            summary: body.summary,
+            facts: body.facts,
+            model: body.model,
+            title: body.title,
+            documentType: body.documentType,
+            guardianStatus: body.guardianStatus,
+            overallConfidence: body.overallConfidence,
+            classificationConfidence: body.classificationConfidence,
+          },
         }));
         if (body.category && !doc.category) {
           setDocuments((docs) =>
-            docs.map((d) => (d.id === doc.id ? { ...d, category: body.category } : d))
+            docs.map((d) =>
+              d.id === doc.id
+                ? {
+                    ...d,
+                    category: body.category,
+                    analysis_status: body.analysisStatus ?? "completed",
+                  }
+                : d
+            )
+          );
+        } else {
+          setDocuments((docs) =>
+            docs.map((d) =>
+              d.id === doc.id
+                ? { ...d, analysis_status: body.analysisStatus ?? "completed" }
+                : d
+            )
           );
         }
         setExpandedId(doc.id);
@@ -361,7 +456,14 @@ export default function DocumentManager({ userId }: { userId: string }) {
       }
     } catch {
       setError("We couldn't reach the analysis service. Check your connection and try again.");
+      setDocuments((docs) =>
+        docs.map((d) =>
+          d.id === doc.id ? { ...d, analysis_status: "failed" } : d
+        )
+      );
     }
+    window.clearInterval(progressTimer);
+    setProgressLabel(null);
     setAnalyzingId(null);
   }
 
@@ -641,11 +743,13 @@ export default function DocumentManager({ userId }: { userId: string }) {
                     <div className="flex flex-wrap items-center gap-1">
                       <button
                         type="button"
-                        onClick={() =>
-                          analysis
-                            ? setExpandedId(expanded ? null : doc.id)
-                            : handleAnalyze(doc)
-                        }
+                        onClick={() => {
+                          if (analysis && doc.analysis_status !== "failed") {
+                            setExpandedId(expanded ? null : doc.id);
+                          } else {
+                            handleAnalyze(doc);
+                          }
+                        }}
                         disabled={analyzingId === doc.id}
                         className="inline-flex items-center gap-1.5 rounded-full border border-brand/30 bg-brand-light px-3 py-1.5 text-xs font-semibold text-brand-dark transition hover:border-brand focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
                       >
@@ -655,11 +759,13 @@ export default function DocumentManager({ userId }: { userId: string }) {
                           <Sparkles className="h-3.5 w-3.5" />
                         )}
                         {analyzingId === doc.id
-                          ? "Analyzing…"
-                          : analysis
-                            ? "Analysis"
-                            : "Analyze"}
-                        {analysis && (
+                          ? progressLabel ?? "Analyzing…"
+                          : doc.analysis_status === "failed"
+                            ? "Try Again"
+                            : analysis
+                              ? "View Analysis"
+                              : "Analyze"}
+                        {analysis && doc.analysis_status !== "failed" && (
                           <ChevronDown
                             className={`h-3.5 w-3.5 transition-transform ${expanded ? "rotate-180" : ""}`}
                           />
@@ -714,7 +820,29 @@ export default function DocumentManager({ userId }: { userId: string }) {
                 {/* Analysis panel */}
                 {expanded && analysis && (
                   <div className="mt-3 rounded-xl border border-stone-200 bg-stone-50/60 p-4 sm:ml-12">
-                    <p className="text-sm leading-relaxed">{analysis.summary}</p>
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      {analysis.guardianStatus && (
+                        <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-brand-dark ring-1 ring-brand/20">
+                          {GUARDIAN_STATUS_LABELS[analysis.guardianStatus]}
+                        </span>
+                      )}
+                      {analysis.documentType && (
+                        <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-ink-muted ring-1 ring-stone-200">
+                          {analysis.documentType.replace(/_/g, " ")}
+                        </span>
+                      )}
+                      {(analysis.classificationConfidence != null &&
+                        analysis.classificationConfidence < 0.8) ||
+                      analysis.guardianStatus === "needs_verification" ? (
+                        <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800 ring-1 ring-amber-200">
+                          Needs verification
+                        </span>
+                      ) : null}
+                    </div>
+                    {analysis.title && (
+                      <p className="text-sm font-semibold">{analysis.title}</p>
+                    )}
+                    <p className="mt-1 text-sm leading-relaxed">{analysis.summary}</p>
                     {analysis.facts.length > 0 && (
                       <ul className="mt-3 space-y-2">
                         {analysis.facts.map((fact, i) => (

@@ -1,85 +1,13 @@
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
 import { createClient } from "@/lib/supabase/server";
-import type { Fact } from "@/lib/analysis";
-import { DOCUMENT_CATEGORIES, isDocumentCategory } from "@/lib/categories";
+import { isDocumentCategory } from "@/lib/categories";
+import { runAnalysisPipeline } from "@/lib/analysis/pipeline";
+import { toDisplayFacts, collectDeadlines } from "@/lib/analysis/display";
+import { documentTypeToCategory } from "@/lib/analysis/openai";
+import type { AnalysisStatus } from "@/lib/analysis/types";
 
-const MODEL = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
 const MAX_ANALYZE_BYTES = 15 * 1024 * 1024;
 const ANALYZE_LIMIT_PER_HOUR = 10;
-
-const EXTRACTION_SCHEMA = {
-  name: "document_extraction",
-  strict: true,
-  schema: {
-    type: "object",
-    additionalProperties: false,
-    properties: {
-      summary: {
-        type: "string",
-        description:
-          "2-3 sentence plain-language summary of what this document is and why it matters.",
-      },
-      facts: {
-        type: "array",
-        description:
-          "Key facts stated LITERALLY in the document: names, numbers, amounts, dates, policy/account identifiers.",
-        items: {
-          type: "object",
-          additionalProperties: false,
-          properties: {
-            label: { type: "string", description: "Short name of the fact." },
-            value: { type: "string", description: "The fact exactly as stated." },
-            date: {
-              type: ["string", "null"],
-              description:
-                "ISO date YYYY-MM-DD if this fact is a specific date stated in the document, otherwise null.",
-            },
-            is_deadline: {
-              type: "boolean",
-              description:
-                "True when the date is something the owner must act on or before (renewal, expiration, due date).",
-            },
-          },
-          required: ["label", "value", "date", "is_deadline"],
-        },
-      },
-      recommendations: {
-        type: "array",
-        description:
-          "1-3 practical suggestions for the document owner. These are AI-generated advice, not document content.",
-        items: { type: "string" },
-      },
-      category: {
-        type: "string",
-        enum: [...DOCUMENT_CATEGORIES],
-        description:
-          "The single category that best fits this document. Use 'Other' when nothing fits well.",
-      },
-    },
-    required: ["summary", "facts", "recommendations", "category"],
-  },
-} as const;
-
-const SYSTEM_PROMPT = `You extract information from personal documents (insurance policies, IDs, leases, letters, bills).
-Rules:
-- "facts" may ONLY contain information literally present in the document. Never infer or invent a fact.
-- If you cannot read the document or it contains no useful facts, return an empty facts list and say so in the summary.
-- Dates must be returned in ISO format (YYYY-MM-DD). Only set is_deadline=true for dates requiring action on or before them.
-- Recommendations are clearly separated advice; keep them practical and short.`;
-
-type ModelFact = {
-  label: string;
-  value: string;
-  date: string | null;
-  is_deadline: boolean;
-};
-
-function daysUntil(iso: string): number {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return Math.round((new Date(iso).getTime() - today.getTime()) / 86_400_000);
-}
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -108,16 +36,18 @@ export async function POST(request: Request) {
   }
 
   let documentId: string | undefined;
+  let timeZone: string | undefined;
   try {
-    ({ documentId } = await request.json());
+    const body = await request.json();
+    documentId = body.documentId;
+    timeZone = typeof body.timeZone === "string" ? body.timeZone : undefined;
   } catch {
-    // fall through to the validation below
+    // fall through
   }
   if (!documentId) {
     return NextResponse.json({ error: "Missing documentId." }, { status: 400 });
   }
 
-  // RLS limits this to the caller's own documents.
   const { data: doc } = await supabase
     .from("documents")
     .select("id, file_name, file_path, mime_type, size_bytes, category")
@@ -165,10 +95,20 @@ export async function POST(request: Request) {
     );
   }
 
+  const setStatus = async (status: AnalysisStatus) => {
+    await supabase
+      .from("documents")
+      .update({ analysis_status: status })
+      .eq("id", doc.id);
+  };
+
+  await setStatus("extracting");
+
   const { data: file, error: downloadError } = await supabase.storage
     .from("documents")
     .download(doc.file_path);
   if (downloadError || !file) {
+    await setStatus("failed");
     return NextResponse.json(
       { error: "We couldn't read the stored file. Try again in a moment." },
       { status: 502 }
@@ -176,125 +116,123 @@ export async function POST(request: Request) {
   }
 
   const base64 = Buffer.from(await file.arrayBuffer()).toString("base64");
-  const dataUrl = `data:${doc.mime_type};base64,${base64}`;
 
-  const userContent: OpenAI.Chat.Completions.ChatCompletionContentPart[] =
-    doc.mime_type === "application/pdf"
-      ? [
-          { type: "text", text: "Extract the key information from this document." },
-          {
-            type: "file",
-            file: { filename: doc.file_name, file_data: dataUrl },
-          },
-        ]
-      : [
-          { type: "text", text: "Extract the key information from this document." },
-          { type: "image_url", image_url: { url: dataUrl } },
-        ];
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name, email")
+    .eq("id", user.id)
+    .maybeSingle();
 
-  let parsed: {
-    summary: string;
-    facts: ModelFact[];
-    recommendations: string[];
-    category?: string;
-  };
   try {
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const completion = await openai.chat.completions.create({
-      model: MODEL,
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: userContent },
-      ],
-      response_format: { type: "json_schema", json_schema: EXTRACTION_SCHEMA },
+    const result = await runAnalysisPipeline(
+      {
+        mimeType: doc.mime_type,
+        fileName: doc.file_name,
+        base64,
+      },
+      {
+        fullName: profile?.full_name ?? null,
+        email: profile?.email ?? user.email ?? null,
+        timeZone: timeZone ?? null,
+      },
+      setStatus
+    );
+
+    const { analysis, classification, routedTo, model } = result;
+    const facts = toDisplayFacts(analysis, timeZone);
+    const finalStatus: AnalysisStatus =
+      analysis.guardian_status === "needs_verification"
+        ? "needs_verification"
+        : "completed";
+
+    const { error: saveError } = await supabase.from("extracted_data").upsert(
+      {
+        document_id: doc.id,
+        user_id: user.id,
+        summary: analysis.summary,
+        facts,
+        model,
+        document_type: analysis.document_type,
+        document_subtype: classification.document_subtype,
+        classification_confidence: classification.classification_confidence,
+        guardian_status: analysis.guardian_status,
+        overall_confidence: analysis.overall_confidence,
+        warnings: analysis.warnings,
+        specialist: {
+          ...analysis.specialist,
+          routed_to: routedTo,
+          classification_reason: classification.classification_reason,
+          people: analysis.people,
+          organizations: analysis.organizations,
+          obligations: analysis.obligations,
+          suggested_actions: analysis.suggested_actions,
+          important_dates: analysis.important_dates,
+          amounts: analysis.amounts,
+        },
+        title: analysis.title,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "document_id" }
+    );
+    if (saveError) {
+      await setStatus("failed");
+      return NextResponse.json(
+        { error: "Analysis finished but couldn't be saved. Please try again." },
+        { status: 500 }
+      );
+    }
+
+    let suggestedCategory: string | null = null;
+    if (!doc.category) {
+      const cat = documentTypeToCategory(analysis.document_type);
+      if (isDocumentCategory(cat)) {
+        const { error: categoryError } = await supabase
+          .from("documents")
+          .update({ category: cat })
+          .eq("id", doc.id);
+        if (!categoryError) suggestedCategory = cat;
+      }
+    }
+
+    const deadlines = collectDeadlines(analysis, doc.file_name);
+    await supabase.from("alerts").delete().eq("document_id", doc.id);
+    if (deadlines.length > 0) {
+      await supabase.from("alerts").insert(
+        deadlines.map((d) => ({
+          document_id: doc.id,
+          user_id: user.id,
+          title: d.title,
+          due_date: d.due_date,
+          source: "document",
+        }))
+      );
+    }
+
+    await setStatus(finalStatus);
+
+    return NextResponse.json({
+      summary: analysis.summary,
+      facts,
+      model,
+      analyzedAt: new Date().toISOString(),
+      category: suggestedCategory,
+      documentType: analysis.document_type,
+      documentSubtype: classification.document_subtype,
+      classificationConfidence: classification.classification_confidence,
+      classificationReason: classification.classification_reason,
+      routedTo,
+      guardianStatus: analysis.guardian_status,
+      overallConfidence: analysis.overall_confidence,
+      title: analysis.title,
+      warnings: analysis.warnings,
+      analysisStatus: finalStatus,
     });
-    parsed = JSON.parse(completion.choices[0].message.content ?? "{}");
   } catch (err) {
-    console.error("OpenAI analysis failed:", err);
+    console.error("Document analysis pipeline failed:", err instanceof Error ? err.name : "error");
+    await setStatus("failed");
     return NextResponse.json(
       { error: "The AI service couldn't analyze this document. Please try again." },
       { status: 502 }
     );
   }
-
-  // Assemble the transparent fact list: document facts as returned, date math
-  // done here in code (calculated), recommendations labeled as AI-generated.
-  const facts: Fact[] = [];
-  const deadlines: { title: string; due_date: string }[] = [];
-
-  for (const f of parsed.facts ?? []) {
-    facts.push({ label: f.label, value: f.value, source: "document", date: f.date });
-    if (f.date && /^\d{4}-\d{2}-\d{2}$/.test(f.date)) {
-      const days = daysUntil(f.date);
-      if (f.is_deadline) {
-        facts.push({
-          label: `${f.label} — time remaining`,
-          value:
-            days > 0
-              ? `${days} day${days === 1 ? "" : "s"} from today`
-              : days === 0
-                ? "Today"
-                : `${Math.abs(days)} day${days === -1 ? "" : "s"} ago`,
-          source: "calculated",
-          date: f.date,
-        });
-        if (days >= 0) {
-          deadlines.push({ title: `${doc.file_name}: ${f.label}`, due_date: f.date });
-        }
-      }
-    }
-  }
-  for (const rec of parsed.recommendations ?? []) {
-    facts.push({ label: "Suggestion", value: rec, source: "ai_generated", date: null });
-  }
-
-  const { error: saveError } = await supabase.from("extracted_data").upsert(
-    {
-      document_id: doc.id,
-      user_id: user.id,
-      summary: parsed.summary ?? "",
-      facts,
-      model: MODEL,
-    },
-    { onConflict: "document_id" }
-  );
-  if (saveError) {
-    return NextResponse.json(
-      { error: "Analysis finished but couldn't be saved. Please try again." },
-      { status: 500 }
-    );
-  }
-
-  // Suggest a category only when the user hasn't set one — a manual choice
-  // is never overwritten.
-  let suggestedCategory: string | null = null;
-  if (!doc.category && parsed.category && isDocumentCategory(parsed.category)) {
-    const { error: categoryError } = await supabase
-      .from("documents")
-      .update({ category: parsed.category })
-      .eq("id", doc.id);
-    if (!categoryError) suggestedCategory = parsed.category;
-  }
-
-  // Replace this document's alerts with the fresh set.
-  await supabase.from("alerts").delete().eq("document_id", doc.id);
-  if (deadlines.length > 0) {
-    await supabase.from("alerts").insert(
-      deadlines.map((d) => ({
-        document_id: doc.id,
-        user_id: user.id,
-        title: d.title,
-        due_date: d.due_date,
-        source: "document",
-      }))
-    );
-  }
-
-  return NextResponse.json({
-    summary: parsed.summary ?? "",
-    facts,
-    model: MODEL,
-    analyzedAt: new Date().toISOString(),
-    category: suggestedCategory,
-  });
 }
