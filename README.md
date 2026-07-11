@@ -1,0 +1,49 @@
+# Guardian — Landing Page
+
+Marketing landing page for **Guardian**, a private vault for the documents you cannot afford to lose. Includes a security-focused landing section and a plain-language [Security Principles](https://guardian-app-delta.vercel.app/security) page.
+
+**Live site:** https://guardian-app-delta.vercel.app
+
+## Stack
+
+- Next.js (App Router) + TypeScript
+- Tailwind CSS v4
+- Lucide icons
+
+## Pages
+
+- `/` — landing page with hero, features, and the "Built for the information you cannot afford to lose" security section
+- `/security` — Security Principles: what data is collected, how auth and access separation work, where files are stored, how AI processing works, what is not yet implemented, deletion, and how to report a concern
+- `/login` and `/signup` — email/password plus "Continue with Google" via Supabase Auth
+- `/dashboard` — protected page for signed-in users
+- `/auth/callback` — OAuth and email-confirmation callback
+
+## Authentication
+
+Auth is powered by Supabase (email/password + Google OAuth). Setup guide:
+[docs/GOOGLE_AUTH_SETUP.md](docs/GOOGLE_AUTH_SETUP.md). Copy `.env.example`
+to `.env.local` and fill in the Supabase URL and anon key; run
+`supabase/migrations/0001_profiles.sql` in the Supabase SQL Editor. Until the
+env vars are configured, auth pages show a friendly notice and the rest of the
+site works normally.
+
+## Getting started
+
+```bash
+npm install
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+## Deploy
+
+The project is linked to Vercel (`guardian-app`). Deploy to production with:
+
+```bash
+vercel --prod
+```
+
+## Content policy
+
+Security copy avoids unverified claims (no end-to-end encryption, HIPAA, SOC 2, "bank-level security", or breach guarantees). Only accurate wording is used: encrypted in transit, protected by authenticated access, user-level access controls. Update `/security` if the underlying implementation changes.
