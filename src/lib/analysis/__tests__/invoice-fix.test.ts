@@ -182,7 +182,7 @@ describe("invoice display dedupe", () => {
 });
 
 describe("invoice validation confidence gate", () => {
-  it("does not emit precise math warning from low-confidence line items", () => {
+  it("flags hours×rate mismatches even when line confidence is low", () => {
     const result = validateAnalysis(
       invoiceBase({
         line_items: [
@@ -199,7 +199,7 @@ describe("invoice validation confidence gate", () => {
         total_amount_due_confidence: 0.9,
       })
     );
-    assert.ok(!result.warnings.some((w) => /does not match quantity/i.test(w)));
-    assert.ok(result.warnings.some((w) => /Line item values need verification/i.test(w)));
+    assert.ok(result.warnings.some((w) => /10 × 100 = 1000/.test(w)));
+    assert.equal(result.specialist.total_amount_due_needs_verification, true);
   });
 });

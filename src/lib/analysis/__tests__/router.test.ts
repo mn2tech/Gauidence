@@ -95,7 +95,8 @@ describe("invoice validation", () => {
         },
       })
     );
-    assert.ok(result.warnings.some((w) => /line item total/i.test(w)));
+    assert.ok(result.warnings.some((w) => /needs verification/i.test(w) && /10 × 100 = 1000/.test(w)));
+    assert.equal(result.specialist.total_amount_due_needs_verification, true);
   });
 
   it("warns when due date precedes invoice date", () => {

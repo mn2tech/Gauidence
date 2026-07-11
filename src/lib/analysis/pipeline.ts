@@ -16,6 +16,12 @@ import { analyzeContract } from "./analyzers/contract";
 import { analyzeReceipt } from "./analyzers/receipt";
 import { analyzeGeneral } from "./analyzers/general";
 import { ANALYSIS_MODEL, type FilePayload, type UserContext } from "./openai";
+import {
+  extractDocumentText,
+  isAnalysisDebugEnabled,
+  previewText,
+  type AnalysisDiagnostic,
+} from "./extract";
 
 export type PipelineProgress = (status: AnalysisStatus) => Promise<void> | void;
 
@@ -24,6 +30,7 @@ export type PipelineResult = {
   routedTo: string;
   analysis: GuardianAnalysis;
   model: string;
+  diagnostic?: AnalysisDiagnostic;
 };
 
 async function runSpecialist(
@@ -32,24 +39,26 @@ async function runSpecialist(
   file: FilePayload,
   user: UserContext,
   classifiedType: Classification["document_type"]
-): Promise<GuardianAnalysis> {
+): Promise<{ analysis: GuardianAnalysis; rawModelJson?: unknown }> {
   switch (type) {
-    case "invoice":
-      return analyzeInvoice(openai, file, user);
+    case "invoice": {
+      const analysis = await analyzeInvoice(openai, file, user);
+      return { analysis, rawModelJson: analysis.specialist.__raw_model };
+    }
     case "insurance":
-      return analyzeInsurance(openai, file);
+      return { analysis: await analyzeInsurance(openai, file) };
     case "contract":
-      return analyzeContract(openai, file);
+      return { analysis: await analyzeContract(openai, file) };
     case "receipt":
-      return analyzeReceipt(openai, file);
+      return { analysis: await analyzeReceipt(openai, file) };
     default:
-      return analyzeGeneral(openai, file, classifiedType);
+      return { analysis: await analyzeGeneral(openai, file, classifiedType) };
   }
 }
 
 /**
- * UPLOAD file bytes already available → classify → specialist → validate.
- * Does not log document text.
+ * Extract text → classify → specialist → validate.
+ * Does not log document text in production.
  */
 export async function runAnalysisPipeline(
   file: FilePayload,
@@ -59,19 +68,36 @@ export async function runAnalysisPipeline(
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
   await onProgress?.("extracting");
-  await onProgress?.("classifying");
-  const classification = await classifyDocument(openai, file);
+  const extraction = await extractDocumentText({
+    mimeType: file.mimeType,
+    base64: file.base64,
+    fileName: file.fileName,
+  });
 
+  const enriched: FilePayload = {
+    ...file,
+    extractedText: extraction.text,
+    extraction,
+  };
+
+  if (extraction.quality < 0.2 && file.mimeType === "application/pdf") {
+    // Continue with file fallback — do not silently pretend extraction is fine.
+    // Specialist still receives the PDF binary via buildFileContent.
+  }
+
+  await onProgress?.("classifying");
+  const classification = await classifyDocument(openai, enriched);
   const routedTo = resolveAnalyzerType(classification, IMPLEMENTED_SPECIALISTS);
 
   await onProgress?.("analyzing");
-  let analysis = await runSpecialist(
+  const { analysis: rawAnalysis, rawModelJson } = await runSpecialist(
     openai,
     routedTo,
-    file,
+    enriched,
     user,
     classification.document_type
   );
+  let analysis = rawAnalysis;
 
   if (classification.classification_confidence < 0.8) {
     analysis.warnings.push(
@@ -83,6 +109,15 @@ export async function runAnalysisPipeline(
     );
   }
 
+  if (extraction.quality > 0 && extraction.quality < 0.45) {
+    analysis.warnings.push(
+      "Document text extraction quality was low — verify all numbers and dates against the original file."
+    );
+    analysis.overall_confidence = Math.min(analysis.overall_confidence, 0.7);
+  }
+
+  const beforeValidation = structuredClone(analysis);
+
   await onProgress?.("validating");
   analysis = validateAnalysis(analysis);
 
@@ -90,10 +125,35 @@ export async function runAnalysisPipeline(
     analysis.guardian_status = "needs_verification";
   }
 
-  return {
+  // Strip internal debug payload from specialist before save/display
+  if (analysis.specialist && "__raw_model" in analysis.specialist) {
+    const { __raw_model: _, ...rest } = analysis.specialist;
+    analysis.specialist = rest;
+  }
+
+  const result: PipelineResult = {
     classification,
     routedTo,
     analysis,
     model: ANALYSIS_MODEL,
   };
+
+  if (isAnalysisDebugEnabled()) {
+    result.diagnostic = {
+      extraction,
+      classifierInputPreview: previewText(extraction.text || "[no native text]"),
+      specialistInputPreview: previewText(extraction.text || "[file/vision fallback]"),
+      rawModelJson: rawModelJson ?? beforeValidation.specialist,
+      finalJson: {
+        document_type: analysis.document_type,
+        specialist: analysis.specialist,
+        facts: analysis.facts,
+        warnings: analysis.warnings,
+        guardian_status: analysis.guardian_status,
+        overall_confidence: analysis.overall_confidence,
+      },
+    };
+  }
+
+  return result;
 }

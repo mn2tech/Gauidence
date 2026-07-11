@@ -49,8 +49,22 @@ export function buildInvoiceCanonicalFacts(
     });
   }
 
-  if (specialist.issuer) push({ label: "Issuer", value: String(specialist.issuer) });
-  if (specialist.billed_to) push({ label: "Billed to", value: String(specialist.billed_to) });
+  if (specialist.issuer) {
+    push({
+      label: "Issuer",
+      value: String(specialist.issuer),
+      confidence: Number(specialist.issuer_confidence) || 0.9,
+      needs_verification: Boolean(specialist.issuer_needs_verification),
+    });
+  }
+  if (specialist.billed_to) {
+    push({
+      label: "Billed to",
+      value: String(specialist.billed_to),
+      confidence: Number(specialist.billed_to_confidence) || 0.9,
+      needs_verification: Boolean(specialist.billed_to_needs_verification),
+    });
+  }
 
   const invoiceDate =
     typeof specialist.invoice_date === "string" ? specialist.invoice_date : null;
@@ -83,12 +97,28 @@ export function buildInvoiceCanonicalFacts(
     `${currency} ${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   const subtotal = asNumber(specialist.subtotal);
-  if (subtotal != null) push({ label: "Subtotal", value: money(subtotal) });
+  const hideSubtotal = Boolean(specialist.subtotal_needs_verification);
+  if (subtotal != null && !hideSubtotal) {
+    push({ label: "Subtotal", value: money(subtotal) });
+  } else if (hideSubtotal) {
+    push({
+      label: "Subtotal",
+      value: "Needs verification",
+      confidence: 0.2,
+      needs_verification: true,
+      source_type: "ai_suggestion",
+    });
+  }
   const tax = asNumber(specialist.tax);
   if (tax != null) push({ label: "Tax", value: money(tax) });
 
   const total = asNumber(specialist.total_amount_due);
-  if (total != null) {
+  const hideTotal =
+    specialist.total_amount_due_display === null ||
+    (Boolean(specialist.total_amount_due_needs_verification) &&
+      (asNumber(specialist.total_amount_due_confidence) ?? 1) < 0.75);
+
+  if (total != null && !hideTotal) {
     push({
       label: "Total amount due",
       value: money(total),

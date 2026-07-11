@@ -227,6 +227,7 @@ export async function POST(request: Request) {
       title: analysis.title,
       warnings: analysis.warnings,
       analysisStatus: finalStatus,
+      ...(result.diagnostic ? { diagnostic: result.diagnostic } : {}),
     });
   } catch (err) {
     console.error("Document analysis pipeline failed:", err instanceof Error ? err.name : "error");

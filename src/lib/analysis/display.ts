@@ -74,10 +74,16 @@ export function toDisplayFacts(
   const now = new Date();
   const out: Fact[] = [];
 
-  // Invoices: specialist fields are canonical — avoid duplicates from generic arrays.
+  // Invoices: specialist canonical fields are authoritative; keep calculated /
+  // verification extras from post-validation facts (never duplicate labels).
   const sourceFacts: ExtractedFact[] =
     analysis.document_type === "invoice"
-      ? buildInvoiceCanonicalFacts(analysis.specialist)
+      ? (() => {
+          const canonical = buildInvoiceCanonicalFacts(analysis.specialist);
+          const keys = new Set(canonical.map((f) => canonicalKey(f.label)));
+          const extras = analysis.facts.filter((f) => !keys.has(canonicalKey(f.label)));
+          return [...canonical, ...extras];
+        })()
       : [
           ...analysis.facts,
           ...analysis.important_dates,

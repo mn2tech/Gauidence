@@ -1,7 +1,7 @@
 import "server-only";
 
 import type OpenAI from "openai";
-import type { GuardianAnalysis } from "../types";
+import type { ExtractedFact, GuardianAnalysis } from "../types";
 import { BASE_ANALYSIS_PROPERTIES, BASE_REQUIRED } from "../schemas";
 import { fromModelBase } from "../normalize";
 import {
@@ -11,33 +11,26 @@ import {
   type UserContext,
 } from "../openai";
 import {
-  looksLikeDateString,
   resolvePaymentDirection,
   suggestionForPaymentDirection,
 } from "../company";
+import { sanitizeInvoiceNumber } from "../invoiceSanitize";
 import { buildInvoiceCanonicalFacts } from "../invoiceDisplay";
+
+export { sanitizeInvoiceNumber };
 
 const LINE_ITEM = {
   type: "object",
   additionalProperties: false,
   properties: {
+    contractor: { type: "string" },
     description: { type: "string" },
-    person_or_service: { type: "string" },
-    quantity: { type: ["number", "null"] },
     hours: { type: ["number", "null"] },
-    unit_rate: { type: ["number", "null"] },
-    line_total: { type: ["number", "null"] },
+    rate: { type: ["number", "null"] },
+    amount: { type: ["number", "null"] },
     confidence: { type: "number" },
   },
-  required: [
-    "description",
-    "person_or_service",
-    "quantity",
-    "hours",
-    "unit_rate",
-    "line_total",
-    "confidence",
-  ],
+  required: ["contractor", "description", "hours", "rate", "amount", "confidence"],
 } as const;
 
 const SCHEMA = {
@@ -50,9 +43,12 @@ const SCHEMA = {
     invoice_number_confidence: { type: "number" },
     invoice_number_source_excerpt: { type: "string" },
     issuer: { type: "string" },
+    issuer_confidence: { type: "number" },
     billed_to: { type: "string" },
+    billed_to_confidence: { type: "number" },
     invoice_date: { type: ["string", "null"] },
     due_date: { type: ["string", "null"] },
+    dates_from_explicit_labels: { type: "boolean" },
     payment_terms: { type: "string" },
     purchase_order: { type: "string" },
     subtotal: { type: ["number", "null"] },
@@ -74,9 +70,12 @@ const SCHEMA = {
     "invoice_number_confidence",
     "invoice_number_source_excerpt",
     "issuer",
+    "issuer_confidence",
     "billed_to",
+    "billed_to_confidence",
     "invoice_date",
     "due_date",
+    "dates_from_explicit_labels",
     "payment_terms",
     "purchase_order",
     "subtotal",
@@ -92,18 +91,22 @@ const SCHEMA = {
 } as const;
 
 const SYSTEM = `You are Guardian's Invoice Analyzer.
-Critical extraction rules:
-1) Invoice number: ONLY take a value next to labels like "Invoice #", "Invoice No.", "Invoice Number", or "Invoice ID".
-   NEVER use a date (including ISO dates like 2026-07-01) as the invoice number unless that exact date-like string is explicitly labeled as the invoice number.
-   If no reliable invoice number is found, return null for invoice_number and set invoice_number_confidence below 0.5.
-2) total_amount_due: ONLY take values labeled "Total Amount Due", "Amount Due", "Balance Due", "Invoice Total", "Grand Total", or a clearly final "Total".
-   NEVER use a line-item total, hourly rate, quantity, or individual service amount as total_amount_due.
-   Prefer the bottom/final total. If multiple candidates conflict, set total_amount_due to null and lower total_amount_due_confidence.
-3) Do not put the same canonical fields into facts/important_dates/amounts — leave those arrays mostly empty for invoices; specialist fields are authoritative.
-4) Dates ISO YYYY-MM-DD. Invoice date is a past event. Due date is a deadline.
-5) payment_status must be "unknown" unless the document explicitly states paid/unpaid/partial.
-6) Never invent corrected amounts. Never claim unpaid without evidence.
-7) Do NOT set payment_direction — the application computes that from the user's saved company profile.`;
+You receive NATIVE DOCUMENT TEXT when available. Trust that text's digits exactly — do not drop digits (e.g. 16128 must not become 1628).
+
+Critical rules:
+1) Invoice number: ONLY values next to "Invoice #", "Invoice No.", "Invoice Number", or "Invoice ID".
+   Preserve leading zeros and # (example shape: #0000016).
+   NEVER use hours, dates, EIN, phone numbers, or amounts as the invoice number.
+   If unreliable, return null.
+2) Dates: Prefer explicitly labeled "Date" / "Invoice Date" and "Due" / "Due Date". ISO YYYY-MM-DD.
+   Do NOT invent or recalculate a due date when an explicit due date exists.
+3) Line items: Keep columns aligned — contractor | description | hours | rate | amount.
+   Never shift values between columns. amount is the line total for that row.
+4) total_amount_due: ONLY from "Total Due", "Total Amount Due", "Amount Due", "Balance Due", "Grand Total", or final Total.
+   NEVER use a single line amount or rate as the invoice total.
+5) Leave facts/important_dates/amounts empty — specialist fields are authoritative.
+6) payment_status stays "unknown" unless explicitly stated.
+7) Do NOT invent payment_direction.`;
 
 function asNumber(v: unknown): number | null {
   if (typeof v === "number" && Number.isFinite(v)) return v;
@@ -114,92 +117,31 @@ function asNumber(v: unknown): number | null {
   return null;
 }
 
-function sanitizeInvoiceNumber(
-  raw: unknown,
-  confidence: number,
-  invoiceDate: string | null
-): { value: string | null; confidence: number; needsVerification: boolean; warning?: string } {
-  if (raw == null || raw === "") {
+function normalizeLineItems(raw: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((item) => {
+    const row = item as Record<string, unknown>;
+    // Support both new and legacy field names from the model
+    const hours = asNumber(row.hours) ?? asNumber(row.quantity);
+    const rate = asNumber(row.rate) ?? asNumber(row.unit_rate);
+    const amount = asNumber(row.amount) ?? asNumber(row.line_total);
+    const contractor =
+      String(row.contractor ?? row.person_or_service ?? "").trim() ||
+      String(row.description ?? "").trim();
     return {
-      value: null,
-      confidence: 0,
-      needsVerification: true,
-      warning: "Invoice number needs verification.",
+      contractor,
+      description: String(row.description ?? ""),
+      hours,
+      rate,
+      amount,
+      // legacy aliases kept for validation helpers
+      quantity: hours,
+      unit_rate: rate,
+      line_total: amount,
+      person_or_service: contractor,
+      confidence: asNumber(row.confidence) ?? 0.5,
     };
-  }
-  const value = String(raw).trim();
-  if (!value) {
-    return {
-      value: null,
-      confidence: 0,
-      needsVerification: true,
-      warning: "Invoice number needs verification.",
-    };
-  }
-  // Reject dates mistaken for invoice numbers.
-  if (looksLikeDateString(value) || (invoiceDate && value === invoiceDate)) {
-    return {
-      value: null,
-      confidence: 0,
-      needsVerification: true,
-      warning: "Invoice number needs verification.",
-    };
-  }
-  if (confidence < 0.75) {
-    return { value, confidence, needsVerification: true };
-  }
-  return { value, confidence, needsVerification: false };
-}
-
-function sanitizeTotal(
-  raw: unknown,
-  confidence: number,
-  label: string,
-  lineItems: Record<string, unknown>[]
-): { value: number | null; confidence: number; needsVerification: boolean; warning?: string } {
-  const total = asNumber(raw);
-  if (total == null) {
-    return {
-      value: null,
-      confidence: Math.min(confidence, 0.4),
-      needsVerification: true,
-      warning: "Total amount due needs verification.",
-    };
-  }
-
-  const lineTotals = lineItems
-    .map((i) => asNumber(i.line_total))
-    .filter((n): n is number => n != null);
-  const rates = lineItems
-    .map((i) => asNumber(i.unit_rate))
-    .filter((n): n is number => n != null);
-
-  // If the "total" equals exactly one line total or a rate and the label is weak, reject.
-  const labelOk = /total amount due|amount due|balance due|invoice total|grand total|^total$/i.test(
-    label.trim() || "total"
-  );
-  const matchesSingleLine =
-    lineTotals.length > 0 && lineTotals.some((lt) => Math.abs(lt - total) < 0.01);
-  const matchesRate = rates.some((r) => Math.abs(r - total) < 0.01);
-
-  if (!labelOk && (matchesSingleLine || matchesRate)) {
-    return {
-      value: null,
-      confidence: 0.3,
-      needsVerification: true,
-      warning: "Total amount due needs verification.",
-    };
-  }
-
-  if (confidence < 0.75 || !labelOk) {
-    return {
-      value: total,
-      confidence: Math.min(confidence, 0.7),
-      needsVerification: true,
-    };
-  }
-
-  return { value: total, confidence, needsVerification: false };
+  });
 }
 
 export async function analyzeInvoice(
@@ -211,7 +153,7 @@ export async function analyzeInvoice(
     system: SYSTEM,
     userContent: buildFileContent(
       file,
-      "Analyze this invoice. Extract specialist fields carefully. Leave facts/important_dates/amounts empty when specialist fields cover them."
+      "Analyze this invoice from the provided document text/tables. Copy numbers exactly; do not drop digits."
     ),
     schemaName: "invoice_analysis",
     schema: SCHEMA as unknown as Record<string, unknown>,
@@ -221,24 +163,24 @@ export async function analyzeInvoice(
     typeof parsed.invoice_date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(parsed.invoice_date)
       ? parsed.invoice_date
       : null;
-  const lineItems = Array.isArray(parsed.line_items)
-    ? (parsed.line_items as Record<string, unknown>[])
-    : [];
+  const dueDate =
+    typeof parsed.due_date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(parsed.due_date)
+      ? parsed.due_date
+      : null;
+
+  const lineItems = normalizeLineItems(parsed.line_items);
 
   const inv = sanitizeInvoiceNumber(
     parsed.invoice_number,
     Number(parsed.invoice_number_confidence) || 0,
     invoiceDate
   );
-  const tot = sanitizeTotal(
-    parsed.total_amount_due,
-    Number(parsed.total_amount_due_confidence) || 0,
-    String(parsed.total_amount_due_label ?? ""),
-    lineItems
-  );
 
   const issuer = String(parsed.issuer ?? "");
   const billedTo = String(parsed.billed_to ?? "");
+  const issuerConf = Number(parsed.issuer_confidence) || 0.8;
+  const billedConf = Number(parsed.billed_to_confidence) || 0.8;
+
   const direction = resolvePaymentDirection({
     issuer,
     billedTo,
@@ -247,22 +189,27 @@ export async function analyzeInvoice(
   });
 
   const specialist: Record<string, unknown> = {
+    __raw_model: parsed,
     invoice_number: inv.value,
     invoice_number_confidence: inv.confidence,
     invoice_number_needs_verification: inv.needsVerification,
     invoice_number_source_excerpt: parsed.invoice_number_source_excerpt ?? "",
     issuer,
+    issuer_confidence: issuerConf,
+    issuer_needs_verification: issuerConf < 0.75,
     billed_to: billedTo,
+    billed_to_confidence: billedConf,
+    billed_to_needs_verification: billedConf < 0.75,
     invoice_date: invoiceDate,
-    due_date: parsed.due_date ?? null,
+    due_date: dueDate,
+    dates_from_explicit_labels: Boolean(parsed.dates_from_explicit_labels),
     payment_terms: parsed.payment_terms ?? "",
     purchase_order: parsed.purchase_order ?? "",
     subtotal: parsed.subtotal ?? null,
     tax: parsed.tax ?? null,
     discount: parsed.discount ?? null,
-    total_amount_due: tot.value,
-    total_amount_due_confidence: tot.confidence,
-    total_amount_due_needs_verification: tot.needsVerification,
+    total_amount_due: parsed.total_amount_due ?? null,
+    total_amount_due_confidence: Number(parsed.total_amount_due_confidence) || 0.5,
     total_amount_due_label: parsed.total_amount_due_label ?? "",
     currency: parsed.currency ?? "USD",
     line_items: lineItems,
@@ -270,7 +217,6 @@ export async function analyzeInvoice(
     payment_status: parsed.payment_status ?? "unknown",
   };
 
-  // Strip AI-emitted duplicate facts; rebuild from specialist only.
   const analysis = fromModelBase(
     "invoice",
     {
@@ -283,29 +229,22 @@ export async function analyzeInvoice(
     specialist
   );
 
+  // Canonical facts rebuilt after validation (pipeline calls validate next, then
+  // route rebuilds display facts). Seed here for completeness.
   analysis.facts = buildInvoiceCanonicalFacts(specialist);
   analysis.suggested_actions = [suggestionForPaymentDirection(direction)];
 
   const warnings = [...analysis.warnings];
   if (inv.warning) warnings.push(inv.warning);
-  if (tot.warning) warnings.push(tot.warning);
-
-  if (
-    specialist.due_date &&
-    typeof specialist.due_date === "string" &&
-    specialist.payment_status === "unknown"
-  ) {
-    const due = specialist.due_date;
-    if (/^\d{4}-\d{2}-\d{2}$/.test(due) && due < new Date().toISOString().slice(0, 10)) {
-      warnings.push(
-        "Appears past its due date based on the invoice date and payment terms. Payment status is unknown."
-      );
-    }
+  if (issuerConf < 0.75) {
+    warnings.push("Issuer name needs verification.");
   }
-
-  if (inv.needsVerification || tot.needsVerification) {
-    analysis.overall_confidence = Math.min(analysis.overall_confidence, 0.7);
+  if (billedConf < 0.75) {
+    warnings.push("Billed-to name needs verification.");
   }
 
   return { ...analysis, warnings };
 }
+
+/** Exported for unit tests — pure line-item math helpers live in validate. */
+export type { ExtractedFact };

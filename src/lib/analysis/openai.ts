@@ -2,6 +2,7 @@ import "server-only";
 
 import OpenAI from "openai";
 import type { DocumentType } from "./types";
+import type { ExtractionResult } from "./extract";
 
 export const ANALYSIS_MODEL = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
 
@@ -9,6 +10,9 @@ export type FilePayload = {
   mimeType: string;
   fileName: string;
   base64: string;
+  /** Native-extracted text (preferred for text-layer PDFs). */
+  extractedText?: string;
+  extraction?: ExtractionResult;
 };
 
 export type UserContext = {
@@ -18,19 +22,47 @@ export type UserContext = {
   timeZone?: string | null;
 };
 
+/**
+ * Prefer native extracted text when quality is good.
+ * For PDFs with usable text, do NOT also attach the binary file (avoids
+ * digit-loss from the model re-reading a rendered PDF).
+ * For images / failed extraction, fall back to file/vision.
+ */
 export function buildFileContent(
   file: FilePayload,
   instruction: string
 ): OpenAI.Chat.Completions.ChatCompletionContentPart[] {
+  const quality = file.extraction?.quality ?? 0;
+  const text = (file.extractedText ?? "").trim();
+
+  if (text && quality >= 0.45) {
+    return [
+      {
+        type: "text",
+        text: `${instruction}
+
+--- DOCUMENT TEXT (native extraction; preserve numbers, leading zeros, and table columns exactly) ---
+${text}
+--- END DOCUMENT TEXT ---`,
+      },
+    ];
+  }
+
   const dataUrl = `data:${file.mimeType};base64,${file.base64}`;
+  const preface = text
+    ? `${instruction}
+
+Partial native text (may be incomplete — also inspect the attached file):\n${text.slice(0, 4000)}`
+    : instruction;
+
   if (file.mimeType === "application/pdf") {
     return [
-      { type: "text", text: instruction },
+      { type: "text", text: preface },
       { type: "file", file: { filename: file.fileName, file_data: dataUrl } },
     ];
   }
   return [
-    { type: "text", text: instruction },
+    { type: "text", text: preface },
     { type: "image_url", image_url: { url: dataUrl } },
   ];
 }
