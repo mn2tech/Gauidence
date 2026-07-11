@@ -4,7 +4,7 @@ import type OpenAI from "openai";
 import type { DocumentType, GuardianAnalysis } from "../types";
 import { BASE_ANALYSIS_PROPERTIES, BASE_REQUIRED } from "../schemas";
 import { fromModelBase } from "../normalize";
-import { buildFileContent, runStructuredJson, type FilePayload } from "../openai";
+import { buildFileContent, modelForInputMode, runStructuredJson, type FilePayload } from "../openai";
 
 /** Stub schemas for types that still route to the general analyzer. */
 export const PASSPORT_FIELDS = [
@@ -78,6 +78,7 @@ export async function analyzeGeneral(
     userContent: buildFileContent(file, `Analyze this document carefully.\n${hint}`),
     schemaName: "general_analysis",
     schema: SCHEMA as unknown as Record<string, unknown>,
+    model: modelForInputMode(file.inputMode),
   });
 
   const specialist = {

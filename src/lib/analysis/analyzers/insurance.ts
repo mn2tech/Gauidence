@@ -4,7 +4,7 @@ import type OpenAI from "openai";
 import type { GuardianAnalysis } from "../types";
 import { BASE_ANALYSIS_PROPERTIES, BASE_REQUIRED } from "../schemas";
 import { fromModelBase } from "../normalize";
-import { buildFileContent, runStructuredJson, type FilePayload } from "../openai";
+import { buildFileContent, modelForInputMode, runStructuredJson, type FilePayload } from "../openai";
 
 const SCHEMA = {
   type: "object",
@@ -61,6 +61,7 @@ export async function analyzeInsurance(
     userContent: buildFileContent(file, "Analyze this insurance document."),
     schemaName: "insurance_analysis",
     schema: SCHEMA as unknown as Record<string, unknown>,
+    model: modelForInputMode(file.inputMode),
   });
 
   const specialist = {

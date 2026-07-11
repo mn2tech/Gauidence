@@ -2,7 +2,7 @@ import "server-only";
 
 import type OpenAI from "openai";
 import type { Classification, DocumentType } from "./types";
-import { buildFileContent, runStructuredJson, type FilePayload } from "./openai";
+import { buildFileContent, modelForInputMode, runStructuredJson, type FilePayload } from "./openai";
 import { resolveAnalyzerType } from "./route";
 
 export { resolveAnalyzerType };
@@ -58,6 +58,7 @@ export async function classifyDocument(
     ),
     schemaName: "document_classification",
     schema: CLASSIFY_SCHEMA as unknown as Record<string, unknown>,
+    model: modelForInputMode(file.inputMode),
   });
 
   const confidence = Math.max(

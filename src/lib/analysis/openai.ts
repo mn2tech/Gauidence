@@ -4,19 +4,33 @@ import OpenAI from "openai";
 import type { DocumentType } from "./types";
 import type { ExtractionResult, PageImage } from "./extract";
 import type { ParsedInvoiceAnchors } from "./invoiceText";
+import type { AnalysisInputMode } from "./inputMode";
 
+/** Default chat model (text + vision capable). Override with OPENAI_MODEL. */
 export const ANALYSIS_MODEL = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
+
+/**
+ * Model used for visual/multimodal document understanding.
+ * Defaults to gpt-4o (stronger layout/digit fidelity than mini).
+ * Override with OPENAI_VISUAL_MODEL or fall back to OPENAI_MODEL.
+ */
+export const VISUAL_ANALYSIS_MODEL =
+  process.env.OPENAI_VISUAL_MODEL ??
+  process.env.OPENAI_MODEL ??
+  "gpt-4o";
 
 export type FilePayload = {
   mimeType: string;
   fileName: string;
   base64: string;
-  /** Native or OCR-extracted text (preferred for analysis). */
+  /** Native extracted text (optional supplement for visual / primary for text mode). */
   extractedText?: string;
   extraction?: ExtractionResult;
   pageImages?: PageImage[];
-  /** Deterministic anchors parsed from extracted text (invoice). */
+  /** Deterministic anchors parsed from high-quality native text only. */
   invoiceAnchors?: ParsedInvoiceAnchors | null;
+  /** How content should be sent to OpenAI. */
+  inputMode?: AnalysisInputMode;
 };
 
 export type UserContext = {
@@ -26,19 +40,43 @@ export type UserContext = {
   timeZone?: string | null;
 };
 
+function appendPageImages(
+  parts: OpenAI.Chat.Completions.ChatCompletionContentPart[],
+  images: PageImage[],
+  maxPages: number
+) {
+  for (const img of images.slice(0, maxPages)) {
+    parts.push({ type: "text", text: `--- Page ${img.page} (visual) ---` });
+    parts.push({
+      type: "image_url",
+      image_url: { url: img.dataUrl, detail: "high" },
+    });
+  }
+}
+
 /**
- * Prefer extracted text when quality is good.
- * For image-only PDFs after OCR, send text only (do not re-send PDF — causes digit loss).
- * If text is still poor, send page images (preferred) or file/vision fallback.
+ * Build multimodal user content for chat.completions.create.
+ *
+ * visual: prefer high-res page images (or original image). Optional short native
+ *   text as a hint only — never text-only for structured visual docs.
+ * text: native text only when reliable.
+ * hybrid: native text + up to 2 page images for tables/ambiguous layout.
+ *
+ * API: OpenAI Chat Completions (openai.chat.completions.create) with
+ * response_format json_schema (strict). Content parts: text | image_url | file.
  */
 export function buildFileContent(
   file: FilePayload,
   instruction: string
 ): OpenAI.Chat.Completions.ChatCompletionContentPart[] {
+  const mode: AnalysisInputMode = file.inputMode ?? "visual";
   const quality = file.extraction?.quality ?? 0;
   const text = (file.extractedText ?? "").trim();
+  const images = file.pageImages?.length
+    ? file.pageImages
+    : file.extraction?.pageImages ?? [];
 
-  if (text && quality >= 0.45) {
+  if (mode === "text" && text && quality >= 0.45) {
     return [
       {
         type: "text",
@@ -51,42 +89,81 @@ ${text}
     ];
   }
 
-  const parts: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [
-    {
-      type: "text",
-      text: text
-        ? `${instruction}
+  if (mode === "hybrid" && text && quality >= 0.45) {
+    const parts: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [
+      {
+        type: "text",
+        text: `${instruction}
 
-Partial extracted text (may be incomplete — also inspect the attached pages):\n${text.slice(0, 4000)}`
-        : instruction,
-    },
-  ];
+Analyze using the document text below. Also inspect the attached page image(s) for tables, forms, stamps, and any values that may be ambiguous in plain text.
 
-  const images = file.pageImages?.length
-    ? file.pageImages
-    : file.extraction?.pageImages ?? [];
-
-  if (images.length > 0) {
-    for (const img of images) {
-      parts.push({ type: "text", text: `--- Page ${img.page} ---` });
-      parts.push({
-        type: "image_url",
-        image_url: { url: img.dataUrl, detail: "high" },
-      });
+--- DOCUMENT TEXT ---
+${text.slice(0, 12000)}
+--- END DOCUMENT TEXT ---`,
+      },
+    ];
+    if (images.length > 0) {
+      appendPageImages(parts, images, 2);
     }
     return parts;
   }
 
-  const dataUrl = `data:${file.mimeType};base64,${file.base64}`;
-  if (file.mimeType === "application/pdf") {
+  // visual (default for structured docs)
+  const parts: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [
+    {
+      type: "text",
+      text: `${instruction}
+
+Analyze the attached visual document page(s). Read tables row-by-row.
+Preserve every digit exactly (do not drop digits). Preserve leading zeros.
+Keep CONTRACTOR | HOURS | RATE | AMOUNT (or equivalent) columns aligned per row.
+Prefer explicitly labeled dates; do not invent or recalculate dates.
+Extract every visible line-item row.`,
+    },
+  ];
+
+  if (text && quality >= 0.45) {
     parts.push({
-      type: "file",
-      file: { filename: file.fileName, file_data: dataUrl },
+      type: "text",
+      text: `Optional native text layer (secondary; trust the visuals if they conflict):\n${text.slice(0, 6000)}`,
+    });
+  }
+
+  if (images.length > 0) {
+    appendPageImages(parts, images, 4);
+    return parts;
+  }
+
+  // Original image upload
+  if (file.mimeType.startsWith("image/")) {
+    parts.push({
+      type: "image_url",
+      image_url: {
+        url: `data:${file.mimeType};base64,${file.base64}`,
+        detail: "high",
+      },
     });
     return parts;
   }
-  parts.push({ type: "image_url", image_url: { url: dataUrl, detail: "high" } });
+
+  // PDF without rendered pages — SDK supports file content parts
+  if (file.mimeType === "application/pdf") {
+    parts.push({
+      type: "file",
+      file: {
+        filename: file.fileName,
+        file_data: `data:${file.mimeType};base64,${file.base64}`,
+      },
+    });
+    return parts;
+  }
+
   return parts;
+}
+
+export function modelForInputMode(mode: AnalysisInputMode | undefined): string {
+  if (mode === "text") return ANALYSIS_MODEL;
+  return VISUAL_ANALYSIS_MODEL;
 }
 
 export async function runStructuredJson<T>(
@@ -96,10 +173,12 @@ export async function runStructuredJson<T>(
     userContent: OpenAI.Chat.Completions.ChatCompletionContentPart[];
     schemaName: string;
     schema: Record<string, unknown>;
+    /** Defaults from input mode / ANALYSIS_MODEL. */
+    model?: string;
   }
 ): Promise<T> {
   const completion = await openai.chat.completions.create({
-    model: ANALYSIS_MODEL,
+    model: args.model ?? ANALYSIS_MODEL,
     messages: [
       { role: "system", content: args.system },
       { role: "user", content: args.userContent },

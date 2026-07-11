@@ -15,9 +15,13 @@ import { analyzeInsurance } from "./analyzers/insurance";
 import { analyzeContract } from "./analyzers/contract";
 import { analyzeReceipt } from "./analyzers/receipt";
 import { analyzeGeneral } from "./analyzers/general";
-import { ANALYSIS_MODEL, type FilePayload, type UserContext } from "./openai";
 import {
-  assessExtractionQuality,
+  ANALYSIS_MODEL,
+  VISUAL_ANALYSIS_MODEL,
+  type FilePayload,
+  type UserContext,
+} from "./openai";
+import {
   extractDocumentText,
   isAnalysisDebugEnabled,
   previewText,
@@ -25,7 +29,13 @@ import {
   type ExtractionResult,
 } from "./extract";
 import { transcribeDocument } from "./ocr";
+import { assessExtractionQuality } from "./extract-quality";
 import { parseInvoiceFromText } from "./invoiceText";
+import {
+  detectDocumentCharacteristics,
+  resolveAnalysisInputMode,
+  type AnalysisInputMode,
+} from "./inputMode";
 
 export type PipelineProgress = (status: AnalysisStatus) => Promise<void> | void;
 
@@ -34,6 +44,7 @@ export type PipelineResult = {
   routedTo: string;
   analysis: GuardianAnalysis;
   model: string;
+  inputMode?: AnalysisInputMode;
   diagnostic?: AnalysisDiagnostic;
 };
 
@@ -60,16 +71,22 @@ async function runSpecialist(
   }
 }
 
+/**
+ * OCR fallback only when visual page images are unavailable and native text is poor.
+ * Visual-primary path skips this — the specialist reads page images directly.
+ */
 async function maybeOcrFallback(
   openai: OpenAI,
   file: FilePayload,
   extraction: ExtractionResult
 ): Promise<{ extraction: ExtractionResult; ocrText?: string }> {
+  if (extraction.pageImages.length > 0) {
+    return { extraction };
+  }
   if (extraction.quality >= 0.45) {
     return { extraction };
   }
 
-  // Image uploads: treat as OCR source via pageImages empty → file/image path in OCR
   const ocr = await transcribeDocument({
     openai,
     fileName: file.fileName,
@@ -93,11 +110,8 @@ async function maybeOcrFallback(
         issues: [...new Set([...extraction.issues, ...ocr.issues, ...report.issues])],
         estimatedLineRows: report.estimatedLineRows,
         reason:
-          nativeScore < 0.2
-            ? "Native text layer empty/unusable; used vision OCR transcription of page images."
-            : "Vision OCR scored higher than native extraction; using OCR text.",
-        // Keep page images only if OCR still weak (analyzer may need them)
-        pageImages: ocrScore >= 0.45 ? [] : extraction.pageImages,
+          "No page images available; used vision OCR transcription as text fallback.",
+        pageImages: [],
       },
     };
   }
@@ -113,7 +127,7 @@ async function maybeOcrFallback(
 }
 
 /**
- * Extract text → OCR if needed → classify → specialist → validate.
+ * Detect → prepare visual/text → multimodal structured analysis → validate.
  * Does not log full document text in production.
  */
 export async function runAnalysisPipeline(
@@ -130,15 +144,32 @@ export async function runAnalysisPipeline(
     fileName: file.fileName,
   });
 
+  const characteristics = detectDocumentCharacteristics({
+    mimeType: file.mimeType,
+    extraction,
+  });
+  const inputMode = resolveAnalysisInputMode(characteristics);
+
   let ocrText: string | undefined;
-  if (extraction.quality < 0.45) {
+  // Visual path: keep page images for multimodal specialist (no OCR flatten).
+  // OCR only if we cannot render pages and native text is unusable.
+  if (inputMode !== "visual" && extraction.quality < 0.45) {
+    const fallback = await maybeOcrFallback(openai, file, extraction);
+    extraction = fallback.extraction;
+    ocrText = fallback.ocrText;
+  } else if (
+    inputMode === "visual" &&
+    extraction.pageImages.length === 0 &&
+    extraction.quality < 0.45
+  ) {
     const fallback = await maybeOcrFallback(openai, file, extraction);
     extraction = fallback.extraction;
     ocrText = fallback.ocrText;
   }
 
+  // Anchors only from reliable native text — never from lossy OCR flatten
   const invoiceAnchors =
-    extraction.text.trim().length > 0
+    extraction.method !== "vision_ocr" && extraction.quality >= 0.45
       ? parseInvoiceFromText(extraction.text)
       : null;
 
@@ -148,6 +179,7 @@ export async function runAnalysisPipeline(
     extraction,
     pageImages: extraction.pageImages,
     invoiceAnchors,
+    inputMode,
   };
 
   await onProgress?.("classifying");
@@ -174,7 +206,8 @@ export async function runAnalysisPipeline(
     );
   }
 
-  if (extraction.quality < 0.45) {
+  // Empty native text is expected for Print-to-PDF when using visual mode.
+  if (inputMode !== "visual" && extraction.quality < 0.45) {
     analysis.warnings.push(
       "Document text extraction quality was low — verify all numbers and dates against the original file."
     );
@@ -182,12 +215,12 @@ export async function runAnalysisPipeline(
     analysis.guardian_status = "needs_verification";
   }
 
-  // Stash extraction row estimate for completeness checks
   analysis.specialist = {
     ...analysis.specialist,
     __extraction_estimated_line_rows: extraction.estimatedLineRows,
     __extraction_quality: extraction.quality,
     __source_text_excerpt: extraction.text.slice(0, 4000),
+    __input_mode: inputMode,
   };
 
   const beforeValidation = structuredClone(analysis);
@@ -199,23 +232,27 @@ export async function runAnalysisPipeline(
     analysis.guardian_status = "needs_verification";
   }
 
-  // Strip internal debug payload from specialist before save/display
   if (analysis.specialist) {
     const {
       __raw_model: _r,
       __extraction_estimated_line_rows: _e,
       __extraction_quality: _q,
       __source_text_excerpt: _s,
+      __input_mode: _m,
       ...rest
     } = analysis.specialist as Record<string, unknown>;
     analysis.specialist = rest;
   }
 
+  const usedModel =
+    inputMode === "text" ? ANALYSIS_MODEL : VISUAL_ANALYSIS_MODEL;
+
   const result: PipelineResult = {
     classification,
     routedTo,
     analysis,
-    model: ANALYSIS_MODEL,
+    model: usedModel,
+    inputMode,
   };
 
   if (isAnalysisDebugEnabled()) {
@@ -225,8 +262,16 @@ export async function runAnalysisPipeline(
         ...extractionSafe,
         pageImageCount: pageImages.length,
       },
-      classifierInputPreview: previewText(extraction.text || "[no text]"),
-      specialistInputPreview: previewText(extraction.text || "[vision fallback]"),
+      classifierInputPreview: previewText(
+        inputMode === "visual"
+          ? `[visual mode — ${pageImages.length} page image(s)]`
+          : extraction.text || "[no text]"
+      ),
+      specialistInputPreview: previewText(
+        inputMode === "visual"
+          ? `[visual multimodal → ${usedModel}]`
+          : extraction.text || "[fallback]"
+      ),
       ocrTextPreview: ocrText ? previewText(ocrText) : undefined,
       rawModelJson: rawModelJson ?? beforeValidation.specialist,
       finalJson: {
@@ -236,6 +281,8 @@ export async function runAnalysisPipeline(
         warnings: analysis.warnings,
         guardian_status: analysis.guardian_status,
         overall_confidence: analysis.overall_confidence,
+        input_mode: inputMode,
+        model: usedModel,
       },
     };
   }

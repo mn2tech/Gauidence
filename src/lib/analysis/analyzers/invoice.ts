@@ -6,6 +6,7 @@ import { BASE_ANALYSIS_PROPERTIES, BASE_REQUIRED } from "../schemas";
 import { fromModelBase } from "../normalize";
 import {
   buildFileContent,
+  modelForInputMode,
   runStructuredJson,
   type FilePayload,
   type UserContext,
@@ -91,7 +92,7 @@ const SCHEMA = {
 } as const;
 
 const SYSTEM = `You are Guardian's Invoice Analyzer.
-You receive DOCUMENT TEXT (native or OCR transcription) when available. Trust that text's digits exactly — do not drop digits (e.g. 16128 must not become 1628; 71628 must not become 712.62).
+You receive the invoice as visual page image(s) and/or document text. Prefer the visual layout for tables and amounts.
 
 Critical rules:
 1) Invoice number: ONLY values next to "Invoice #", "Invoice No.", "Invoice Number", or "Invoice ID".
@@ -103,12 +104,14 @@ Critical rules:
    Do NOT derive due date from invoice date + payment terms when an explicit Due date is present.
 3) Line items: Keep columns aligned — contractor | description | hours | rate | amount.
    Never shift values between columns. amount is the line total for that row.
-   Extract EVERY line-item row present in the text. Do not omit contractors.
+   Extract EVERY visible line-item row. Do not omit contractors.
+   Copy every digit exactly (16128 must not become 1628; 71628 must not become 712.62).
 4) total_amount_due: ONLY from "Total Due", "Total Amount Due", "Amount Due", "Balance Due", "Grand Total", or final Total.
    NEVER use a single line amount or rate as the invoice total.
 5) Leave facts/important_dates/amounts empty — specialist fields are authoritative.
 6) payment_status stays "unknown" unless explicitly stated.
 7) Do NOT invent payment_direction.`;
+
 
 
 function asNumber(v: unknown): number | null {
@@ -240,10 +243,11 @@ export async function analyzeInvoice(
     system: SYSTEM,
     userContent: buildFileContent(
       file,
-      "Analyze this invoice from the provided document text/tables. Copy numbers exactly; do not drop digits. Include every line-item row."
+      "Analyze this invoice visually when page images are attached. Copy numbers exactly; do not drop digits. Include every line-item row."
     ),
     schemaName: "invoice_analysis",
     schema: SCHEMA as unknown as Record<string, unknown>,
+    model: modelForInputMode(file.inputMode),
   });
 
   let invoiceDate =

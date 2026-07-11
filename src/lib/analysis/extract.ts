@@ -183,10 +183,15 @@ export async function extractDocumentText(args: {
         : nativeText;
       const report = assessExtractionQuality(combined);
 
-      const pageImages =
-        report.score < 0.45
-          ? await renderPdfPageImages(bytes, pageCount ?? 1)
-          : [];
+      // Always prepare page images for short PDFs or poor text (visual / hybrid modes).
+      const shouldRenderPages =
+        report.score < 0.45 ||
+        (pageCount != null && pageCount <= 4) ||
+        (pageCount != null && pageCount <= 8 && report.score < 0.7);
+
+      const pageImages = shouldRenderPages
+        ? await renderPdfPageImages(bytes, pageCount ?? 1)
+        : [];
 
       return {
         text: combined,
@@ -200,11 +205,13 @@ export async function extractDocumentText(args: {
         pageImages,
         nativeTextPreview: previewText(combined || "[empty native text layer]", 800),
         reason:
-          report.score >= 0.45
-            ? "Native PDF text layer scored usable; OCR skipped."
-            : pageImages.length > 0
-              ? "Native PDF text missing or poor (likely Print-to-PDF / scan); page images prepared for OCR."
-              : "Native PDF text missing or poor; vision OCR fallback required.",
+          report.score >= 0.45 && pageImages.length === 0
+            ? "Native PDF text layer scored usable; page images not required."
+            : report.score >= 0.45 && pageImages.length > 0
+              ? "Native text available; page images prepared for visual/hybrid analysis."
+              : pageImages.length > 0
+                ? "Native PDF text missing or poor (likely Print-to-PDF / scan); page images prepared for visual analysis."
+                : "Native PDF text missing or poor; visual file fallback required.",
       };
     } catch {
       return {
