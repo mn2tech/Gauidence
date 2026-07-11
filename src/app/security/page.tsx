@@ -71,7 +71,7 @@ const sections = [
     id: "deleting-data",
     title: "How you can delete your data",
     paragraphs: [
-      "You can delete any document from within the app. Deleting a document removes its database record, the extracted data associated with it, any alerts created from it, and the stored file itself.",
+      "You can delete any document from within the app. Deleting a document removes both its database record and the stored file itself. As document analysis features arrive (extracted data and alerts), they are tied to the document so they are removed along with it.",
       "If you want your entire account and all associated data removed, contact us at the address below and we will process the request.",
     ],
   },

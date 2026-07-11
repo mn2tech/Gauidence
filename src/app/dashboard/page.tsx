@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import { redirect } from "next/navigation";
-import { FileText, ShieldCheck, UserRound } from "lucide-react";
+import { ShieldCheck, UserRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 import SignOutButton from "@/components/SignOutButton";
+import DocumentManager from "@/components/DocumentManager";
 
 export const metadata: Metadata = {
   title: "Dashboard — Guardian",
@@ -64,26 +65,17 @@ export default async function DashboardPage() {
             <SignOutButton />
           </div>
 
-          <div className="mt-10 grid gap-6 sm:grid-cols-2">
-            <div className="rounded-2xl border border-stone-200 bg-white p-6">
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-light text-brand">
-                <FileText className="h-5 w-5" />
+          <div className="mt-10 space-y-6">
+            <DocumentManager userId={user.id} />
+            <div className="flex items-start gap-3 rounded-2xl border border-stone-200 bg-white p-5">
+              <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-light text-brand">
+                <ShieldCheck className="h-4 w-4" />
               </span>
-              <h2 className="mt-4 text-base font-semibold">Your documents</h2>
-              <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-                Document upload and analysis are coming in the next sprint.
-                Your vault is ready and private to you.
-              </p>
-            </div>
-            <div className="rounded-2xl border border-stone-200 bg-white p-6">
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-light text-brand">
-                <ShieldCheck className="h-5 w-5" />
-              </span>
-              <h2 className="mt-4 text-base font-semibold">Your data, protected</h2>
-              <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-                Your account is protected by authenticated access and
-                user-level access controls. Only you can see what you store
-                here.
+              <p className="text-sm leading-relaxed text-ink-muted">
+                Your files are private to you: encrypted in transit, protected
+                by authenticated access, and separated by user-level access
+                controls. Deleting a document removes both the stored file and
+                its record.
               </p>
             </div>
           </div>
