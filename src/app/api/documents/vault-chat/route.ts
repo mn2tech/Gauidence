@@ -31,6 +31,13 @@ type ChatMessageRow = {
   created_at: string;
 };
 
+type ChatSummary = {
+  id: string;
+  title: string;
+  updated_at: string;
+  created_at: string;
+};
+
 type Authed = { supabase: SupabaseClient; user: User };
 
 async function requireUser(): Promise<Authed | NextResponse> {
@@ -57,19 +64,47 @@ function isAuthed(v: Authed | NextResponse): v is Authed {
   return !(v instanceof NextResponse);
 }
 
-export async function GET() {
+function titleFromQuestion(question: string): string {
+  const t = question.trim().replace(/\s+/g, " ");
+  if (t.length <= 48) return t || "New chat";
+  return `${t.slice(0, 47)}…`;
+}
+
+async function listChats(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<ChatSummary[]> {
+  const { data } = await supabase
+    .from("vault_chats")
+    .select("id, title, updated_at, created_at")
+    .eq("user_id", userId)
+    .order("updated_at", { ascending: false })
+    .limit(50);
+  return (data ?? []) as ChatSummary[];
+}
+
+/** List threads, or load one thread's messages. */
+export async function GET(request: Request) {
   const auth = await requireUser();
   if (!isAuthed(auth)) return auth;
   const { supabase, user } = auth;
 
+  const chatId = new URL(request.url).searchParams.get("chatId");
+  const chats = await listChats(supabase, user.id);
+
+  if (!chatId) {
+    return NextResponse.json({ chats });
+  }
+
   const { data: chat } = await supabase
     .from("vault_chats")
-    .select("id")
+    .select("id, title")
+    .eq("id", chatId)
     .eq("user_id", user.id)
     .maybeSingle();
 
   if (!chat) {
-    return NextResponse.json({ messages: [] as ChatMessageRow[] });
+    return NextResponse.json({ error: "Chat not found." }, { status: 404 });
   }
 
   const { data: messages, error } = await supabase
@@ -86,11 +121,65 @@ export async function GET() {
   }
 
   return NextResponse.json({
+    chats,
     chatId: chat.id,
+    title: chat.title,
     messages: (messages ?? []) as ChatMessageRow[],
   });
 }
 
+/** Create a blank thread (New chat). */
+export async function PUT() {
+  const auth = await requireUser();
+  if (!isAuthed(auth)) return auth;
+  const { supabase, user } = auth;
+
+  const { data: created, error } = await supabase
+    .from("vault_chats")
+    .insert({ user_id: user.id, title: "New chat" })
+    .select("id, title, updated_at, created_at")
+    .single();
+
+  if (error || !created) {
+    return NextResponse.json(
+      { error: "Couldn't create a new chat." },
+      { status: 502 }
+    );
+  }
+
+  const chats = await listChats(supabase, user.id);
+  return NextResponse.json({ chat: created as ChatSummary, chats });
+}
+
+/** Delete a thread. */
+export async function DELETE(request: Request) {
+  const auth = await requireUser();
+  if (!isAuthed(auth)) return auth;
+  const { supabase, user } = auth;
+
+  const chatId = new URL(request.url).searchParams.get("chatId");
+  if (!chatId) {
+    return NextResponse.json({ error: "Missing chatId." }, { status: 400 });
+  }
+
+  const { error } = await supabase
+    .from("vault_chats")
+    .delete()
+    .eq("id", chatId)
+    .eq("user_id", user.id);
+
+  if (error) {
+    return NextResponse.json(
+      { error: "Couldn't delete chat." },
+      { status: 502 }
+    );
+  }
+
+  const chats = await listChats(supabase, user.id);
+  return NextResponse.json({ chats });
+}
+
+/** Ask a question; pass chatId to continue a thread, or omit to start a new one. */
 export async function POST(request: Request) {
   const auth = await requireUser();
   if (!isAuthed(auth)) return auth;
@@ -117,9 +206,11 @@ export async function POST(request: Request) {
   }
 
   let questionRaw: unknown;
+  let chatIdRaw: unknown;
   try {
     const body = await request.json();
     questionRaw = body.question;
+    chatIdRaw = body.chatId;
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
@@ -189,18 +280,28 @@ export async function POST(request: Request) {
   }
 
   let chatId: string;
-  const { data: existingChat } = await supabase
-    .from("vault_chats")
-    .select("id")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  let isNewChat = false;
+  const requestedId =
+    typeof chatIdRaw === "string" && chatIdRaw.trim() ? chatIdRaw.trim() : null;
 
-  if (existingChat) {
+  if (requestedId) {
+    const { data: existingChat } = await supabase
+      .from("vault_chats")
+      .select("id, title")
+      .eq("id", requestedId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (!existingChat) {
+      return NextResponse.json({ error: "Chat not found." }, { status: 404 });
+    }
     chatId = existingChat.id;
   } else {
     const { data: created, error: chatError } = await supabase
       .from("vault_chats")
-      .insert({ user_id: user.id })
+      .insert({
+        user_id: user.id,
+        title: titleFromQuestion(question),
+      })
       .select("id")
       .single();
     if (chatError || !created) {
@@ -210,6 +311,7 @@ export async function POST(request: Request) {
       );
     }
     chatId = created.id;
+    isNewChat = true;
   }
 
   const { data: priorMessages } = await supabase
@@ -225,6 +327,14 @@ export async function POST(request: Request) {
       role: m.role as "user" | "assistant",
       content: String(m.content),
     }));
+
+  if (!isNewChat && history.length === 0) {
+    await supabase
+      .from("vault_chats")
+      .update({ title: titleFromQuestion(question) })
+      .eq("id", chatId)
+      .eq("user_id", user.id);
+  }
 
   const { data: userMsg, error: userMsgError } = await supabase
     .from("vault_chat_messages")
@@ -316,8 +426,11 @@ ${formatted.context}
     .update({ updated_at: new Date().toISOString() })
     .eq("id", chatId);
 
+  const chats = await listChats(supabase, user.id);
+
   return NextResponse.json({
     chatId,
+    chats,
     messages: [userMsg, assistantMsg] as ChatMessageRow[],
   });
 }
