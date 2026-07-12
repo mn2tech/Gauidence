@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Loader2, Library, Send } from "lucide-react";
+import Link from "next/link";
+import { ExternalLink, Loader2, Library, Send } from "lucide-react";
 
 type Citation = { documentId: string; fileName: string };
 
@@ -13,13 +14,20 @@ type VaultMessage = {
   created_at: string;
 };
 
-export default function VaultChatPanel() {
+type Props = {
+  /** embedded = dashboard card; page = full /dashboard/chat tab */
+  variant?: "embedded" | "page";
+};
+
+export default function VaultChatPanel({ variant = "embedded" }: Props) {
+  const isPage = variant === "page";
   const [messages, setMessages] = useState<VaultMessage[]>([]);
   const [input, setInput] = useState("");
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const inputId = isPage ? "vault-chat-page-input" : "vault-chat-input";
 
   const loadHistory = useCallback(async () => {
     setLoadingHistory(true);
@@ -102,17 +110,44 @@ export default function VaultChatPanel() {
   };
 
   return (
-    <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-      <div className="mb-2 flex items-center gap-2">
-        <Library className="h-4 w-4 text-brand" />
-        <h2 className="text-base font-semibold">Ask your vault</h2>
+    <div
+      className={
+        isPage
+          ? "flex min-h-[70vh] flex-col rounded-2xl border border-stone-200 bg-white p-5 shadow-sm sm:p-6"
+          : "rounded-2xl border border-stone-200 bg-white p-5 shadow-sm"
+      }
+    >
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Library className="h-4 w-4 text-brand" />
+          <h2 className={isPage ? "text-lg font-semibold" : "text-base font-semibold"}>
+            Ask your vault
+          </h2>
+        </div>
+        {!isPage && (
+          <Link
+            href="/dashboard/chat"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand hover:text-brand-dark focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+          >
+            Open in new tab
+            <ExternalLink className="h-3.5 w-3.5" />
+          </Link>
+        )}
       </div>
       <p className="mb-4 text-xs text-ink-muted">
         Search across your analyzed documents only. Answers cite source files.
         AI can be wrong — verify important details.
       </p>
 
-      <div className="max-h-64 space-y-3 overflow-y-auto rounded-xl bg-stone-50 p-3 ring-1 ring-stone-200">
+      <div
+        className={
+          isPage
+            ? "min-h-0 flex-1 space-y-3 overflow-y-auto rounded-xl bg-stone-50 p-4 ring-1 ring-stone-200"
+            : "max-h-64 space-y-3 overflow-y-auto rounded-xl bg-stone-50 p-3 ring-1 ring-stone-200"
+        }
+      >
         {loadingHistory ? (
           <p className="flex items-center gap-2 text-xs text-ink-muted">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -167,11 +202,11 @@ export default function VaultChatPanel() {
       )}
 
       <form onSubmit={send} className="mt-3 flex gap-2">
-        <label className="sr-only" htmlFor="vault-chat-input">
+        <label className="sr-only" htmlFor={inputId}>
           Ask your vault
         </label>
         <input
-          id="vault-chat-input"
+          id={inputId}
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}

@@ -43,6 +43,9 @@ export default function SiteHeader() {
               <Link href="/dashboard" className="hover:text-foreground">
                 Dashboard
               </Link>
+              <Link href="/dashboard/chat" className="hover:text-foreground">
+                Vault chat
+              </Link>
               <Link
                 href="/settings"
                 className="rounded-full border border-stone-300 bg-white px-4 py-2 font-medium text-foreground transition hover:border-stone-400 hover:bg-stone-50"

@@ -16,6 +16,7 @@ Marketing landing page for **Guardian**, a private vault for the documents you c
 - `/security` — Security Principles: what data is collected, how auth and access separation work, where files are stored, how AI processing works, what is not yet implemented, deletion, and how to report a concern
 - `/login` and `/signup` — email/password plus "Continue with Google" via Supabase Auth
 - `/dashboard` — protected document vault: upload, view in-browser, download, search, category filters, sorting, rename, AI analysis with source-labeled facts (including an AI-suggested category that never overrides a manual choice; limited to 10 analyses per user per hour), ask-your-document chat, ask-your-vault retrieval across analyzed files, deadline alerts, and safe deletion
+- `/dashboard/chat` — full-page Ask your vault chat (same thread; open from the dashboard in a new tab)
 - `/settings` — edit profile name, change/set password, toggle email deadline reminders, and permanently delete your account with all data (requires `SUPABASE_SERVICE_ROLE_KEY`, server-side only)
 - `/auth/callback` — OAuth and email-confirmation callback
 
