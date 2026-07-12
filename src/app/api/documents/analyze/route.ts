@@ -217,6 +217,30 @@ export async function POST(request: Request) {
       );
     }
 
+    // Best-effort vault RAG index (requires OPENAI_API_KEY for embeddings).
+    try {
+      const { indexDocumentForVault } = await import("@/lib/vault/indexDocument");
+      await indexDocumentForVault({
+        supabase,
+        userId: user.id,
+        documentId: doc.id,
+        fileName: doc.file_name,
+        source: {
+          title: analysis.title,
+          summary: analysis.summary,
+          documentType: analysis.document_type,
+          facts,
+          warnings: analysis.warnings,
+          specialist: analysis.specialist,
+        },
+      });
+    } catch (indexErr) {
+      console.error(
+        "Vault index after analyze failed:",
+        indexErr instanceof Error ? indexErr.message : "error"
+      );
+    }
+
     await setStatus(finalStatus);
 
     return NextResponse.json({

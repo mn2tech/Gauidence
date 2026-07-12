@@ -1,0 +1,323 @@
+import { NextResponse } from "next/server";
+import type { User, SupabaseClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/server";
+import {
+  ANALYSIS_MODEL,
+  createLlmClient,
+  runChatCompletion,
+} from "@/lib/analysis/llm";
+import {
+  sanitizeChatQuestion,
+  CHAT_HISTORY_MAX_TURNS,
+} from "@/lib/chat/context";
+import { embedQuery, isVaultEmbeddingConfigured } from "@/lib/vault/embeddings";
+import {
+  formatRetrievalContext,
+  retrieveVaultChunks,
+  VAULT_CHAT_SYSTEM,
+} from "@/lib/vault/indexDocument";
+import { ensureUserVaultIndexed } from "@/lib/vault/ensureIndexed";
+
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
+const CHAT_LIMIT_PER_HOUR = 30;
+
+type ChatMessageRow = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  citations?: { documentId: string; fileName: string }[];
+  created_at: string;
+};
+
+type Authed = { supabase: SupabaseClient; user: User };
+
+async function requireUser(): Promise<Authed | NextResponse> {
+  const supabase = await createClient();
+  if (!supabase) {
+    return NextResponse.json(
+      { error: "Sign-in isn't configured on this deployment." },
+      { status: 503 }
+    );
+  }
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json(
+      { error: "You need to be signed in." },
+      { status: 401 }
+    );
+  }
+  return { supabase, user };
+}
+
+function isAuthed(v: Authed | NextResponse): v is Authed {
+  return !(v instanceof NextResponse);
+}
+
+export async function GET() {
+  const auth = await requireUser();
+  if (!isAuthed(auth)) return auth;
+  const { supabase, user } = auth;
+
+  const { data: chat } = await supabase
+    .from("vault_chats")
+    .select("id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (!chat) {
+    return NextResponse.json({ messages: [] as ChatMessageRow[] });
+  }
+
+  const { data: messages, error } = await supabase
+    .from("vault_chat_messages")
+    .select("id, role, content, citations, created_at")
+    .eq("chat_id", chat.id)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    return NextResponse.json(
+      { error: "Couldn't load vault chat history." },
+      { status: 502 }
+    );
+  }
+
+  return NextResponse.json({
+    chatId: chat.id,
+    messages: (messages ?? []) as ChatMessageRow[],
+  });
+}
+
+export async function POST(request: Request) {
+  const auth = await requireUser();
+  if (!isAuthed(auth)) return auth;
+  const { supabase, user } = auth;
+
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return NextResponse.json(
+      {
+        error:
+          "AI chat isn't set up yet. Add an Anthropic (Claude) API key on this deployment.",
+      },
+      { status: 503 }
+    );
+  }
+
+  if (!isVaultEmbeddingConfigured()) {
+    return NextResponse.json(
+      {
+        error:
+          "Vault search isn't set up yet. Add OPENAI_API_KEY for embeddings (Claude still answers).",
+      },
+      { status: 503 }
+    );
+  }
+
+  let questionRaw: unknown;
+  try {
+    const body = await request.json();
+    questionRaw = body.question;
+  } catch {
+    return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+  }
+
+  const question = sanitizeChatQuestion(questionRaw);
+  if (!question) {
+    return NextResponse.json(
+      { error: "Enter a question about your vault." },
+      { status: 400 }
+    );
+  }
+
+  const hourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const { count, error: countError } = await supabase
+    .from("chat_events")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id)
+    .gte("created_at", hourAgo);
+  if (countError) {
+    return NextResponse.json(
+      { error: "We couldn't start vault chat. Please try again." },
+      { status: 502 }
+    );
+  }
+  if ((count ?? 0) >= CHAT_LIMIT_PER_HOUR) {
+    return NextResponse.json(
+      {
+        error:
+          "You've reached the chat limit for now. Try again in about an hour.",
+      },
+      { status: 429 }
+    );
+  }
+
+  const { error: eventError } = await supabase.from("chat_events").insert({
+    user_id: user.id,
+  });
+  if (eventError) {
+    return NextResponse.json(
+      { error: "We couldn't start vault chat. Please try again." },
+      { status: 502 }
+    );
+  }
+
+  try {
+    await ensureUserVaultIndexed(supabase, user.id);
+  } catch (err) {
+    console.error(
+      "Vault ensure index failed:",
+      err instanceof Error ? err.message : "error"
+    );
+  }
+
+  const { count: chunkCount } = await supabase
+    .from("document_chunks")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id);
+
+  if ((chunkCount ?? 0) === 0) {
+    return NextResponse.json(
+      {
+        error:
+          "Analyze at least one document first so Guardian can search your vault.",
+      },
+      { status: 409 }
+    );
+  }
+
+  let chatId: string;
+  const { data: existingChat } = await supabase
+    .from("vault_chats")
+    .select("id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (existingChat) {
+    chatId = existingChat.id;
+  } else {
+    const { data: created, error: chatError } = await supabase
+      .from("vault_chats")
+      .insert({ user_id: user.id })
+      .select("id")
+      .single();
+    if (chatError || !created) {
+      return NextResponse.json(
+        { error: "Couldn't create vault chat." },
+        { status: 502 }
+      );
+    }
+    chatId = created.id;
+  }
+
+  const { data: priorMessages } = await supabase
+    .from("vault_chat_messages")
+    .select("role, content")
+    .eq("chat_id", chatId)
+    .order("created_at", { ascending: true });
+
+  const history = (priorMessages ?? [])
+    .filter((m) => m.role === "user" || m.role === "assistant")
+    .slice(-CHAT_HISTORY_MAX_TURNS * 2)
+    .map((m) => ({
+      role: m.role as "user" | "assistant",
+      content: String(m.content),
+    }));
+
+  const { data: userMsg, error: userMsgError } = await supabase
+    .from("vault_chat_messages")
+    .insert({
+      chat_id: chatId,
+      user_id: user.id,
+      role: "user",
+      content: question,
+      citations: [],
+    })
+    .select("id, role, content, citations, created_at")
+    .single();
+
+  if (userMsgError || !userMsg) {
+    return NextResponse.json(
+      { error: "Couldn't save your question." },
+      { status: 502 }
+    );
+  }
+
+  let citations: { documentId: string; fileName: string }[] = [];
+  let answer: string;
+
+  try {
+    const queryEmbedding = await embedQuery(question);
+    const chunks = await retrieveVaultChunks(supabase, queryEmbedding, 8);
+    const formatted = formatRetrievalContext(chunks);
+    citations = formatted.citations;
+
+    if (!formatted.context.trim()) {
+      answer =
+        "I couldn't find relevant passages in your vault for that question. Try analyzing more documents or rephrasing.";
+    } else {
+      const client = createLlmClient();
+      const system = `${VAULT_CHAT_SYSTEM}
+
+--- RETRIEVED EXCERPTS (this user's vault only) ---
+${formatted.context}
+--- END EXCERPTS ---`;
+
+      answer = await runChatCompletion(client, {
+        system,
+        model: ANALYSIS_MODEL,
+        messages: [...history, { role: "user", content: question }],
+      });
+      if (!answer) {
+        answer =
+          "I couldn't generate an answer from your vault. Try rephrasing your question.";
+      }
+    }
+  } catch (err) {
+    if (err && typeof err === "object" && "status" in err && "message" in err) {
+      return NextResponse.json(
+        { error: String((err as { message: string }).message) },
+        { status: Number((err as { status: number }).status) || 502 }
+      );
+    }
+    console.error(
+      "Vault chat failed:",
+      err instanceof Error ? err.message : "error"
+    );
+    return NextResponse.json(
+      { error: "Vault search couldn't answer. Please try again." },
+      { status: 502 }
+    );
+  }
+
+  const { data: assistantMsg, error: assistantError } = await supabase
+    .from("vault_chat_messages")
+    .insert({
+      chat_id: chatId,
+      user_id: user.id,
+      role: "assistant",
+      content: answer,
+      citations,
+    })
+    .select("id, role, content, citations, created_at")
+    .single();
+
+  if (assistantError || !assistantMsg) {
+    return NextResponse.json(
+      { error: "Answer generated but couldn't be saved." },
+      { status: 500 }
+    );
+  }
+
+  await supabase
+    .from("vault_chats")
+    .update({ updated_at: new Date().toISOString() })
+    .eq("id", chatId);
+
+  return NextResponse.json({
+    chatId,
+    messages: [userMsg, assistantMsg] as ChatMessageRow[],
+  });
+}

@@ -5,7 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 /**
  * Permanently deletes the calling user's account:
  * stored files, then the auth user (profiles, documents, extracted_data,
- * alerts, and document chats all cascade from auth.users).
+ * alerts, document chats, and vault search chunks all cascade from auth.users).
  */
 export async function POST() {
   const supabase = await createClient();
