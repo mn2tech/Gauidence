@@ -64,7 +64,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
+          redirectTo: `${window.location.origin}/auth/callback?next=/dashboard/chat`,
         },
       });
       if (error) {
@@ -96,13 +96,13 @@ export default function AuthForm({ mode }: { mode: Mode }) {
           password,
           options: {
             data: { full_name: fullName },
-            emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
+            emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard/chat`,
           },
         });
         if (error) {
           setError(error.message);
         } else if (data.session) {
-          router.push("/dashboard");
+          router.push("/dashboard/chat");
           router.refresh();
           return;
         } else {
@@ -122,7 +122,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
               : error.message
           );
         } else {
-          router.push("/dashboard");
+          router.push("/dashboard/chat");
           router.refresh();
           return;
         }

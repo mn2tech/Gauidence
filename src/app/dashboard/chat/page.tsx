@@ -32,7 +32,7 @@ export default async function VaultChatPage() {
             className="mb-6 inline-flex w-fit items-center gap-2 text-sm font-medium text-ink-muted transition hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to dashboard
+            Back to documents
           </Link>
           <VaultChatPanel variant="page" />
         </section>

@@ -40,11 +40,11 @@ export default function SiteHeader() {
           </Link>
           {signedIn ? (
             <>
-              <Link href="/dashboard" className="hover:text-foreground">
-                Dashboard
-              </Link>
               <Link href="/dashboard/chat" className="hover:text-foreground">
                 Vault chat
+              </Link>
+              <Link href="/dashboard" className="hover:text-foreground">
+                Documents
               </Link>
               <Link
                 href="/settings"
