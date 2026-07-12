@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { BellRing, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { daysRelativeTo, formatDisplayDate } from "@/lib/analysis/dates";
+import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
 
 type AlertRow = {
   id: string;
@@ -10,10 +12,13 @@ type AlertRow = {
   due_date: string;
 };
 
-function daysUntil(iso: string): number {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return Math.round((new Date(iso).getTime() - today.getTime()) / 86_400_000);
+function todayEasternIso(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: GUARDIAN_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
 }
 
 function urgencyStyle(days: number) {
@@ -28,7 +33,7 @@ export default function AlertsPanel() {
 
   const loadAlerts = useCallback(async () => {
     if (!supabase) return;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayEasternIso();
     const { data } = await supabase
       .from("alerts")
       .select("id, title, due_date")
@@ -40,37 +45,36 @@ export default function AlertsPanel() {
   }, []);
 
   useEffect(() => {
-    loadAlerts();
-    window.addEventListener("guardian:alerts-updated", loadAlerts);
-    return () => window.removeEventListener("guardian:alerts-updated", loadAlerts);
+    void loadAlerts();
+    const onUpdated = () => void loadAlerts();
+    window.addEventListener("guardian:alerts-updated", onUpdated);
+    return () => window.removeEventListener("guardian:alerts-updated", onUpdated);
   }, [loadAlerts]);
 
-  async function dismiss(id: string) {
+  const dismiss = async (id: string) => {
     if (!supabase) return;
     setAlerts((prev) => prev.filter((a) => a.id !== id));
     await supabase
       .from("alerts")
       .update({ dismissed_at: new Date().toISOString() })
       .eq("id", id);
-  }
+  };
 
   if (alerts.length === 0) return null;
 
   return (
-    <div className="rounded-2xl border border-stone-200 bg-white p-6">
-      <div className="flex items-center gap-2">
-        <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-brand-light text-brand">
-          <BellRing className="h-4 w-4" />
-        </span>
-        <h2 className="text-base font-semibold">Upcoming deadlines</h2>
+    <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+      <div className="mb-3 flex items-center gap-2">
+        <BellRing className="h-4 w-4 text-brand" />
+        <h2 className="text-sm font-semibold">Upcoming deadlines</h2>
       </div>
-      <ul className="mt-4 space-y-2">
+      <ul className="space-y-2">
         {alerts.map((alert) => {
-          const days = daysUntil(alert.due_date);
+          const days = daysRelativeTo(alert.due_date);
           return (
             <li
               key={alert.id}
-              className="flex items-center gap-3 rounded-xl border border-stone-100 bg-stone-50/60 px-4 py-2.5"
+              className="flex items-start gap-3 rounded-xl bg-stone-50 px-3 py-2.5"
             >
               <span
                 className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${urgencyStyle(days)}`}
@@ -80,12 +84,7 @@ export default function AlertsPanel() {
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{alert.title}</p>
                 <p className="text-xs text-ink-muted">
-                  Due{" "}
-                  {new Date(alert.due_date).toLocaleDateString(undefined, {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })}
+                  Due {formatDisplayDate(alert.due_date)}
                 </p>
               </div>
               <button

@@ -34,7 +34,8 @@ const LINE_ITEM = {
   required: ["contractor", "description", "hours", "rate", "amount", "confidence"],
 } as const;
 
-const SCHEMA = {
+/** Shared invoice JSON schema — used by Claude production and compare harness arms. */
+export const INVOICE_ANALYSIS_SCHEMA = {
   type: "object",
   additionalProperties: false,
   properties: {
@@ -91,7 +92,7 @@ const SCHEMA = {
   ],
 } as const;
 
-const SYSTEM = `You are Guardian's Invoice Analyzer.
+export const INVOICE_ANALYSIS_SYSTEM = `You are Guardian's Invoice Analyzer.
 You receive the invoice as visual page image(s) and/or document text. Prefer the visual layout for tables and amounts.
 
 Critical rules:
@@ -111,6 +112,9 @@ Critical rules:
 5) Leave facts/important_dates/amounts empty — specialist fields are authoritative.
 6) payment_status stays "unknown" unless explicitly stated.
 7) Do NOT invent payment_direction.`;
+
+const SCHEMA = INVOICE_ANALYSIS_SCHEMA;
+const SYSTEM = INVOICE_ANALYSIS_SYSTEM;
 
 
 
@@ -234,22 +238,15 @@ function reconcileWithAnchors(
   return { specialist: next, warnings };
 }
 
-export async function analyzeInvoice(
-  client: LlmClient,
+/**
+ * Map a raw model JSON payload into GuardianAnalysis (sanitize, anchors, payment direction).
+ * Shared by production Claude path and the dual-analyzer compare harness.
+ */
+export function materializeInvoiceFromParsed(
+  parsed: Record<string, unknown>,
   file: FilePayload,
   user: UserContext
-): Promise<GuardianAnalysis> {
-  const parsed = await runStructuredJson<Record<string, unknown>>(client, {
-    system: SYSTEM,
-    userContent: buildFileContent(
-      file,
-      "Analyze this invoice visually when page images are attached. Copy numbers exactly; do not drop digits. Include every line-item row."
-    ),
-    schemaName: "invoice_analysis",
-    schema: SCHEMA as unknown as Record<string, unknown>,
-    model: modelForInputMode(file.inputMode),
-  });
-
+): GuardianAnalysis {
   let invoiceDate =
     typeof parsed.invoice_date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(parsed.invoice_date)
       ? parsed.invoice_date
@@ -354,6 +351,25 @@ export async function analyzeInvoice(
   }
 
   return { ...analysis, warnings };
+}
+
+export async function analyzeInvoice(
+  client: LlmClient,
+  file: FilePayload,
+  user: UserContext
+): Promise<GuardianAnalysis> {
+  const parsed = await runStructuredJson<Record<string, unknown>>(client, {
+    system: SYSTEM,
+    userContent: buildFileContent(
+      file,
+      "Analyze this invoice visually when page images are attached. Copy numbers exactly; do not drop digits. Include every line-item row."
+    ),
+    schemaName: "invoice_analysis",
+    schema: SCHEMA as unknown as Record<string, unknown>,
+    model: modelForInputMode(file.inputMode),
+  });
+
+  return materializeInvoiceFromParsed(parsed, file, user);
 }
 
 function asDateString(v: unknown): string | null {

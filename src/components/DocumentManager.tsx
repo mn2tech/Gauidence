@@ -26,6 +26,8 @@ import {
   type GuardianStatus,
 } from "@/lib/analysis";
 import { DOCUMENT_CATEGORIES } from "@/lib/categories";
+import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
+import DocumentChatPanel from "@/components/DocumentChatPanel";
 
 type DocumentRow = {
   id: string;
@@ -79,10 +81,11 @@ function formatSize(bytes: number) {
 }
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString(undefined, {
+  return new Date(iso).toLocaleDateString("en-US", {
     year: "numeric",
     month: "short",
     day: "numeric",
+    timeZone: GUARDIAN_TIME_ZONE,
   });
 }
 
@@ -405,7 +408,7 @@ export default function DocumentManager({ userId }: { userId: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           documentId: doc.id,
-          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          timeZone: GUARDIAN_TIME_ZONE,
         }),
       });
       let body: {
@@ -904,6 +907,13 @@ export default function DocumentManager({ userId }: { userId: string }) {
                         Re-analyze
                       </button>
                     </div>
+                    <DocumentChatPanel
+                      documentId={doc.id}
+                      enabled={
+                        doc.analysis_status === "completed" ||
+                        doc.analysis_status === "needs_verification"
+                      }
+                    />
                   </div>
                 )}
               </li>

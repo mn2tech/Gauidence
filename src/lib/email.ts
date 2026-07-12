@@ -1,6 +1,7 @@
 import "server-only";
 
 import { Resend } from "resend";
+import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
 
 export type ReminderItem = {
   title: string;
@@ -22,7 +23,7 @@ function formatDueDate(isoDate: string) {
     weekday: "long",
     month: "long",
     day: "numeric",
-    timeZone: "UTC",
+    timeZone: GUARDIAN_TIME_ZONE,
   });
 }
 

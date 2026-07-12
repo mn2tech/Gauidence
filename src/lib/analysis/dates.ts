@@ -1,19 +1,28 @@
 /** Date display helpers for Guardian analysis (past vs countdown). */
 
-export function daysRelativeTo(isoDate: string, now = new Date(), timeZone?: string): number {
+import { GUARDIAN_TIME_ZONE } from "../timezone";
+
+export function daysRelativeTo(
+  isoDate: string,
+  now = new Date(),
+  timeZone: string = GUARDIAN_TIME_ZONE
+): number {
   const today = startOfDayInZone(now, timeZone);
   const target = parseIsoDateAsUtcMidnight(isoDate);
   return Math.round((target.getTime() - today.getTime()) / 86_400_000);
 }
 
-export function formatDisplayDate(isoDate: string, timeZone?: string): string {
+export function formatDisplayDate(
+  isoDate: string,
+  timeZone: string = GUARDIAN_TIME_ZONE
+): string {
   const [y, m, d] = isoDate.split("-").map(Number);
   if (!y || !m || !d) return isoDate;
   return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-US", {
     month: "long",
     day: "numeric",
     year: "numeric",
-    timeZone: timeZone ?? "UTC",
+    timeZone,
   });
 }
 
@@ -26,7 +35,7 @@ export function formatDateRelativeLabel(
   isoDate: string,
   kind: "past_event" | "deadline",
   now = new Date(),
-  timeZone?: string
+  timeZone: string = GUARDIAN_TIME_ZONE
 ): string {
   const days = daysRelativeTo(isoDate, now, timeZone);
   const formatted = formatDisplayDate(isoDate, timeZone);
@@ -52,16 +61,7 @@ function parseIsoDateAsUtcMidnight(isoDate: string): Date {
   return new Date(Date.UTC(y, m - 1, d));
 }
 
-function startOfDayInZone(now: Date, timeZone?: string): Date {
-  if (!timeZone) {
-    const t = new Date(now);
-    t.setHours(0, 0, 0, 0);
-    // Convert local midnight to a comparable UTC date string day
-    const y = t.getFullYear();
-    const m = t.getMonth();
-    const d = t.getDate();
-    return new Date(Date.UTC(y, m, d));
-  }
+function startOfDayInZone(now: Date, timeZone: string): Date {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone,
     year: "numeric",

@@ -5,6 +5,7 @@ import { runAnalysisPipeline } from "@/lib/analysis/pipeline";
 import { toDisplayFacts, collectDeadlines } from "@/lib/analysis/display";
 import { documentTypeToCategory } from "@/lib/analysis/llm";
 import type { AnalysisStatus } from "@/lib/analysis/types";
+import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -43,10 +44,14 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     documentId = body.documentId;
-    timeZone = typeof body.timeZone === "string" ? body.timeZone : undefined;
+    timeZone =
+      typeof body.timeZone === "string" && body.timeZone.trim()
+        ? body.timeZone.trim()
+        : GUARDIAN_TIME_ZONE;
   } catch {
     // fall through
   }
+  if (!timeZone) timeZone = GUARDIAN_TIME_ZONE;
   if (!documentId) {
     return NextResponse.json({ error: "Missing documentId." }, { status: 400 });
   }

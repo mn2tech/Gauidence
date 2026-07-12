@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendReminderEmail, type ReminderItem } from "@/lib/email";
+import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
 
 export const dynamic = "force-dynamic";
 
@@ -13,9 +14,18 @@ type AlertRow = {
   reminder_1d_sent_at: string | null;
 };
 
-function todayUtc() {
-  const now = new Date();
-  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+/** Calendar "today" in Eastern Time for reminder windows. */
+function todayEasternMs() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: GUARDIAN_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const y = Number(parts.find((p) => p.type === "year")?.value);
+  const m = Number(parts.find((p) => p.type === "month")?.value);
+  const d = Number(parts.find((p) => p.type === "day")?.value);
+  return Date.UTC(y, m - 1, d);
 }
 
 function daysUntil(isoDate: string, todayMs: number) {
@@ -43,7 +53,7 @@ export async function GET(request: Request) {
     );
   }
 
-  const todayMs = todayUtc();
+  const todayMs = todayEasternMs();
   const todayIso = new Date(todayMs).toISOString().slice(0, 10);
   const windowEndIso = new Date(todayMs + 7 * 86_400_000)
     .toISOString()

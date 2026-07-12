@@ -359,6 +359,34 @@ export async function runPlainText(
   }
 }
 
+/** Multi-turn chat for Ask-your-document (text-only messages). */
+export async function runChatCompletion(
+  client: LlmClient,
+  args: {
+    system: string;
+    messages: { role: "user" | "assistant"; content: string }[];
+    model?: string;
+    maxTokens?: number;
+  }
+): Promise<string> {
+  try {
+    const response = await client.messages.create({
+      model: args.model ?? ANALYSIS_MODEL,
+      max_tokens: args.maxTokens ?? 2048,
+      temperature: 0,
+      system: args.system,
+      messages: args.messages.map((m) => ({
+        role: m.role,
+        content: m.content,
+      })),
+    });
+    const textBlock = response.content.find((b) => b.type === "text");
+    return textBlock && textBlock.type === "text" ? textBlock.text.trim() : "";
+  } catch (err) {
+    mapAnthropicError(err);
+  }
+}
+
 export function documentTypeToCategory(type: DocumentType): string {
   switch (type) {
     case "invoice":
