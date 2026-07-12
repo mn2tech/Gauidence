@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  Camera,
   Check,
   ChevronDown,
   Download,
@@ -28,6 +29,7 @@ import {
 import { DOCUMENT_CATEGORIES } from "@/lib/categories";
 import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
 import DocumentChatPanel from "@/components/DocumentChatPanel";
+import CameraCaptureModal from "@/components/CameraCaptureModal";
 
 type DocumentRow = {
   id: string;
@@ -96,11 +98,13 @@ export function notifyAlertsUpdated() {
 export default function DocumentManager({ userId }: { userId: string }) {
   const supabase = createClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const [documents, setDocuments] = useState<DocumentRow[]>([]);
   const [analyses, setAnalyses] = useState<Record<string, Analysis>>({});
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -169,9 +173,15 @@ export default function DocumentManager({ userId }: { userId: string }) {
     loadDocuments();
   }, [loadDocuments]);
 
-  async function handleFiles(files: FileList | null) {
-    if (!files || files.length === 0 || !supabase) return;
-    const file = files[0];
+  async function handleFiles(files: FileList | File[] | null) {
+    const list = files
+      ? Array.isArray(files)
+        ? files
+        : Array.from(files)
+      : [];
+    if (list.length === 0 || !supabase) return;
+    const file = list[0];
+    if (!file) return;
     setError(null);
 
     if (!ACCEPTED_TYPES[file.type]) {
@@ -224,6 +234,7 @@ export default function DocumentManager({ userId }: { userId: string }) {
       await loadDocuments();
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
+      if (cameraInputRef.current) cameraInputRef.current.value = "";
       // Auto-analyze once after upload — not on every page load.
       void handleAnalyze({
         ...inserted,
@@ -235,6 +246,16 @@ export default function DocumentManager({ userId }: { userId: string }) {
     }
     setUploading(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
+    if (cameraInputRef.current) cameraInputRef.current.value = "";
+  }
+
+  function openCamera() {
+    setError(null);
+    if (typeof navigator !== "undefined" && navigator.mediaDevices?.getUserMedia) {
+      setCameraOpen(true);
+      return;
+    }
+    cameraInputRef.current?.click();
   }
 
   async function handleDownload(doc: DocumentRow) {
@@ -563,17 +584,32 @@ export default function DocumentManager({ userId }: { userId: string }) {
       >
         <UploadCloud className="h-8 w-8 text-brand" />
         <p className="text-sm text-ink-muted">
-          Drag and drop a file here, or
+          Drag and drop, choose a file, or scan with your camera
         </p>
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={uploading}
-          className="inline-flex items-center gap-2 rounded-full bg-brand px-5 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {uploading && <Loader2 className="h-4 w-4 animate-spin" />}
-          {uploading ? "Uploading…" : "Choose a file"}
-        </button>
+        <p className="max-w-sm text-xs text-ink-muted">
+          Business cards, receipts, invoices, IDs, and other paper documents
+          work well as photos.
+        </p>
+        <div className="mt-1 flex flex-wrap items-center justify-center gap-2">
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className="inline-flex items-center gap-2 rounded-full bg-brand px-5 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {uploading && <Loader2 className="h-4 w-4 animate-spin" />}
+            {uploading ? "Uploading…" : "Choose a file"}
+          </button>
+          <button
+            type="button"
+            onClick={openCamera}
+            disabled={uploading}
+            className="inline-flex items-center gap-2 rounded-full border border-stone-300 bg-white px-5 py-2 text-sm font-semibold text-foreground transition hover:border-stone-400 hover:bg-stone-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Camera className="h-4 w-4 text-brand" />
+            Take photo
+          </button>
+        </div>
         <p className="text-xs text-ink-muted">PDF, JPG, PNG, or WebP — up to 15 MB</p>
         <input
           ref={fileInputRef}
@@ -582,7 +618,21 @@ export default function DocumentManager({ userId }: { userId: string }) {
           className="hidden"
           onChange={(e) => handleFiles(e.target.files)}
         />
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/*"
+          capture="environment"
+          className="hidden"
+          onChange={(e) => handleFiles(e.target.files)}
+        />
       </div>
+
+      <CameraCaptureModal
+        open={cameraOpen}
+        onClose={() => setCameraOpen(false)}
+        onCapture={(file) => void handleFiles([file])}
+      />
 
       {error && (
         <p
