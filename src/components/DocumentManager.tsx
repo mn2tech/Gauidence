@@ -251,7 +251,10 @@ export default function DocumentManager({ userId }: { userId: string }) {
 
   function openCamera() {
     setError(null);
-    if (typeof navigator !== "undefined" && navigator.mediaDevices?.getUserMedia) {
+    if (
+      typeof navigator !== "undefined" &&
+      typeof navigator.mediaDevices?.getUserMedia === "function"
+    ) {
       setCameraOpen(true);
       return;
     }
