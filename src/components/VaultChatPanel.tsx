@@ -419,7 +419,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
   }
 
   return (
-    <div className="flex h-[100dvh] w-full overflow-hidden bg-white">
+    <div className="flex h-full w-full overflow-hidden bg-white">
       {/* Desktop sidebar */}
       <div className="hidden md:flex">{sidebar}</div>
 

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import SiteHeader from "@/components/SiteHeader";
 import VaultChatPanel from "@/components/VaultChatPanel";
 
 export const metadata: Metadata = {
@@ -18,5 +19,12 @@ export default async function VaultChatPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  return <VaultChatPanel variant="page" />;
+  return (
+    <div className="flex h-[100dvh] flex-col overflow-hidden">
+      <SiteHeader />
+      <div className="min-h-0 flex-1">
+        <VaultChatPanel variant="page" />
+      </div>
+    </div>
+  );
 }
