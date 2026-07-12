@@ -1,7 +1,3 @@
-/**
- * Compatibility re-exports — analysis LLM is Anthropic Claude (see llm.ts).
- * Import from `@/lib/analysis/llm` for new code.
- */
 export {
   ANALYSIS_MODEL,
   VISUAL_ANALYSIS_MODEL,
@@ -12,6 +8,7 @@ export {
   createLlmClient,
   createAnalysisClient,
   documentTypeToCategory,
+  AnalysisLlmError,
   type FilePayload,
   type UserContext,
   type LlmClient,

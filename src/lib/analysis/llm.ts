@@ -42,10 +42,26 @@ export type UserContext = {
   timeZone?: string | null;
 };
 
+export class AnalysisLlmError extends Error {
+  status: number;
+  code: string;
+
+  constructor(message: string, status = 502, code = "llm_error") {
+    super(message);
+    this.name = "AnalysisLlmError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
 export function createLlmClient(): LlmClient {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
   if (!apiKey) {
-    throw new Error("ANTHROPIC_API_KEY is not configured");
+    throw new AnalysisLlmError(
+      "AI analysis isn't set up yet. Add ANTHROPIC_API_KEY on this deployment.",
+      503,
+      "missing_api_key"
+    );
   }
   return new Anthropic({ apiKey });
 }
@@ -83,12 +99,6 @@ function appendPageImages(
 
 /**
  * Build multimodal user content for Anthropic Messages API.
- *
- * visual: high-res page images (or original image / PDF document)
- * text: native extracted text only
- * hybrid: native text + limited page images
- *
- * API: anthropic.messages.parse → POST /v1/messages with output_config.format json_schema
  */
 export function buildFileContent(
   file: FilePayload,
@@ -177,7 +187,6 @@ Extract every visible line-item row.`,
     }
   }
 
-  // PDF without rendered pages — Claude document block
   if (file.mimeType === "application/pdf") {
     parts.push({
       type: "document",
@@ -198,6 +207,63 @@ export function modelForInputMode(mode: AnalysisInputMode | undefined): string {
   return VISUAL_ANALYSIS_MODEL;
 }
 
+function mapAnthropicError(err: unknown): never {
+  if (err instanceof AnalysisLlmError) throw err;
+  if (err instanceof Anthropic.APIError) {
+    if (err.status === 401 || err.status === 403) {
+      throw new AnalysisLlmError(
+        "Claude rejected the API key. Check ANTHROPIC_API_KEY in Vercel.",
+        502,
+        "auth"
+      );
+    }
+    if (err.status === 429) {
+      throw new AnalysisLlmError(
+        "Claude rate limit reached. Please try again in a minute.",
+        429,
+        "rate_limit"
+      );
+    }
+    if (err.status === 400) {
+      const detail = (err.message || "").slice(0, 200);
+      throw new AnalysisLlmError(
+        `Claude could not process this analysis request.${detail ? ` (${detail})` : ""}`,
+        502,
+        "bad_request"
+      );
+    }
+    throw new AnalysisLlmError(
+      "The Claude service couldn't analyze this document. Please try again.",
+      502,
+      "api_error"
+    );
+  }
+  throw new AnalysisLlmError(
+    "The AI service couldn't analyze this document. Please try again.",
+    502,
+    "unknown"
+  );
+}
+
+function extractJsonObject(raw: string): unknown {
+  const trimmed = raw.trim();
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    const start = trimmed.indexOf("{");
+    const end = trimmed.lastIndexOf("}");
+    if (start >= 0 && end > start) {
+      return JSON.parse(trimmed.slice(start, end + 1));
+    }
+    throw new Error("No JSON object in model response");
+  }
+}
+
+/**
+ * Structured extraction via Claude Messages API.
+ * Tries native json_schema output first; falls back to prompted JSON if the
+ * schema is too complex for Claude's grammar compiler.
+ */
 export async function runStructuredJson<T>(
   client: LlmClient,
   args: {
@@ -208,39 +274,68 @@ export async function runStructuredJson<T>(
     model?: string;
   }
 ): Promise<T> {
-  const response = await client.messages.parse({
-    model: args.model ?? ANALYSIS_MODEL,
-    max_tokens: 8192,
-    temperature: 0,
-    system: args.system,
-    messages: [
-      {
-        role: "user",
-        content: args.userContent,
+  const model = args.model ?? ANALYSIS_MODEL;
+
+  try {
+    const response = await client.messages.parse({
+      model,
+      max_tokens: 8192,
+      temperature: 0,
+      system: args.system,
+      messages: [{ role: "user", content: args.userContent }],
+      output_config: {
+        // Allow SDK transform — our OpenAI-era schemas use type unions Claude may rewrite
+        format: jsonSchemaOutputFormat(
+          args.schema as Parameters<typeof jsonSchemaOutputFormat>[0]
+        ),
       },
-    ],
-    output_config: {
-      // Schemas already use additionalProperties: false / strict shapes
-      format: jsonSchemaOutputFormat(
-        args.schema as Parameters<typeof jsonSchemaOutputFormat>[0],
-        { transform: false }
-      ),
-    },
-  });
+    });
 
-  if (response.parsed_output != null) {
-    return response.parsed_output as T;
+    if (response.parsed_output != null) {
+      return response.parsed_output as T;
+    }
+    const textBlock = response.content.find((b) => b.type === "text");
+    if (textBlock && textBlock.type === "text") {
+      return extractJsonObject(textBlock.text) as T;
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "";
+    const tooComplex =
+      /too complex|compilation|union types|optional parameters/i.test(msg) ||
+      (err instanceof Anthropic.APIError && err.status === 400);
+
+    if (!tooComplex) {
+      mapAnthropicError(err);
+    }
+    // Fall through to prompted JSON
   }
 
-  // Fallback: parse first text block if parse helper left output untyped
-  const textBlock = response.content.find((b) => b.type === "text");
-  if (textBlock && textBlock.type === "text") {
-    return JSON.parse(textBlock.text) as T;
+  try {
+    const response = await client.messages.create({
+      model,
+      max_tokens: 8192,
+      temperature: 0,
+      system: `${args.system}
+
+You MUST respond with a single JSON object only (no markdown fences, no prose).
+The JSON must match this schema name "${args.schemaName}" and shape:
+${JSON.stringify(args.schema)}`,
+      messages: [{ role: "user", content: args.userContent }],
+    });
+    const textBlock = response.content.find((b) => b.type === "text");
+    if (!textBlock || textBlock.type !== "text") {
+      throw new AnalysisLlmError(
+        "Claude returned an empty analysis response.",
+        502,
+        "empty_response"
+      );
+    }
+    return extractJsonObject(textBlock.text) as T;
+  } catch (err) {
+    mapAnthropicError(err);
   }
-  return {} as T;
 }
 
-/** OCR / freeform transcription (no JSON schema). */
 export async function runPlainText(
   client: LlmClient,
   args: {
@@ -249,15 +344,19 @@ export async function runPlainText(
     model?: string;
   }
 ): Promise<string> {
-  const response = await client.messages.create({
-    model: args.model ?? ANALYSIS_MODEL,
-    max_tokens: 8192,
-    temperature: 0,
-    system: args.system,
-    messages: [{ role: "user", content: args.userContent }],
-  });
-  const textBlock = response.content.find((b) => b.type === "text");
-  return textBlock && textBlock.type === "text" ? textBlock.text.trim() : "";
+  try {
+    const response = await client.messages.create({
+      model: args.model ?? ANALYSIS_MODEL,
+      max_tokens: 8192,
+      temperature: 0,
+      system: args.system,
+      messages: [{ role: "user", content: args.userContent }],
+    });
+    const textBlock = response.content.find((b) => b.type === "text");
+    return textBlock && textBlock.type === "text" ? textBlock.text.trim() : "";
+  } catch (err) {
+    mapAnthropicError(err);
+  }
 }
 
 export function documentTypeToCategory(type: DocumentType): string {
@@ -281,7 +380,6 @@ export function documentTypeToCategory(type: DocumentType): string {
   }
 }
 
-/** @deprecated Use createLlmClient — kept name for gradual migration. */
 export function createAnalysisClient(): LlmClient {
   return createLlmClient();
 }

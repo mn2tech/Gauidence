@@ -233,7 +233,21 @@ export async function POST(request: Request) {
       ...(result.diagnostic ? { diagnostic: result.diagnostic } : {}),
     });
   } catch (err) {
-    console.error("Document analysis pipeline failed:", err instanceof Error ? err.name : "error");
+    if (err && typeof err === "object" && "status" in err && "message" in err) {
+      const status = Number((err as { status: number }).status) || 502;
+      const message = String((err as { message: string }).message);
+      console.error(
+        "Document analysis pipeline failed:",
+        (err as { code?: string }).code ?? (err instanceof Error ? err.name : "error"),
+        status
+      );
+      await setStatus("failed");
+      return NextResponse.json({ error: message }, { status });
+    }
+    console.error(
+      "Document analysis pipeline failed:",
+      err instanceof Error ? err.name : "error"
+    );
     await setStatus("failed");
     return NextResponse.json(
       { error: "The AI service couldn't analyze this document. Please try again." },

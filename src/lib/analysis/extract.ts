@@ -132,7 +132,8 @@ async function renderPdfPageImages(bytes: Uint8Array, pageCount: number): Promis
     try {
       const dataUrl = await renderPageAsImage(bytes, page, {
         canvasImport: () => import("@napi-rs/canvas"),
-        scale: 2,
+        // 1.5 balances digit clarity vs Claude request size limits
+        scale: 1.5,
         toDataURL: true,
       });
       if (typeof dataUrl === "string" && dataUrl.startsWith("data:")) {
