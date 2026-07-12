@@ -1,6 +1,5 @@
 import "server-only";
 
-import type OpenAI from "openai";
 import type { ExtractedFact, GuardianAnalysis } from "../types";
 import { BASE_ANALYSIS_PROPERTIES, BASE_REQUIRED } from "../schemas";
 import { fromModelBase } from "../normalize";
@@ -9,8 +8,9 @@ import {
   modelForInputMode,
   runStructuredJson,
   type FilePayload,
+  type LlmClient,
   type UserContext,
-} from "../openai";
+} from "../llm";
 import {
   resolvePaymentDirection,
   suggestionForPaymentDirection,
@@ -235,11 +235,11 @@ function reconcileWithAnchors(
 }
 
 export async function analyzeInvoice(
-  openai: OpenAI,
+  client: LlmClient,
   file: FilePayload,
   user: UserContext
 ): Promise<GuardianAnalysis> {
-  const parsed = await runStructuredJson<Record<string, unknown>>(openai, {
+  const parsed = await runStructuredJson<Record<string, unknown>>(client, {
     system: SYSTEM,
     userContent: buildFileContent(
       file,

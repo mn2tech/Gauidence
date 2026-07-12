@@ -1,6 +1,5 @@
 import "server-only";
 
-import OpenAI from "openai";
 import type {
   AnalysisStatus,
   Classification,
@@ -18,9 +17,11 @@ import { analyzeGeneral } from "./analyzers/general";
 import {
   ANALYSIS_MODEL,
   VISUAL_ANALYSIS_MODEL,
+  createLlmClient,
   type FilePayload,
+  type LlmClient,
   type UserContext,
-} from "./openai";
+} from "./llm";
 import {
   extractDocumentText,
   isAnalysisDebugEnabled,
@@ -49,7 +50,7 @@ export type PipelineResult = {
 };
 
 async function runSpecialist(
-  openai: OpenAI,
+  client: LlmClient,
   type: ReturnType<typeof resolveAnalyzerType>,
   file: FilePayload,
   user: UserContext,
@@ -57,26 +58,22 @@ async function runSpecialist(
 ): Promise<{ analysis: GuardianAnalysis; rawModelJson?: unknown }> {
   switch (type) {
     case "invoice": {
-      const analysis = await analyzeInvoice(openai, file, user);
+      const analysis = await analyzeInvoice(client, file, user);
       return { analysis, rawModelJson: analysis.specialist.__raw_model };
     }
     case "insurance":
-      return { analysis: await analyzeInsurance(openai, file) };
+      return { analysis: await analyzeInsurance(client, file) };
     case "contract":
-      return { analysis: await analyzeContract(openai, file) };
+      return { analysis: await analyzeContract(client, file) };
     case "receipt":
-      return { analysis: await analyzeReceipt(openai, file) };
+      return { analysis: await analyzeReceipt(client, file) };
     default:
-      return { analysis: await analyzeGeneral(openai, file, classifiedType) };
+      return { analysis: await analyzeGeneral(client, file, classifiedType) };
   }
 }
 
-/**
- * OCR fallback only when visual page images are unavailable and native text is poor.
- * Visual-primary path skips this — the specialist reads page images directly.
- */
 async function maybeOcrFallback(
-  openai: OpenAI,
+  client: LlmClient,
   file: FilePayload,
   extraction: ExtractionResult
 ): Promise<{ extraction: ExtractionResult; ocrText?: string }> {
@@ -88,7 +85,7 @@ async function maybeOcrFallback(
   }
 
   const ocr = await transcribeDocument({
-    openai,
+    client,
     fileName: file.fileName,
     mimeType: file.mimeType,
     base64: file.base64,
@@ -127,7 +124,7 @@ async function maybeOcrFallback(
 }
 
 /**
- * Detect → prepare visual/text → multimodal structured analysis → validate.
+ * Detect → prepare visual/text → Claude multimodal structured analysis → validate.
  * Does not log full document text in production.
  */
 export async function runAnalysisPipeline(
@@ -135,7 +132,7 @@ export async function runAnalysisPipeline(
   user: UserContext,
   onProgress?: PipelineProgress
 ): Promise<PipelineResult> {
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const client = createLlmClient();
 
   await onProgress?.("extracting");
   let extraction = await extractDocumentText({
@@ -151,10 +148,8 @@ export async function runAnalysisPipeline(
   const inputMode = resolveAnalysisInputMode(characteristics);
 
   let ocrText: string | undefined;
-  // Visual path: keep page images for multimodal specialist (no OCR flatten).
-  // OCR only if we cannot render pages and native text is unusable.
   if (inputMode !== "visual" && extraction.quality < 0.45) {
-    const fallback = await maybeOcrFallback(openai, file, extraction);
+    const fallback = await maybeOcrFallback(client, file, extraction);
     extraction = fallback.extraction;
     ocrText = fallback.ocrText;
   } else if (
@@ -162,12 +157,11 @@ export async function runAnalysisPipeline(
     extraction.pageImages.length === 0 &&
     extraction.quality < 0.45
   ) {
-    const fallback = await maybeOcrFallback(openai, file, extraction);
+    const fallback = await maybeOcrFallback(client, file, extraction);
     extraction = fallback.extraction;
     ocrText = fallback.ocrText;
   }
 
-  // Anchors only from reliable native text — never from lossy OCR flatten
   const invoiceAnchors =
     extraction.method !== "vision_ocr" && extraction.quality >= 0.45
       ? parseInvoiceFromText(extraction.text)
@@ -183,12 +177,12 @@ export async function runAnalysisPipeline(
   };
 
   await onProgress?.("classifying");
-  const classification = await classifyDocument(openai, enriched);
+  const classification = await classifyDocument(client, enriched);
   const routedTo = resolveAnalyzerType(classification, IMPLEMENTED_SPECIALISTS);
 
   await onProgress?.("analyzing");
   const { analysis: rawAnalysis, rawModelJson } = await runSpecialist(
-    openai,
+    client,
     routedTo,
     enriched,
     user,
@@ -206,7 +200,6 @@ export async function runAnalysisPipeline(
     );
   }
 
-  // Empty native text is expected for Print-to-PDF when using visual mode.
   if (inputMode !== "visual" && extraction.quality < 0.45) {
     analysis.warnings.push(
       "Document text extraction quality was low — verify all numbers and dates against the original file."

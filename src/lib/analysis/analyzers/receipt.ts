@@ -1,10 +1,15 @@
 import "server-only";
 
-import type OpenAI from "openai";
 import type { GuardianAnalysis } from "../types";
 import { BASE_ANALYSIS_PROPERTIES, BASE_REQUIRED } from "../schemas";
 import { fromModelBase } from "../normalize";
-import { buildFileContent, modelForInputMode, runStructuredJson, type FilePayload } from "../openai";
+import {
+  buildFileContent,
+  modelForInputMode,
+  runStructuredJson,
+  type FilePayload,
+  type LlmClient,
+} from "../llm";
 
 const ITEM = {
   type: "object",
@@ -65,10 +70,10 @@ Rules:
 - Transaction date is a past event (is_past_event=true), not a deadline.`;
 
 export async function analyzeReceipt(
-  openai: OpenAI,
+  client: LlmClient,
   file: FilePayload
 ): Promise<GuardianAnalysis> {
-  const parsed = await runStructuredJson<Record<string, unknown>>(openai, {
+  const parsed = await runStructuredJson<Record<string, unknown>>(client, {
     system: SYSTEM,
     userContent: buildFileContent(file, "Analyze this receipt."),
     schemaName: "receipt_analysis",

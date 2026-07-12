@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isDocumentCategory } from "@/lib/categories";
 import { runAnalysisPipeline } from "@/lib/analysis/pipeline";
 import { toDisplayFacts, collectDeadlines } from "@/lib/analysis/display";
-import { documentTypeToCategory } from "@/lib/analysis/openai";
+import { documentTypeToCategory } from "@/lib/analysis/llm";
 import type { AnalysisStatus } from "@/lib/analysis/types";
 
 export const runtime = "nodejs";
@@ -28,11 +28,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "You need to be signed in." }, { status: 401 });
   }
 
-  if (!process.env.OPENAI_API_KEY) {
+  if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json(
       {
         error:
-          "AI analysis isn't set up yet on this deployment. The site owner needs to add an OpenAI API key.",
+          "AI analysis isn't set up yet on this deployment. The site owner needs to add an Anthropic (Claude) API key.",
       },
       { status: 503 }
     );

@@ -30,14 +30,14 @@ site works normally.
 
 ## AI analysis
 
-Document analysis uses OpenAI (server-side via `OPENAI_API_KEY`; the key is
-never exposed to the browser). Facts are labeled by source — from the
+Document analysis uses Anthropic Claude (server-side via `ANTHROPIC_API_KEY`;
+the key is never exposed to the browser). Facts are labeled by source — from the
 document, calculated, or AI-generated — and future deadline dates become
 dismissible alerts on the dashboard. Without the key configured, the Analyze
 button returns a friendly "not set up yet" message.
 
 Each signed-in user can run up to **10 analyses per hour**. Further requests
-return a clear "try again later" message so OpenAI usage stays bounded.
+return a clear "try again later" message so Claude usage stays bounded.
 
 ## Error monitoring
 

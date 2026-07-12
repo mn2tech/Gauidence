@@ -1,8 +1,13 @@
 import "server-only";
 
-import type OpenAI from "openai";
 import type { Classification, DocumentType } from "./types";
-import { buildFileContent, modelForInputMode, runStructuredJson, type FilePayload } from "./openai";
+import {
+  buildFileContent,
+  modelForInputMode,
+  runStructuredJson,
+  type FilePayload,
+  type LlmClient,
+} from "./llm";
 import { resolveAnalyzerType } from "./route";
 
 export { resolveAnalyzerType };
@@ -42,7 +47,7 @@ Pick exactly one document_type. Be conservative: if uncertain, use "general" and
 Never invent details. classification_confidence is 0–1.`;
 
 export async function classifyDocument(
-  openai: OpenAI,
+  client: LlmClient,
   file: FilePayload
 ): Promise<Classification> {
   const parsed = await runStructuredJson<{
@@ -50,7 +55,7 @@ export async function classifyDocument(
     document_subtype: string;
     classification_confidence: number;
     classification_reason: string;
-  }>(openai, {
+  }>(client, {
     system: SYSTEM,
     userContent: buildFileContent(
       file,

@@ -1,10 +1,15 @@
 import "server-only";
 
-import type OpenAI from "openai";
 import type { GuardianAnalysis } from "../types";
 import { BASE_ANALYSIS_PROPERTIES, BASE_REQUIRED } from "../schemas";
 import { fromModelBase } from "../normalize";
-import { buildFileContent, modelForInputMode, runStructuredJson, type FilePayload } from "../openai";
+import {
+  buildFileContent,
+  modelForInputMode,
+  runStructuredJson,
+  type FilePayload,
+  type LlmClient,
+} from "../llm";
 
 const SCHEMA = {
   type: "object",
@@ -58,10 +63,10 @@ Rules:
 - Mark end/renewal/termination dates as deadlines when they require action.`;
 
 export async function analyzeContract(
-  openai: OpenAI,
+  client: LlmClient,
   file: FilePayload
 ): Promise<GuardianAnalysis> {
-  const parsed = await runStructuredJson<Record<string, unknown>>(openai, {
+  const parsed = await runStructuredJson<Record<string, unknown>>(client, {
     system: SYSTEM,
     userContent: buildFileContent(file, "Analyze this contract."),
     schemaName: "contract_analysis",

@@ -1,7 +1,7 @@
 import "server-only";
 
-import type OpenAI from "openai";
-import { ANALYSIS_MODEL } from "./openai";
+import type { LlmClient, ContentPart } from "./llm";
+import { ANALYSIS_MODEL, runPlainText } from "./llm";
 import type { PageImage } from "./extract";
 import { assessExtractionQuality } from "./extract-quality";
 
@@ -16,18 +16,35 @@ Transcribe the document EXACTLY as shown. Rules:
 - Do NOT calculate due dates. Do NOT summarize. Do NOT convert currency formats except to plain digits with decimals.
 - Output plain text only.`;
 
+function dataUrlToImagePart(dataUrl: string): ContentPart | null {
+  const match = dataUrl.match(/^data:(image\/(?:jpeg|png|gif|webp));base64,(.+)$/i);
+  if (!match) return null;
+  return {
+    type: "image",
+    source: {
+      type: "base64",
+      media_type: match[1]!.toLowerCase() as
+        | "image/jpeg"
+        | "image/png"
+        | "image/gif"
+        | "image/webp",
+      data: match[2]!,
+    },
+  };
+}
+
 /**
- * Vision OCR when native PDF text is missing/poor.
- * Prefers rendered page images over raw PDF binary (more reliable digit retention).
+ * Vision OCR when native PDF text is missing/poor and page images unavailable
+ * for the primary visual specialist path.
  */
 export async function transcribeDocument(args: {
-  openai: OpenAI;
+  client: LlmClient;
   fileName: string;
   mimeType: string;
   base64: string;
   pageImages: PageImage[];
 }): Promise<{ text: string; quality: number; issues: string[]; method: "vision_ocr" }> {
-  const content: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [
+  const content: ContentPart[] = [
     {
       type: "text",
       text: `Transcribe this document (${args.fileName}) verbatim. Preserve invoice table columns and all digits.`,
@@ -36,43 +53,40 @@ export async function transcribeDocument(args: {
 
   if (args.pageImages.length > 0) {
     for (const img of args.pageImages) {
-      content.push({
-        type: "text",
-        text: `--- Page ${img.page} ---`,
-      });
-      content.push({
-        type: "image_url",
-        image_url: { url: img.dataUrl, detail: "high" },
-      });
+      content.push({ type: "text", text: `--- Page ${img.page} ---` });
+      const block = dataUrlToImagePart(img.dataUrl);
+      if (block) content.push(block);
     }
   } else if (args.mimeType === "application/pdf") {
     content.push({
-      type: "file",
-      file: {
-        filename: args.fileName,
-        file_data: `data:${args.mimeType};base64,${args.base64}`,
+      type: "document",
+      source: {
+        type: "base64",
+        media_type: "application/pdf",
+        data: args.base64,
       },
     });
-  } else {
-    content.push({
-      type: "image_url",
-      image_url: {
-        url: `data:${args.mimeType};base64,${args.base64}`,
-        detail: "high",
-      },
-    });
+  } else if (args.mimeType.startsWith("image/")) {
+    const media =
+      args.mimeType === "image/jpg" ? "image/jpeg" : args.mimeType;
+    if (
+      media === "image/jpeg" ||
+      media === "image/png" ||
+      media === "image/gif" ||
+      media === "image/webp"
+    ) {
+      content.push({
+        type: "image",
+        source: { type: "base64", media_type: media, data: args.base64 },
+      });
+    }
   }
 
-  const completion = await args.openai.chat.completions.create({
+  const text = await runPlainText(args.client, {
+    system: OCR_SYSTEM,
+    userContent: content,
     model: ANALYSIS_MODEL,
-    messages: [
-      { role: "system", content: OCR_SYSTEM },
-      { role: "user", content },
-    ],
-    temperature: 0,
   });
-
-  const text = (completion.choices[0]?.message?.content ?? "").trim();
   const report = assessExtractionQuality(text);
   return {
     text,

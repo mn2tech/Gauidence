@@ -1,4 +1,4 @@
-/** Shared JSON-schema fragments for specialist OpenAI responses. */
+/** Shared JSON-schema fragments for specialist Claude responses. */
 
 export const EXTRACTED_FACT_SCHEMA = {
   type: "object",

@@ -1,10 +1,15 @@
 import "server-only";
 
-import type OpenAI from "openai";
 import type { DocumentType, GuardianAnalysis } from "../types";
 import { BASE_ANALYSIS_PROPERTIES, BASE_REQUIRED } from "../schemas";
 import { fromModelBase } from "../normalize";
-import { buildFileContent, modelForInputMode, runStructuredJson, type FilePayload } from "../openai";
+import {
+  buildFileContent,
+  modelForInputMode,
+  runStructuredJson,
+  type FilePayload,
+  type LlmClient,
+} from "../llm";
 
 /** Stub schemas for types that still route to the general analyzer. */
 export const PASSPORT_FIELDS = [
@@ -65,7 +70,7 @@ Rules:
 - Prefer omitting uncertain values over inventing them.`;
 
 export async function analyzeGeneral(
-  openai: OpenAI,
+  client: LlmClient,
   file: FilePayload,
   classifiedAs?: DocumentType
 ): Promise<GuardianAnalysis> {
@@ -73,7 +78,7 @@ export async function analyzeGeneral(
     ? `Classification hint (may be uncertain): ${classifiedAs}. Still use the general extractor; do not invent specialist fields.`
     : "No reliable specialist type. Extract only general fields.";
 
-  const parsed = await runStructuredJson<Record<string, unknown>>(openai, {
+  const parsed = await runStructuredJson<Record<string, unknown>>(client, {
     system: SYSTEM,
     userContent: buildFileContent(file, `Analyze this document carefully.\n${hint}`),
     schemaName: "general_analysis",

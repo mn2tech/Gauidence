@@ -59,7 +59,7 @@ export function detectDocumentCharacteristics(args: {
 }
 
 /**
- * Choose how content is sent to OpenAI chat.completions.
+ * Choose how content is sent to the Claude Messages API.
  * - visual: page images / original image (and PDF file only if images unavailable)
  * - text: native extracted text only
  * - hybrid: reliable text + limited page images for tables/forms
