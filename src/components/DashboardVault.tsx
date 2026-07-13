@@ -56,7 +56,7 @@ export default function DashboardVault({ userId }: { userId: string }) {
         </span>
         <p className="text-sm leading-relaxed text-ink-muted">
           Documents and Daily Logs belong only to the active profile. Switch
-          profiles from the header to change context.
+          profiles above or from the header to change context.
         </p>
       </div>
     </div>
