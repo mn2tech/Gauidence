@@ -14,6 +14,7 @@ import { embedQuery, isVaultEmbeddingConfigured } from "@/lib/vault/embeddings";
 import {
   formatRetrievalContext,
   retrieveVaultChunks,
+  selectCitationsForAnswer,
   VAULT_CHAT_SYSTEM,
 } from "@/lib/vault/indexDocument";
 import { ensureUserVaultIndexed } from "@/lib/vault/ensureIndexed";
@@ -408,11 +409,11 @@ export async function POST(request: Request) {
     const queryEmbedding = await embedQuery(question);
     const chunks = await retrieveVaultChunks(supabase, queryEmbedding, 8);
     const formatted = formatRetrievalContext(chunks);
-    citations = formatted.citations;
 
     if (!formatted.context.trim()) {
       answer =
         "I couldn't find that information in your current vault.";
+      citations = [];
     } else {
       const client = createLlmClient();
       const system = `${VAULT_CHAT_SYSTEM}
@@ -430,6 +431,9 @@ ${formatted.context}
         answer =
           "I found potentially relevant information, but it needs verification before I can give you a reliable answer.";
       }
+      // Only attach sources the answer actually names from retrieval —
+      // never show unrelated retrieved files as citations.
+      citations = selectCitationsForAnswer(answer, chunks);
     }
   } catch (err) {
     if (err && typeof err === "object" && "status" in err && "message" in err) {

@@ -6,7 +6,12 @@ import { embedTexts, isVaultEmbeddingConfigured } from "./embeddings";
 import type { RetrievedChunk } from "./retrieve";
 
 export type { RetrievedChunk };
-export { formatRetrievalContext, VAULT_CHAT_SYSTEM } from "./retrieve";
+export {
+  formatRetrievalContext,
+  selectCitationsForAnswer,
+  VAULT_CHAT_SYSTEM,
+} from "./retrieve";
+export type { VaultCitation } from "./retrieve";
 
 export type IndexDocumentArgs = {
   supabase: SupabaseClient;

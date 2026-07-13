@@ -5,7 +5,10 @@ import {
   chunkText,
   prepareVaultChunks,
 } from "../../vault/chunk.ts";
-import { formatRetrievalContext } from "../../vault/retrieve.ts";
+import {
+  formatRetrievalContext,
+  selectCitationsForAnswer,
+} from "../../vault/retrieve.ts";
 
 describe("vault RAG chunking", () => {
   it("builds searchable text from analysis fields", () => {
@@ -71,5 +74,47 @@ describe("vault retrieval formatting", () => {
     assert.match(context, /a\.pdf/);
     assert.match(context, /b\.pdf/);
     assert.equal(citations.length, 2);
+  });
+
+  it("only cites documents named in the answer", () => {
+    const chunks = [
+      {
+        id: "1",
+        document_id: "d-onyx",
+        file_name: "Onyx_Invoice16_2026_June.pdf",
+        content: "total 71628",
+        chunk_index: 0,
+        similarity: 0.92,
+      },
+      {
+        id: "2",
+        document_id: "d-reggie",
+        file_name: "Reggie_Invoice.pdf",
+        content: "other invoice",
+        chunk_index: 0,
+        similarity: 0.71,
+      },
+      {
+        id: "3",
+        document_id: "d-mortgage",
+        file_name: "Rocket Mortgage - Closing Package.pdf",
+        content: "closing",
+        chunk_index: 0,
+        similarity: 0.55,
+      },
+    ];
+
+    const cited = selectCitationsForAnswer(
+      "You are expecting $71,628 from Invoice #0000016.\nSource: Onyx_Invoice16_2026_June.pdf",
+      chunks
+    );
+    assert.equal(cited.length, 1);
+    assert.equal(cited[0]?.fileName, "Onyx_Invoice16_2026_June.pdf");
+
+    const noneNamed = selectCitationsForAnswer(
+      "You are expecting $71,628 based on your invoice.",
+      chunks
+    );
+    assert.equal(noneNamed.length, 0);
   });
 });
