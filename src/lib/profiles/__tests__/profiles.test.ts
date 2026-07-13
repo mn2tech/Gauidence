@@ -41,6 +41,9 @@ describe("guardian profiles helpers", () => {
     assert.ok(PROFILE_CREATE_OPTIONS.length >= 10);
     assert.ok(PROFILE_CREATE_OPTIONS.some((o) => o.profileType === "business"));
     assert.ok(PROFILE_CREATE_OPTIONS.some((o) => o.profileType === "non_profit"));
+    assert.ok(PROFILE_CREATE_OPTIONS.some((o) => o.profileType === "vehicle"));
+    assert.ok(PROFILE_CREATE_OPTIONS.some((o) => o.profileType === "home"));
+    assert.ok(PROFILE_CREATE_OPTIONS.some((o) => o.profileType === "pet"));
     assert.ok(PROFILE_CREATE_OPTIONS.some((o) => o.profileType === "child"));
   });
 
@@ -64,6 +67,20 @@ describe("guardian profiles helpers", () => {
         sample({ profile_type: "business", display_name: "NM2TECH LLC" })
       ),
       "NM2TECH LLC Vault"
+    );
+    assert.equal(
+      vaultLabel(
+        sample({ profile_type: "vehicle", display_name: "2019 Civic" })
+      ),
+      "2019 Civic Vault"
+    );
+    assert.equal(
+      vaultLabel(sample({ profile_type: "home", display_name: "Oak Street" })),
+      "Oak Street Vault"
+    );
+    assert.equal(
+      vaultLabel(sample({ profile_type: "pet", display_name: "Buddy" })),
+      "Buddy Vault"
     );
   });
 

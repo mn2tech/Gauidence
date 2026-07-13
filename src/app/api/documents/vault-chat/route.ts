@@ -47,6 +47,9 @@ function suggestionKindFrom(
   ) {
     return type === "non_profit" ? "business" : type;
   }
+  if (type === "vehicle" || type === "home" || type === "pet") {
+    return type;
+  }
   if (
     type === "spouse_partner" ||
     type === "parent" ||

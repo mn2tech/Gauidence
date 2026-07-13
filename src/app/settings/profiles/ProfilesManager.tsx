@@ -173,8 +173,38 @@ export default function ProfilesManager() {
     option?.profileType === "child" || option?.profileType === "student";
   const isEmployee = option?.profileType === "employee";
   const isClient = option?.profileType === "client";
+  const isVehicle = option?.profileType === "vehicle";
+  const isHome = option?.profileType === "home";
+  const isPet = option?.profileType === "pet";
   const orgNameLabel =
     option?.profileType === "non_profit" ? "Nonprofit name" : "Business name";
+  const nameLabel = isBiz
+    ? orgNameLabel
+    : isVehicle
+      ? "Vehicle name"
+      : isHome
+        ? "Home name"
+        : isPet
+          ? "Pet name"
+          : "Display name";
+  const namePlaceholder = isBiz
+    ? option?.profileType === "non_profit"
+      ? "Community Foundation"
+      : "NM2TECH LLC"
+    : isVehicle
+      ? "2019 Honda Civic"
+      : isHome
+        ? "Oak Street home"
+        : isPet
+          ? "Buddy"
+          : "Name";
+  const detailsLabel = isVehicle
+    ? "Year / make / model notes (optional)"
+    : isHome
+      ? "Address or notes (optional)"
+      : isPet
+        ? "Species / breed (optional)"
+        : null;
 
   return (
     <div className="space-y-6">
@@ -252,22 +282,33 @@ export default function ProfilesManager() {
               </h2>
               <div className="mt-4 space-y-3">
                 <label className="block text-sm">
-                  <span className="font-medium">
-                    {isBiz ? orgNameLabel : "Display name"}
-                  </span>
+                  <span className="font-medium">{nameLabel}</span>
                   <input
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
                     className="mt-1 w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none ring-brand focus:ring-2"
-                    placeholder={
-                      option?.profileType === "non_profit"
-                        ? "Community Foundation"
-                        : isBiz
-                          ? "NM2TECH LLC"
-                          : "Name"
-                    }
+                    placeholder={namePlaceholder}
                   />
                 </label>
+                {detailsLabel && (
+                  <label className="block text-sm">
+                    <span className="text-ink-muted">{detailsLabel}</span>
+                    <input
+                      value={extra.description ?? ""}
+                      onChange={(e) =>
+                        setExtra((x) => ({ ...x, description: e.target.value }))
+                      }
+                      className="mt-1 w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none ring-brand focus:ring-2"
+                      placeholder={
+                        isVehicle
+                          ? "Silver, VIN last 4 optional"
+                          : isHome
+                            ? "123 Oak St"
+                            : "Golden retriever"
+                      }
+                    />
+                  </label>
+                )}
                 {isChild && (
                   <>
                     <label className="block text-sm">

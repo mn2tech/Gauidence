@@ -79,6 +79,9 @@ export type SuggestionProfileKind =
   | "employee"
   | "client"
   | "family"
+  | "vehicle"
+  | "home"
+  | "pet"
   | "other";
 
 /**
@@ -93,6 +96,27 @@ export function buildGideonLogSuggestions(
       "What happened recently in the Daily Log?",
       "Summarize the latest Daily Log entries.",
       "Are there any school or homework updates?",
+    ];
+  }
+  if (profileKind === "vehicle") {
+    return [
+      "What happened recently in the Daily Log?",
+      "When was the last service or maintenance?",
+      "Any insurance or registration updates?",
+    ];
+  }
+  if (profileKind === "home") {
+    return [
+      "What happened recently in the Daily Log?",
+      "Summarize recent repairs or contractor work.",
+      "Any insurance or mortgage updates?",
+    ];
+  }
+  if (profileKind === "pet") {
+    return [
+      "What happened recently in the Daily Log?",
+      "Any recent vet or medication notes?",
+      "Summarize the latest pet care updates.",
     ];
   }
   if (
@@ -140,6 +164,10 @@ export function buildGideonSuggestions(
     profileKind === "business" ||
     profileKind === "employee" ||
     profileKind === "client";
+  const isAsset =
+    profileKind === "vehicle" ||
+    profileKind === "home" ||
+    profileKind === "pet";
 
   if (hasAttention) {
     suggestions.push("What needs my attention this month?");
@@ -149,6 +177,18 @@ export function buildGideonSuggestions(
     suggestions.push("What school documents are in this vault?");
     suggestions.push("Are there any upcoming school deadlines?");
     suggestions.push("Summarize the latest school document.");
+  } else if (profileKind === "vehicle") {
+    suggestions.push("When does insurance or registration renew?");
+    suggestions.push("What vehicle documents are in this vault?");
+    suggestions.push("Which documents expire soon?");
+  } else if (profileKind === "home") {
+    suggestions.push("What home documents are in this vault?");
+    suggestions.push("When is the next mortgage, rent, or insurance date?");
+    suggestions.push("Which documents expire soon?");
+  } else if (profileKind === "pet") {
+    suggestions.push("What pet records are in this vault?");
+    suggestions.push("Any upcoming vet or vaccination dates?");
+    suggestions.push("Summarize the latest pet document.");
   } else if (isBiz) {
     if (types.has("invoice") || docs.length > 0) {
       suggestions.push("Which invoices are due soon?");
@@ -166,7 +206,7 @@ export function buildGideonSuggestions(
     suggestions.push("Show me upcoming important dates.");
   }
 
-  if (!isSchool && types.has("invoice")) {
+  if (!isSchool && !isAsset && types.has("invoice")) {
     if (!suggestions.includes("How much am I expecting to receive?")) {
       suggestions.push("How much am I expecting to receive?");
     }

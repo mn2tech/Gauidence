@@ -13,6 +13,9 @@ export const GUARDIAN_PROFILE_TYPES = [
   "non_profit",
   "employee",
   "client",
+  "vehicle",
+  "home",
+  "pet",
   "other",
 ] as const;
 
@@ -29,6 +32,9 @@ export const PROFILE_TYPE_LABELS: Record<GuardianProfileType, string> = {
   non_profit: "Nonprofit",
   employee: "Employee",
   client: "Client",
+  vehicle: "Vehicle",
+  home: "Home",
+  pet: "Pet",
   other: "Other",
 };
 
@@ -59,6 +65,9 @@ export const PROFILE_CREATE_OPTIONS: {
   { id: "nonprofit", label: "A nonprofit", profileType: "non_profit" },
   { id: "employee", label: "An employee", profileType: "employee" },
   { id: "client", label: "A client", profileType: "client" },
+  { id: "vehicle", label: "A vehicle", profileType: "vehicle" },
+  { id: "home", label: "A home", profileType: "home" },
+  { id: "pet", label: "A pet", profileType: "pet" },
   { id: "other", label: "Something else", profileType: "other" },
 ];
 
@@ -126,8 +135,8 @@ export function profileCompanyContext(profile: GuardianProfile): string | null {
 export function vaultLabel(profile: GuardianProfile): string {
   const name = profile.display_name.trim() || "Profile";
   if (
-    profile.profile_type === "business" ||
-    profile.profile_type === "non_profit"
+    isOrgStyleProfile(profile.profile_type) ||
+    isAssetStyleProfile(profile.profile_type)
   ) {
     return `${name} Vault`;
   }
@@ -138,8 +147,8 @@ export function vaultLabel(profile: GuardianProfile): string {
 export function askGideonContextLabel(profile: GuardianProfile): string {
   const name = profile.display_name.trim() || "this profile";
   if (
-    profile.profile_type === "business" ||
-    profile.profile_type === "non_profit"
+    isOrgStyleProfile(profile.profile_type) ||
+    isAssetStyleProfile(profile.profile_type)
   ) {
     return `Ask Gideon about ${name}`;
   }
@@ -151,4 +160,9 @@ export function askGideonContextLabel(profile: GuardianProfile): string {
 
 export function isOrgStyleProfile(type: GuardianProfileType): boolean {
   return type === "business" || type === "non_profit";
+}
+
+/** Vehicle, home, pet — named assets, not people. */
+export function isAssetStyleProfile(type: GuardianProfileType): boolean {
+  return type === "vehicle" || type === "home" || type === "pet";
 }

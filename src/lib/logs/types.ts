@@ -104,6 +104,33 @@ export const LOG_CATEGORIES_BY_PROFILE: Record<
     "Important Event",
     "General",
   ],
+  vehicle: [
+    "Service",
+    "Insurance",
+    "Registration",
+    "Accident/Incident",
+    "Mileage",
+    "Payment",
+    "Important Event",
+  ],
+  home: [
+    "Repair",
+    "Maintenance",
+    "Insurance",
+    "Mortgage/Rent",
+    "Taxes",
+    "Contractor",
+    "Warranty",
+    "Important Event",
+  ],
+  pet: [
+    "Vet",
+    "Medication",
+    "Grooming",
+    "Insurance",
+    "Behavior",
+    "Important Event",
+  ],
   other: ["General", "Important Event"],
 };
 

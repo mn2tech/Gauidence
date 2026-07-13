@@ -9,6 +9,10 @@ import SiteFooter from "@/components/SiteFooter";
 import SignOutButton from "@/components/SignOutButton";
 import DashboardVault from "@/components/DashboardVault";
 import { getActiveGuardianProfile } from "@/lib/profiles/server";
+import {
+  isAssetStyleProfile,
+  isOrgStyleProfile,
+} from "@/lib/profiles/types";
 
 export const metadata: Metadata = {
   title: "Dashboard — Guardian",
@@ -50,8 +54,8 @@ export default async function DashboardPage() {
               )}
               <div>
                 <h1 className="text-2xl font-bold tracking-tight">
-                  {active.profile_type === "business" ||
-                  active.profile_type === "non_profit"
+                  {isOrgStyleProfile(active.profile_type) ||
+                  isAssetStyleProfile(active.profile_type)
                     ? displayName
                     : `Welcome, ${displayName}`}
                 </h1>
