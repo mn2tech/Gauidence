@@ -54,10 +54,11 @@ export async function retrieveRelevantDailyLogs(
   }
 
   // Soft fallback: most recent few only when the question is timeline-ish
-  if (/today|yesterday|recent|log|what happened|update|follow/i.test(args.question)) {
-    return (data as DailyLog[]).slice(0, Math.min(3, limit));
+  if (/today|yesterday|recent|log|what happened|update|follow|summar|remember|this week/i.test(args.question)) {
+    return (data as DailyLog[]).slice(0, Math.min(5, limit));
   }
-  return [];
+  // Still return a few recent logs so log-only profiles can always ask
+  return (data as DailyLog[]).slice(0, Math.min(3, limit));
 }
 
 export function formatDailyLogsForGideon(logs: DailyLog[]): string {

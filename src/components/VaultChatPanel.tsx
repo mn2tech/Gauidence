@@ -47,6 +47,7 @@ type ChatSummary = {
 type Meta = {
   firstName: string | null;
   documentCount: number;
+  logCount?: number;
   suggestions: string[];
   profileId?: string;
   profileName?: string;
@@ -350,7 +351,10 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
   };
 
   const welcome = !loadingHistory && messages.length === 0 && !sending;
-  const emptyVault = (meta?.documentCount ?? 0) === 0;
+  const docCount = meta?.documentCount ?? 0;
+  const logCount = meta?.logCount ?? 0;
+  const emptyVault = docCount === 0 && logCount === 0;
+  const logsOnly = docCount === 0 && logCount > 0;
   const greetName = meta?.firstName;
 
   const welcomeBlock = welcome && (
@@ -375,23 +379,30 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
                   : "Your vault is empty."}
               </p>
               <p className="text-sm text-ink-muted">
-                Upload the first important document for this profile, and
-                I&apos;ll help you understand what it contains and what may need
-                attention.
+                Upload a document or add a Daily Log for this profile, and
+                I&apos;ll help you understand what matters.
               </p>
-              <Link
-                href="/dashboard"
-                className="inline-flex rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark"
-              >
-                Upload a Document
-              </Link>
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  href="/dashboard"
+                  className="inline-flex rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark"
+                >
+                  Upload a Document
+                </Link>
+                <Link
+                  href="/dashboard"
+                  className="inline-flex rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-stone-50"
+                >
+                  Add a Daily Log
+                </Link>
+              </div>
             </>
           ) : (
             <>
               <p className="text-sm leading-relaxed text-ink-muted">
-                I can help you understand your documents, find important dates
-                and amounts, and see what may need your attention. What would
-                you like to know?
+                {logsOnly
+                  ? "I can use this profile's Daily Logs to answer questions about recent updates and what you've recorded. What would you like to know?"
+                  : "I can help you understand your documents, Daily Logs, important dates and amounts, and see what may need your attention. What would you like to know?"}
               </p>
               {meta && meta.suggestions.length > 0 && (
                 <div className="flex flex-wrap gap-2 pt-1">
@@ -539,8 +550,10 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
           maxLength={2000}
           placeholder={
             emptyVault
-              ? "Upload a document to ask Gideon…"
-              : "Ask about your documents…"
+              ? "Add a Daily Log or upload a document to ask Gideon…"
+              : logsOnly
+                ? "Ask about Daily Logs…"
+                : "Ask about your documents…"
           }
           className="min-w-0 flex-1 rounded-full border border-stone-200 bg-white px-3 py-2.5 text-sm outline-none ring-brand focus:ring-2 disabled:opacity-50"
         />

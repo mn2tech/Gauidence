@@ -82,13 +82,36 @@ export type SuggestionProfileKind =
   | "other";
 
 /**
- * Suggested questions based on vault contents and profile type.
+ * Suggested questions when a profile has Daily Logs (with or without documents).
  */
-export function buildGideonSuggestions(
-  docs: VaultDocHint[],
+export function buildGideonLogSuggestions(
   profileKind: SuggestionProfileKind = "personal"
 ): string[] {
-  if (docs.length === 0) return [];
+  const isSchool = profileKind === "child" || profileKind === "student";
+  if (isSchool) {
+    return [
+      "What happened recently in the Daily Log?",
+      "Summarize the latest Daily Log entries.",
+      "Are there any school or homework updates?",
+    ];
+  }
+  if (
+    profileKind === "business" ||
+    profileKind === "employee" ||
+    profileKind === "client"
+  ) {
+    return [
+      "What happened recently in the Daily Log?",
+      "Summarize recent follow-ups and updates.",
+      "What should I remember from this week's logs?",
+    ];
+  }
+  return [
+    "What happened recently in the Daily Log?",
+    "Summarize the latest Daily Log entries.",
+    "What should I remember from recent updates?",
+  ];
+}
 
   const types = new Set(
     docs

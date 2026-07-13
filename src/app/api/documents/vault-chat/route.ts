@@ -20,6 +20,7 @@ import {
 import { ensureUserVaultIndexed } from "@/lib/vault/ensureIndexed";
 import {
   buildGideonSuggestions,
+  buildGideonLogSuggestions,
   firstNameFrom,
   type SuggestionProfileKind,
   type VaultDocHint,
@@ -137,6 +138,13 @@ export async function GET(request: Request) {
       .eq("profile_id", active.id);
 
     const docCount = docs?.length ?? 0;
+    const { count: logCountRaw } = await supabase
+      .from("daily_logs")
+      .select("id", { count: "exact", head: true })
+      .eq("owner_user_id", user.id)
+      .eq("profile_id", active.id);
+    const logCount = logCountRaw ?? 0;
+
     let suggestions: string[] = [];
     if (docCount > 0) {
       const { data: extracted } = await supabase
@@ -160,6 +168,10 @@ export async function GET(request: Request) {
         hints,
         suggestionKindFrom(active.profile_type)
       );
+    } else if (logCount > 0) {
+      suggestions = buildGideonLogSuggestions(
+        suggestionKindFrom(active.profile_type)
+      );
     }
 
     const { data: account } = await supabase
@@ -179,6 +191,7 @@ export async function GET(request: Request) {
             user.email
         ),
         documentCount: docCount,
+        logCount,
         suggestions,
         profileId: active.id,
         profileName: active.display_name,
@@ -300,16 +313,6 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!isVaultEmbeddingConfigured()) {
-    return NextResponse.json(
-      {
-        error:
-          "I couldn't complete that request right now. Please try again.",
-      },
-      { status: 503 }
-    );
-  }
-
   let questionRaw: unknown;
   let chatIdRaw: unknown;
   try {
@@ -390,6 +393,17 @@ export async function POST(request: Request) {
           "Analyze a document or add a Daily Log so Gideon has something to search in this profile.",
       },
       { status: 409 }
+    );
+  }
+
+  // Document RAG needs embeddings; Daily Log-only questions do not.
+  if ((chunkCount ?? 0) > 0 && !isVaultEmbeddingConfigured()) {
+    return NextResponse.json(
+      {
+        error:
+          "I couldn't complete that request right now. Please try again.",
+      },
+      { status: 503 }
     );
   }
 
