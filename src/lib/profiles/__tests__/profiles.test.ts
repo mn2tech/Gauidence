@@ -4,6 +4,7 @@ import {
   PROFILE_CREATE_OPTIONS,
   canHaveLinkedEmployees,
   employeesOf,
+  formatLinkedEmployeesForGideon,
   profileCompanyContext,
   profileSubtitle,
   vaultLabel,
@@ -141,5 +142,15 @@ describe("guardian profiles helpers", () => {
     const linked = employeesOf(list, parentId);
     assert.equal(linked.length, 1);
     assert.equal(linked[0]?.display_name, "Jordan");
+
+    const roster = formatLinkedEmployeesForGideon("Acme", [
+      { display_name: "Jordan", job_title: "Ops", department: null },
+    ]);
+    assert.match(roster, /Linked employee profiles in Guardian: 1/);
+    assert.match(roster, /Jordan/);
+    assert.match(
+      formatLinkedEmployeesForGideon("Acme", []),
+      /Linked employee profiles in Guardian: 0/
+    );
   });
 });

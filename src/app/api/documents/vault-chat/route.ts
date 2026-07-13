@@ -28,12 +28,30 @@ import {
 import { getActiveGuardianProfile } from "@/lib/profiles/server";
 import {
   askGideonContextLabel,
+  canHaveLinkedEmployees,
+  formatLinkedEmployeesForGideon,
   type GuardianProfileType,
 } from "@/lib/profiles/types";
 import {
   formatDailyLogsForGideon,
   retrieveRelevantDailyLogs,
 } from "@/lib/logs/retrieve";
+
+async function loadLinkedEmployeeContext(
+  supabase: SupabaseClient,
+  userId: string,
+  active: { id: string; display_name: string; profile_type: GuardianProfileType }
+): Promise<string> {
+  if (!canHaveLinkedEmployees(active.profile_type)) return "";
+  const { data } = await supabase
+    .from("guardian_profiles")
+    .select("display_name, job_title, department")
+    .eq("owner_user_id", userId)
+    .eq("parent_profile_id", active.id)
+    .eq("profile_type", "employee")
+    .order("display_name", { ascending: true });
+  return formatLinkedEmployeesForGideon(active.display_name, data ?? []);
+}
 
 function suggestionKindFrom(
   type: GuardianProfileType
@@ -510,8 +528,13 @@ export async function POST(request: Request) {
       question,
     });
     const logContext = formatDailyLogsForGideon(dailyLogs);
+    const linkedContext = await loadLinkedEmployeeContext(
+      supabase,
+      user.id,
+      active
+    );
 
-    if (!formatted.context.trim() && !logContext.trim()) {
+    if (!formatted.context.trim() && !logContext.trim() && !linkedContext.trim()) {
       answer =
         "I couldn't find that information in your current vault.";
       citations = [];
@@ -520,7 +543,7 @@ export async function POST(request: Request) {
       const system = `${VAULT_CHAT_SYSTEM}
 
 Active profile: ${active.display_name} (${active.profile_type}).
-Search only this profile's vault and Daily Logs. Never use other profiles' data.
+Search only this profile's vault, Daily Logs, and linked profile structure. Never use other unrelated profiles' data.
 
 --- RETRIEVED EXCERPTS (active profile documents only) ---
 ${formatted.context.trim() || "(none)"}
@@ -528,7 +551,11 @@ ${formatted.context.trim() || "(none)"}
 
 --- RETRIEVED DAILY LOGS (active profile only; user-entered notes) ---
 ${logContext.trim() || "(none)"}
---- END DAILY LOGS ---`;
+--- END DAILY LOGS ---
+
+--- LINKED PROFILE STRUCTURE (employees linked to this org profile) ---
+${linkedContext.trim() || "(none — not an org profile, or unavailable)"}
+--- END LINKED PROFILE STRUCTURE ---`;
 
       answer = await runChatCompletion(client, {
         system,

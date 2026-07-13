@@ -181,3 +181,26 @@ export function employeesOf(
     (p) => p.parent_profile_id === parentId && p.profile_type === "employee"
   );
 }
+
+export type LinkedEmployeeSummary = {
+  display_name: string;
+  job_title: string | null;
+  department: string | null;
+};
+
+/** Context block for Gideon: linked employee roster under an org profile. */
+export function formatLinkedEmployeesForGideon(
+  orgName: string,
+  employees: LinkedEmployeeSummary[]
+): string {
+  const count = employees.length;
+  const header = `Organization profile: ${orgName}\nLinked employee profiles in Guardian: ${count}`;
+  if (count === 0) {
+    return `${header}\n(None linked yet. This is Guardian's linked-profile count — not a payroll or legal headcount from documents.)`;
+  }
+  const lines = employees.map((e, i) => {
+    const bits = [e.job_title, e.department].filter(Boolean);
+    return `${i + 1}. ${e.display_name}${bits.length ? ` — ${bits.join(", ")}` : ""}`;
+  });
+  return `${header}\n${lines.join("\n")}\n(This is Guardian's linked-profile roster — not payroll headcount unless documents also support it.)`;
+}
