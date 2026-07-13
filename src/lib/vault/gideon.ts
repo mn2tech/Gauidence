@@ -113,6 +113,15 @@ export function buildGideonLogSuggestions(
   ];
 }
 
+/**
+ * Suggested questions based on vault contents and profile type.
+ */
+export function buildGideonSuggestions(
+  docs: VaultDocHint[],
+  profileKind: SuggestionProfileKind = "personal"
+): string[] {
+  if (docs.length === 0) return [];
+
   const types = new Set(
     docs
       .map((d) => String(d.documentType ?? "").toLowerCase())
