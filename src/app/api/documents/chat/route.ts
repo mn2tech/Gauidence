@@ -147,7 +147,7 @@ export async function POST(request: Request) {
 
   const { data: doc } = await supabase
     .from("documents")
-    .select("id, file_name")
+    .select("id, file_name, profile_id")
     .eq("id", documentId)
     .maybeSingle();
   if (!doc) {
@@ -239,6 +239,7 @@ export async function POST(request: Request) {
       .insert({
         document_id: documentId,
         user_id: user.id,
+        profile_id: doc.profile_id,
       })
       .select("id")
       .single();

@@ -2,13 +2,13 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Settings, ShieldCheck, UserRound } from "lucide-react";
+import { Settings, UserRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 import SignOutButton from "@/components/SignOutButton";
-import DocumentManager from "@/components/DocumentManager";
-import AlertsPanel from "@/components/AlertsPanel";
+import DashboardVault from "@/components/DashboardVault";
+import { getActiveGuardianProfile } from "@/lib/profiles/server";
 
 export const metadata: Metadata = {
   title: "Dashboard — Guardian",
@@ -23,18 +23,9 @@ export default async function DashboardPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name, avatar_url, email")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  const displayName =
-    profile?.full_name ||
-    user.user_metadata?.full_name ||
-    user.user_metadata?.name ||
-    user.email;
-  const avatarUrl = profile?.avatar_url || user.user_metadata?.avatar_url || null;
+  const active = await getActiveGuardianProfile(supabase, user);
+  const displayName = active.display_name;
+  const avatarUrl = active.avatar_url;
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -59,7 +50,9 @@ export default async function DashboardPage() {
               )}
               <div>
                 <h1 className="text-2xl font-bold tracking-tight">
-                  Welcome, {displayName}
+                  {active.profile_type === "business"
+                    ? displayName
+                    : `Welcome, ${displayName}`}
                 </h1>
                 <p className="text-sm text-ink-muted">{user.email}</p>
               </div>
@@ -76,20 +69,8 @@ export default async function DashboardPage() {
             </div>
           </div>
 
-          <div className="mt-10 space-y-6">
-            <AlertsPanel />
-            <DocumentManager userId={user.id} />
-            <div className="flex items-start gap-3 rounded-2xl border border-stone-200 bg-white p-5">
-              <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-light text-brand">
-                <ShieldCheck className="h-4 w-4" />
-              </span>
-              <p className="text-sm leading-relaxed text-ink-muted">
-                Your files are private to you: encrypted in transit, protected
-                by authenticated access, and separated by user-level access
-                controls. Deleting a document removes both the stored file and
-                its record.
-              </p>
-            </div>
+          <div className="mt-10">
+            <DashboardVault userId={user.id} />
           </div>
         </section>
       </main>

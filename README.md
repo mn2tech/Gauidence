@@ -18,6 +18,7 @@ Marketing landing page for **Guardian**, a private vault for the documents you c
 - `/dashboard` — protected document vault: upload, view in-browser, download, search, category filters, sorting, rename, AI analysis with source-labeled facts (including an AI-suggested category that never overrides a manual choice; limited to 10 analyses per user per hour), ask-your-document chat, Ask Gideon (vault Q&A), deadline alerts, and safe deletion
 - `/ask` — Ask Gideon: full-page AI guide chat across your vault (`/dashboard/chat` redirects here)
 - `/settings` — edit profile name, change/set password, toggle email deadline reminders, and permanently delete your account with all data (requires `SUPABASE_SERVICE_ROLE_KEY`, server-side only)
+- `/settings/profiles` — create and switch between multiple Guardian profiles (separate vaults under one login)
 - `/auth/callback` — OAuth and email-confirmation callback
 
 ## Authentication

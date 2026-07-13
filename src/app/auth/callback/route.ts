@@ -52,6 +52,14 @@ export async function GET(request: Request) {
       },
       { onConflict: "id", ignoreDuplicates: true }
     );
+    try {
+      const { ensureDefaultGuardianProfile } = await import(
+        "@/lib/profiles/server"
+      );
+      await ensureDefaultGuardianProfile(supabase, user);
+    } catch {
+      // Non-fatal: pages/APIs also ensure a default profile.
+    }
   }
 
   return NextResponse.redirect(`${origin}${safeNext}`);

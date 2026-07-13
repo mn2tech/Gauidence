@@ -27,28 +27,34 @@ function urgencyStyle(days: number) {
   return "bg-brand-light text-brand-dark";
 }
 
-export default function AlertsPanel() {
+export default function AlertsPanel({ profileId }: { profileId: string }) {
   const supabase = createClient();
   const [alerts, setAlerts] = useState<AlertRow[]>([]);
 
   const loadAlerts = useCallback(async () => {
-    if (!supabase) return;
+    if (!supabase || !profileId) return;
     const today = todayEasternIso();
     const { data } = await supabase
       .from("alerts")
       .select("id, title, due_date")
+      .eq("profile_id", profileId)
       .is("dismissed_at", null)
       .gte("due_date", today)
       .order("due_date", { ascending: true });
     setAlerts(data ?? []);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [profileId]);
 
   useEffect(() => {
+    setAlerts([]);
     void loadAlerts();
     const onUpdated = () => void loadAlerts();
+    const onProfile = () => void loadAlerts();
     window.addEventListener("guardian:alerts-updated", onUpdated);
-    return () => window.removeEventListener("guardian:alerts-updated", onUpdated);
+    window.addEventListener("guardian:profile-changed", onProfile);
+    return () => {
+      window.removeEventListener("guardian:alerts-updated", onUpdated);
+      window.removeEventListener("guardian:profile-changed", onProfile);
+    };
   }, [loadAlerts]);
 
   const dismiss = async (id: string) => {

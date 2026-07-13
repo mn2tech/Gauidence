@@ -21,8 +21,32 @@ import { ensureUserVaultIndexed } from "@/lib/vault/ensureIndexed";
 import {
   buildGideonSuggestions,
   firstNameFrom,
+  type SuggestionProfileKind,
   type VaultDocHint,
 } from "@/lib/vault/gideon";
+import { getActiveGuardianProfile } from "@/lib/profiles/server";
+import {
+  askGideonContextLabel,
+  type GuardianProfileType,
+} from "@/lib/profiles/types";
+
+function suggestionKindFrom(
+  type: GuardianProfileType
+): SuggestionProfileKind {
+  if (type === "child" || type === "student") return type;
+  if (type === "business" || type === "employee" || type === "client") {
+    return type;
+  }
+  if (
+    type === "spouse_partner" ||
+    type === "parent" ||
+    type === "family_member"
+  ) {
+    return "family";
+  }
+  if (type === "personal") return "personal";
+  return "other";
+}
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -78,12 +102,14 @@ function titleFromQuestion(question: string): string {
 
 async function listChats(
   supabase: SupabaseClient,
-  userId: string
+  userId: string,
+  profileId: string
 ): Promise<ChatSummary[]> {
   const { data } = await supabase
     .from("vault_chats")
     .select("id, title, updated_at, created_at")
     .eq("user_id", userId)
+    .eq("profile_id", profileId)
     .order("updated_at", { ascending: false })
     .limit(50);
   return (data ?? []) as ChatSummary[];
@@ -95,20 +121,16 @@ export async function GET(request: Request) {
   if (!isAuthed(auth)) return auth;
   const { supabase, user } = auth;
 
+  const active = await getActiveGuardianProfile(supabase, user);
   const chatId = new URL(request.url).searchParams.get("chatId");
-  const chats = await listChats(supabase, user.id);
+  const chats = await listChats(supabase, user.id, active.id);
 
   if (!chatId) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("full_name")
-      .eq("id", user.id)
-      .maybeSingle();
-
     const { data: docs } = await supabase
       .from("documents")
       .select("id, file_name")
-      .eq("user_id", user.id);
+      .eq("user_id", user.id)
+      .eq("profile_id", active.id);
 
     const docCount = docs?.length ?? 0;
     let suggestions: string[] = [];
@@ -116,7 +138,8 @@ export async function GET(request: Request) {
       const { data: extracted } = await supabase
         .from("extracted_data")
         .select("document_id, document_type, guardian_status, title")
-        .eq("user_id", user.id);
+        .eq("user_id", user.id)
+        .eq("profile_id", active.id);
       const nameById = new Map((docs ?? []).map((d) => [d.id, d.file_name]));
       const hints: VaultDocHint[] = (extracted ?? []).map((row) => ({
         documentType: row.document_type,
@@ -124,30 +147,37 @@ export async function GET(request: Request) {
         title: row.title,
         fileName: nameById.get(row.document_id) ?? null,
       }));
-      // Include docs without analysis so "summarize recent" still appears
       if (hints.length === 0) {
         hints.push(
           ...((docs ?? []).map((d) => ({ fileName: d.file_name })) as VaultDocHint[])
         );
       }
-      suggestions = buildGideonSuggestions(hints);
+      suggestions = buildGideonSuggestions(
+        hints,
+        suggestionKindFrom(active.profile_type)
+      );
     }
 
     return NextResponse.json({
       chats,
       meta: {
-        firstName: firstNameFrom(profile?.full_name ?? null),
+        firstName: firstNameFrom(active.display_name),
         documentCount: docCount,
         suggestions,
+        profileId: active.id,
+        profileName: active.display_name,
+        profileType: active.profile_type,
+        askContextLabel: askGideonContextLabel(active),
       },
     });
   }
 
   const { data: chat } = await supabase
     .from("vault_chats")
-    .select("id, title")
+    .select("id, title, profile_id")
     .eq("id", chatId)
     .eq("user_id", user.id)
+    .eq("profile_id", active.id)
     .maybeSingle();
 
   if (!chat) {
@@ -172,6 +202,11 @@ export async function GET(request: Request) {
     chatId: chat.id,
     title: chat.title,
     messages: (messages ?? []) as ChatMessageRow[],
+    meta: {
+      profileId: active.id,
+      profileName: active.display_name,
+      askContextLabel: askGideonContextLabel(active),
+    },
   });
 }
 
@@ -180,10 +215,15 @@ export async function PUT() {
   const auth = await requireUser();
   if (!isAuthed(auth)) return auth;
   const { supabase, user } = auth;
+  const active = await getActiveGuardianProfile(supabase, user);
 
   const { data: created, error } = await supabase
     .from("vault_chats")
-    .insert({ user_id: user.id, title: "New chat" })
+    .insert({
+      user_id: user.id,
+      profile_id: active.id,
+      title: "New chat",
+    })
     .select("id, title, updated_at, created_at")
     .single();
 
@@ -194,7 +234,7 @@ export async function PUT() {
     );
   }
 
-  const chats = await listChats(supabase, user.id);
+  const chats = await listChats(supabase, user.id, active.id);
   return NextResponse.json({ chat: created as ChatSummary, chats });
 }
 
@@ -203,6 +243,7 @@ export async function DELETE(request: Request) {
   const auth = await requireUser();
   if (!isAuthed(auth)) return auth;
   const { supabase, user } = auth;
+  const active = await getActiveGuardianProfile(supabase, user);
 
   const chatId = new URL(request.url).searchParams.get("chatId");
   if (!chatId) {
@@ -213,7 +254,8 @@ export async function DELETE(request: Request) {
     .from("vault_chats")
     .delete()
     .eq("id", chatId)
-    .eq("user_id", user.id);
+    .eq("user_id", user.id)
+    .eq("profile_id", active.id);
 
   if (error) {
     return NextResponse.json(
@@ -222,7 +264,7 @@ export async function DELETE(request: Request) {
     );
   }
 
-  const chats = await listChats(supabase, user.id);
+  const chats = await listChats(supabase, user.id, active.id);
   return NextResponse.json({ chats });
 }
 
@@ -302,8 +344,10 @@ export async function POST(request: Request) {
     );
   }
 
+  const active = await getActiveGuardianProfile(supabase, user);
+
   try {
-    await ensureUserVaultIndexed(supabase, user.id);
+    await ensureUserVaultIndexed(supabase, user.id, active.id);
   } catch (err) {
     console.error(
       "Vault ensure index failed:",
@@ -314,7 +358,8 @@ export async function POST(request: Request) {
   const { count: chunkCount } = await supabase
     .from("document_chunks")
     .select("id", { count: "exact", head: true })
-    .eq("user_id", user.id);
+    .eq("user_id", user.id)
+    .eq("profile_id", active.id);
 
   if ((chunkCount ?? 0) === 0) {
     return NextResponse.json(
@@ -337,6 +382,7 @@ export async function POST(request: Request) {
       .select("id, title")
       .eq("id", requestedId)
       .eq("user_id", user.id)
+      .eq("profile_id", active.id)
       .maybeSingle();
     if (!existingChat) {
       return NextResponse.json({ error: "Chat not found." }, { status: 404 });
@@ -347,6 +393,7 @@ export async function POST(request: Request) {
       .from("vault_chats")
       .insert({
         user_id: user.id,
+        profile_id: active.id,
         title: titleFromQuestion(question),
       })
       .select("id")
@@ -380,7 +427,8 @@ export async function POST(request: Request) {
       .from("vault_chats")
       .update({ title: titleFromQuestion(question) })
       .eq("id", chatId)
-      .eq("user_id", user.id);
+      .eq("user_id", user.id)
+      .eq("profile_id", active.id);
   }
 
   const { data: userMsg, error: userMsgError } = await supabase
@@ -407,7 +455,12 @@ export async function POST(request: Request) {
 
   try {
     const queryEmbedding = await embedQuery(question);
-    const chunks = await retrieveVaultChunks(supabase, queryEmbedding, 8);
+    const chunks = await retrieveVaultChunks(
+      supabase,
+      queryEmbedding,
+      active.id,
+      8
+    );
     const formatted = formatRetrievalContext(chunks);
 
     if (!formatted.context.trim()) {
@@ -418,7 +471,10 @@ export async function POST(request: Request) {
       const client = createLlmClient();
       const system = `${VAULT_CHAT_SYSTEM}
 
---- RETRIEVED EXCERPTS (this user's vault only) ---
+Active profile: ${active.display_name} (${active.profile_type}).
+Search only this profile's vault. Never use other profiles' documents.
+
+--- RETRIEVED EXCERPTS (active profile only) ---
 ${formatted.context}
 --- END EXCERPTS ---`;
 
@@ -431,8 +487,6 @@ ${formatted.context}
         answer =
           "I found potentially relevant information, but it needs verification before I can give you a reliable answer.";
       }
-      // Only attach sources the answer actually names from retrieval —
-      // never show unrelated retrieved files as citations.
       citations = selectCitationsForAnswer(answer, chunks);
     }
   } catch (err) {
@@ -476,7 +530,7 @@ ${formatted.context}
     .update({ updated_at: new Date().toISOString() })
     .eq("id", chatId);
 
-  const chats = await listChats(supabase, user.id);
+  const chats = await listChats(supabase, user.id, active.id);
 
   return NextResponse.json({
     chatId,

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { LogOut, Menu, ShieldCheck, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import ProfileSwitcher from "@/components/ProfileSwitcher";
 
 export default function SiteHeader() {
   const pathname = usePathname();
@@ -65,6 +66,7 @@ export default function SiteHeader() {
           </Link>
           {signedIn ? (
             <>
+              <ProfileSwitcher />
               <Link href="/ask" className="hover:text-foreground">
                 Ask Gideon
               </Link>
@@ -126,6 +128,9 @@ export default function SiteHeader() {
             </Link>
             {signedIn ? (
               <>
+                <div className="px-3 py-2">
+                  <ProfileSwitcher />
+                </div>
                 <Link href="/ask" className={linkClass}>
                   Ask Gideon
                 </Link>

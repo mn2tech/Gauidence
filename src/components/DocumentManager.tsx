@@ -95,7 +95,15 @@ export function notifyAlertsUpdated() {
   window.dispatchEvent(new Event("guardian:alerts-updated"));
 }
 
-export default function DocumentManager({ userId }: { userId: string }) {
+export default function DocumentManager({
+  userId,
+  profileId,
+  profileName,
+}: {
+  userId: string;
+  profileId: string;
+  profileName: string;
+}) {
   const supabase = createClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -127,19 +135,21 @@ export default function DocumentManager({ userId }: { userId: string }) {
   const [savingRename, setSavingRename] = useState(false);
 
   const loadDocuments = useCallback(async () => {
-    if (!supabase) return;
+    if (!supabase || !profileId) return;
     const [docsRes, analysesRes] = await Promise.all([
       supabase
         .from("documents")
         .select(
           "id, file_name, file_path, mime_type, size_bytes, created_at, category, analysis_status"
         )
+        .eq("profile_id", profileId)
         .order("created_at", { ascending: false }),
       supabase
         .from("extracted_data")
         .select(
           "document_id, summary, facts, model, title, document_type, guardian_status, overall_confidence, classification_confidence"
-        ),
+        )
+        .eq("profile_id", profileId),
     ]);
     if (docsRes.error) {
       setError("We couldn't load your documents. Refresh the page to try again.");
@@ -166,11 +176,13 @@ export default function DocumentManager({ userId }: { userId: string }) {
       setAnalyses(map);
     }
     setLoading(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [profileId]);
 
   useEffect(() => {
-    loadDocuments();
+    setDocuments([]);
+    setAnalyses({});
+    setLoading(true);
+    void loadDocuments();
   }, [loadDocuments]);
 
   async function handleFiles(files: FileList | File[] | null) {
@@ -179,7 +191,7 @@ export default function DocumentManager({ userId }: { userId: string }) {
         ? files
         : Array.from(files)
       : [];
-    if (list.length === 0 || !supabase) return;
+    if (list.length === 0 || !supabase || !profileId) return;
     const file = list[0];
     if (!file) return;
     setError(null);
@@ -195,7 +207,7 @@ export default function DocumentManager({ userId }: { userId: string }) {
 
     setUploading(true);
     const safeName = file.name.replace(/[^\w.\- ]/g, "_");
-    const path = `${userId}/${crypto.randomUUID()}-${safeName}`;
+    const path = `${userId}/${profileId}/${crypto.randomUUID()}-${safeName}`;
 
     try {
       const { error: uploadError } = await supabase.storage
@@ -215,6 +227,7 @@ export default function DocumentManager({ userId }: { userId: string }) {
         .from("documents")
         .insert({
           user_id: userId,
+          profile_id: profileId,
           file_name: file.name,
           file_path: path,
           mime_type: file.type,
@@ -561,7 +574,10 @@ export default function DocumentManager({ userId }: { userId: string }) {
   return (
     <div className="rounded-2xl border border-stone-200 bg-white p-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-base font-semibold">Your documents</h2>
+        <h2 className="text-base font-semibold">{profileName}&apos;s Vault</h2>
+        <p className="text-xs text-ink-muted">
+          Uploading to: <span className="font-medium text-foreground">{profileName}</span>
+        </p>
         <span className="text-xs text-ink-muted">
           {documents.length} {documents.length === 1 ? "document" : "documents"}
         </span>

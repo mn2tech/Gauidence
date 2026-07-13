@@ -15,11 +15,12 @@ type ExtractedRow = {
 };
 
 /**
- * Index any analyzed documents that have no chunks yet (lazy backfill for vault chat).
+ * Index analyzed documents for one profile that have no chunks yet.
  */
 export async function ensureUserVaultIndexed(
   supabase: SupabaseClient,
-  userId: string
+  userId: string,
+  profileId: string
 ): Promise<{ indexedDocs: number; skipped?: string }> {
   if (!isVaultEmbeddingConfigured()) {
     return { indexedDocs: 0, skipped: "missing_openai_key" };
@@ -30,7 +31,8 @@ export async function ensureUserVaultIndexed(
     .select(
       "document_id, summary, facts, title, document_type, warnings, specialist"
     )
-    .eq("user_id", userId);
+    .eq("user_id", userId)
+    .eq("profile_id", profileId);
 
   if (error || !extracted?.length) {
     return { indexedDocs: 0 };
@@ -40,6 +42,7 @@ export async function ensureUserVaultIndexed(
     .from("documents")
     .select("id, file_name")
     .eq("user_id", userId)
+    .eq("profile_id", profileId)
     .in(
       "id",
       extracted.map((e) => e.document_id)
@@ -50,7 +53,8 @@ export async function ensureUserVaultIndexed(
   const { data: existing } = await supabase
     .from("document_chunks")
     .select("document_id")
-    .eq("user_id", userId);
+    .eq("user_id", userId)
+    .eq("profile_id", profileId);
 
   const already = new Set((existing ?? []).map((r) => r.document_id));
 
@@ -64,6 +68,7 @@ export async function ensureUserVaultIndexed(
       const result = await indexDocumentForVault({
         supabase,
         userId,
+        profileId,
         documentId: row.document_id,
         fileName,
         source: {

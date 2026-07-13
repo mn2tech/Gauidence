@@ -16,6 +16,7 @@ export type { VaultCitation } from "./retrieve";
 export type IndexDocumentArgs = {
   supabase: SupabaseClient;
   userId: string;
+  profileId: string;
   documentId: string;
   fileName: string;
   source: Omit<VaultIndexSource, "fileName">;
@@ -51,6 +52,7 @@ export async function indexDocumentForVault(
   const rows = chunks.map((content, chunk_index) => ({
     document_id: args.documentId,
     user_id: args.userId,
+    profile_id: args.profileId,
     file_name: args.fileName,
     chunk_index,
     content,
@@ -68,11 +70,13 @@ export async function indexDocumentForVault(
 export async function retrieveVaultChunks(
   supabase: SupabaseClient,
   queryEmbedding: number[],
+  profileId: string,
   matchCount = 8
 ): Promise<RetrievedChunk[]> {
   const { data, error } = await supabase.rpc("match_document_chunks", {
     query_embedding: queryEmbedding,
     match_count: matchCount,
+    filter_profile_id: profileId,
   });
   if (error) {
     throw new Error(`Vault retrieval failed: ${error.message}`);

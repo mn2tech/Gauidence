@@ -48,6 +48,9 @@ type Meta = {
   firstName: string | null;
   documentCount: number;
   suggestions: string[];
+  profileId?: string;
+  profileName?: string;
+  askContextLabel?: string;
 };
 
 type Props = {
@@ -130,6 +133,17 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
 
   useEffect(() => {
     void bootstrap();
+  }, [bootstrap]);
+
+  useEffect(() => {
+    const onProfile = () => {
+      setActiveChatId(null);
+      setMessages([]);
+      void bootstrap();
+    };
+    window.addEventListener("guardian:profile-changed", onProfile);
+    return () =>
+      window.removeEventListener("guardian:profile-changed", onProfile);
   }, [bootstrap]);
 
   useEffect(() => {
@@ -623,7 +637,8 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
               </button>
             </div>
             <p className="truncate text-[11px] text-ink-muted">
-              Your AI guide to everything in your vault.
+              {meta?.askContextLabel ??
+                "Your AI guide to everything in your vault."}
             </p>
           </div>
           <button

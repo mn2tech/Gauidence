@@ -66,10 +66,23 @@ export type VaultDocHint = {
   title?: string | null;
 };
 
+export type SuggestionProfileKind =
+  | "personal"
+  | "child"
+  | "student"
+  | "business"
+  | "employee"
+  | "client"
+  | "family"
+  | "other";
+
 /**
- * Suggested questions based on what actually exists in the vault.
+ * Suggested questions based on vault contents and profile type.
  */
-export function buildGideonSuggestions(docs: VaultDocHint[]): string[] {
+export function buildGideonSuggestions(
+  docs: VaultDocHint[],
+  profileKind: SuggestionProfileKind = "personal"
+): string[] {
   if (docs.length === 0) return [];
 
   const types = new Set(
@@ -84,21 +97,48 @@ export function buildGideonSuggestions(docs: VaultDocHint[]): string[] {
       d.guardianStatus === "needs_verification"
   );
   const suggestions: string[] = [];
+  const isSchool =
+    profileKind === "child" || profileKind === "student";
+  const isBiz =
+    profileKind === "business" ||
+    profileKind === "employee" ||
+    profileKind === "client";
 
   if (hasAttention) {
     suggestions.push("What needs my attention this month?");
   }
-  suggestions.push("When is my next important deadline?");
-  suggestions.push("Which documents expire soon?");
 
-  if (types.has("invoice")) {
-    suggestions.push("How much am I expecting to receive?");
+  if (isSchool) {
+    suggestions.push("What school documents are in this vault?");
+    suggestions.push("Are there any upcoming school deadlines?");
+    suggestions.push("Summarize the latest school document.");
+  } else if (isBiz) {
+    if (types.has("invoice") || docs.length > 0) {
+      suggestions.push("Which invoices are due soon?");
+      if (types.has("invoice")) {
+        suggestions.push("How much am I expecting to receive?");
+      }
+    }
+    if (types.has("contract") || docs.length > 0) {
+      suggestions.push("Which contracts need attention?");
+    }
+    suggestions.push("What needs my attention this month?");
+  } else {
+    suggestions.push("When is my next important deadline?");
+    suggestions.push("Which documents expire soon?");
+    suggestions.push("Show me upcoming important dates.");
+  }
+
+  if (!isSchool && types.has("invoice")) {
+    if (!suggestions.includes("How much am I expecting to receive?")) {
+      suggestions.push("How much am I expecting to receive?");
+    }
     suggestions.push("What are my upcoming invoice due dates?");
   }
   if (types.has("insurance")) {
     suggestions.push("Which insurance policies renew or expire soon?");
   }
-  if (types.has("contract")) {
+  if (types.has("contract") && !isBiz) {
     suggestions.push("Which contracts have upcoming end dates?");
   }
   if (types.has("receipt")) {
@@ -106,8 +146,9 @@ export function buildGideonSuggestions(docs: VaultDocHint[]): string[] {
   }
 
   suggestions.push("Summarize my most recent document.");
-  suggestions.push("Which documents need verification?");
-
+  if (!isSchool) {
+    suggestions.push("Which documents need verification?");
+  }
   // Dedupe while preserving order; cap at 5
   const seen = new Set<string>();
   const out: string[] = [];

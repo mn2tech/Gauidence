@@ -58,7 +58,7 @@ export async function POST(request: Request) {
 
   const { data: doc } = await supabase
     .from("documents")
-    .select("id, file_name, file_path, mime_type, size_bytes, category")
+    .select("id, file_name, file_path, mime_type, size_bytes, category, profile_id")
     .eq("id", documentId)
     .maybeSingle();
   if (!doc) {
@@ -125,11 +125,29 @@ export async function POST(request: Request) {
 
   const base64 = Buffer.from(await file.arrayBuffer()).toString("base64");
 
-  const { data: profile } = await supabase
+  const { data: accountProfile } = await supabase
     .from("profiles")
     .select("full_name, email, company_name")
     .eq("id", user.id)
     .maybeSingle();
+
+  const { data: guardianProfile } = doc.profile_id
+    ? await supabase
+        .from("guardian_profiles")
+        .select(
+          "id, profile_type, display_name, business_legal_name, organization_name"
+        )
+        .eq("id", doc.profile_id)
+        .eq("owner_user_id", user.id)
+        .maybeSingle()
+    : { data: null };
+
+  const companyName =
+    (guardianProfile?.profile_type === "business"
+      ? guardianProfile.business_legal_name || guardianProfile.display_name
+      : guardianProfile?.organization_name) ||
+    accountProfile?.company_name ||
+    null;
 
   try {
     const result = await runAnalysisPipeline(
@@ -139,9 +157,10 @@ export async function POST(request: Request) {
         base64,
       },
       {
-        fullName: profile?.full_name ?? null,
-        email: profile?.email ?? user.email ?? null,
-        companyName: profile?.company_name ?? null,
+        fullName:
+          guardianProfile?.display_name ?? accountProfile?.full_name ?? null,
+        email: accountProfile?.email ?? user.email ?? null,
+        companyName,
         timeZone: timeZone ?? null,
       },
       setStatus
@@ -154,10 +173,13 @@ export async function POST(request: Request) {
         ? "needs_verification"
         : "completed";
 
+    const profileId = doc.profile_id as string;
+
     const { error: saveError } = await supabase.from("extracted_data").upsert(
       {
         document_id: doc.id,
         user_id: user.id,
+        profile_id: profileId,
         summary: analysis.summary,
         facts,
         model,
@@ -210,6 +232,7 @@ export async function POST(request: Request) {
         deadlines.map((d) => ({
           document_id: doc.id,
           user_id: user.id,
+          profile_id: profileId,
           title: d.title,
           due_date: d.due_date,
           source: "document",
@@ -223,6 +246,7 @@ export async function POST(request: Request) {
       await indexDocumentForVault({
         supabase,
         userId: user.id,
+        profileId,
         documentId: doc.id,
         fileName: doc.file_name,
         source: {
