@@ -17,6 +17,11 @@ import {
   VAULT_CHAT_SYSTEM,
 } from "@/lib/vault/indexDocument";
 import { ensureUserVaultIndexed } from "@/lib/vault/ensureIndexed";
+import {
+  buildGideonSuggestions,
+  firstNameFrom,
+  type VaultDocHint,
+} from "@/lib/vault/gideon";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -93,7 +98,48 @@ export async function GET(request: Request) {
   const chats = await listChats(supabase, user.id);
 
   if (!chatId) {
-    return NextResponse.json({ chats });
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    const { data: docs } = await supabase
+      .from("documents")
+      .select("id, file_name")
+      .eq("user_id", user.id);
+
+    const docCount = docs?.length ?? 0;
+    let suggestions: string[] = [];
+    if (docCount > 0) {
+      const { data: extracted } = await supabase
+        .from("extracted_data")
+        .select("document_id, document_type, guardian_status, title")
+        .eq("user_id", user.id);
+      const nameById = new Map((docs ?? []).map((d) => [d.id, d.file_name]));
+      const hints: VaultDocHint[] = (extracted ?? []).map((row) => ({
+        documentType: row.document_type,
+        guardianStatus: row.guardian_status,
+        title: row.title,
+        fileName: nameById.get(row.document_id) ?? null,
+      }));
+      // Include docs without analysis so "summarize recent" still appears
+      if (hints.length === 0) {
+        hints.push(
+          ...((docs ?? []).map((d) => ({ fileName: d.file_name })) as VaultDocHint[])
+        );
+      }
+      suggestions = buildGideonSuggestions(hints);
+    }
+
+    return NextResponse.json({
+      chats,
+      meta: {
+        firstName: firstNameFrom(profile?.full_name ?? null),
+        documentCount: docCount,
+        suggestions,
+      },
+    });
   }
 
   const { data: chat } = await supabase
@@ -189,7 +235,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error:
-          "AI chat isn't set up yet. Add an Anthropic (Claude) API key on this deployment.",
+          "I couldn't complete that request right now. Please try again.",
       },
       { status: 503 }
     );
@@ -199,7 +245,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error:
-          "Vault search isn't set up yet. Add OPENAI_API_KEY for embeddings (Claude still answers).",
+          "I couldn't complete that request right now. Please try again.",
       },
       { status: 503 }
     );
@@ -366,7 +412,7 @@ export async function POST(request: Request) {
 
     if (!formatted.context.trim()) {
       answer =
-        "I couldn't find relevant passages in your vault for that question. Try analyzing more documents or rephrasing.";
+        "I couldn't find that information in your current vault.";
     } else {
       const client = createLlmClient();
       const system = `${VAULT_CHAT_SYSTEM}
@@ -382,22 +428,22 @@ ${formatted.context}
       });
       if (!answer) {
         answer =
-          "I couldn't generate an answer from your vault. Try rephrasing your question.";
+          "I found potentially relevant information, but it needs verification before I can give you a reliable answer.";
       }
     }
   } catch (err) {
     if (err && typeof err === "object" && "status" in err && "message" in err) {
       return NextResponse.json(
-        { error: String((err as { message: string }).message) },
+        { error: "I couldn't complete that request right now. Please try again." },
         { status: Number((err as { status: number }).status) || 502 }
       );
     }
     console.error(
       "Vault chat failed:",
-      err instanceof Error ? err.message : "error"
+      err instanceof Error ? err.name : "error"
     );
     return NextResponse.json(
-      { error: "Vault search couldn't answer. Please try again." },
+      { error: "I couldn't complete that request right now. Please try again." },
       { status: 502 }
     );
   }

@@ -15,8 +15,8 @@ Marketing landing page for **Guardian**, a private vault for the documents you c
 - `/` — landing page with hero, features, and the "Built for the information you cannot afford to lose" security section
 - `/security` — Security Principles: what data is collected, how auth and access separation work, where files are stored, how AI processing works, what is not yet implemented, deletion, and how to report a concern
 - `/login` and `/signup` — email/password plus "Continue with Google" via Supabase Auth
-- `/dashboard` — protected document vault: upload, view in-browser, download, search, category filters, sorting, rename, AI analysis with source-labeled facts (including an AI-suggested category that never overrides a manual choice; limited to 10 analyses per user per hour), ask-your-document chat, ask-your-vault retrieval across analyzed files, deadline alerts, and safe deletion
-- `/dashboard/chat` — full-page Ask your vault chat (same thread; open from the dashboard in a new tab)
+- `/dashboard` — protected document vault: upload, view in-browser, download, search, category filters, sorting, rename, AI analysis with source-labeled facts (including an AI-suggested category that never overrides a manual choice; limited to 10 analyses per user per hour), ask-your-document chat, Ask Gideon (vault Q&A), deadline alerts, and safe deletion
+- `/ask` — Ask Gideon: full-page AI guide chat across your vault (`/dashboard/chat` redirects here)
 - `/settings` — edit profile name, change/set password, toggle email deadline reminders, and permanently delete your account with all data (requires `SUPABASE_SERVICE_ROLE_KEY`, server-side only)
 - `/auth/callback` — OAuth and email-confirmation callback
 
@@ -44,10 +44,13 @@ After a document is analyzed, you can ask follow-up questions about that file
 only (Ask-your-document chat). Answers are grounded in the stored analysis,
 capped at **30 chat turns per hour**, and deleted with the document.
 
-**Ask your vault** searches across *your* analyzed documents (embeddings via
-`OPENAI_API_KEY`, answers via Claude) and cites source file names. Run
-`supabase/migrations/0010_vault_rag.sql` and set `OPENAI_API_KEY` on Vercel.
-Re-analyze existing files (or ask the vault once) to backfill the search index.
+**Ask Gideon** is Guardian's named AI guide. It searches across *your*
+analyzed documents (embeddings via `OPENAI_API_KEY`, answers via Claude),
+structures answers (documents / calculated / suggestion / needs verification),
+and cites source file names with a View Source action. Run
+`supabase/migrations/0010_vault_rag.sql` (and `0011_vault_chat_threads.sql`)
+and set `OPENAI_API_KEY` on Vercel. Re-analyze existing files (or ask Gideon
+once) to backfill the search index.
 
 ## Error monitoring
 

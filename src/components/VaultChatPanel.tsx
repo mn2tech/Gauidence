@@ -1,17 +1,31 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent,
+} from "react";
 import Link from "next/link";
 import {
   ExternalLink,
+  Info,
   Loader2,
-  Library,
   Menu,
   MessageSquarePlus,
   Send,
   Trash2,
   X,
 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import GideonAvatar from "@/components/GideonAvatar";
+import {
+  GIDEON_BRAND_LINE,
+  GIDEON_LOADING_STATES,
+  GIDEON_WHY,
+  parseGideonSections,
+} from "@/lib/vault/gideon";
 
 type Citation = { documentId: string; fileName: string };
 
@@ -30,9 +44,22 @@ type ChatSummary = {
   created_at: string;
 };
 
+type Meta = {
+  firstName: string | null;
+  documentCount: number;
+  suggestions: string[];
+};
+
 type Props = {
-  /** embedded = dashboard card; page = full-screen workspace */
   variant?: "embedded" | "page";
+};
+
+const SECTION_STYLES: Record<string, string> = {
+  from_documents: "border-brand/30 bg-brand-light/40",
+  calculated: "border-sky-200 bg-sky-50/80",
+  suggestion: "border-violet-200 bg-violet-50/70",
+  needs_verification: "border-amber-200 bg-amber-50/80",
+  body: "border-transparent bg-transparent",
 };
 
 export default function VaultChatPanel({ variant = "embedded" }: Props) {
@@ -40,22 +67,29 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [messages, setMessages] = useState<VaultMessage[]>([]);
+  const [meta, setMeta] = useState<Meta | null>(null);
   const [input, setInput] = useState("");
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [sending, setSending] = useState(false);
+  const [loadingLabel, setLoadingLabel] = useState<string>(
+    GIDEON_LOADING_STATES[0]
+  );
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [whyOpen, setWhyOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const inputId = isPage ? "vault-chat-page-input" : "vault-chat-input";
+  const inputId = isPage ? "ask-gideon-page-input" : "ask-gideon-input";
 
-  const loadChats = useCallback(async () => {
+  const loadMetaAndChats = useCallback(async () => {
     const res = await fetch("/api/documents/vault-chat");
     const body = (await res.json().catch(() => ({}))) as {
       error?: string;
       chats?: ChatSummary[];
+      meta?: Meta;
     };
-    if (!res.ok) throw new Error(body.error ?? "Couldn't load chats.");
+    if (!res.ok) throw new Error(body.error ?? "Couldn't load Ask Gideon.");
     setChats(body.chats ?? []);
+    if (body.meta) setMeta(body.meta);
     return body.chats ?? [];
   }, []);
 
@@ -79,20 +113,20 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     setLoadingHistory(true);
     setError(null);
     try {
-      const list = await loadChats();
-      if (list.length > 0) {
-        await loadThread(list[0]!.id);
-      } else {
-        setActiveChatId(null);
-        setMessages([]);
+      const list = await loadMetaAndChats();
+      // Fresh landing: show welcome (no auto-open of old thread)
+      setActiveChatId(null);
+      setMessages([]);
+      if (!isPage && list[0]) {
+        await loadThread(list[0].id);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't load vault chat.");
+      setError(err instanceof Error ? err.message : "Couldn't load Ask Gideon.");
       setMessages([]);
     } finally {
       setLoadingHistory(false);
     }
-  }, [loadChats, loadThread]);
+  }, [isPage, loadMetaAndChats, loadThread]);
 
   useEffect(() => {
     void bootstrap();
@@ -102,28 +136,26 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, sending]);
 
+  useEffect(() => {
+    if (!sending) return;
+    let i = 0;
+    setLoadingLabel(GIDEON_LOADING_STATES[0]);
+    const t = window.setInterval(() => {
+      i = (i + 1) % GIDEON_LOADING_STATES.length;
+      setLoadingLabel(GIDEON_LOADING_STATES[i]!);
+    }, 2200);
+    return () => window.clearInterval(t);
+  }, [sending]);
+
   const startNewChat = async () => {
     setError(null);
-    setSending(true);
+    setActiveChatId(null);
+    setMessages([]);
+    setSidebarOpen(false);
     try {
-      const res = await fetch("/api/documents/vault-chat", { method: "PUT" });
-      const body = (await res.json().catch(() => ({}))) as {
-        error?: string;
-        chat?: ChatSummary;
-        chats?: ChatSummary[];
-      };
-      if (!res.ok) {
-        setError(body.error ?? "Couldn't create a new chat.");
-        return;
-      }
-      if (body.chats) setChats(body.chats);
-      setActiveChatId(body.chat?.id ?? null);
-      setMessages([]);
-      setSidebarOpen(false);
+      await loadMetaAndChats();
     } catch {
-      setError("Couldn't create a new chat.");
-    } finally {
-      setSending(false);
+      /* welcome still works */
     }
   };
 
@@ -140,7 +172,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     }
   };
 
-  const deleteChat = async (chatId: string, e: React.MouseEvent) => {
+  const deleteChat = async (chatId: string, e: MouseEvent) => {
     e.stopPropagation();
     setError(null);
     try {
@@ -159,20 +191,39 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
       const next = body.chats ?? [];
       setChats(next);
       if (activeChatId === chatId) {
-        if (next[0]) await loadThread(next[0].id);
-        else {
-          setActiveChatId(null);
-          setMessages([]);
-        }
+        setActiveChatId(null);
+        setMessages([]);
       }
     } catch {
       setError("Couldn't delete chat.");
     }
   };
 
-  const send = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const question = input.trim();
+  const viewSource = async (documentId: string, fileName: string) => {
+    const supabase = createClient();
+    if (!supabase) return;
+    const { data: doc } = await supabase
+      .from("documents")
+      .select("file_path")
+      .eq("id", documentId)
+      .maybeSingle();
+    if (!doc?.file_path) {
+      setError("I couldn't open that source document.");
+      return;
+    }
+    const { data, error: signedError } = await supabase.storage
+      .from("documents")
+      .createSignedUrl(doc.file_path, 60);
+    if (signedError || !data?.signedUrl) {
+      setError("I couldn't open that source document.");
+      return;
+    }
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    void fileName;
+  };
+
+  const sendQuestion = async (questionRaw: string) => {
+    const question = questionRaw.trim();
     if (!question || sending) return;
 
     setSending(true);
@@ -208,7 +259,9 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
       if (!res.ok) {
         setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
         setInput(question);
-        setError(body.error ?? "Couldn't get an answer. Please try again.");
+        setError(
+          body.error ?? "I couldn't complete that request right now. Please try again."
+        );
         return;
       }
       if (body.chats) setChats(body.chats);
@@ -218,29 +271,132 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
         ...prev.filter((m) => m.id !== optimisticId),
         ...turn,
       ]);
+      void loadMetaAndChats();
     } catch {
       setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
       setInput(question);
-      setError("Couldn't reach vault chat. Check your connection.");
+      setError("I couldn't complete that request right now. Please try again.");
     } finally {
       setSending(false);
     }
   };
 
-  const sidebar = (
-    <aside
-      className={
-        isPage
-          ? "flex h-full w-64 shrink-0 flex-col border-r border-stone-200 bg-stone-50"
-          : "hidden"
-      }
-    >
+  const send = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await sendQuestion(input);
+  };
+
+  const renderAssistantContent = (m: VaultMessage) => {
+    const sections = parseGideonSections(m.content);
+    const citations = Array.isArray(m.citations) ? m.citations : [];
+    const uniqueCitations = [
+      ...new Map(citations.map((c) => [c.documentId, c])).values(),
+    ];
+
+    return (
+      <div className="min-w-0 flex-1 space-y-2">
+        {sections.map((sec, i) => (
+          <div
+            key={`${m.id}-${i}`}
+            className={`rounded-xl border px-3 py-2 text-sm leading-relaxed ${SECTION_STYLES[sec.kind] ?? SECTION_STYLES.body}`}
+          >
+            {sec.title && (
+              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
+                {sec.title}
+              </p>
+            )}
+            <p className="whitespace-pre-wrap text-foreground/90">{sec.content}</p>
+          </div>
+        ))}
+        {uniqueCitations.length > 0 && (
+          <div className="space-y-1.5 pt-1">
+            {uniqueCitations.map((c) => (
+              <div
+                key={c.documentId}
+                className="flex flex-wrap items-center gap-2 text-[11px] text-ink-muted"
+              >
+                <span>
+                  Source: <span className="font-medium text-foreground">{c.fileName}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void viewSource(c.documentId, c.fileName)}
+                  className="inline-flex items-center gap-1 rounded-full border border-stone-300 bg-white px-2.5 py-1 font-semibold text-brand transition hover:bg-stone-50"
+                >
+                  View source
+                  <ExternalLink className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const welcome = !loadingHistory && messages.length === 0 && !sending;
+  const emptyVault = (meta?.documentCount ?? 0) === 0;
+  const greetName = meta?.firstName;
+
+  const welcomeBlock = welcome && (
+    <div className="mx-auto max-w-xl space-y-4 px-1 py-6">
+      <div className="flex items-start gap-3">
+        <GideonAvatar size={44} />
+        <div className="min-w-0 space-y-2">
+          <p className="text-base font-semibold text-foreground">
+            Hi{greetName ? ` ${greetName}` : ""}, I&apos;m Gideon.
+          </p>
+          {emptyVault ? (
+            <>
+              <p className="text-sm text-ink-muted">Your vault is empty.</p>
+              <p className="text-sm text-ink-muted">
+                Upload your first important document, and I&apos;ll help you
+                understand what it contains and what may need your attention.
+              </p>
+              <Link
+                href="/dashboard"
+                className="inline-flex rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark"
+              >
+                Upload a Document
+              </Link>
+            </>
+          ) : (
+            <>
+              <p className="text-sm leading-relaxed text-ink-muted">
+                I can help you understand your documents, find important dates
+                and amounts, and see what may need your attention. What would
+                you like to know?
+              </p>
+              {meta && meta.suggestions.length > 0 && (
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {meta.suggestions.map((q) => (
+                    <button
+                      key={q}
+                      type="button"
+                      disabled={sending}
+                      onClick={() => void sendQuestion(q)}
+                      className="rounded-full border border-stone-300 bg-white px-3 py-1.5 text-left text-xs font-medium text-foreground transition hover:border-brand hover:bg-brand-light/40 disabled:opacity-50"
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  const chatList = (
+    <>
       <div className="flex items-center gap-2 border-b border-stone-200 p-3">
         <button
           type="button"
           onClick={() => void startNewChat()}
           disabled={sending}
-          className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-brand px-3 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
+          className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-brand px-3 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark disabled:opacity-50"
         >
           <MessageSquarePlus className="h-4 w-4" />
           New chat
@@ -290,59 +446,46 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
           ← Documents
         </Link>
       </div>
-    </aside>
+    </>
   );
 
   const messageList = (
     <div
       className={
         isPage
-          ? "min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4 sm:px-8"
+          ? "min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-8"
           : "max-h-64 space-y-3 overflow-y-auto rounded-xl bg-stone-50 p-3 ring-1 ring-stone-200"
       }
     >
       {loadingHistory ? (
         <p className="flex items-center gap-2 text-xs text-ink-muted">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          Loading conversation…
-        </p>
-      ) : messages.length === 0 ? (
-        <p className="text-xs text-ink-muted">
-          Try “Which invoices are unpaid?” or “What renews in the next 30 days?”
+          <GideonAvatar size={28} pulse />
+          Gideon is checking your vault…
         </p>
       ) : (
-        messages.map((m) => (
-          <div key={m.id} className="text-sm leading-relaxed">
-            <span className="mr-1.5 text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
-              {m.role === "user" ? "You" : "Guardian"}
-            </span>
-            <span
-              className={`whitespace-pre-wrap ${
-                m.role === "user" ? "text-foreground" : "text-ink-muted"
-              }`}
-            >
-              {m.content}
-            </span>
-            {m.role === "assistant" &&
-              Array.isArray(m.citations) &&
-              m.citations.length > 0 && (
-                <p className="mt-1 text-[11px] text-ink-muted">
-                  Sources:{" "}
-                  {[
-                    ...new Map(
-                      m.citations.map((c) => [c.documentId, c.fileName])
-                    ).values(),
-                  ].join(", ")}
-                </p>
-              )}
-          </div>
-        ))
-      )}
-      {sending && (
-        <p className="flex items-center gap-2 text-xs text-ink-muted">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          Searching your vault…
-        </p>
+        <>
+          {welcomeBlock}
+          {messages.map((m) =>
+            m.role === "user" ? (
+              <div key={m.id} className="flex justify-end">
+                <div className="max-w-[85%] rounded-2xl bg-stone-100 px-3.5 py-2 text-sm text-foreground">
+                  <span className="whitespace-pre-wrap">{m.content}</span>
+                </div>
+              </div>
+            ) : (
+              <div key={m.id} className="flex items-start gap-2.5">
+                <GideonAvatar size={28} />
+                {renderAssistantContent(m)}
+              </div>
+            )
+          )}
+          {sending && (
+            <div className="flex items-center gap-2 text-xs text-ink-muted">
+              <GideonAvatar size={28} pulse />
+              {loadingLabel}
+            </div>
+          )}
+        </>
       )}
       <div ref={bottomRef} />
     </div>
@@ -359,22 +502,26 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     >
       <div className={isPage ? "mx-auto flex w-full max-w-3xl gap-2" : "contents"}>
         <label className="sr-only" htmlFor={inputId}>
-          Ask your vault
+          Ask Gideon
         </label>
         <input
           id={inputId}
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          disabled={sending}
+          disabled={sending || emptyVault}
           maxLength={2000}
-          placeholder="Ask across your documents…"
+          placeholder={
+            emptyVault
+              ? "Upload a document to ask Gideon…"
+              : "Ask about your documents…"
+          }
           className="min-w-0 flex-1 rounded-full border border-stone-200 bg-white px-3 py-2.5 text-sm outline-none ring-brand focus:ring-2 disabled:opacity-50"
         />
         <button
           type="submit"
-          disabled={sending || !input.trim()}
-          aria-label="Send vault question"
+          disabled={sending || !input.trim() || emptyVault}
+          aria-label="Send question to Gideon"
           className="inline-flex items-center justify-center rounded-full bg-brand px-3 py-2 text-white transition hover:bg-brand-dark focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
         >
           {sending ? (
@@ -392,21 +539,22 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
       <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <Library className="h-4 w-4 text-brand" />
-            <h2 className="text-base font-semibold">Ask your vault</h2>
+            <GideonAvatar size={28} />
+            <div>
+              <h2 className="text-base font-semibold">Ask Gideon</h2>
+              <p className="text-[11px] text-ink-muted">
+                Your AI guide to everything in your vault.
+              </p>
+            </div>
           </div>
           <Link
-            href="/dashboard/chat"
+            href="/ask"
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand hover:text-brand-dark"
           >
             Open full screen
             <ExternalLink className="h-3.5 w-3.5" />
           </Link>
         </div>
-        <p className="mb-4 text-xs text-ink-muted">
-          Search across your analyzed documents. Use full screen for history and
-          new chats.
-        </p>
         {messageList}
         {error && (
           <p className="mt-2 text-xs text-red-700" role="alert">
@@ -420,10 +568,10 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
 
   return (
     <div className="flex h-full w-full overflow-hidden bg-white">
-      {/* Desktop sidebar */}
-      <div className="hidden md:flex">{sidebar}</div>
+      <aside className="hidden h-full w-64 shrink-0 flex-col border-r border-stone-200 bg-stone-50 md:flex">
+        {chatList}
+      </aside>
 
-      {/* Mobile drawer */}
       {sidebarOpen && (
         <div className="fixed inset-0 z-50 flex md:hidden">
           <button
@@ -444,7 +592,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
                 <X className="h-4 w-4" />
               </button>
             </div>
-            {sidebar}
+            <div className="flex min-h-0 flex-1 flex-col">{chatList}</div>
           </div>
         </div>
       )}
@@ -459,13 +607,23 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
           >
             <Menu className="h-5 w-5" />
           </button>
-          <Library className="hidden h-4 w-4 text-brand sm:block" />
+          <GideonAvatar size={32} className="hidden sm:inline-flex" />
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-sm font-semibold sm:text-base">
-              {chats.find((c) => c.id === activeChatId)?.title ?? "Ask your vault"}
-            </h1>
+            <div className="flex items-center gap-1.5">
+              <h1 className="truncate text-sm font-semibold sm:text-base">
+                {chats.find((c) => c.id === activeChatId)?.title ?? "Ask Gideon"}
+              </h1>
+              <button
+                type="button"
+                onClick={() => setWhyOpen((o) => !o)}
+                aria-label="About Gideon"
+                className="rounded-full p-1 text-ink-muted hover:bg-stone-100 hover:text-foreground"
+              >
+                <Info className="h-3.5 w-3.5" />
+              </button>
+            </div>
             <p className="truncate text-[11px] text-ink-muted">
-              Answers cite your documents · AI can be wrong
+              Your AI guide to everything in your vault.
             </p>
           </div>
           <button
@@ -478,6 +636,13 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
             New
           </button>
         </header>
+
+        {whyOpen && (
+          <div className="shrink-0 border-b border-stone-200 bg-stone-50 px-4 py-3 text-xs leading-relaxed text-ink-muted sm:px-8">
+            <p className="whitespace-pre-wrap">{GIDEON_WHY}</p>
+            <p className="mt-2 font-medium text-foreground">{GIDEON_BRAND_LINE}</p>
+          </div>
+        )}
 
         {messageList}
 

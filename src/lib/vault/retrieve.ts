@@ -1,3 +1,5 @@
+import { GIDEON_SYSTEM } from "./gideon";
+
 export type RetrievedChunk = {
   id: string;
   document_id: string;
@@ -35,11 +37,5 @@ export function formatRetrievalContext(chunks: RetrievedChunk[]): {
   };
 }
 
-export const VAULT_CHAT_SYSTEM = `You are Guardian's vault assistant.
-You answer questions using ONLY the retrieved excerpts from this user's private documents.
-Rules:
-1) Cite the source file name when you use information (e.g. "According to Invoice16.pdf…").
-2) If the excerpts are not enough, say you do not know from the vault — do not invent.
-3) Prefer document facts over calculated or AI suggestions when both appear.
-4) Keep answers concise and plain language.
-5) Never claim access to other users' documents.`;
+/** @deprecated Use GIDEON_SYSTEM — kept as alias for vault modules. */
+export const VAULT_CHAT_SYSTEM = GIDEON_SYSTEM;
