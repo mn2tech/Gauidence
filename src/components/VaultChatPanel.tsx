@@ -361,12 +361,23 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
           <p className="text-base font-semibold text-foreground">
             Hi{greetName ? ` ${greetName}` : ""}, I&apos;m Gideon.
           </p>
+          {meta?.profileName && (
+            <p className="text-xs font-medium text-ink-muted">
+              {meta.askContextLabel ??
+                `Looking at ${meta.profileName}'s vault`}
+            </p>
+          )}
           {emptyVault ? (
             <>
-              <p className="text-sm text-ink-muted">Your vault is empty.</p>
               <p className="text-sm text-ink-muted">
-                Upload your first important document, and I&apos;ll help you
-                understand what it contains and what may need your attention.
+                {meta?.profileName
+                  ? `${meta.profileName}'s vault is empty.`
+                  : "Your vault is empty."}
+              </p>
+              <p className="text-sm text-ink-muted">
+                Upload the first important document for this profile, and
+                I&apos;ll help you understand what it contains and what may need
+                attention.
               </p>
               <Link
                 href="/dashboard"

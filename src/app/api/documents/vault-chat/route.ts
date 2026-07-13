@@ -162,10 +162,22 @@ export async function GET(request: Request) {
       );
     }
 
+    const { data: account } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", user.id)
+      .maybeSingle();
+
     return NextResponse.json({
       chats,
       meta: {
-        firstName: firstNameFrom(active.display_name),
+        // Greet the account owner — profiles are vault contexts, not the user.
+        firstName: firstNameFrom(
+          account?.full_name ??
+            user.user_metadata?.full_name ??
+            user.user_metadata?.name ??
+            user.email
+        ),
         documentCount: docCount,
         suggestions,
         profileId: active.id,
