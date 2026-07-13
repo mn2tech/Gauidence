@@ -22,21 +22,12 @@ export const metadata: Metadata = {
     title: "Guardian — Keep your most important documents safe and understood",
     description:
       "Store, understand, and act on the documents that matter most. Private by default.",
-    images: [
-      {
-        url: "/og.png",
-        width: 1376,
-        height: 768,
-        alt: "Guardian by NM2TECH — your private vault for the documents that matter",
-      },
-    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "Guardian — Keep your most important documents safe and understood",
     description:
       "Store, understand, and act on the documents that matter most. Private by default.",
-    images: ["/og.png"],
   },
 };
 
