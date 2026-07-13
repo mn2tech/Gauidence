@@ -59,6 +59,7 @@ type Props = {
 
 const SECTION_STYLES: Record<string, string> = {
   from_documents: "border-brand/30 bg-brand-light/40",
+  from_daily_log: "border-emerald-200 bg-emerald-50/80",
   calculated: "border-sky-200 bg-sky-50/80",
   suggestion: "border-violet-200 bg-violet-50/70",
   needs_verification: "border-amber-200 bg-amber-50/80",

@@ -29,6 +29,10 @@ import {
   askGideonContextLabel,
   type GuardianProfileType,
 } from "@/lib/profiles/types";
+import {
+  formatDailyLogsForGideon,
+  retrieveRelevantDailyLogs,
+} from "@/lib/logs/retrieve";
 
 function suggestionKindFrom(
   type: GuardianProfileType
@@ -361,11 +365,17 @@ export async function POST(request: Request) {
     .eq("user_id", user.id)
     .eq("profile_id", active.id);
 
-  if ((chunkCount ?? 0) === 0) {
+  const { count: logCount } = await supabase
+    .from("daily_logs")
+    .select("id", { count: "exact", head: true })
+    .eq("owner_user_id", user.id)
+    .eq("profile_id", active.id);
+
+  if ((chunkCount ?? 0) === 0 && (logCount ?? 0) === 0) {
     return NextResponse.json(
       {
         error:
-          "Analyze at least one document first so Guardian can search your vault.",
+          "Analyze a document or add a Daily Log so Gideon has something to search in this profile.",
       },
       { status: 409 }
     );
@@ -454,16 +464,20 @@ export async function POST(request: Request) {
   let answer: string;
 
   try {
-    const queryEmbedding = await embedQuery(question);
-    const chunks = await retrieveVaultChunks(
-      supabase,
-      queryEmbedding,
-      active.id,
-      8
-    );
+    const queryEmbedding =
+      (chunkCount ?? 0) > 0 ? await embedQuery(question) : null;
+    const chunks = queryEmbedding
+      ? await retrieveVaultChunks(supabase, queryEmbedding, active.id, 8)
+      : [];
     const formatted = formatRetrievalContext(chunks);
+    const dailyLogs = await retrieveRelevantDailyLogs(supabase, {
+      userId: user.id,
+      profileId: active.id,
+      question,
+    });
+    const logContext = formatDailyLogsForGideon(dailyLogs);
 
-    if (!formatted.context.trim()) {
+    if (!formatted.context.trim() && !logContext.trim()) {
       answer =
         "I couldn't find that information in your current vault.";
       citations = [];
@@ -472,11 +486,15 @@ export async function POST(request: Request) {
       const system = `${VAULT_CHAT_SYSTEM}
 
 Active profile: ${active.display_name} (${active.profile_type}).
-Search only this profile's vault. Never use other profiles' documents.
+Search only this profile's vault and Daily Logs. Never use other profiles' data.
 
---- RETRIEVED EXCERPTS (active profile only) ---
-${formatted.context}
---- END EXCERPTS ---`;
+--- RETRIEVED EXCERPTS (active profile documents only) ---
+${formatted.context.trim() || "(none)"}
+--- END EXCERPTS ---
+
+--- RETRIEVED DAILY LOGS (active profile only; user-entered notes) ---
+${logContext.trim() || "(none)"}
+--- END DAILY LOGS ---`;
 
       answer = await runChatCompletion(client, {
         system,

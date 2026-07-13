@@ -46,6 +46,9 @@ describe("Gideon helpers", () => {
     const sections = parseGideonSections(`## FROM YOUR DOCUMENTS
 Due date is August 5, 2026.
 
+## FROM YOUR DAILY LOG
+You recorded a follow-up on July 13.
+
 ## CALCULATED
 3 days remaining.
 
@@ -55,11 +58,12 @@ Confirm the amount before paying.
 ## NEEDS VERIFICATION
 Payment status is unclear.`);
 
-    assert.equal(sections.length, 4);
+    assert.equal(sections.length, 5);
     assert.equal(sections[0]?.kind, "from_documents");
-    assert.equal(sections[1]?.kind, "calculated");
-    assert.equal(sections[2]?.kind, "suggestion");
-    assert.equal(sections[3]?.kind, "needs_verification");
+    assert.equal(sections[1]?.kind, "from_daily_log");
+    assert.equal(sections[2]?.kind, "calculated");
+    assert.equal(sections[3]?.kind, "suggestion");
+    assert.equal(sections[4]?.kind, "needs_verification");
     assert.match(sections[0]!.content, /August 5/);
   });
 

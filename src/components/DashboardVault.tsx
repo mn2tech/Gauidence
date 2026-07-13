@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
 import DocumentManager from "@/components/DocumentManager";
 import AlertsPanel from "@/components/AlertsPanel";
+import DailyLogPanel from "@/components/DailyLogPanel";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import { vaultLabel } from "@/lib/profiles/types";
 
@@ -35,6 +36,11 @@ export default function DashboardVault({ userId }: { userId: string }) {
     <div className="space-y-6">
       <p className="text-sm text-ink-muted">{vaultLabel(active)}</p>
       <AlertsPanel profileId={active.id} />
+      <DailyLogPanel
+        profileId={active.id}
+        profileName={active.display_name}
+        profileType={active.profile_type}
+      />
       <DocumentManager
         userId={userId}
         profileId={active.id}
@@ -45,7 +51,7 @@ export default function DashboardVault({ userId }: { userId: string }) {
           <ShieldCheck className="h-4 w-4" />
         </span>
         <p className="text-sm leading-relaxed text-ink-muted">
-          Documents in this vault belong only to the active profile. Switch
+          Documents and Daily Logs belong only to the active profile. Switch
           profiles from the header to change context.
         </p>
       </div>
