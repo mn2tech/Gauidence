@@ -92,6 +92,18 @@ export function profileTypeLabel(type: GuardianProfileType): string {
   return PROFILE_TYPE_LABELS[type];
 }
 
+/** Type · relationship, omitting relationship when it duplicates the type. */
+export function profileSubtitle(profile: {
+  profile_type: GuardianProfileType;
+  relationship?: string | null;
+}): string {
+  const type = profileTypeLabel(profile.profile_type);
+  const rel = profile.relationship?.trim();
+  if (!rel) return type;
+  if (rel.toLowerCase() === type.toLowerCase()) return type;
+  return `${type} · ${rel}`;
+}
+
 /** Company/org name used for invoice payment-direction matching. */
 export function profileCompanyContext(profile: GuardianProfile): string | null {
   if (profile.profile_type === "business") {

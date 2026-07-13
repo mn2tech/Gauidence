@@ -7,7 +7,7 @@ import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
   PROFILE_CREATE_OPTIONS,
-  profileTypeLabel,
+  profileSubtitle,
   type GuardianProfile,
 } from "@/lib/profiles/types";
 
@@ -426,8 +426,7 @@ export default function ProfilesManager() {
                       ) : null}
                     </p>
                     <p className="text-xs text-ink-muted">
-                      {profileTypeLabel(p.profile_type)}
-                      {p.relationship ? ` · ${p.relationship}` : ""}
+                      {profileSubtitle(p)}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">

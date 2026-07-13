@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   PROFILE_CREATE_OPTIONS,
   profileCompanyContext,
+  profileSubtitle,
   vaultLabel,
   type GuardianProfile,
 } from "../types.ts";
@@ -62,6 +63,23 @@ describe("guardian profiles helpers", () => {
         sample({ profile_type: "business", display_name: "NM2TECH LLC" })
       ),
       "NM2TECH LLC Vault"
+    );
+  });
+
+  it("does not duplicate Child · Child in subtitle", () => {
+    assert.equal(
+      profileSubtitle({
+        profile_type: "child",
+        relationship: "Child",
+      }),
+      "Child"
+    );
+    assert.equal(
+      profileSubtitle({
+        profile_type: "personal",
+        relationship: "Myself",
+      }),
+      "Personal · Myself"
     );
   });
 

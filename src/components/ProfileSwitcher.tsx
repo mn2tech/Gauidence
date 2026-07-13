@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Check, ChevronDown, Plus, UserRound } from "lucide-react";
 import { useActiveProfile } from "@/components/ProfileProvider";
-import { profileTypeLabel } from "@/lib/profiles/types";
+import { profileSubtitle } from "@/lib/profiles/types";
 
 export default function ProfileSwitcher() {
   const { profiles, active, loading, switchProfile } = useActiveProfile();
@@ -73,8 +73,7 @@ export default function ProfileSwitcher() {
                         {p.display_name}
                       </span>
                       <span className="block truncate text-[11px] text-ink-muted">
-                        {profileTypeLabel(p.profile_type)}
-                        {p.relationship ? ` · ${p.relationship}` : ""}
+                        {profileSubtitle(p)}
                       </span>
                     </span>
                   </button>
