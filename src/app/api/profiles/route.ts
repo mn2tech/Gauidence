@@ -120,12 +120,19 @@ export async function POST(request: Request) {
     );
     if (!parent || !canHaveLinkedEmployees(parent.profile_type)) {
       return NextResponse.json(
-        { error: "Employees can only be linked to a business or nonprofit." },
+        {
+          error:
+            "Employees and clients can only be linked to a business or nonprofit.",
+        },
         { status: 400 }
       );
     }
     parentId = parent.id;
-    profileType = "employee";
+    const wantsClient =
+      option?.profileType === "client" ||
+      body.profileType === "client" ||
+      body.linkedKind === "client";
+    profileType = wantsClient ? "client" : "employee";
     if (!organizationName) {
       organizationName = profileCompanyContext(parent);
     }
@@ -134,7 +141,12 @@ export async function POST(request: Request) {
   const relationship =
     typeof body.relationship === "string"
       ? body.relationship.trim() || null
-      : option?.relationship ?? (parentId ? "Employee" : null);
+      : option?.relationship ??
+        (parentId
+          ? profileType === "client"
+            ? "Client"
+            : "Employee"
+          : null);
 
   const row = {
     owner_user_id: user.id,

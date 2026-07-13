@@ -29,6 +29,7 @@ import { getActiveGuardianProfile } from "@/lib/profiles/server";
 import {
   askGideonContextLabel,
   canHaveLinkedEmployees,
+  formatLinkedClientsForGideon,
   formatLinkedEmployeesForGideon,
   type GuardianProfileType,
 } from "@/lib/profiles/types";
@@ -37,20 +38,32 @@ import {
   retrieveRelevantDailyLogs,
 } from "@/lib/logs/retrieve";
 
-async function loadLinkedEmployeeContext(
+async function loadLinkedOrgContext(
   supabase: SupabaseClient,
   userId: string,
   active: { id: string; display_name: string; profile_type: GuardianProfileType }
 ): Promise<string> {
   if (!canHaveLinkedEmployees(active.profile_type)) return "";
-  const { data } = await supabase
-    .from("guardian_profiles")
-    .select("display_name, job_title, department")
-    .eq("owner_user_id", userId)
-    .eq("parent_profile_id", active.id)
-    .eq("profile_type", "employee")
-    .order("display_name", { ascending: true });
-  return formatLinkedEmployeesForGideon(active.display_name, data ?? []);
+  const [{ data: employees }, { data: clients }] = await Promise.all([
+    supabase
+      .from("guardian_profiles")
+      .select("display_name, job_title, department, description")
+      .eq("owner_user_id", userId)
+      .eq("parent_profile_id", active.id)
+      .eq("profile_type", "employee")
+      .order("display_name", { ascending: true }),
+    supabase
+      .from("guardian_profiles")
+      .select("display_name, job_title, department, description")
+      .eq("owner_user_id", userId)
+      .eq("parent_profile_id", active.id)
+      .eq("profile_type", "client")
+      .order("display_name", { ascending: true }),
+  ]);
+  return [
+    formatLinkedEmployeesForGideon(active.display_name, employees ?? []),
+    formatLinkedClientsForGideon(active.display_name, clients ?? []),
+  ].join("\n\n");
 }
 
 function suggestionKindFrom(
@@ -528,7 +541,7 @@ export async function POST(request: Request) {
       question,
     });
     const logContext = formatDailyLogsForGideon(dailyLogs);
-    const linkedContext = await loadLinkedEmployeeContext(
+    const linkedContext = await loadLinkedOrgContext(
       supabase,
       user.id,
       active

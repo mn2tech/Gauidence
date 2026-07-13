@@ -7,8 +7,13 @@ import DocumentManager from "@/components/DocumentManager";
 import AlertsPanel from "@/components/AlertsPanel";
 import DailyLogPanel from "@/components/DailyLogPanel";
 import LinkedEmployeesPanel from "@/components/LinkedEmployeesPanel";
+import LinkedClientsPanel from "@/components/LinkedClientsPanel";
 import { useActiveProfile } from "@/components/ProfileProvider";
-import { canHaveLinkedEmployees, vaultLabel } from "@/lib/profiles/types";
+import {
+  canHaveLinkedClients,
+  canHaveLinkedEmployees,
+  vaultLabel,
+} from "@/lib/profiles/types";
 
 export default function DashboardVault({ userId }: { userId: string }) {
   const router = useRouter();
@@ -39,6 +44,9 @@ export default function DashboardVault({ userId }: { userId: string }) {
       <AlertsPanel profileId={active.id} />
       {canHaveLinkedEmployees(active.profile_type) && (
         <LinkedEmployeesPanel parent={active} />
+      )}
+      {canHaveLinkedClients(active.profile_type) && (
+        <LinkedClientsPanel parent={active} />
       )}
       <DailyLogPanel
         profileId={active.id}

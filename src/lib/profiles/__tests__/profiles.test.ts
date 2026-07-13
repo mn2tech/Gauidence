@@ -2,8 +2,11 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   PROFILE_CREATE_OPTIONS,
+  canHaveLinkedClients,
   canHaveLinkedEmployees,
+  clientsOf,
   employeesOf,
+  formatLinkedClientsForGideon,
   formatLinkedEmployeesForGideon,
   profileCompanyContext,
   profileSubtitle,
@@ -118,9 +121,9 @@ describe("guardian profiles helpers", () => {
     assert.ok(!child.some((q) => /expecting to receive/i.test(q)));
   });
 
-  it("links employees under org profiles", () => {
+  it("links employees and clients under org profiles", () => {
     assert.equal(canHaveLinkedEmployees("business"), true);
-    assert.equal(canHaveLinkedEmployees("non_profit"), true);
+    assert.equal(canHaveLinkedClients("non_profit"), true);
     assert.equal(canHaveLinkedEmployees("personal"), false);
 
     const parentId = "biz1";
@@ -133,6 +136,13 @@ describe("guardian profiles helpers", () => {
         parent_profile_id: parentId,
       }),
       sample({
+        id: "c1",
+        profile_type: "client",
+        display_name: "Northside Clinic",
+        parent_profile_id: parentId,
+        description: "Retainer",
+      }),
+      sample({
         id: "e2",
         profile_type: "employee",
         display_name: "Sam",
@@ -143,6 +153,10 @@ describe("guardian profiles helpers", () => {
     assert.equal(linked.length, 1);
     assert.equal(linked[0]?.display_name, "Jordan");
 
+    const linkedClients = clientsOf(list, parentId);
+    assert.equal(linkedClients.length, 1);
+    assert.equal(linkedClients[0]?.display_name, "Northside Clinic");
+
     const roster = formatLinkedEmployeesForGideon("Acme", [
       { display_name: "Jordan", job_title: "Ops", department: null },
     ]);
@@ -151,6 +165,17 @@ describe("guardian profiles helpers", () => {
     assert.match(
       formatLinkedEmployeesForGideon("Acme", []),
       /Linked employee profiles in Guardian: 0/
+    );
+    assert.match(
+      formatLinkedClientsForGideon("Acme", [
+        {
+          display_name: "Northside Clinic",
+          job_title: null,
+          department: null,
+          description: "Retainer",
+        },
+      ]),
+      /Linked client profiles in Guardian: 1/
     );
   });
 });

@@ -168,8 +168,12 @@ export function isAssetStyleProfile(type: GuardianProfileType): boolean {
   return type === "vehicle" || type === "home" || type === "pet";
 }
 
-/** Business / nonprofit can own linked employee profiles. */
+/** Business / nonprofit can own linked employee and client profiles. */
 export function canHaveLinkedEmployees(type: GuardianProfileType): boolean {
+  return isOrgStyleProfile(type);
+}
+
+export function canHaveLinkedClients(type: GuardianProfileType): boolean {
   return isOrgStyleProfile(type);
 }
 
@@ -182,16 +186,29 @@ export function employeesOf(
   );
 }
 
-export type LinkedEmployeeSummary = {
+export function clientsOf(
+  profiles: GuardianProfile[],
+  parentId: string
+): GuardianProfile[] {
+  return profiles.filter(
+    (p) => p.parent_profile_id === parentId && p.profile_type === "client"
+  );
+}
+
+export type LinkedPersonSummary = {
   display_name: string;
   job_title: string | null;
   department: string | null;
+  description?: string | null;
 };
+
+/** @deprecated Use LinkedPersonSummary */
+export type LinkedEmployeeSummary = LinkedPersonSummary;
 
 /** Context block for Gideon: linked employee roster under an org profile. */
 export function formatLinkedEmployeesForGideon(
   orgName: string,
-  employees: LinkedEmployeeSummary[]
+  employees: LinkedPersonSummary[]
 ): string {
   const count = employees.length;
   const header = `Organization profile: ${orgName}\nLinked employee profiles in Guardian: ${count}`;
@@ -203,4 +220,21 @@ export function formatLinkedEmployeesForGideon(
     return `${i + 1}. ${e.display_name}${bits.length ? ` — ${bits.join(", ")}` : ""}`;
   });
   return `${header}\n${lines.join("\n")}\n(This is Guardian's linked-profile roster — not payroll headcount unless documents also support it.)`;
+}
+
+/** Context block for Gideon: linked client roster under an org profile. */
+export function formatLinkedClientsForGideon(
+  orgName: string,
+  clients: LinkedPersonSummary[]
+): string {
+  const count = clients.length;
+  const header = `Organization profile: ${orgName}\nLinked client profiles in Guardian: ${count}`;
+  if (count === 0) {
+    return `${header}\n(None linked yet.)`;
+  }
+  const lines = clients.map((c, i) => {
+    const note = c.description?.trim() || c.job_title?.trim();
+    return `${i + 1}. ${c.display_name}${note ? ` — ${note}` : ""}`;
+  });
+  return `${header}\n${lines.join("\n")}\n(This is Guardian's linked client roster under this organization.)`;
 }
