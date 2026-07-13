@@ -477,6 +477,9 @@ export default function ProfilesManager() {
                     </p>
                     <p className="text-xs text-ink-muted">
                       {profileSubtitle(p)}
+                      {p.profile_type === "employee" && p.organization_name
+                        ? ` · ${p.organization_name}`
+                        : ""}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">

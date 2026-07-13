@@ -2,6 +2,8 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   PROFILE_CREATE_OPTIONS,
+  canHaveLinkedEmployees,
+  employeesOf,
   profileCompanyContext,
   profileSubtitle,
   vaultLabel,
@@ -29,6 +31,7 @@ function sample(
     job_title: null,
     department: null,
     organization_name: null,
+    parent_profile_id: null,
     is_default: true,
     created_at: "",
     updated_at: "",
@@ -112,5 +115,31 @@ describe("guardian profiles helpers", () => {
     );
     assert.ok(child.some((q) => /school/i.test(q)));
     assert.ok(!child.some((q) => /expecting to receive/i.test(q)));
+  });
+
+  it("links employees under org profiles", () => {
+    assert.equal(canHaveLinkedEmployees("business"), true);
+    assert.equal(canHaveLinkedEmployees("non_profit"), true);
+    assert.equal(canHaveLinkedEmployees("personal"), false);
+
+    const parentId = "biz1";
+    const list = [
+      sample({ id: parentId, profile_type: "business", display_name: "Acme" }),
+      sample({
+        id: "e1",
+        profile_type: "employee",
+        display_name: "Jordan",
+        parent_profile_id: parentId,
+      }),
+      sample({
+        id: "e2",
+        profile_type: "employee",
+        display_name: "Sam",
+        parent_profile_id: null,
+      }),
+    ];
+    const linked = employeesOf(list, parentId);
+    assert.equal(linked.length, 1);
+    assert.equal(linked[0]?.display_name, "Jordan");
   });
 });

@@ -8,7 +8,7 @@ import {
 } from "./types";
 
 const PROFILE_SELECT =
-  "id, owner_user_id, profile_type, display_name, relationship, avatar_url, date_of_birth, school_name, grade_level, business_legal_name, industry, website, description, job_title, department, organization_name, is_default, created_at, updated_at";
+  "id, owner_user_id, profile_type, display_name, relationship, avatar_url, date_of_birth, school_name, grade_level, business_legal_name, industry, website, description, job_title, department, organization_name, parent_profile_id, is_default, created_at, updated_at";
 
 function asProfile(row: Record<string, unknown>): GuardianProfile {
   const type = isGuardianProfileType(row.profile_type)
@@ -31,6 +31,7 @@ function asProfile(row: Record<string, unknown>): GuardianProfile {
     job_title: (row.job_title as string | null) ?? null,
     department: (row.department as string | null) ?? null,
     organization_name: (row.organization_name as string | null) ?? null,
+    parent_profile_id: (row.parent_profile_id as string | null) ?? null,
     is_default: Boolean(row.is_default),
     created_at: String(row.created_at ?? ""),
     updated_at: String(row.updated_at ?? ""),

@@ -2,16 +2,19 @@ import { NextResponse } from "next/server";
 import type { User, SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import {
+  isGuardianProfileType,
+  PROFILE_CREATE_OPTIONS,
+  canHaveLinkedEmployees,
+  profileCompanyContext,
+  type GuardianProfileType,
+} from "@/lib/profiles/types";
+import {
   ensureDefaultGuardianProfile,
   getActiveGuardianProfile,
   listGuardianProfiles,
+  requireOwnedGuardianProfile,
   setActiveGuardianProfile,
 } from "@/lib/profiles/server";
-import {
-  isGuardianProfileType,
-  PROFILE_CREATE_OPTIONS,
-  type GuardianProfileType,
-} from "@/lib/profiles/types";
 
 export const runtime = "nodejs";
 
@@ -100,10 +103,38 @@ export async function POST(request: Request) {
     );
   }
 
+  const parentProfileId =
+    typeof body.parentProfileId === "string" ? body.parentProfileId.trim() : "";
+
+  let organizationName =
+    typeof body.organizationName === "string"
+      ? body.organizationName.trim() || null
+      : null;
+
+  let parentId: string | null = null;
+  if (parentProfileId) {
+    const parent = await requireOwnedGuardianProfile(
+      supabase,
+      user.id,
+      parentProfileId
+    );
+    if (!parent || !canHaveLinkedEmployees(parent.profile_type)) {
+      return NextResponse.json(
+        { error: "Employees can only be linked to a business or nonprofit." },
+        { status: 400 }
+      );
+    }
+    parentId = parent.id;
+    profileType = "employee";
+    if (!organizationName) {
+      organizationName = profileCompanyContext(parent);
+    }
+  }
+
   const relationship =
     typeof body.relationship === "string"
       ? body.relationship.trim() || null
-      : option?.relationship ?? null;
+      : option?.relationship ?? (parentId ? "Employee" : null);
 
   const row = {
     owner_user_id: user.id,
@@ -140,10 +171,8 @@ export async function POST(request: Request) {
       typeof body.department === "string"
         ? body.department.trim() || null
         : null,
-    organization_name:
-      typeof body.organizationName === "string"
-        ? body.organizationName.trim() || null
-        : null,
+    organization_name: organizationName,
+    parent_profile_id: parentId,
     is_default: false,
   };
 
@@ -151,7 +180,7 @@ export async function POST(request: Request) {
     .from("guardian_profiles")
     .insert(row)
     .select(
-      "id, owner_user_id, profile_type, display_name, relationship, avatar_url, date_of_birth, school_name, grade_level, business_legal_name, industry, website, description, job_title, department, organization_name, is_default, created_at, updated_at"
+      "id, owner_user_id, profile_type, display_name, relationship, avatar_url, date_of_birth, school_name, grade_level, business_legal_name, industry, website, description, job_title, department, organization_name, parent_profile_id, is_default, created_at, updated_at"
     )
     .single();
 

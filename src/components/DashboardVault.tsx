@@ -6,8 +6,9 @@ import { ShieldCheck } from "lucide-react";
 import DocumentManager from "@/components/DocumentManager";
 import AlertsPanel from "@/components/AlertsPanel";
 import DailyLogPanel from "@/components/DailyLogPanel";
+import LinkedEmployeesPanel from "@/components/LinkedEmployeesPanel";
 import { useActiveProfile } from "@/components/ProfileProvider";
-import { vaultLabel } from "@/lib/profiles/types";
+import { canHaveLinkedEmployees, vaultLabel } from "@/lib/profiles/types";
 
 export default function DashboardVault({ userId }: { userId: string }) {
   const router = useRouter();
@@ -36,6 +37,9 @@ export default function DashboardVault({ userId }: { userId: string }) {
     <div className="space-y-6">
       <p className="text-sm text-ink-muted">{vaultLabel(active)}</p>
       <AlertsPanel profileId={active.id} />
+      {canHaveLinkedEmployees(active.profile_type) && (
+        <LinkedEmployeesPanel parent={active} />
+      )}
       <DailyLogPanel
         profileId={active.id}
         profileName={active.display_name}

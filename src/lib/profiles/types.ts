@@ -88,6 +88,7 @@ export type GuardianProfile = {
   job_title: string | null;
   department: string | null;
   organization_name: string | null;
+  parent_profile_id: string | null;
   is_default: boolean;
   created_at: string;
   updated_at: string;
@@ -165,4 +166,18 @@ export function isOrgStyleProfile(type: GuardianProfileType): boolean {
 /** Vehicle, home, pet — named assets, not people. */
 export function isAssetStyleProfile(type: GuardianProfileType): boolean {
   return type === "vehicle" || type === "home" || type === "pet";
+}
+
+/** Business / nonprofit can own linked employee profiles. */
+export function canHaveLinkedEmployees(type: GuardianProfileType): boolean {
+  return isOrgStyleProfile(type);
+}
+
+export function employeesOf(
+  profiles: GuardianProfile[],
+  parentId: string
+): GuardianProfile[] {
+  return profiles.filter(
+    (p) => p.parent_profile_id === parentId && p.profile_type === "employee"
+  );
 }

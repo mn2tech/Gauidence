@@ -70,7 +70,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
       .eq("id", id)
       .eq("owner_user_id", user.id)
       .select(
-        "id, owner_user_id, profile_type, display_name, relationship, avatar_url, date_of_birth, school_name, grade_level, business_legal_name, industry, website, description, job_title, department, organization_name, is_default, created_at, updated_at"
+        "id, owner_user_id, profile_type, display_name, relationship, avatar_url, date_of_birth, school_name, grade_level, business_legal_name, industry, website, description, job_title, department, organization_name, parent_profile_id, is_default, created_at, updated_at"
       )
       .single();
     if (error || !data) {
@@ -143,7 +143,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
     .eq("id", id)
     .eq("owner_user_id", user.id)
     .select(
-      "id, owner_user_id, profile_type, display_name, relationship, avatar_url, date_of_birth, school_name, grade_level, business_legal_name, industry, website, description, job_title, department, organization_name, is_default, created_at, updated_at"
+      "id, owner_user_id, profile_type, display_name, relationship, avatar_url, date_of_birth, school_name, grade_level, business_legal_name, industry, website, description, job_title, department, organization_name, parent_profile_id, is_default, created_at, updated_at"
     )
     .single();
 
