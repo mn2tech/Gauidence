@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Plus, UserRound } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
   profileSubtitle,
@@ -14,6 +14,58 @@ function initialFor(profile: GuardianProfile): string {
   const name = profile.display_name.trim();
   if (!name) return "?";
   return name.charAt(0).toUpperCase();
+}
+
+function ProfileChip({
+  profile,
+  selected,
+  onSelect,
+}: {
+  profile: GuardianProfile;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="option"
+      aria-selected={selected}
+      onClick={onSelect}
+      className={`flex w-full items-center gap-2.5 rounded-2xl border px-3 py-2.5 text-left transition sm:min-w-[8.5rem] sm:max-w-[11rem] ${
+        selected
+          ? "border-brand bg-brand-light ring-1 ring-brand/30"
+          : "border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50"
+      }`}
+    >
+      {profile.avatar_url ? (
+        <Image
+          src={profile.avatar_url}
+          alt=""
+          width={36}
+          height={36}
+          className="h-9 w-9 shrink-0 rounded-full border border-stone-200 object-cover"
+          unoptimized
+        />
+      ) : (
+        <span
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
+            selected ? "bg-brand text-white" : "bg-stone-100 text-ink-muted"
+          }`}
+          aria-hidden
+        >
+          {initialFor(profile)}
+        </span>
+      )}
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-semibold leading-tight">
+          {profile.display_name}
+        </span>
+        <span className="block truncate text-[11px] text-ink-muted">
+          {profileTypeLabel(profile.profile_type)}
+        </span>
+      </span>
+    </button>
+  );
 }
 
 type Props = {
@@ -28,17 +80,14 @@ export default function WelcomeProfileStrip({
   const { profiles, active, loading, switchProfile } = useActiveProfile();
 
   return (
-    <div className="welcome-strip space-y-5">
-      <div className="flex flex-col items-start justify-between gap-6 sm:flex-row sm:items-center">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            Welcome, {ownerName}
-          </h1>
-          {ownerEmail ? (
-            <p className="mt-0.5 text-sm text-ink-muted">{ownerEmail}</p>
-          ) : null}
-        </div>
-        {/* Settings / sign-out stay in parent */}
+    <div className="welcome-strip space-y-4 sm:space-y-5">
+      <div>
+        <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
+          Welcome, {ownerName}
+        </h1>
+        {ownerEmail ? (
+          <p className="mt-0.5 truncate text-sm text-ink-muted">{ownerEmail}</p>
+        ) : null}
       </div>
 
       <div>
@@ -56,7 +105,7 @@ export default function WelcomeProfileStrip({
           <p className="mt-3 text-sm text-ink-muted">Loading profiles…</p>
         ) : (
           <ul
-            className="welcome-chips mt-3 flex gap-2.5 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className="welcome-chips mt-3 grid grid-cols-2 gap-2 sm:flex sm:gap-2.5 sm:overflow-x-auto sm:pb-1 sm:[-ms-overflow-style:none] sm:[scrollbar-width:none] sm:[&::-webkit-scrollbar]:hidden"
             role="listbox"
             aria-label="Guardian profiles"
           >
@@ -65,66 +114,30 @@ export default function WelcomeProfileStrip({
               return (
                 <li
                   key={p.id}
-                  className="welcome-chip shrink-0"
+                  className="welcome-chip min-w-0 sm:shrink-0"
                   style={{ animationDelay: `${80 + i * 45}ms` }}
                 >
-                  <button
-                    type="button"
-                    role="option"
-                    aria-selected={selected}
-                    onClick={() => {
+                  <ProfileChip
+                    profile={p}
+                    selected={selected}
+                    onSelect={() => {
                       if (p.id !== active?.id) void switchProfile(p.id);
                     }}
-                    className={`flex min-w-[7.5rem] max-w-[10rem] items-center gap-2.5 rounded-2xl border px-3 py-2.5 text-left transition ${
-                      selected
-                        ? "border-brand bg-brand-light ring-1 ring-brand/30"
-                        : "border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50"
-                    }`}
-                  >
-                    {p.avatar_url ? (
-                      <Image
-                        src={p.avatar_url}
-                        alt=""
-                        width={36}
-                        height={36}
-                        className="h-9 w-9 shrink-0 rounded-full border border-stone-200 object-cover"
-                        unoptimized
-                      />
-                    ) : (
-                      <span
-                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
-                          selected
-                            ? "bg-brand text-white"
-                            : "bg-stone-100 text-ink-muted"
-                        }`}
-                        aria-hidden
-                      >
-                        {initialFor(p)}
-                      </span>
-                    )}
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-semibold leading-tight">
-                        {p.display_name}
-                      </span>
-                      <span className="block truncate text-[11px] text-ink-muted">
-                        {profileTypeLabel(p.profile_type)}
-                      </span>
-                    </span>
-                  </button>
+                  />
                 </li>
               );
             })}
             <li
-              className="welcome-chip shrink-0"
+              className="welcome-chip min-w-0 sm:shrink-0"
               style={{
                 animationDelay: `${80 + profiles.length * 45}ms`,
               }}
             >
               <Link
                 href="/settings/profiles?add=1"
-                className="flex h-full min-w-[7.5rem] items-center gap-2 rounded-2xl border border-dashed border-stone-300 bg-white/70 px-3 py-2.5 text-sm font-medium text-ink-muted transition hover:border-brand hover:text-brand"
+                className="flex h-full w-full min-h-[3.25rem] items-center gap-2 rounded-2xl border border-dashed border-stone-300 bg-white/70 px-3 py-2.5 text-sm font-medium text-ink-muted transition hover:border-brand hover:text-brand sm:min-w-[8.5rem]"
               >
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-stone-50">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-stone-50">
                   <Plus className="h-4 w-4" />
                 </span>
                 Add
@@ -139,7 +152,7 @@ export default function WelcomeProfileStrip({
             <span className="font-medium text-foreground">
               {active.display_name}
             </span>
-            <span className="text-ink-muted">
+            <span>
               {" "}
               · {profileSubtitle(active)}
             </span>
@@ -147,14 +160,5 @@ export default function WelcomeProfileStrip({
         ) : null}
       </div>
     </div>
-  );
-}
-
-/** Decorative avatar used outside the strip when we still want a face mark. */
-export function WelcomeFallbackAvatar() {
-  return (
-    <span className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-light text-brand">
-      <UserRound className="h-7 w-7" />
-    </span>
   );
 }

@@ -46,27 +46,25 @@ export default async function DashboardPage() {
     <div className="flex min-h-screen flex-col">
       <SiteHeader />
       <main className="flex-1">
-        <section className="mx-auto max-w-4xl px-6 py-14">
-          <div className="flex flex-col items-start justify-between gap-6 sm:flex-row sm:items-start">
-            <div className="min-w-0 flex-1">
-              <WelcomeProfileStrip
-                ownerName={ownerName}
-                ownerEmail={user.email}
-              />
-            </div>
-            <div className="flex shrink-0 items-center gap-3">
+        <section className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-14">
+          <div className="flex flex-col gap-4 sm:gap-6">
+            <div className="flex items-center justify-end gap-2 sm:gap-3">
               <Link
                 href="/settings"
-                className="inline-flex items-center gap-2 rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-foreground transition hover:border-stone-400 hover:bg-stone-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                className="inline-flex items-center gap-2 rounded-full border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-foreground transition hover:border-stone-400 hover:bg-stone-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:px-4 sm:py-2"
               >
                 <Settings className="h-4 w-4" />
-                Settings
+                <span className="sm:inline">Settings</span>
               </Link>
               <SignOutButton />
             </div>
+            <WelcomeProfileStrip
+              ownerName={ownerName}
+              ownerEmail={user.email}
+            />
           </div>
 
-          <div className="mt-10">
+          <div className="mt-8 sm:mt-10">
             <DashboardVault userId={user.id} />
           </div>
         </section>
