@@ -167,11 +167,14 @@ export default function ProfilesManager() {
     window.dispatchEvent(new CustomEvent("guardian:profile-changed"));
   };
 
-  const isBiz = option?.profileType === "business";
+  const isBiz =
+    option?.profileType === "business" || option?.profileType === "non_profit";
   const isChild =
     option?.profileType === "child" || option?.profileType === "student";
   const isEmployee = option?.profileType === "employee";
   const isClient = option?.profileType === "client";
+  const orgNameLabel =
+    option?.profileType === "non_profit" ? "Nonprofit name" : "Business name";
 
   return (
     <div className="space-y-6">
@@ -250,13 +253,19 @@ export default function ProfilesManager() {
               <div className="mt-4 space-y-3">
                 <label className="block text-sm">
                   <span className="font-medium">
-                    {isBiz ? "Business name" : "Display name"}
+                    {isBiz ? orgNameLabel : "Display name"}
                   </span>
                   <input
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
                     className="mt-1 w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none ring-brand focus:ring-2"
-                    placeholder={isBiz ? "NM2TECH LLC" : "Name"}
+                    placeholder={
+                      option?.profileType === "non_profit"
+                        ? "Community Foundation"
+                        : isBiz
+                          ? "NM2TECH LLC"
+                          : "Name"
+                    }
                   />
                 </label>
                 {isChild && (

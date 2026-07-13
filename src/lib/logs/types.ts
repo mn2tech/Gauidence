@@ -77,6 +77,17 @@ export const LOG_CATEGORIES_BY_PROFILE: Record<
     "Operations",
     "Important Event",
   ],
+  non_profit: [
+    "Donor",
+    "Grant",
+    "Program",
+    "Volunteer",
+    "Board",
+    "Fundraising",
+    "Meeting",
+    "Operations",
+    "Important Event",
+  ],
   employee: [
     "Work Update",
     "Project",

@@ -40,6 +40,7 @@ describe("guardian profiles helpers", () => {
   it("exposes create options for all intended audiences", () => {
     assert.ok(PROFILE_CREATE_OPTIONS.length >= 10);
     assert.ok(PROFILE_CREATE_OPTIONS.some((o) => o.profileType === "business"));
+    assert.ok(PROFILE_CREATE_OPTIONS.some((o) => o.profileType === "non_profit"));
     assert.ok(PROFILE_CREATE_OPTIONS.some((o) => o.profileType === "child"));
   });
 

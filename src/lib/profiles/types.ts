@@ -10,6 +10,7 @@ export const GUARDIAN_PROFILE_TYPES = [
   "family_member",
   "student",
   "business",
+  "non_profit",
   "employee",
   "client",
   "other",
@@ -25,6 +26,7 @@ export const PROFILE_TYPE_LABELS: Record<GuardianProfileType, string> = {
   family_member: "Family member",
   student: "Student",
   business: "Business",
+  non_profit: "Nonprofit",
   employee: "Employee",
   client: "Client",
   other: "Other",
@@ -54,6 +56,7 @@ export const PROFILE_CREATE_OPTIONS: {
   },
   { id: "student", label: "A student", profileType: "student", relationship: "Student" },
   { id: "business", label: "My business", profileType: "business" },
+  { id: "nonprofit", label: "A nonprofit", profileType: "non_profit" },
   { id: "employee", label: "An employee", profileType: "employee" },
   { id: "client", label: "A client", profileType: "client" },
   { id: "other", label: "Something else", profileType: "other" },
@@ -106,7 +109,7 @@ export function profileSubtitle(profile: {
 
 /** Company/org name used for invoice payment-direction matching. */
 export function profileCompanyContext(profile: GuardianProfile): string | null {
-  if (profile.profile_type === "business") {
+  if (profile.profile_type === "business" || profile.profile_type === "non_profit") {
     return (
       profile.business_legal_name?.trim() ||
       profile.display_name?.trim() ||
@@ -122,18 +125,30 @@ export function profileCompanyContext(profile: GuardianProfile): string | null {
 
 export function vaultLabel(profile: GuardianProfile): string {
   const name = profile.display_name.trim() || "Profile";
-  if (profile.profile_type === "business") return `${name} Vault`;
+  if (
+    profile.profile_type === "business" ||
+    profile.profile_type === "non_profit"
+  ) {
+    return `${name} Vault`;
+  }
   if (name.toLowerCase().endsWith("s")) return `${name}' Vault`;
   return `${name}'s Vault`;
 }
 
 export function askGideonContextLabel(profile: GuardianProfile): string {
   const name = profile.display_name.trim() || "this profile";
-  if (profile.profile_type === "business") {
+  if (
+    profile.profile_type === "business" ||
+    profile.profile_type === "non_profit"
+  ) {
     return `Ask Gideon about ${name}`;
   }
   if (name.toLowerCase().endsWith("s")) {
     return `Ask Gideon about ${name}' vault`;
   }
   return `Ask Gideon about ${name}'s vault`;
+}
+
+export function isOrgStyleProfile(type: GuardianProfileType): boolean {
+  return type === "business" || type === "non_profit";
 }

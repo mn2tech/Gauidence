@@ -39,8 +39,13 @@ function suggestionKindFrom(
   type: GuardianProfileType
 ): SuggestionProfileKind {
   if (type === "child" || type === "student") return type;
-  if (type === "business" || type === "employee" || type === "client") {
-    return type;
+  if (
+    type === "business" ||
+    type === "non_profit" ||
+    type === "employee" ||
+    type === "client"
+  ) {
+    return type === "non_profit" ? "business" : type;
   }
   if (
     type === "spouse_partner" ||

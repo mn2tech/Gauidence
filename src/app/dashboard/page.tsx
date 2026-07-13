@@ -50,7 +50,8 @@ export default async function DashboardPage() {
               )}
               <div>
                 <h1 className="text-2xl font-bold tracking-tight">
-                  {active.profile_type === "business"
+                  {active.profile_type === "business" ||
+                  active.profile_type === "non_profit"
                     ? displayName
                     : `Welcome, ${displayName}`}
                 </h1>

@@ -143,7 +143,8 @@ export async function POST(request: Request) {
     : { data: null };
 
   const companyName =
-    (guardianProfile?.profile_type === "business"
+    (guardianProfile?.profile_type === "business" ||
+      guardianProfile?.profile_type === "non_profit"
       ? guardianProfile.business_legal_name || guardianProfile.display_name
       : guardianProfile?.organization_name) ||
     accountProfile?.company_name ||
