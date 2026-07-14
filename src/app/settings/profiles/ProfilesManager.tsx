@@ -130,6 +130,11 @@ export default function ProfilesManager() {
         return;
       }
       await refresh();
+      window.dispatchEvent(
+        new CustomEvent("guardian:profile-changed", {
+          detail: { profileId: id },
+        })
+      );
     } finally {
       setBusy(false);
     }
