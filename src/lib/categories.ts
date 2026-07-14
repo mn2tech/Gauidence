@@ -1,5 +1,7 @@
 /** Fixed document categories, shared by the vault UI and the AI analyze route. */
 export const DOCUMENT_CATEGORIES = [
+  "Family",
+  "Business",
   "Insurance",
   "Medical",
   "Legal",
@@ -8,6 +10,8 @@ export const DOCUMENT_CATEGORIES = [
   "Identity",
   "Home",
   "Vehicle",
+  "Education",
+  "Employment",
   "Other",
 ] as const;
 
