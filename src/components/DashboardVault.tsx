@@ -67,7 +67,7 @@ export default function DashboardVault({ userId }: { userId: string }) {
         />
       </VaultSection>
 
-      <VaultSection id={`vault-${active.id}`} title="Vault">
+      <VaultSection id={`documents-${active.id}`} title="Documents">
         <DocumentManager
           userId={userId}
           profileId={active.id}
@@ -80,7 +80,7 @@ export default function DashboardVault({ userId }: { userId: string }) {
           <ShieldCheck className="h-4 w-4" />
         </span>
         <p className="text-sm leading-relaxed text-ink-muted">
-          Vault and Daily Logs belong only to the active profile. Switch
+          Documents and Daily Logs belong only to the active profile. Switch
           profiles above or from the header to change context. Tap a section
           title to collapse or expand it.
         </p>
