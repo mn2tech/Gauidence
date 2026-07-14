@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
-  isLinkedOrgMember,
+  isLinkedMemberProfile,
   profileSubtitle,
   profileTypeLabel,
   topLevelProfiles,
@@ -81,7 +81,7 @@ export default function WelcomeProfileStrip({
 }: Props) {
   const { profiles, active, loading, switchProfile } = useActiveProfile();
   const topLevel = topLevelProfiles(profiles);
-  const viewingLinked = active && isLinkedOrgMember(active);
+  const viewingLinked = active && isLinkedMemberProfile(active);
   const chipHighlightId = viewingLinked
     ? active.parent_profile_id
     : active?.id;

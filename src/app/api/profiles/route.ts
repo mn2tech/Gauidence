@@ -3,9 +3,13 @@ import type { User, SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import {
   isGuardianProfileType,
+  isFamilyMemberType,
   PROFILE_CREATE_OPTIONS,
   canHaveLinkedEmployees,
+  canHaveLinkedFamilyMembers,
+  canHaveLinkedVehicles,
   profileCompanyContext,
+  profileTypeLabel,
   type GuardianProfileType,
 } from "@/lib/profiles/types";
 import {
@@ -118,35 +122,64 @@ export async function POST(request: Request) {
       user.id,
       parentProfileId
     );
-    if (!parent || !canHaveLinkedEmployees(parent.profile_type)) {
+    if (!parent) {
+      return NextResponse.json(
+        { error: "Parent profile not found." },
+        { status: 400 }
+      );
+    }
+
+    const requestedType: GuardianProfileType =
+      option?.profileType ??
+      (isGuardianProfileType(body.profileType) ? body.profileType : profileType);
+
+    if (canHaveLinkedEmployees(parent.profile_type)) {
+      const asClient =
+        requestedType === "client" ||
+        body.profileType === "client" ||
+        body.linkedKind === "client";
+      profileType = asClient ? "client" : "employee";
+      if (!organizationName) {
+        organizationName = profileCompanyContext(parent);
+      }
+    } else if (canHaveLinkedFamilyMembers(parent.profile_type)) {
+      if (!isFamilyMemberType(requestedType)) {
+        return NextResponse.json(
+          {
+            error:
+              "Only child, spouse/partner, parent, family member, or student can be linked to a Family profile.",
+          },
+          { status: 400 }
+        );
+      }
+      profileType = requestedType;
+    } else if (canHaveLinkedVehicles(parent.profile_type)) {
+      if (requestedType !== "vehicle") {
+        return NextResponse.json(
+          {
+            error: "Only vehicle profiles can be linked to a Vehicles profile.",
+          },
+          { status: 400 }
+        );
+      }
+      profileType = "vehicle";
+    } else {
       return NextResponse.json(
         {
           error:
-            "Employees and clients can only be linked to a business or nonprofit.",
+            "This profile type cannot have linked members. Use a Business, Nonprofit, Family, or Vehicles profile.",
         },
         { status: 400 }
       );
     }
     parentId = parent.id;
-    const wantsClient =
-      option?.profileType === "client" ||
-      body.profileType === "client" ||
-      body.linkedKind === "client";
-    profileType = wantsClient ? "client" : "employee";
-    if (!organizationName) {
-      organizationName = profileCompanyContext(parent);
-    }
   }
 
   const relationship =
     typeof body.relationship === "string"
       ? body.relationship.trim() || null
       : option?.relationship ??
-        (parentId
-          ? profileType === "client"
-            ? "Client"
-            : "Employee"
-          : null);
+        (parentId ? profileTypeLabel(profileType) : null);
 
   const row = {
     owner_user_id: user.id,

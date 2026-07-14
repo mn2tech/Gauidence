@@ -4,15 +4,21 @@ import {
   PROFILE_CREATE_OPTIONS,
   canHaveLinkedClients,
   canHaveLinkedEmployees,
+  canHaveLinkedFamilyMembers,
+  canHaveLinkedVehicles,
   clientsOf,
   employeesOf,
+  familyMembersOf,
   formatLinkedClientsForGideon,
   formatLinkedEmployeesForGideon,
-  isLinkedOrgMember,
+  formatLinkedFamilyForGideon,
+  formatLinkedVehiclesForGideon,
+  isLinkedMemberProfile,
   profileCompanyContext,
   profileSubtitle,
   topLevelProfiles,
   vaultLabel,
+  vehiclesOf,
   type GuardianProfile,
 } from "../types.ts";
 import { buildGideonSuggestions } from "../../vault/gideon.ts";
@@ -50,6 +56,8 @@ describe("guardian profiles helpers", () => {
     assert.ok(PROFILE_CREATE_OPTIONS.length >= 10);
     assert.ok(PROFILE_CREATE_OPTIONS.some((o) => o.profileType === "business"));
     assert.ok(PROFILE_CREATE_OPTIONS.some((o) => o.profileType === "non_profit"));
+    assert.ok(PROFILE_CREATE_OPTIONS.some((o) => o.profileType === "family"));
+    assert.ok(PROFILE_CREATE_OPTIONS.some((o) => o.profileType === "vehicles"));
     assert.ok(PROFILE_CREATE_OPTIONS.some((o) => o.profileType === "vehicle"));
     assert.ok(PROFILE_CREATE_OPTIONS.some((o) => o.profileType === "home"));
     assert.ok(PROFILE_CREATE_OPTIONS.some((o) => o.profileType === "pet"));
@@ -180,16 +188,84 @@ describe("guardian profiles helpers", () => {
       /Linked client profiles in Guardian: 1/
     );
 
-    assert.equal(isLinkedOrgMember(list[1]!), true);
-    assert.equal(isLinkedOrgMember(list[2]!), true);
-    assert.equal(isLinkedOrgMember(list[3]!), false);
-    assert.equal(isLinkedOrgMember(list[0]!), false);
+    assert.equal(isLinkedMemberProfile(list[1]!), true);
+    assert.equal(isLinkedMemberProfile(list[2]!), true);
+    assert.equal(isLinkedMemberProfile(list[3]!), false);
+    assert.equal(isLinkedMemberProfile(list[0]!), false);
 
     const top = topLevelProfiles(list);
     assert.equal(top.length, 2);
     assert.deepEqual(
       top.map((p) => p.id).sort(),
       [parentId, "e2"].sort()
+    );
+  });
+
+  it("links family members and vehicles under container profiles", () => {
+    assert.equal(canHaveLinkedFamilyMembers("family"), true);
+    assert.equal(canHaveLinkedVehicles("vehicles"), true);
+    assert.equal(canHaveLinkedFamilyMembers("personal"), false);
+
+    const familyId = "fam1";
+    const fleetId = "veh1";
+    const list = [
+      sample({ id: familyId, profile_type: "family", display_name: "Our Family" }),
+      sample({
+        id: "kid1",
+        profile_type: "child",
+        display_name: "Maya",
+        parent_profile_id: familyId,
+        relationship: "Child",
+      }),
+      sample({
+        id: "spouse1",
+        profile_type: "spouse_partner",
+        display_name: "Sam",
+        parent_profile_id: familyId,
+      }),
+      sample({
+        id: "standalone-child",
+        profile_type: "child",
+        display_name: "Unlinked",
+        parent_profile_id: null,
+      }),
+      sample({ id: fleetId, profile_type: "vehicles", display_name: "Garage" }),
+      sample({
+        id: "car1",
+        profile_type: "vehicle",
+        display_name: "2019 Civic",
+        parent_profile_id: fleetId,
+      }),
+    ];
+
+    const members = familyMembersOf(list, familyId);
+    assert.equal(members.length, 2);
+    assert.equal(vehiclesOf(list, fleetId).length, 1);
+    assert.equal(isLinkedMemberProfile(list[1]!), true);
+    assert.equal(isLinkedMemberProfile(list[5]!), true);
+    assert.equal(isLinkedMemberProfile(list[3]!), false);
+
+    const top = topLevelProfiles(list);
+    assert.deepEqual(
+      top.map((p) => p.id).sort(),
+      [familyId, fleetId, "standalone-child"].sort()
+    );
+
+    assert.match(
+      formatLinkedFamilyForGideon("Our Family", [
+        {
+          display_name: "Maya",
+          profile_type: "child",
+          relationship: "Child",
+        },
+      ]),
+      /Linked family member profiles in Guardian: 1/
+    );
+    assert.match(
+      formatLinkedVehiclesForGideon("Garage", [
+        { display_name: "2019 Civic", description: null },
+      ]),
+      /Linked vehicle profiles in Guardian: 1/
     );
   });
 });

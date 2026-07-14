@@ -8,11 +8,15 @@ import AlertsPanel from "@/components/AlertsPanel";
 import DailyLogPanel from "@/components/DailyLogPanel";
 import LinkedEmployeesPanel from "@/components/LinkedEmployeesPanel";
 import LinkedClientsPanel from "@/components/LinkedClientsPanel";
+import LinkedFamilyPanel from "@/components/LinkedFamilyPanel";
+import LinkedVehiclesPanel from "@/components/LinkedVehiclesPanel";
 import VaultSection from "@/components/VaultSection";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
   canHaveLinkedClients,
   canHaveLinkedEmployees,
+  canHaveLinkedFamilyMembers,
+  canHaveLinkedVehicles,
   vaultLabel,
 } from "@/lib/profiles/types";
 
@@ -56,6 +60,18 @@ export default function DashboardVault({ userId }: { userId: string }) {
       {canHaveLinkedClients(active.profile_type) && (
         <VaultSection id={`clients-${active.id}`} title="Clients">
           <LinkedClientsPanel parent={active} />
+        </VaultSection>
+      )}
+
+      {canHaveLinkedFamilyMembers(active.profile_type) && (
+        <VaultSection id={`family-${active.id}`} title="Family members">
+          <LinkedFamilyPanel parent={active} />
+        </VaultSection>
+      )}
+
+      {canHaveLinkedVehicles(active.profile_type) && (
+        <VaultSection id={`vehicles-${active.id}`} title="Vehicles">
+          <LinkedVehiclesPanel parent={active} />
         </VaultSection>
       )}
 

@@ -7,11 +7,15 @@ import { useActiveProfile } from "@/components/ProfileProvider";
 import {
   canHaveLinkedClients,
   canHaveLinkedEmployees,
+  canHaveLinkedFamilyMembers,
+  canHaveLinkedVehicles,
   clientsOf,
   employeesOf,
+  familyMembersOf,
   profileSubtitle,
   profileTypeLabel,
   topLevelProfiles,
+  vehiclesOf,
   type GuardianProfile,
 } from "@/lib/profiles/types";
 
@@ -102,12 +106,20 @@ export default function ProfileSwitcher() {
           <ul className="max-h-72 overflow-y-auto py-1">
             {topLevel.map((p) => {
               const selected = p.id === active.id;
-              const employees = canHaveLinkedEmployees(p.profile_type)
-                ? employeesOf(profiles, p.id)
-                : [];
-              const clients = canHaveLinkedClients(p.profile_type)
-                ? clientsOf(profiles, p.id)
-                : [];
+              const children = [
+                ...(canHaveLinkedEmployees(p.profile_type)
+                  ? employeesOf(profiles, p.id)
+                  : []),
+                ...(canHaveLinkedClients(p.profile_type)
+                  ? clientsOf(profiles, p.id)
+                  : []),
+                ...(canHaveLinkedFamilyMembers(p.profile_type)
+                  ? familyMembersOf(profiles, p.id)
+                  : []),
+                ...(canHaveLinkedVehicles(p.profile_type)
+                  ? vehiclesOf(profiles, p.id)
+                  : []),
+              ];
               return (
                 <li key={p.id}>
                   <SwitcherRow
@@ -115,16 +127,7 @@ export default function ProfileSwitcher() {
                     selected={selected}
                     onSelect={() => pick(p.id)}
                   />
-                  {employees.map((child) => (
-                    <SwitcherRow
-                      key={child.id}
-                      profile={child}
-                      selected={child.id === active.id}
-                      indented
-                      onSelect={() => pick(child.id)}
-                    />
-                  ))}
-                  {clients.map((child) => (
+                  {children.map((child) => (
                     <SwitcherRow
                       key={child.id}
                       profile={child}

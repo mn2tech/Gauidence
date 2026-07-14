@@ -9,11 +9,13 @@ export const GUARDIAN_PROFILE_TYPES = [
   "parent",
   "family_member",
   "student",
+  "family",
   "business",
   "non_profit",
   "employee",
   "client",
   "vehicle",
+  "vehicles",
   "home",
   "pet",
   "other",
@@ -28,15 +30,28 @@ export const PROFILE_TYPE_LABELS: Record<GuardianProfileType, string> = {
   parent: "Parent",
   family_member: "Family member",
   student: "Student",
+  family: "Family",
   business: "Business",
   non_profit: "Nonprofit",
   employee: "Employee",
   client: "Client",
   vehicle: "Vehicle",
+  vehicles: "Vehicles",
   home: "Home",
   pet: "Pet",
   other: "Other",
 };
+
+/** Leaf types that nest under a Family container. */
+export const FAMILY_MEMBER_TYPES = [
+  "child",
+  "spouse_partner",
+  "parent",
+  "family_member",
+  "student",
+] as const;
+
+export type FamilyMemberType = (typeof FAMILY_MEMBER_TYPES)[number];
 
 /** Creation wizard step-1 options → profile_type */
 export const PROFILE_CREATE_OPTIONS: {
@@ -46,6 +61,7 @@ export const PROFILE_CREATE_OPTIONS: {
   relationship?: string;
 }[] = [
   { id: "myself", label: "Myself", profileType: "personal", relationship: "Myself" },
+  { id: "my_family", label: "My family", profileType: "family" },
   { id: "child", label: "My child", profileType: "child", relationship: "Child" },
   {
     id: "spouse",
@@ -65,6 +81,7 @@ export const PROFILE_CREATE_OPTIONS: {
   { id: "nonprofit", label: "A nonprofit", profileType: "non_profit" },
   { id: "employee", label: "An employee", profileType: "employee" },
   { id: "client", label: "A client", profileType: "client" },
+  { id: "my_vehicles", label: "My vehicles", profileType: "vehicles" },
   { id: "vehicle", label: "A vehicle", profileType: "vehicle" },
   { id: "home", label: "A home", profileType: "home" },
   { id: "pet", label: "A pet", profileType: "pet" },
@@ -98,6 +115,13 @@ export function isGuardianProfileType(v: unknown): v is GuardianProfileType {
   return (
     typeof v === "string" &&
     (GUARDIAN_PROFILE_TYPES as readonly string[]).includes(v)
+  );
+}
+
+export function isFamilyMemberType(v: unknown): v is FamilyMemberType {
+  return (
+    typeof v === "string" &&
+    (FAMILY_MEMBER_TYPES as readonly string[]).includes(v)
   );
 }
 
@@ -136,7 +160,7 @@ export function profileCompanyContext(profile: GuardianProfile): string | null {
 export function vaultLabel(profile: GuardianProfile): string {
   const name = profile.display_name.trim() || "Profile";
   if (
-    isOrgStyleProfile(profile.profile_type) ||
+    isGroupStyleProfile(profile.profile_type) ||
     isAssetStyleProfile(profile.profile_type)
   ) {
     return `${name} Vault`;
@@ -148,7 +172,7 @@ export function vaultLabel(profile: GuardianProfile): string {
 export function askGideonContextLabel(profile: GuardianProfile): string {
   const name = profile.display_name.trim() || "this profile";
   if (
-    isOrgStyleProfile(profile.profile_type) ||
+    isGroupStyleProfile(profile.profile_type) ||
     isAssetStyleProfile(profile.profile_type)
   ) {
     return `Ask Gideon about ${name}`;
@@ -163,6 +187,13 @@ export function isOrgStyleProfile(type: GuardianProfileType): boolean {
   return type === "business" || type === "non_profit";
 }
 
+/** Family / Vehicles / Business / Nonprofit — container vaults with linked children. */
+export function isGroupStyleProfile(type: GuardianProfileType): boolean {
+  return (
+    isOrgStyleProfile(type) || type === "family" || type === "vehicles"
+  );
+}
+
 /** Vehicle, home, pet — named assets, not people. */
 export function isAssetStyleProfile(type: GuardianProfileType): boolean {
   return type === "vehicle" || type === "home" || type === "pet";
@@ -175,6 +206,14 @@ export function canHaveLinkedEmployees(type: GuardianProfileType): boolean {
 
 export function canHaveLinkedClients(type: GuardianProfileType): boolean {
   return isOrgStyleProfile(type);
+}
+
+export function canHaveLinkedFamilyMembers(type: GuardianProfileType): boolean {
+  return type === "family";
+}
+
+export function canHaveLinkedVehicles(type: GuardianProfileType): boolean {
+  return type === "vehicles";
 }
 
 export function employeesOf(
@@ -195,22 +234,53 @@ export function clientsOf(
   );
 }
 
-/** Employee/client vault linked under a business or nonprofit. */
+export function familyMembersOf(
+  profiles: GuardianProfile[],
+  parentId: string
+): GuardianProfile[] {
+  return profiles.filter(
+    (p) =>
+      p.parent_profile_id === parentId && isFamilyMemberType(p.profile_type)
+  );
+}
+
+export function vehiclesOf(
+  profiles: GuardianProfile[],
+  parentId: string
+): GuardianProfile[] {
+  return profiles.filter(
+    (p) => p.parent_profile_id === parentId && p.profile_type === "vehicle"
+  );
+}
+
+/** Any nested vault under a container (org, family, or vehicles). */
+export function isLinkedMemberProfile(profile: {
+  profile_type: GuardianProfileType;
+  parent_profile_id?: string | null;
+}): boolean {
+  if (!profile.parent_profile_id) return false;
+  const t = profile.profile_type;
+  return (
+    t === "employee" ||
+    t === "client" ||
+    t === "vehicle" ||
+    isFamilyMemberType(t)
+  );
+}
+
+/** @deprecated Use isLinkedMemberProfile */
 export function isLinkedOrgMember(profile: {
   profile_type: GuardianProfileType;
   parent_profile_id?: string | null;
 }): boolean {
-  return (
-    Boolean(profile.parent_profile_id) &&
-    (profile.profile_type === "employee" || profile.profile_type === "client")
-  );
+  return isLinkedMemberProfile(profile);
 }
 
 /** Profiles shown at the root of switchers / manage list (not nested members). */
 export function topLevelProfiles(
   profiles: GuardianProfile[]
 ): GuardianProfile[] {
-  return profiles.filter((p) => !isLinkedOrgMember(p));
+  return profiles.filter((p) => !isLinkedMemberProfile(p));
 }
 
 export type LinkedPersonSummary = {
@@ -222,6 +292,17 @@ export type LinkedPersonSummary = {
 
 /** @deprecated Use LinkedPersonSummary */
 export type LinkedEmployeeSummary = LinkedPersonSummary;
+
+export type LinkedFamilyMemberSummary = {
+  display_name: string;
+  profile_type: GuardianProfileType;
+  relationship: string | null;
+};
+
+export type LinkedVehicleSummary = {
+  display_name: string;
+  description?: string | null;
+};
 
 /** Context block for Gideon: linked employee roster under an org profile. */
 export function formatLinkedEmployeesForGideon(
@@ -255,4 +336,36 @@ export function formatLinkedClientsForGideon(
     return `${i + 1}. ${c.display_name}${note ? ` — ${note}` : ""}`;
   });
   return `${header}\n${lines.join("\n")}\n(This is Guardian's linked client roster under this organization.)`;
+}
+
+export function formatLinkedFamilyForGideon(
+  familyName: string,
+  members: LinkedFamilyMemberSummary[]
+): string {
+  const count = members.length;
+  const header = `Family profile: ${familyName}\nLinked family member profiles in Guardian: ${count}`;
+  if (count === 0) {
+    return `${header}\n(None linked yet.)`;
+  }
+  const lines = members.map((m, i) => {
+    const role = m.relationship?.trim() || profileTypeLabel(m.profile_type);
+    return `${i + 1}. ${m.display_name} — ${role}`;
+  });
+  return `${header}\n${lines.join("\n")}`;
+}
+
+export function formatLinkedVehiclesForGideon(
+  groupName: string,
+  vehicles: LinkedVehicleSummary[]
+): string {
+  const count = vehicles.length;
+  const header = `Vehicles profile: ${groupName}\nLinked vehicle profiles in Guardian: ${count}`;
+  if (count === 0) {
+    return `${header}\n(None linked yet.)`;
+  }
+  const lines = vehicles.map((v, i) => {
+    const note = v.description?.trim();
+    return `${i + 1}. ${v.display_name}${note ? ` — ${note}` : ""}`;
+  });
+  return `${header}\n${lines.join("\n")}`;
 }

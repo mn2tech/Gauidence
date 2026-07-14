@@ -29,8 +29,12 @@ import { getActiveGuardianProfile } from "@/lib/profiles/server";
 import {
   askGideonContextLabel,
   canHaveLinkedEmployees,
+  canHaveLinkedFamilyMembers,
+  canHaveLinkedVehicles,
   formatLinkedClientsForGideon,
   formatLinkedEmployeesForGideon,
+  formatLinkedFamilyForGideon,
+  formatLinkedVehiclesForGideon,
   type GuardianProfileType,
 } from "@/lib/profiles/types";
 import {
@@ -43,27 +47,58 @@ async function loadLinkedOrgContext(
   userId: string,
   active: { id: string; display_name: string; profile_type: GuardianProfileType }
 ): Promise<string> {
-  if (!canHaveLinkedEmployees(active.profile_type)) return "";
-  const [{ data: employees }, { data: clients }] = await Promise.all([
-    supabase
+  if (canHaveLinkedEmployees(active.profile_type)) {
+    const [{ data: employees }, { data: clients }] = await Promise.all([
+      supabase
+        .from("guardian_profiles")
+        .select("display_name, job_title, department, description")
+        .eq("owner_user_id", userId)
+        .eq("parent_profile_id", active.id)
+        .eq("profile_type", "employee")
+        .order("display_name", { ascending: true }),
+      supabase
+        .from("guardian_profiles")
+        .select("display_name, job_title, department, description")
+        .eq("owner_user_id", userId)
+        .eq("parent_profile_id", active.id)
+        .eq("profile_type", "client")
+        .order("display_name", { ascending: true }),
+    ]);
+    return [
+      formatLinkedEmployeesForGideon(active.display_name, employees ?? []),
+      formatLinkedClientsForGideon(active.display_name, clients ?? []),
+    ].join("\n\n");
+  }
+
+  if (canHaveLinkedFamilyMembers(active.profile_type)) {
+    const { data: members } = await supabase
       .from("guardian_profiles")
-      .select("display_name, job_title, department, description")
+      .select("display_name, profile_type, relationship")
       .eq("owner_user_id", userId)
       .eq("parent_profile_id", active.id)
-      .eq("profile_type", "employee")
-      .order("display_name", { ascending: true }),
-    supabase
+      .in("profile_type", [
+        "child",
+        "spouse_partner",
+        "parent",
+        "family_member",
+        "student",
+      ])
+      .order("display_name", { ascending: true });
+    return formatLinkedFamilyForGideon(active.display_name, members ?? []);
+  }
+
+  if (canHaveLinkedVehicles(active.profile_type)) {
+    const { data: vehicles } = await supabase
       .from("guardian_profiles")
-      .select("display_name, job_title, department, description")
+      .select("display_name, description")
       .eq("owner_user_id", userId)
       .eq("parent_profile_id", active.id)
-      .eq("profile_type", "client")
-      .order("display_name", { ascending: true }),
-  ]);
-  return [
-    formatLinkedEmployeesForGideon(active.display_name, employees ?? []),
-    formatLinkedClientsForGideon(active.display_name, clients ?? []),
-  ].join("\n\n");
+      .eq("profile_type", "vehicle")
+      .order("display_name", { ascending: true });
+    return formatLinkedVehiclesForGideon(active.display_name, vehicles ?? []);
+  }
+
+  return "";
 }
 
 function suggestionKindFrom(

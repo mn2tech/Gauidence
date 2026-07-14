@@ -8,12 +8,16 @@ import { useActiveProfile } from "@/components/ProfileProvider";
 import {
   canHaveLinkedClients,
   canHaveLinkedEmployees,
+  canHaveLinkedFamilyMembers,
+  canHaveLinkedVehicles,
   clientsOf,
   employeesOf,
+  familyMembersOf,
   PROFILE_CREATE_OPTIONS,
   profileSubtitle,
   profileTypeLabel,
   topLevelProfiles,
+  vehiclesOf,
   type GuardianProfile,
 } from "@/lib/profiles/types";
 
@@ -561,7 +565,18 @@ export default function ProfilesManager() {
             const nestedClients = canHaveLinkedClients(p.profile_type)
               ? clientsOf(profiles, p.id)
               : [];
-            const nested = [...nestedEmployees, ...nestedClients];
+            const nestedFamily = canHaveLinkedFamilyMembers(p.profile_type)
+              ? familyMembersOf(profiles, p.id)
+              : [];
+            const nestedVehicles = canHaveLinkedVehicles(p.profile_type)
+              ? vehiclesOf(profiles, p.id)
+              : [];
+            const nested = [
+              ...nestedEmployees,
+              ...nestedClients,
+              ...nestedFamily,
+              ...nestedVehicles,
+            ];
             return (
               <li
                 key={p.id}
@@ -684,6 +699,44 @@ export default function ProfilesManager() {
                       </li>
                     ) : null}
                     {nestedClients.map((child) => (
+                      <NestedMemberRow
+                        key={child.id}
+                        child={child}
+                        activeId={active?.id}
+                        busy={busy}
+                        editing={editing}
+                        setEditing={setEditing}
+                        onSaveEdit={() => void saveEdit()}
+                        onSwitch={() => void switchProfile(child.id)}
+                        onSetDefault={() => void setDefault(child.id)}
+                        onRemove={() => void remove(child)}
+                      />
+                    ))}
+                    {nestedFamily.length > 0 ? (
+                      <li className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">
+                        Family members
+                      </li>
+                    ) : null}
+                    {nestedFamily.map((child) => (
+                      <NestedMemberRow
+                        key={child.id}
+                        child={child}
+                        activeId={active?.id}
+                        busy={busy}
+                        editing={editing}
+                        setEditing={setEditing}
+                        onSaveEdit={() => void saveEdit()}
+                        onSwitch={() => void switchProfile(child.id)}
+                        onSetDefault={() => void setDefault(child.id)}
+                        onRemove={() => void remove(child)}
+                      />
+                    ))}
+                    {nestedVehicles.length > 0 ? (
+                      <li className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">
+                        Vehicles
+                      </li>
+                    ) : null}
+                    {nestedVehicles.map((child) => (
                       <NestedMemberRow
                         key={child.id}
                         child={child}
