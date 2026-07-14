@@ -83,7 +83,7 @@ export const PROFILE_CREATE_OPTIONS: {
   { id: "client", label: "A client", profileType: "client" },
   { id: "my_vehicles", label: "My vehicles", profileType: "vehicles" },
   { id: "vehicle", label: "A vehicle", profileType: "vehicle" },
-  { id: "home", label: "A home", profileType: "home" },
+  { id: "home", label: "A home / house", profileType: "home" },
   { id: "pet", label: "A pet", profileType: "pet" },
   { id: "other", label: "Something else", profileType: "other" },
 ];
@@ -216,12 +216,18 @@ export function canHaveLinkedVehicles(type: GuardianProfileType): boolean {
   return type === "vehicles";
 }
 
+/** Family / business / nonprofit can own linked home (house) profiles. */
+export function canHaveLinkedHomes(type: GuardianProfileType): boolean {
+  return type === "family" || isOrgStyleProfile(type);
+}
+
 /** Profile types that can nest under a container (not the containers themselves). */
 export function isNestableProfileType(type: GuardianProfileType): boolean {
   return (
     type === "employee" ||
     type === "client" ||
     type === "vehicle" ||
+    type === "home" ||
     isFamilyMemberType(type)
   );
 }
@@ -231,6 +237,9 @@ export function canAttachChildToParent(
   childType: GuardianProfileType,
   parentType: GuardianProfileType
 ): boolean {
+  if (childType === "home") {
+    return canHaveLinkedHomes(parentType);
+  }
   if (canHaveLinkedFamilyMembers(parentType)) {
     return isFamilyMemberType(childType);
   }
@@ -293,6 +302,15 @@ export function vehiclesOf(
   );
 }
 
+export function homesOf(
+  profiles: GuardianProfile[],
+  parentId: string
+): GuardianProfile[] {
+  return profiles.filter(
+    (p) => p.parent_profile_id === parentId && p.profile_type === "home"
+  );
+}
+
 /** Any nested vault under a container (org, family, or vehicles). */
 export function isLinkedMemberProfile(profile: {
   profile_type: GuardianProfileType;
@@ -304,6 +322,7 @@ export function isLinkedMemberProfile(profile: {
     t === "employee" ||
     t === "client" ||
     t === "vehicle" ||
+    t === "home" ||
     isFamilyMemberType(t)
   );
 }

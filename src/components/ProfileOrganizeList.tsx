@@ -7,10 +7,12 @@ import {
   canHaveLinkedClients,
   canHaveLinkedEmployees,
   canHaveLinkedFamilyMembers,
+  canHaveLinkedHomes,
   canHaveLinkedVehicles,
   clientsOf,
   employeesOf,
   familyMembersOf,
+  homesOf,
   isGroupStyleProfile,
   isNestableProfileType,
   profileSubtitle,
@@ -338,7 +340,7 @@ export default function ProfileOrganizeList({
   return (
     <div className="space-y-3">
       <p className="text-xs text-ink-muted">
-        Drag a child, spouse, employee, client, or vehicle onto a Family,
+        Drag a child, spouse, home, employee, client, or vehicle onto a Family,
         Business, Nonprofit, or Vehicles card — or use Move under. Tap the
         chevron to collapse nested members.
       </p>
@@ -371,6 +373,9 @@ export default function ProfileOrganizeList({
           const nestedFamily = canHaveLinkedFamilyMembers(p.profile_type)
             ? familyMembersOf(profiles, p.id)
             : [];
+          const nestedHomes = canHaveLinkedHomes(p.profile_type)
+            ? homesOf(profiles, p.id)
+            : [];
           const nestedVehicles = canHaveLinkedVehicles(p.profile_type)
             ? vehiclesOf(profiles, p.id)
             : [];
@@ -378,6 +383,7 @@ export default function ProfileOrganizeList({
             ...nestedEmployees,
             ...nestedClients,
             ...nestedFamily,
+            ...nestedHomes,
             ...nestedVehicles,
           ];
           const isContainer = isGroupStyleProfile(p.profile_type);
@@ -590,6 +596,28 @@ export default function ProfileOrganizeList({
                     </li>
                   ) : null}
                   {nestedFamily.map((child) => (
+                    <NestedMemberRow
+                      key={child.id}
+                      child={child}
+                      activeId={activeId}
+                      busy={busy}
+                      editing={editing}
+                      setEditing={setEditing}
+                      onSaveEdit={onSaveEdit}
+                      onSwitch={() => onSwitch(child.id)}
+                      onSetDefault={() => onSetDefault(child.id)}
+                      onRemove={() => onRemove(child)}
+                      dragEnabled
+                      onDragStart={onDragStart}
+                      moveControl={renderMoveSelect(child)}
+                    />
+                  ))}
+                  {nestedHomes.length > 0 ? (
+                    <li className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">
+                      Homes
+                    </li>
+                  ) : null}
+                  {nestedHomes.map((child) => (
                     <NestedMemberRow
                       key={child.id}
                       child={child}

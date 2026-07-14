@@ -274,5 +274,9 @@ describe("guardian profiles helpers", () => {
     assert.equal(canAttachChildToParent("vehicle", "vehicles"), true);
     assert.equal(canAttachChildToParent("child", "vehicles"), false);
     assert.equal(canAttachChildToParent("employee", "business"), true);
+    assert.equal(canAttachChildToParent("home", "family"), true);
+    assert.equal(canAttachChildToParent("home", "business"), true);
+    assert.equal(canAttachChildToParent("home", "non_profit"), true);
+    assert.equal(canAttachChildToParent("home", "vehicles"), false);
   });
 });

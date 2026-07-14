@@ -134,25 +134,32 @@ export async function POST(request: Request) {
       (isGuardianProfileType(body.profileType) ? body.profileType : profileType);
 
     if (canHaveLinkedEmployees(parent.profile_type)) {
-      const asClient =
-        requestedType === "client" ||
-        body.profileType === "client" ||
-        body.linkedKind === "client";
-      profileType = asClient ? "client" : "employee";
-      if (!organizationName) {
-        organizationName = profileCompanyContext(parent);
+      if (requestedType === "home") {
+        profileType = "home";
+      } else {
+        const asClient =
+          requestedType === "client" ||
+          body.profileType === "client" ||
+          body.linkedKind === "client";
+        profileType = asClient ? "client" : "employee";
+        if (!organizationName) {
+          organizationName = profileCompanyContext(parent);
+        }
       }
     } else if (canHaveLinkedFamilyMembers(parent.profile_type)) {
-      if (!isFamilyMemberType(requestedType)) {
+      if (requestedType === "home") {
+        profileType = "home";
+      } else if (!isFamilyMemberType(requestedType)) {
         return NextResponse.json(
           {
             error:
-              "Only child, spouse/partner, parent, family member, or student can be linked to a Family profile.",
+              "Only child, spouse/partner, parent, family member, student, or home can be linked to a Family profile.",
           },
           { status: 400 }
         );
+      } else {
+        profileType = requestedType;
       }
-      profileType = requestedType;
     } else if (canHaveLinkedVehicles(parent.profile_type)) {
       if (requestedType !== "vehicle") {
         return NextResponse.json(

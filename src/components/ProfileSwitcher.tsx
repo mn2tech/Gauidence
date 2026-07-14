@@ -8,10 +8,12 @@ import {
   canHaveLinkedClients,
   canHaveLinkedEmployees,
   canHaveLinkedFamilyMembers,
+  canHaveLinkedHomes,
   canHaveLinkedVehicles,
   clientsOf,
   employeesOf,
   familyMembersOf,
+  homesOf,
   profileSubtitle,
   profileTypeLabel,
   topLevelProfiles,
@@ -115,6 +117,9 @@ export default function ProfileSwitcher() {
                   : []),
                 ...(canHaveLinkedFamilyMembers(p.profile_type)
                   ? familyMembersOf(profiles, p.id)
+                  : []),
+                ...(canHaveLinkedHomes(p.profile_type)
+                  ? homesOf(profiles, p.id)
                   : []),
                 ...(canHaveLinkedVehicles(p.profile_type)
                   ? vehiclesOf(profiles, p.id)
