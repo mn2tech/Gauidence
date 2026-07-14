@@ -19,6 +19,11 @@ import {
 } from "@/lib/vault/indexDocument";
 import { ensureUserVaultIndexed } from "@/lib/vault/ensureIndexed";
 import {
+  canRollupLinkedVaultSearch,
+  listLinkedProfilesForVaultRollup,
+  retrieveVaultChunksAcrossProfiles,
+} from "@/lib/vault/rollup";
+import {
   buildGideonSuggestions,
   buildGideonLogSuggestions,
   firstNameFrom,
@@ -30,6 +35,7 @@ import {
   askGideonContextLabel,
   canHaveLinkedEmployees,
   canHaveLinkedFamilyMembers,
+  canHaveLinkedHomes,
   canHaveLinkedVehicles,
   formatLinkedClientsForGideon,
   formatLinkedEmployeesForGideon,
@@ -48,43 +54,73 @@ async function loadLinkedOrgContext(
   active: { id: string; display_name: string; profile_type: GuardianProfileType }
 ): Promise<string> {
   if (canHaveLinkedEmployees(active.profile_type)) {
-    const [{ data: employees }, { data: clients }] = await Promise.all([
-      supabase
-        .from("guardian_profiles")
-        .select("display_name, job_title, department, description")
-        .eq("owner_user_id", userId)
-        .eq("parent_profile_id", active.id)
-        .eq("profile_type", "employee")
-        .order("display_name", { ascending: true }),
-      supabase
-        .from("guardian_profiles")
-        .select("display_name, job_title, department, description")
-        .eq("owner_user_id", userId)
-        .eq("parent_profile_id", active.id)
-        .eq("profile_type", "client")
-        .order("display_name", { ascending: true }),
-    ]);
-    return [
+    const [{ data: employees }, { data: clients }, { data: homes }] =
+      await Promise.all([
+        supabase
+          .from("guardian_profiles")
+          .select("display_name, job_title, department, description")
+          .eq("owner_user_id", userId)
+          .eq("parent_profile_id", active.id)
+          .eq("profile_type", "employee")
+          .order("display_name", { ascending: true }),
+        supabase
+          .from("guardian_profiles")
+          .select("display_name, job_title, department, description")
+          .eq("owner_user_id", userId)
+          .eq("parent_profile_id", active.id)
+          .eq("profile_type", "client")
+          .order("display_name", { ascending: true }),
+        canHaveLinkedHomes(active.profile_type)
+          ? supabase
+              .from("guardian_profiles")
+              .select("display_name")
+              .eq("owner_user_id", userId)
+              .eq("parent_profile_id", active.id)
+              .eq("profile_type", "home")
+              .order("display_name", { ascending: true })
+          : Promise.resolve({ data: [] as { display_name: string }[] }),
+      ]);
+    const parts = [
       formatLinkedEmployeesForGideon(active.display_name, employees ?? []),
       formatLinkedClientsForGideon(active.display_name, clients ?? []),
-    ].join("\n\n");
+    ];
+    if ((homes ?? []).length > 0) {
+      parts.push(
+        `Linked homes under this organization: ${(homes ?? [])
+          .map((h) => h.display_name)
+          .join(", ")}`
+      );
+    }
+    return parts.join("\n\n");
   }
 
   if (canHaveLinkedFamilyMembers(active.profile_type)) {
+    const types = [
+      "child",
+      "spouse_partner",
+      "parent",
+      "family_member",
+      "student",
+      ...(canHaveLinkedHomes(active.profile_type) ? (["home"] as const) : []),
+    ];
     const { data: members } = await supabase
       .from("guardian_profiles")
       .select("display_name, profile_type, relationship")
       .eq("owner_user_id", userId)
       .eq("parent_profile_id", active.id)
-      .in("profile_type", [
-        "child",
-        "spouse_partner",
-        "parent",
-        "family_member",
-        "student",
-      ])
+      .in("profile_type", types)
       .order("display_name", { ascending: true });
-    return formatLinkedFamilyForGideon(active.display_name, members ?? []);
+    const people = (members ?? []).filter((m) => m.profile_type !== "home");
+    const homes = (members ?? []).filter((m) => m.profile_type === "home");
+    const parts = [formatLinkedFamilyForGideon(active.display_name, people)];
+    if (homes.length > 0) {
+      parts.push(
+        `Linked homes under this family: ${homes
+          .map((h) => h.display_name)
+          .join(", ")}`
+      );
+    }
+    return parts.join("\n\n");
   }
 
   if (canHaveLinkedVehicles(active.profile_type)) {
@@ -123,6 +159,9 @@ function suggestionKindFrom(
   ) {
     return "family";
   }
+  if (type === "family" || type === "vehicles") {
+    return type === "family" ? "family" : "other";
+  }
   if (type === "personal") return "personal";
   return "other";
 }
@@ -136,7 +175,7 @@ type ChatMessageRow = {
   id: string;
   role: "user" | "assistant";
   content: string;
-  citations?: { documentId: string; fileName: string }[];
+  citations?: { documentId: string; fileName: string; profileName?: string }[];
   created_at: string;
 };
 
@@ -439,32 +478,56 @@ export async function POST(request: Request) {
 
   const active = await getActiveGuardianProfile(supabase, user);
 
+  const linkedProfiles = canRollupLinkedVaultSearch(active.profile_type)
+    ? await listLinkedProfilesForVaultRollup(supabase, user.id, active)
+    : [];
+  const searchScopes = [
+    {
+      id: active.id,
+      display_name: active.display_name,
+      profile_type: active.profile_type,
+    },
+    ...linkedProfiles,
+  ];
+  const searchIds = searchScopes.map((s) => s.id);
+  const profileNames = Object.fromEntries(
+    searchScopes.map((s) => [s.id, s.display_name])
+  );
+
   try {
-    await ensureUserVaultIndexed(supabase, user.id, active.id);
-  } catch (err) {
-    console.error(
-      "Vault ensure index failed:",
-      err instanceof Error ? err.message : "error"
+    await Promise.all(
+      searchScopes.slice(0, 8).map((scope) =>
+        ensureUserVaultIndexed(supabase, user.id, scope.id).catch((err) => {
+          console.error(
+            "Vault ensure index failed:",
+            err instanceof Error ? err.message : "error"
+          );
+        })
+      )
     );
+  } catch {
+    /* already logged per profile */
   }
 
   const { count: chunkCount } = await supabase
     .from("document_chunks")
     .select("id", { count: "exact", head: true })
     .eq("user_id", user.id)
-    .eq("profile_id", active.id);
+    .in("profile_id", searchIds);
 
   const { count: logCount } = await supabase
     .from("daily_logs")
     .select("id", { count: "exact", head: true })
     .eq("owner_user_id", user.id)
-    .eq("profile_id", active.id);
+    .in("profile_id", searchIds);
 
   if ((chunkCount ?? 0) === 0 && (logCount ?? 0) === 0) {
     return NextResponse.json(
       {
         error:
-          "Analyze a document or add a Daily Log so Gideon has something to search in this profile.",
+          linkedProfiles.length > 0
+            ? "Analyze a document or add a Daily Log in this profile or a linked member vault so Gideon has something to search."
+            : "Analyze a document or add a Daily Log so Gideon has something to search in this profile.",
       },
       { status: 409 }
     );
@@ -560,22 +623,42 @@ export async function POST(request: Request) {
     );
   }
 
-  let citations: { documentId: string; fileName: string }[] = [];
+  let citations: {
+    documentId: string;
+    fileName: string;
+    profileName?: string;
+  }[] = [];
   let answer: string;
 
   try {
     const queryEmbedding =
       (chunkCount ?? 0) > 0 ? await embedQuery(question) : null;
     const chunks = queryEmbedding
-      ? await retrieveVaultChunks(supabase, queryEmbedding, active.id, 8)
+      ? linkedProfiles.length > 0
+        ? await retrieveVaultChunksAcrossProfiles(
+            supabase,
+            queryEmbedding,
+            searchScopes,
+            10
+          )
+        : (
+            await retrieveVaultChunks(supabase, queryEmbedding, active.id, 8)
+          ).map((c) => ({
+            ...c,
+            profile_id: active.id,
+            profile_name: active.display_name,
+          }))
       : [];
     const formatted = formatRetrievalContext(chunks);
     const dailyLogs = await retrieveRelevantDailyLogs(supabase, {
       userId: user.id,
       profileId: active.id,
+      profileIds: searchIds,
+      profileNames,
       question,
+      limit: linkedProfiles.length > 0 ? 8 : 6,
     });
-    const logContext = formatDailyLogsForGideon(dailyLogs);
+    const logContext = formatDailyLogsForGideon(dailyLogs, profileNames);
     const linkedContext = await loadLinkedOrgContext(
       supabase,
       user.id,
@@ -588,21 +671,28 @@ export async function POST(request: Request) {
       citations = [];
     } else {
       const client = createLlmClient();
+      const rollupNote =
+        linkedProfiles.length > 0
+          ? `This is a container profile. Search includes this vault plus linked member vaults (${linkedProfiles
+              .map((p) => p.display_name)
+              .join(", ")}). Attribute facts to the vault owner named in each source. Do not invent links across unrelated people.`
+          : "Search only this profile's vault and Daily Logs.";
+
       const system = `${VAULT_CHAT_SYSTEM}
 
 Active profile: ${active.display_name} (${active.profile_type}).
-Search only this profile's vault, Daily Logs, and linked profile structure. Never use other unrelated profiles' data.
+${rollupNote}
 
---- RETRIEVED EXCERPTS (active profile documents only) ---
+--- RETRIEVED EXCERPTS ---
 ${formatted.context.trim() || "(none)"}
 --- END EXCERPTS ---
 
---- RETRIEVED DAILY LOGS (active profile only; user-entered notes) ---
+--- RETRIEVED DAILY LOGS (user-entered notes; vault owner labeled when linked) ---
 ${logContext.trim() || "(none)"}
 --- END DAILY LOGS ---
 
---- LINKED PROFILE STRUCTURE (employees linked to this org profile) ---
-${linkedContext.trim() || "(none — not an org profile, or unavailable)"}
+--- LINKED PROFILE STRUCTURE ---
+${linkedContext.trim() || "(none)"}
 --- END LINKED PROFILE STRUCTURE ---`;
 
       answer = await runChatCompletion(client, {

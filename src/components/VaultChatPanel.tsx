@@ -27,7 +27,7 @@ import {
   parseGideonSections,
 } from "@/lib/vault/gideon";
 
-type Citation = { documentId: string; fileName: string };
+type Citation = { documentId: string; fileName: string; profileName?: string };
 
 type VaultMessage = {
   id: string;
@@ -333,7 +333,12 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
                 className="flex flex-wrap items-center gap-2 text-[11px] text-ink-muted"
               >
                 <span>
-                  Source: <span className="font-medium text-foreground">{c.fileName}</span>
+                  Source:{" "}
+                  <span className="font-medium text-foreground">
+                    {c.profileName
+                      ? `${c.profileName} · ${c.fileName}`
+                      : c.fileName}
+                  </span>
                 </span>
                 <button
                   type="button"

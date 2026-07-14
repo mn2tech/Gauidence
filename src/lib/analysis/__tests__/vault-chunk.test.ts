@@ -76,6 +76,22 @@ describe("vault retrieval formatting", () => {
     assert.equal(citations.length, 2);
   });
 
+  it("labels linked vault owners in retrieval context", () => {
+    const { context } = formatRetrievalContext([
+      {
+        id: "1",
+        document_id: "d1",
+        file_name: "iep.pdf",
+        content: "school plan",
+        chunk_index: 0,
+        similarity: 0.9,
+        profile_name: "Maya",
+      },
+    ]);
+    assert.match(context, /Maya · iep\.pdf/);
+    assert.match(context, /vault:Maya/);
+  });
+
   it("only cites documents named in the answer", () => {
     const chunks = [
       {
