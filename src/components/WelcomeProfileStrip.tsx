@@ -5,8 +5,10 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
+  isLinkedOrgMember,
   profileSubtitle,
   profileTypeLabel,
+  topLevelProfiles,
   type GuardianProfile,
 } from "@/lib/profiles/types";
 
@@ -78,6 +80,11 @@ export default function WelcomeProfileStrip({
   ownerEmail,
 }: Props) {
   const { profiles, active, loading, switchProfile } = useActiveProfile();
+  const topLevel = topLevelProfiles(profiles);
+  const viewingLinked = active && isLinkedOrgMember(active);
+  const chipHighlightId = viewingLinked
+    ? active.parent_profile_id
+    : active?.id;
 
   return (
     <div className="welcome-strip space-y-4 sm:space-y-5">
@@ -109,8 +116,8 @@ export default function WelcomeProfileStrip({
             role="listbox"
             aria-label="Guardian profiles"
           >
-            {profiles.map((p, i) => {
-              const selected = p.id === active?.id;
+            {topLevel.map((p, i) => {
+              const selected = p.id === chipHighlightId;
               return (
                 <li
                   key={p.id}
@@ -130,7 +137,7 @@ export default function WelcomeProfileStrip({
             <li
               className="welcome-chip min-w-0 sm:shrink-0"
               style={{
-                animationDelay: `${80 + profiles.length * 45}ms`,
+                animationDelay: `${80 + topLevel.length * 45}ms`,
               }}
             >
               <Link
@@ -146,7 +153,15 @@ export default function WelcomeProfileStrip({
           </ul>
         )}
 
-        {active ? (
+        {viewingLinked && active ? (
+          <p className="mt-3 text-xs text-ink-muted">
+            Viewing:{" "}
+            <span className="font-medium text-foreground">
+              {active.display_name}
+            </span>{" "}
+            ({profileTypeLabel(active.profile_type)})
+          </p>
+        ) : active ? (
           <p className="mt-3 text-xs text-ink-muted">
             Viewing{" "}
             <span className="font-medium text-foreground">

@@ -8,8 +8,10 @@ import {
   employeesOf,
   formatLinkedClientsForGideon,
   formatLinkedEmployeesForGideon,
+  isLinkedOrgMember,
   profileCompanyContext,
   profileSubtitle,
+  topLevelProfiles,
   vaultLabel,
   type GuardianProfile,
 } from "../types.ts";
@@ -176,6 +178,18 @@ describe("guardian profiles helpers", () => {
         },
       ]),
       /Linked client profiles in Guardian: 1/
+    );
+
+    assert.equal(isLinkedOrgMember(list[1]!), true);
+    assert.equal(isLinkedOrgMember(list[2]!), true);
+    assert.equal(isLinkedOrgMember(list[3]!), false);
+    assert.equal(isLinkedOrgMember(list[0]!), false);
+
+    const top = topLevelProfiles(list);
+    assert.equal(top.length, 2);
+    assert.deepEqual(
+      top.map((p) => p.id).sort(),
+      [parentId, "e2"].sort()
     );
   });
 });

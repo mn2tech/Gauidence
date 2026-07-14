@@ -195,6 +195,24 @@ export function clientsOf(
   );
 }
 
+/** Employee/client vault linked under a business or nonprofit. */
+export function isLinkedOrgMember(profile: {
+  profile_type: GuardianProfileType;
+  parent_profile_id?: string | null;
+}): boolean {
+  return (
+    Boolean(profile.parent_profile_id) &&
+    (profile.profile_type === "employee" || profile.profile_type === "client")
+  );
+}
+
+/** Profiles shown at the root of switchers / manage list (not nested members). */
+export function topLevelProfiles(
+  profiles: GuardianProfile[]
+): GuardianProfile[] {
+  return profiles.filter((p) => !isLinkedOrgMember(p));
+}
+
 export type LinkedPersonSummary = {
   display_name: string;
   job_title: string | null;

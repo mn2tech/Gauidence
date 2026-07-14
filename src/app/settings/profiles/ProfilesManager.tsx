@@ -6,10 +6,132 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
+  canHaveLinkedClients,
+  canHaveLinkedEmployees,
+  clientsOf,
+  employeesOf,
   PROFILE_CREATE_OPTIONS,
   profileSubtitle,
+  profileTypeLabel,
+  topLevelProfiles,
   type GuardianProfile,
 } from "@/lib/profiles/types";
+
+function NestedMemberRow({
+  child,
+  activeId,
+  busy,
+  editing,
+  setEditing,
+  onSaveEdit,
+  onSwitch,
+  onSetDefault,
+  onRemove,
+}: {
+  child: GuardianProfile;
+  activeId?: string;
+  busy: boolean;
+  editing: GuardianProfile | null;
+  setEditing: (p: GuardianProfile | null) => void;
+  onSaveEdit: () => void;
+  onSwitch: () => void;
+  onSetDefault: () => void;
+  onRemove: () => void;
+}) {
+  if (editing?.id === child.id) {
+    return (
+      <li className="rounded-xl bg-stone-50 px-3 py-2">
+        <div className="space-y-2">
+          <input
+            value={editing.display_name}
+            onChange={(e) =>
+              setEditing({ ...editing, display_name: e.target.value })
+            }
+            className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm"
+          />
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={onSaveEdit}
+              className="rounded-full bg-brand px-3 py-1.5 text-xs font-semibold text-white"
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditing(null)}
+              className="rounded-full border border-stone-300 px-3 py-1.5 text-xs"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </li>
+    );
+  }
+
+  return (
+    <li className="flex flex-wrap items-start justify-between gap-2 rounded-xl bg-stone-50 px-3 py-2">
+      <div className="min-w-0">
+        <p className="text-sm font-medium">
+          {child.display_name}
+          {child.is_default ? (
+            <span className="ml-2 text-[11px] font-medium text-brand">
+              Default
+            </span>
+          ) : null}
+          {activeId === child.id ? (
+            <span className="ml-2 text-[11px] font-medium text-ink-muted">
+              Active
+            </span>
+          ) : null}
+        </p>
+        <p className="text-[11px] text-ink-muted">
+          {profileTypeLabel(child.profile_type)}
+          {child.job_title ? ` · ${child.job_title}` : ""}
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {activeId !== child.id && (
+          <button
+            type="button"
+            onClick={onSwitch}
+            className="rounded-full border border-stone-300 px-2.5 py-1 text-[11px] font-medium"
+          >
+            Switch
+          </button>
+        )}
+        {!child.is_default && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onSetDefault}
+            className="rounded-full border border-stone-300 px-2.5 py-1 text-[11px] font-medium"
+          >
+            Make default
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => setEditing(child)}
+          className="rounded-full border border-stone-300 px-2.5 py-1 text-[11px] font-medium"
+        >
+          Edit
+        </button>
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label={`Delete ${child.display_name}`}
+          className="inline-flex items-center gap-1 rounded-full border border-red-200 px-2.5 py-1 text-[11px] font-medium text-red-700 hover:bg-red-50"
+        >
+          <Trash2 className="h-3 w-3" />
+          Delete
+        </button>
+      </div>
+    </li>
+  );
+}
 
 export default function ProfilesManager() {
   const router = useRouter();
@@ -432,104 +554,154 @@ export default function ProfilesManager() {
         </div>
       ) : (
         <ul className="space-y-3">
-          {profiles.map((p) => (
-            <li
-              key={p.id}
-              className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm"
-            >
-              {editing?.id === p.id ? (
-                <div className="space-y-3">
-                  <input
-                    value={editing.display_name}
-                    onChange={(e) =>
-                      setEditing({ ...editing, display_name: e.target.value })
-                    }
-                    className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm"
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => void saveEdit()}
-                      className="rounded-full bg-brand px-3 py-1.5 text-xs font-semibold text-white"
-                    >
-                      Save
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditing(null)}
-                      className="rounded-full border border-stone-300 px-3 py-1.5 text-xs"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="font-semibold">
-                      {p.display_name}
-                      {p.is_default ? (
-                        <span className="ml-2 text-[11px] font-medium text-brand">
-                          Default
-                        </span>
-                      ) : null}
-                      {active?.id === p.id ? (
-                        <span className="ml-2 text-[11px] font-medium text-ink-muted">
-                          Active
-                        </span>
-                      ) : null}
-                    </p>
-                    <p className="text-xs text-ink-muted">
-                      {profileSubtitle(p)}
-                      {(p.profile_type === "employee" ||
-                        p.profile_type === "client") &&
-                      p.organization_name
-                        ? ` · ${p.organization_name}`
-                        : ""}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {active?.id !== p.id && (
-                      <button
-                        type="button"
-                        onClick={() => void switchProfile(p.id)}
-                        className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium"
-                      >
-                        Switch
-                      </button>
-                    )}
-                    {!p.is_default && (
+          {topLevelProfiles(profiles).map((p) => {
+            const nestedEmployees = canHaveLinkedEmployees(p.profile_type)
+              ? employeesOf(profiles, p.id)
+              : [];
+            const nestedClients = canHaveLinkedClients(p.profile_type)
+              ? clientsOf(profiles, p.id)
+              : [];
+            const nested = [...nestedEmployees, ...nestedClients];
+            return (
+              <li
+                key={p.id}
+                className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm"
+              >
+                {editing?.id === p.id ? (
+                  <div className="space-y-3">
+                    <input
+                      value={editing.display_name}
+                      onChange={(e) =>
+                        setEditing({
+                          ...editing,
+                          display_name: e.target.value,
+                        })
+                      }
+                      className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm"
+                    />
+                    <div className="flex gap-2">
                       <button
                         type="button"
                         disabled={busy}
-                        onClick={() => void setDefault(p.id)}
+                        onClick={() => void saveEdit()}
+                        className="rounded-full bg-brand px-3 py-1.5 text-xs font-semibold text-white"
+                      >
+                        Save
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditing(null)}
+                        className="rounded-full border border-stone-300 px-3 py-1.5 text-xs"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold">
+                        {p.display_name}
+                        {p.is_default ? (
+                          <span className="ml-2 text-[11px] font-medium text-brand">
+                            Default
+                          </span>
+                        ) : null}
+                        {active?.id === p.id ? (
+                          <span className="ml-2 text-[11px] font-medium text-ink-muted">
+                            Active
+                          </span>
+                        ) : null}
+                      </p>
+                      <p className="text-xs text-ink-muted">
+                        {profileSubtitle(p)}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {active?.id !== p.id && (
+                        <button
+                          type="button"
+                          onClick={() => void switchProfile(p.id)}
+                          className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium"
+                        >
+                          Switch
+                        </button>
+                      )}
+                      {!p.is_default && (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void setDefault(p.id)}
+                          className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium"
+                        >
+                          Make default
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setEditing(p)}
                         className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium"
                       >
-                        Make default
+                        Edit
                       </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setEditing(p)}
-                      className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void remove(p)}
-                      aria-label={`Delete ${p.display_name}`}
-                      className="inline-flex items-center gap-1 rounded-full border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                      Delete
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => void remove(p)}
+                        aria-label={`Delete ${p.display_name}`}
+                        className="inline-flex items-center gap-1 rounded-full border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                        Delete
+                      </button>
+                    </div>
                   </div>
-                </div>
-              )}
-            </li>
-          ))}
+                )}
+
+                {nested.length > 0 ? (
+                  <ul className="mt-3 space-y-2 border-t border-stone-100 pt-3">
+                    {nestedEmployees.length > 0 ? (
+                      <li className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">
+                        Employees
+                      </li>
+                    ) : null}
+                    {nestedEmployees.map((child) => (
+                      <NestedMemberRow
+                        key={child.id}
+                        child={child}
+                        activeId={active?.id}
+                        busy={busy}
+                        editing={editing}
+                        setEditing={setEditing}
+                        onSaveEdit={() => void saveEdit()}
+                        onSwitch={() => void switchProfile(child.id)}
+                        onSetDefault={() => void setDefault(child.id)}
+                        onRemove={() => void remove(child)}
+                      />
+                    ))}
+                    {nestedClients.length > 0 ? (
+                      <li className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">
+                        Clients
+                      </li>
+                    ) : null}
+                    {nestedClients.map((child) => (
+                      <NestedMemberRow
+                        key={child.id}
+                        child={child}
+                        activeId={active?.id}
+                        busy={busy}
+                        editing={editing}
+                        setEditing={setEditing}
+                        onSaveEdit={() => void saveEdit()}
+                        onSwitch={() => void switchProfile(child.id)}
+                        onSetDefault={() => void setDefault(child.id)}
+                        onRemove={() => void remove(child)}
+                      />
+                    ))}
+                  </ul>
+                ) : null}
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

@@ -4,12 +4,58 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Check, ChevronDown, Plus, UserRound } from "lucide-react";
 import { useActiveProfile } from "@/components/ProfileProvider";
-import { profileSubtitle } from "@/lib/profiles/types";
+import {
+  canHaveLinkedClients,
+  canHaveLinkedEmployees,
+  clientsOf,
+  employeesOf,
+  profileSubtitle,
+  profileTypeLabel,
+  topLevelProfiles,
+  type GuardianProfile,
+} from "@/lib/profiles/types";
+
+function SwitcherRow({
+  profile,
+  selected,
+  indented,
+  onSelect,
+}: {
+  profile: GuardianProfile;
+  selected: boolean;
+  indented?: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="option"
+      aria-selected={selected}
+      onClick={onSelect}
+      className={`flex w-full items-start gap-2 py-2 text-left text-sm hover:bg-stone-50 ${
+        indented ? "pl-8 pr-3" : "px-3"
+      }`}
+    >
+      <span className="mt-0.5 w-4 shrink-0">
+        {selected ? <Check className="h-4 w-4 text-brand" /> : null}
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate font-medium">{profile.display_name}</span>
+        <span className="block truncate text-[11px] text-ink-muted">
+          {indented
+            ? profileTypeLabel(profile.profile_type)
+            : profileSubtitle(profile)}
+        </span>
+      </span>
+    </button>
+  );
+}
 
 export default function ProfileSwitcher() {
   const { profiles, active, loading, switchProfile } = useActiveProfile();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const topLevel = topLevelProfiles(profiles);
 
   useEffect(() => {
     if (!open) return;
@@ -26,6 +72,13 @@ export default function ProfileSwitcher() {
     );
   }
   if (!active) return null;
+
+  const pick = (id: string) => {
+    void (async () => {
+      if (id !== active.id) await switchProfile(id);
+      setOpen(false);
+    })();
+  };
 
   return (
     <div className="relative" ref={rootRef}>
@@ -44,39 +97,42 @@ export default function ProfileSwitcher() {
       {open && (
         <div
           role="listbox"
-          className="absolute right-0 z-50 mt-2 w-64 max-w-[calc(100vw-2rem)] rounded-xl border border-stone-200 bg-white py-1 shadow-lg"
+          className="absolute right-0 z-50 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-xl border border-stone-200 bg-white py-1 shadow-lg"
         >
-          <ul className="max-h-64 overflow-y-auto py-1">
-            {profiles.map((p) => {
+          <ul className="max-h-72 overflow-y-auto py-1">
+            {topLevel.map((p) => {
               const selected = p.id === active.id;
+              const employees = canHaveLinkedEmployees(p.profile_type)
+                ? employeesOf(profiles, p.id)
+                : [];
+              const clients = canHaveLinkedClients(p.profile_type)
+                ? clientsOf(profiles, p.id)
+                : [];
               return (
                 <li key={p.id}>
-                  <button
-                    type="button"
-                    role="option"
-                    aria-selected={selected}
-                    onClick={() => {
-                      void (async () => {
-                        if (p.id !== active.id) await switchProfile(p.id);
-                        setOpen(false);
-                      })();
-                    }}
-                    className="flex w-full items-start gap-2 px-3 py-2 text-left text-sm hover:bg-stone-50"
-                  >
-                    <span className="mt-0.5 w-4 shrink-0">
-                      {selected ? (
-                        <Check className="h-4 w-4 text-brand" />
-                      ) : null}
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block truncate font-medium">
-                        {p.display_name}
-                      </span>
-                      <span className="block truncate text-[11px] text-ink-muted">
-                        {profileSubtitle(p)}
-                      </span>
-                    </span>
-                  </button>
+                  <SwitcherRow
+                    profile={p}
+                    selected={selected}
+                    onSelect={() => pick(p.id)}
+                  />
+                  {employees.map((child) => (
+                    <SwitcherRow
+                      key={child.id}
+                      profile={child}
+                      selected={child.id === active.id}
+                      indented
+                      onSelect={() => pick(child.id)}
+                    />
+                  ))}
+                  {clients.map((child) => (
+                    <SwitcherRow
+                      key={child.id}
+                      profile={child}
+                      selected={child.id === active.id}
+                      indented
+                      onSelect={() => pick(child.id)}
+                    />
+                  ))}
                 </li>
               );
             })}
