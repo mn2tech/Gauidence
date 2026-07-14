@@ -8,6 +8,7 @@ import AlertsPanel from "@/components/AlertsPanel";
 import DailyLogPanel from "@/components/DailyLogPanel";
 import LinkedEmployeesPanel from "@/components/LinkedEmployeesPanel";
 import LinkedClientsPanel from "@/components/LinkedClientsPanel";
+import VaultSection from "@/components/VaultSection";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
   canHaveLinkedClients,
@@ -41,30 +42,47 @@ export default function DashboardVault({ userId }: { userId: string }) {
   return (
     <div className="space-y-6">
       <p className="text-sm text-ink-muted">{vaultLabel(active)}</p>
-      <AlertsPanel profileId={active.id} />
+
+      <VaultSection id={`attention-${active.id}`} title="Attention">
+        <AlertsPanel profileId={active.id} />
+      </VaultSection>
+
       {canHaveLinkedEmployees(active.profile_type) && (
-        <LinkedEmployeesPanel parent={active} />
+        <VaultSection id={`employees-${active.id}`} title="Employees">
+          <LinkedEmployeesPanel parent={active} />
+        </VaultSection>
       )}
+
       {canHaveLinkedClients(active.profile_type) && (
-        <LinkedClientsPanel parent={active} />
+        <VaultSection id={`clients-${active.id}`} title="Clients">
+          <LinkedClientsPanel parent={active} />
+        </VaultSection>
       )}
-      <DailyLogPanel
-        profileId={active.id}
-        profileName={active.display_name}
-        profileType={active.profile_type}
-      />
-      <DocumentManager
-        userId={userId}
-        profileId={active.id}
-        profileName={active.display_name}
-      />
+
+      <VaultSection id={`daily-log-${active.id}`} title="Daily Log">
+        <DailyLogPanel
+          profileId={active.id}
+          profileName={active.display_name}
+          profileType={active.profile_type}
+        />
+      </VaultSection>
+
+      <VaultSection id={`documents-${active.id}`} title="Documents">
+        <DocumentManager
+          userId={userId}
+          profileId={active.id}
+          profileName={active.display_name}
+        />
+      </VaultSection>
+
       <div className="flex items-start gap-3 rounded-2xl border border-stone-200 bg-white p-5">
         <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-light text-brand">
           <ShieldCheck className="h-4 w-4" />
         </span>
         <p className="text-sm leading-relaxed text-ink-muted">
           Documents and Daily Logs belong only to the active profile. Switch
-          profiles above or from the header to change context.
+          profiles above or from the header to change context. Tap a section
+          title to collapse or expand it.
         </p>
       </div>
     </div>
