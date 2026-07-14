@@ -67,6 +67,14 @@ export const LOG_CATEGORIES_BY_PROFILE: Record<
     "Travel",
     "Important Event",
   ],
+  family: [
+    "General",
+    "Family",
+    "School",
+    "Health",
+    "Finance",
+    "Important Event",
+  ],
   business: [
     "Client",
     "Invoice",
@@ -105,6 +113,15 @@ export const LOG_CATEGORIES_BY_PROFILE: Record<
     "General",
   ],
   vehicle: [
+    "Service",
+    "Insurance",
+    "Registration",
+    "Accident/Incident",
+    "Mileage",
+    "Payment",
+    "Important Event",
+  ],
+  vehicles: [
     "Service",
     "Insurance",
     "Registration",
