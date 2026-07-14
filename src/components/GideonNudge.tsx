@@ -3,29 +3,49 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowRight, MessageCircle, X } from "lucide-react";
+import {
+  FileUp,
+  MessageCircle,
+  NotebookPen,
+  X,
+} from "lucide-react";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import { askGideonContextLabel } from "@/lib/profiles/types";
 
+type VaultSummary = {
+  profileId: string;
+  documentCount: number;
+  logCount: number;
+  empty: boolean;
+};
+
+type Action = {
+  key: string;
+  href: string;
+  label: string;
+  primary: boolean;
+  icon: typeof MessageCircle;
+};
+
 /**
- * Soft prompt to Ask Gideon after the user switches active profile
- * (or makes one the default, which also becomes active).
+ * Soft prompt after switching profile: adaptive CTAs for upload, daily log, or Ask Gideon.
  */
 export default function GideonNudge() {
   const pathname = usePathname();
   const { active } = useActiveProfile();
   const [visible, setVisible] = useState(false);
-  const [label, setLabel] = useState("Ask Gideon");
   const [profileKey, setProfileKey] = useState<string | null>(null);
+  const [summary, setSummary] = useState<VaultSummary | null>(null);
+  const [loadingSummary, setLoadingSummary] = useState(false);
 
   useEffect(() => {
     const onChange = (e: Event) => {
       if (pathname.startsWith("/ask")) return;
       const detail = (e as CustomEvent<{ profileId?: string }>).detail;
       const id = detail?.profileId ?? null;
-      // Let ProfileProvider finish updating `active` first
       window.setTimeout(() => {
         setProfileKey(id);
+        setSummary(null);
         setVisible(true);
       }, 80);
     };
@@ -37,12 +57,33 @@ export default function GideonNudge() {
   useEffect(() => {
     if (!visible || !active) return;
     if (profileKey && active.id !== profileKey) return;
-    setLabel(askGideonContextLabel(active));
+
+    let cancelled = false;
+    setLoadingSummary(true);
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/profiles/vault-summary?profileId=${encodeURIComponent(active.id)}`
+        );
+        const body = (await res.json().catch(() => null)) as VaultSummary | null;
+        if (cancelled) return;
+        if (res.ok && body) setSummary(body);
+        else setSummary(null);
+      } catch {
+        if (!cancelled) setSummary(null);
+      } finally {
+        if (!cancelled) setLoadingSummary(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [visible, active, profileKey]);
 
   useEffect(() => {
     if (!visible) return;
-    const t = window.setTimeout(() => setVisible(false), 10000);
+    const t = window.setTimeout(() => setVisible(false), 12000);
     return () => window.clearTimeout(t);
   }, [visible, profileKey]);
 
@@ -50,7 +91,69 @@ export default function GideonNudge() {
     if (pathname.startsWith("/ask")) setVisible(false);
   }, [pathname]);
 
-  if (!visible) return null;
+  if (!visible || !active) return null;
+
+  const empty = summary?.empty ?? true;
+  const name = active.display_name;
+  const docsHref = `/dashboard#documents-${active.id}`;
+  const logHref = `/dashboard#daily-log-${active.id}`;
+  const askHref = "/ask";
+  const askLabel = askGideonContextLabel(active);
+
+  const actions: Action[] = empty
+    ? [
+        {
+          key: "upload",
+          href: docsHref,
+          label: "Upload documents",
+          primary: true,
+          icon: FileUp,
+        },
+        {
+          key: "log",
+          href: logHref,
+          label: "Add daily log",
+          primary: false,
+          icon: NotebookPen,
+        },
+        {
+          key: "ask",
+          href: askHref,
+          label: "Ask Gideon",
+          primary: false,
+          icon: MessageCircle,
+        },
+      ]
+    : [
+        {
+          key: "ask",
+          href: askHref,
+          label: "Ask Gideon",
+          primary: true,
+          icon: MessageCircle,
+        },
+        {
+          key: "upload",
+          href: docsHref,
+          label: "Upload",
+          primary: false,
+          icon: FileUp,
+        },
+        {
+          key: "log",
+          href: logHref,
+          label: "Daily log",
+          primary: false,
+          icon: NotebookPen,
+        },
+      ];
+
+  const PrimaryIcon = actions[0]!.icon;
+  const blurb = loadingSummary
+    ? `Now viewing ${name}.`
+    : empty
+      ? `Now viewing ${name}. Add something to this vault, or ${askLabel.toLowerCase()}.`
+      : `Now viewing ${name}. ${askLabel}?`;
 
   return (
     <div
@@ -60,25 +163,33 @@ export default function GideonNudge() {
     >
       <div className="pointer-events-auto flex max-w-sm items-start gap-3 rounded-2xl border border-brand/25 bg-white p-4 shadow-lg shadow-stone-900/10">
         <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-light text-brand">
-          <MessageCircle className="h-4 w-4" />
+          <PrimaryIcon className="h-4 w-4" />
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-foreground">
             Profile switched
           </p>
-          <p className="mt-0.5 text-sm text-ink-muted">
-            {active
-              ? `Now viewing ${active.display_name}. ${label}?`
-              : "Ask Gideon about this profile?"}
-          </p>
-          <Link
-            href="/ask"
-            onClick={() => setVisible(false)}
-            className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-brand hover:text-brand-dark"
-          >
-            Ask Gideon
-            <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
+          <p className="mt-0.5 text-sm text-ink-muted">{blurb}</p>
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+            {actions.map((action) => {
+              const Icon = action.icon;
+              return (
+                <Link
+                  key={action.key}
+                  href={action.href}
+                  onClick={() => setVisible(false)}
+                  className={
+                    action.primary
+                      ? "inline-flex items-center gap-1.5 text-sm font-semibold text-brand hover:text-brand-dark"
+                      : "inline-flex items-center gap-1 text-xs font-medium text-ink-muted hover:text-foreground"
+                  }
+                >
+                  <Icon className={action.primary ? "h-3.5 w-3.5" : "h-3 w-3"} />
+                  {action.label}
+                </Link>
+              );
+            })}
+          </div>
         </div>
         <button
           type="button"

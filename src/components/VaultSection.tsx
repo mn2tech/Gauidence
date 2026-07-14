@@ -34,6 +34,28 @@ export default function VaultSection({
     setReady(true);
   }, [id]);
 
+  useEffect(() => {
+    const applyHash = () => {
+      if (typeof window === "undefined") return;
+      if (window.location.hash !== `#${id}`) return;
+      setOpen(true);
+      try {
+        localStorage.setItem(storageKey(id), "1");
+      } catch {
+        /* ignore */
+      }
+      window.requestAnimationFrame(() => {
+        document.getElementById(id)?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      });
+    };
+    applyHash();
+    window.addEventListener("hashchange", applyHash);
+    return () => window.removeEventListener("hashchange", applyHash);
+  }, [id]);
+
   const toggle = () => {
     setOpen((prev) => {
       const next = !prev;
@@ -47,7 +69,7 @@ export default function VaultSection({
   };
 
   return (
-    <section className="space-y-2">
+    <section id={id} className="scroll-mt-24 space-y-2">
       <button
         type="button"
         onClick={toggle}
