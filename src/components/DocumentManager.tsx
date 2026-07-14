@@ -575,7 +575,7 @@ export default function DocumentManager({
   return (
     <div className="rounded-2xl border border-stone-200 bg-white p-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-base font-semibold">{profileName}&apos;s Vault</h2>
+        <h2 className="text-base font-semibold">Your documents</h2>
         <p className="text-xs text-ink-muted">
           Uploading to: <span className="font-medium text-foreground">{profileName}</span>
         </p>
