@@ -55,6 +55,14 @@ const sections = [
     ],
   },
   {
+    id: "document-sharing",
+    title: "Document sharing",
+    paragraphs: [
+      "You can create an expiring share link for a single document from your vault. Recipients open a public link that shows the document's name and, when available, its analysis summary and key facts. By default the file itself is not included; you can optionally allow temporary file access.",
+      "Share links expire after 1, 7, or 30 days (your choice) and can be revoked at any time. Sharing one document does not grant access to your account, other profiles, chats, Daily Logs, or the rest of your vault.",
+    ],
+  },
+  {
     id: "not-yet-implemented",
     title: "What is not yet implemented",
     paragraphs: [
@@ -67,7 +75,7 @@ const sections = [
       "Guaranteed protection from all breaches — no service can honestly promise this",
     ],
     paragraphsAfter: [
-      "What we can accurately say today: data is encrypted in transit, protected by authenticated access, and separated by user-level access controls.",
+      "What we can accurately say today: data is encrypted in transit, protected by authenticated access, and separated by user-level access controls. Opt-in document share links are time-limited and revocable.",
     ],
   },
   {

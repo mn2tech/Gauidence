@@ -14,7 +14,7 @@ const points = [
   {
     icon: Lock,
     title: "Private by default",
-    body: "Your account and documents are visible only to you unless you choose to share them.",
+    body: "Your account and documents are private by default. You can create expiring, revocable share links for individual documents when you choose.",
   },
   {
     icon: KeyRound,

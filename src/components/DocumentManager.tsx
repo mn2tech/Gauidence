@@ -30,6 +30,7 @@ import { DOCUMENT_CATEGORIES } from "@/lib/categories";
 import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
 import DocumentChatPanel from "@/components/DocumentChatPanel";
 import CameraCaptureModal from "@/components/CameraCaptureModal";
+import ShareDocumentButton from "@/components/ShareDocumentButton";
 
 type DocumentRow = {
   id: string;
@@ -893,6 +894,10 @@ export default function DocumentManager({
                           <Eye className="h-4 w-4" />
                         )}
                       </button>
+                      <ShareDocumentButton
+                        documentId={doc.id}
+                        fileName={doc.file_name}
+                      />
                       <button
                         type="button"
                         onClick={() => handleDownload(doc)}
