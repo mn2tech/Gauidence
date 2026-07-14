@@ -6,6 +6,7 @@ import {
   canHaveLinkedEmployees,
   canHaveLinkedFamilyMembers,
   canHaveLinkedVehicles,
+  canAttachChildToParent,
   clientsOf,
   employeesOf,
   familyMembersOf,
@@ -267,5 +268,11 @@ describe("guardian profiles helpers", () => {
       ]),
       /Linked vehicle profiles in Guardian: 1/
     );
+
+    assert.equal(canAttachChildToParent("child", "family"), true);
+    assert.equal(canAttachChildToParent("spouse_partner", "family"), true);
+    assert.equal(canAttachChildToParent("vehicle", "vehicles"), true);
+    assert.equal(canAttachChildToParent("child", "vehicles"), false);
+    assert.equal(canAttachChildToParent("employee", "business"), true);
   });
 });

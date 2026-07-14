@@ -216,6 +216,46 @@ export function canHaveLinkedVehicles(type: GuardianProfileType): boolean {
   return type === "vehicles";
 }
 
+/** Profile types that can nest under a container (not the containers themselves). */
+export function isNestableProfileType(type: GuardianProfileType): boolean {
+  return (
+    type === "employee" ||
+    type === "client" ||
+    type === "vehicle" ||
+    isFamilyMemberType(type)
+  );
+}
+
+/** Whether a child profile type may be linked under a parent container type. */
+export function canAttachChildToParent(
+  childType: GuardianProfileType,
+  parentType: GuardianProfileType
+): boolean {
+  if (canHaveLinkedFamilyMembers(parentType)) {
+    return isFamilyMemberType(childType);
+  }
+  if (canHaveLinkedVehicles(parentType)) {
+    return childType === "vehicle";
+  }
+  if (canHaveLinkedEmployees(parentType) || canHaveLinkedClients(parentType)) {
+    return childType === "employee" || childType === "client";
+  }
+  return false;
+}
+
+/** Unlinked nestable profiles eligible to attach under a given container. */
+export function unlinkedAttachableTo(
+  profiles: GuardianProfile[],
+  parent: GuardianProfile
+): GuardianProfile[] {
+  return profiles.filter(
+    (p) =>
+      !p.parent_profile_id &&
+      p.id !== parent.id &&
+      canAttachChildToParent(p.profile_type, parent.profile_type)
+  );
+}
+
 export function employeesOf(
   profiles: GuardianProfile[],
   parentId: string

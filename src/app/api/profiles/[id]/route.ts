@@ -7,7 +7,11 @@ import {
   requireOwnedGuardianProfile,
   setActiveGuardianProfile,
 } from "@/lib/profiles/server";
-import { isGuardianProfileType } from "@/lib/profiles/types";
+import {
+  canAttachChildToParent,
+  isGroupStyleProfile,
+  isGuardianProfileType,
+} from "@/lib/profiles/types";
 
 export const runtime = "nodejs";
 
@@ -135,6 +139,59 @@ export async function PATCH(request: Request, ctx: Ctx) {
   if (body.avatarUrl !== undefined) {
     patch.avatar_url =
       typeof body.avatarUrl === "string" ? body.avatarUrl.trim() || null : null;
+  }
+
+  if (body.parentProfileId !== undefined) {
+    if (body.parentProfileId === null || body.parentProfileId === "") {
+      if (isGroupStyleProfile(owned.profile_type)) {
+        return NextResponse.json(
+          { error: "Container profiles cannot be nested under another profile." },
+          { status: 400 }
+        );
+      }
+      patch.parent_profile_id = null;
+    } else if (typeof body.parentProfileId === "string") {
+      const parentId = body.parentProfileId.trim();
+      if (parentId === id) {
+        return NextResponse.json(
+          { error: "A profile cannot be nested under itself." },
+          { status: 400 }
+        );
+      }
+      if (isGroupStyleProfile(owned.profile_type)) {
+        return NextResponse.json(
+          { error: "Container profiles cannot be nested under another profile." },
+          { status: 400 }
+        );
+      }
+      const parent = await requireOwnedGuardianProfile(
+        supabase,
+        user.id,
+        parentId
+      );
+      if (!parent) {
+        return NextResponse.json(
+          { error: "Parent profile not found." },
+          { status: 400 }
+        );
+      }
+      if (
+        !canAttachChildToParent(owned.profile_type, parent.profile_type)
+      ) {
+        return NextResponse.json(
+          {
+            error: `This ${owned.profile_type} profile cannot be moved under that ${parent.profile_type} profile.`,
+          },
+          { status: 400 }
+        );
+      }
+      patch.parent_profile_id = parent.id;
+    } else {
+      return NextResponse.json(
+        { error: "Invalid parentProfileId." },
+        { status: 400 }
+      );
+    }
   }
 
   const { data, error } = await supabase

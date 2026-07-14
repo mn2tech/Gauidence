@@ -6,6 +6,7 @@ import { useActiveProfile } from "@/components/ProfileProvider";
 import {
   familyMembersOf,
   profileTypeLabel,
+  unlinkedAttachableTo,
   type GuardianProfile,
 } from "@/lib/profiles/types";
 
@@ -24,6 +25,7 @@ const ROLE_OPTIONS: { optionId: string; label: string }[] = [
 export default function LinkedFamilyPanel({ parent }: Props) {
   const { profiles, refresh, switchProfile } = useActiveProfile();
   const [open, setOpen] = useState(false);
+  const [linkOpen, setLinkOpen] = useState(false);
   const [name, setName] = useState("");
   const [roleOptionId, setRoleOptionId] = useState("child");
   const [busy, setBusy] = useState(false);
@@ -34,6 +36,31 @@ export default function LinkedFamilyPanel({ parent }: Props) {
     () => familyMembersOf(profiles, parent.id),
     [profiles, parent.id]
   );
+  const unlinked = useMemo(
+    () => unlinkedAttachableTo(profiles, parent),
+    [profiles, parent]
+  );
+
+  const linkExisting = async (profileId: string) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/profiles/${profileId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ parentProfileId: parent.id }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setError(body.error ?? "Couldn't link profile.");
+        return;
+      }
+      setLinkOpen(false);
+      await refresh();
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const addMember = async (e: FormEvent) => {
     e.preventDefault();
@@ -94,14 +121,31 @@ export default function LinkedFamilyPanel({ parent }: Props) {
           </div>
         </div>
         {!open && (
-          <button
-            type="button"
-            onClick={() => setOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium hover:bg-stone-50"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Add member
-          </button>
+          <div className="flex flex-wrap gap-2">
+            {unlinked.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setLinkOpen((v) => !v);
+                  setOpen(false);
+                }}
+                className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium hover:bg-stone-50"
+              >
+                Link existing
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(true);
+                setLinkOpen(false);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium hover:bg-stone-50"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add member
+            </button>
+          </div>
         )}
       </div>
 
@@ -109,6 +153,45 @@ export default function LinkedFamilyPanel({ parent }: Props) {
         <p className="mt-3 text-sm text-red-700" role="alert">
           {error}
         </p>
+      )}
+
+      {linkOpen && unlinked.length > 0 && (
+        <ul className="mt-4 space-y-2 border-t border-stone-100 pt-4">
+          <li className="text-xs text-ink-muted">
+            Move an existing child, spouse, or family profile under{" "}
+            {parent.display_name}:
+          </li>
+          {unlinked.map((p) => (
+            <li
+              key={p.id}
+              className="flex flex-wrap items-center justify-between gap-2"
+            >
+              <div>
+                <p className="text-sm font-medium">{p.display_name}</p>
+                <p className="text-xs text-ink-muted">
+                  {profileTypeLabel(p.profile_type)}
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void linkExisting(p.id)}
+                className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium hover:bg-stone-50 disabled:opacity-60"
+              >
+                Link
+              </button>
+            </li>
+          ))}
+          <li>
+            <button
+              type="button"
+              onClick={() => setLinkOpen(false)}
+              className="text-sm text-ink-muted hover:text-foreground"
+            >
+              Cancel
+            </button>
+          </li>
+        </ul>
       )}
 
       {open && (
