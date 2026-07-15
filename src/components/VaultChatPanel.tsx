@@ -10,16 +10,20 @@ import {
 import Link from "next/link";
 import {
   ExternalLink,
+  FileUp,
   Info,
   Loader2,
   Menu,
   MessageSquarePlus,
+  NotebookPen,
+  Plus,
   Send,
   Trash2,
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import GideonAvatar from "@/components/GideonAvatar";
+import { useActiveProfile } from "@/components/ProfileProvider";
 import {
   GIDEON_BRAND_LINE,
   GIDEON_LOADING_STATES,
@@ -70,6 +74,7 @@ const SECTION_STYLES: Record<string, string> = {
 
 export default function VaultChatPanel({ variant = "embedded" }: Props) {
   const isPage = variant === "page";
+  const { active } = useActiveProfile();
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [messages, setMessages] = useState<VaultMessage[]>([]);
@@ -83,8 +88,17 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [whyOpen, setWhyOpen] = useState(false);
+  const [plusOpen, setPlusOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const plusRef = useRef<HTMLDivElement>(null);
   const inputId = isPage ? "ask-gideon-page-input" : "ask-gideon-input";
+  const profileId = active?.id ?? meta?.profileId ?? null;
+  const docsHref = profileId
+    ? `/dashboard#documents-${profileId}`
+    : "/dashboard";
+  const logHref = profileId
+    ? `/dashboard#daily-log-${profileId}`
+    : "/dashboard";
 
   const loadMetaAndChats = useCallback(async () => {
     const res = await fetch("/api/documents/vault-chat");
@@ -163,6 +177,22 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     }, 2200);
     return () => window.clearInterval(t);
   }, [sending]);
+
+  useEffect(() => {
+    if (!plusOpen) return;
+    const onDoc = (e: globalThis.MouseEvent) => {
+      if (!plusRef.current?.contains(e.target as Node)) setPlusOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPlusOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [plusOpen]);
 
   const startNewChat = async () => {
     setError(null);
@@ -390,13 +420,13 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
               </p>
               <div className="flex flex-wrap gap-2">
                 <Link
-                  href="/dashboard"
+                  href={docsHref}
                   className="inline-flex rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark"
                 >
                   Upload a Document
                 </Link>
                 <Link
-                  href="/dashboard"
+                  href={logHref}
                   className="inline-flex rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-stone-50"
                 >
                   Add a Daily Log
@@ -543,7 +573,54 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
           : "mt-3 flex gap-2"
       }
     >
-      <div className={isPage ? "mx-auto flex w-full max-w-3xl gap-2" : "contents"}>
+      <div
+        className={
+          isPage
+            ? "mx-auto flex w-full max-w-3xl gap-2"
+            : "flex w-full gap-2"
+        }
+      >
+        <div className="relative shrink-0" ref={plusRef}>
+          <button
+            type="button"
+            onClick={() => setPlusOpen((o) => !o)}
+            aria-expanded={plusOpen}
+            aria-haspopup="menu"
+            aria-label="Add to vault"
+            className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${
+              emptyVault
+                ? "border-brand/40 bg-brand-light text-brand hover:bg-brand/15"
+                : "border-stone-300 bg-white text-ink-muted hover:border-stone-400 hover:text-foreground"
+            }`}
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+          {plusOpen && (
+            <div
+              role="menu"
+              className="absolute bottom-full left-0 z-20 mb-2 w-52 overflow-hidden rounded-xl border border-stone-200 bg-white py-1 shadow-lg"
+            >
+              <Link
+                role="menuitem"
+                href={docsHref}
+                onClick={() => setPlusOpen(false)}
+                className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-foreground hover:bg-stone-50"
+              >
+                <FileUp className="h-4 w-4 text-brand" />
+                Upload document
+              </Link>
+              <Link
+                role="menuitem"
+                href={logHref}
+                onClick={() => setPlusOpen(false)}
+                className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-foreground hover:bg-stone-50"
+              >
+                <NotebookPen className="h-4 w-4 text-brand" />
+                Add daily log
+              </Link>
+            </div>
+          )}
+        </div>
         <label className="sr-only" htmlFor={inputId}>
           Ask Gideon
         </label>
