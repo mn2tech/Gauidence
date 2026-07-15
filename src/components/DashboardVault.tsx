@@ -12,6 +12,7 @@ import LinkedFamilyPanel from "@/components/LinkedFamilyPanel";
 import LinkedVehiclesPanel from "@/components/LinkedVehiclesPanel";
 import LinkedHomesPanel from "@/components/LinkedHomesPanel";
 import LinkedPetsPanel from "@/components/LinkedPetsPanel";
+import LinkedStudentsPanel from "@/components/LinkedStudentsPanel";
 import VaultSection from "@/components/VaultSection";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
@@ -20,6 +21,7 @@ import {
   canHaveLinkedFamilyMembers,
   canHaveLinkedHomes,
   canHaveLinkedPets,
+  canHaveLinkedStudents,
   canHaveLinkedVehicles,
   vaultLabel,
 } from "@/lib/profiles/types";
@@ -91,6 +93,12 @@ export default function DashboardVault({ userId }: { userId: string }) {
       {canHaveLinkedFamilyMembers(active.profile_type) && (
         <VaultSection id={`family-${active.id}`} title="Family members">
           <LinkedFamilyPanel parent={active} />
+        </VaultSection>
+      )}
+
+      {canHaveLinkedStudents(active.profile_type) && (
+        <VaultSection id={`students-${active.id}`} title="Students">
+          <LinkedStudentsPanel parent={active} />
         </VaultSection>
       )}
 

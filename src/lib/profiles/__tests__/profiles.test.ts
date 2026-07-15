@@ -70,16 +70,19 @@ describe("guardian profiles helpers", () => {
   it("groups create options into Family, Business, and Other", () => {
     assert.deepEqual(
       PROFILE_CREATE_GROUPS.map((g) => g.id),
-      ["family", "business", "other"]
+      ["family", "business", "student", "other"]
     );
     const family = optionsForCreateGroup("family");
     assert.ok(family.some((o) => o.id === "child"));
     assert.ok(family.some((o) => o.id === "my_family"));
     assert.ok(!family.some((o) => o.id === "employee"));
+    assert.ok(!family.some((o) => o.id === "student"));
     const business = optionsForCreateGroup("business");
     assert.ok(business.some((o) => o.id === "employee"));
     assert.ok(business.some((o) => o.id === "client"));
     assert.ok(!business.some((o) => o.id === "child"));
+    const student = optionsForCreateGroup("student");
+    assert.ok(student.some((o) => o.id === "student"));
   });
 
   it("uses business legal/display name for company context", () => {

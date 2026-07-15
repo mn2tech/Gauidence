@@ -1,12 +1,10 @@
 "use client";
 
 import { useMemo, useState, type FormEvent } from "react";
-import { Loader2, Plus, Users } from "lucide-react";
+import { GraduationCap, Loader2, Plus } from "lucide-react";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
-  FAMILY_PEOPLE_TYPES,
-  familyMembersOf,
-  profileTypeLabel,
+  studentsOf,
   unlinkedOfTypes,
   type GuardianProfile,
 } from "@/lib/profiles/types";
@@ -15,29 +13,23 @@ type Props = {
   parent: GuardianProfile;
 };
 
-const ROLE_OPTIONS: { optionId: string; label: string }[] = [
-  { optionId: "child", label: "Child" },
-  { optionId: "spouse", label: "Spouse or partner" },
-  { optionId: "parent", label: "Parent" },
-  { optionId: "family", label: "Family member" },
-];
-
-export default function LinkedFamilyPanel({ parent }: Props) {
+export default function LinkedStudentsPanel({ parent }: Props) {
   const { profiles, refresh, switchProfile } = useActiveProfile();
   const [open, setOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
   const [name, setName] = useState("");
-  const [roleOptionId, setRoleOptionId] = useState("child");
+  const [schoolName, setSchoolName] = useState("");
+  const [gradeLevel, setGradeLevel] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [openingId, setOpeningId] = useState<string | null>(null);
 
-  const members = useMemo(
-    () => familyMembersOf(profiles, parent.id),
+  const students = useMemo(
+    () => studentsOf(profiles, parent.id),
     [profiles, parent.id]
   );
   const unlinked = useMemo(
-    () => unlinkedOfTypes(profiles, parent, FAMILY_PEOPLE_TYPES),
+    () => unlinkedOfTypes(profiles, parent, ["student"]),
     [profiles, parent]
   );
 
@@ -62,7 +54,7 @@ export default function LinkedFamilyPanel({ parent }: Props) {
     }
   };
 
-  const addMember = async (e: FormEvent) => {
+  const addStudent = async (e: FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
     setBusy(true);
@@ -72,19 +64,22 @@ export default function LinkedFamilyPanel({ parent }: Props) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          optionId: roleOptionId,
+          optionId: "student",
           displayName: name.trim(),
+          schoolName: schoolName.trim() || null,
+          gradeLevel: gradeLevel.trim() || null,
           parentProfileId: parent.id,
           switchTo: false,
         }),
       });
       const body = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
-        setError(body.error ?? "Couldn't add family member.");
+        setError(body.error ?? "Couldn't add student.");
         return;
       }
       setName("");
-      setRoleOptionId("child");
+      setSchoolName("");
+      setGradeLevel("");
       setOpen(false);
       await refresh();
     } finally {
@@ -97,7 +92,7 @@ export default function LinkedFamilyPanel({ parent }: Props) {
     setError(null);
     try {
       const ok = await switchProfile(id);
-      if (!ok) setError("Couldn't open family member vault.");
+      if (!ok) setError("Couldn't open student vault.");
       else window.dispatchEvent(new CustomEvent("guardian:profile-changed"));
     } finally {
       setOpeningId(null);
@@ -109,14 +104,12 @@ export default function LinkedFamilyPanel({ parent }: Props) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-brand-light text-brand">
-            <Users className="h-4 w-4" />
+            <GraduationCap className="h-4 w-4" />
           </span>
           <div>
-            <h2 className="text-base font-semibold tracking-tight">
-              Family members
-            </h2>
+            <h2 className="text-base font-semibold tracking-tight">Students</h2>
             <p className="text-xs text-ink-muted">
-              Separate vaults linked to {parent.display_name}
+              Separate school vaults linked to {parent.display_name}
             </p>
           </div>
         </div>
@@ -143,7 +136,7 @@ export default function LinkedFamilyPanel({ parent }: Props) {
               className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium hover:bg-stone-50"
             >
               <Plus className="h-3.5 w-3.5" />
-              Add member
+              Add student
             </button>
           </div>
         )}
@@ -158,20 +151,14 @@ export default function LinkedFamilyPanel({ parent }: Props) {
       {linkOpen && unlinked.length > 0 && (
         <ul className="mt-4 space-y-2 border-t border-stone-100 pt-4">
           <li className="text-xs text-ink-muted">
-            Move an existing child, spouse, or family profile under{" "}
-            {parent.display_name}:
+            Move an existing student under {parent.display_name}:
           </li>
           {unlinked.map((p) => (
             <li
               key={p.id}
               className="flex flex-wrap items-center justify-between gap-2"
             >
-              <div>
-                <p className="text-sm font-medium">{p.display_name}</p>
-                <p className="text-xs text-ink-muted">
-                  {profileTypeLabel(p.profile_type)}
-                </p>
-              </div>
+              <p className="text-sm font-medium">{p.display_name}</p>
               <button
                 type="button"
                 disabled={busy}
@@ -196,7 +183,7 @@ export default function LinkedFamilyPanel({ parent }: Props) {
 
       {open && (
         <form
-          onSubmit={addMember}
+          onSubmit={addStudent}
           className="mt-4 space-y-3 border-t border-stone-100 pt-4"
         >
           <label className="block text-sm">
@@ -206,22 +193,26 @@ export default function LinkedFamilyPanel({ parent }: Props) {
               onChange={(e) => setName(e.target.value)}
               required
               className="mt-1 w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none ring-brand focus:ring-2"
-              placeholder="Alex"
+              placeholder="Maya"
             />
           </label>
           <label className="block text-sm">
-            <span className="font-medium">Role</span>
-            <select
-              value={roleOptionId}
-              onChange={(e) => setRoleOptionId(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm outline-none ring-brand focus:ring-2"
-            >
-              {ROLE_OPTIONS.map((r) => (
-                <option key={r.optionId} value={r.optionId}>
-                  {r.label}
-                </option>
-              ))}
-            </select>
+            <span className="text-ink-muted">School (optional)</span>
+            <input
+              value={schoolName}
+              onChange={(e) => setSchoolName(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none ring-brand focus:ring-2"
+              placeholder="Lincoln High"
+            />
+          </label>
+          <label className="block text-sm">
+            <span className="text-ink-muted">Grade (optional)</span>
+            <input
+              value={gradeLevel}
+              onChange={(e) => setGradeLevel(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none ring-brand focus:ring-2"
+              placeholder="10th"
+            />
           </label>
           <div className="flex flex-wrap gap-2">
             <button
@@ -230,7 +221,7 @@ export default function LinkedFamilyPanel({ parent }: Props) {
               className="inline-flex items-center gap-2 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-60"
             >
               {busy && <Loader2 className="h-4 w-4 animate-spin" />}
-              Add member
+              Add student
             </button>
             <button
               type="button"
@@ -247,30 +238,31 @@ export default function LinkedFamilyPanel({ parent }: Props) {
       )}
 
       <ul className="mt-4 divide-y divide-stone-100">
-        {members.length === 0 ? (
+        {students.length === 0 ? (
           <li className="py-3 text-sm text-ink-muted">
-            No family members yet. Add a child, spouse, or other relative to
-            keep their documents in a separate vault under this family.
+            No students yet. Add one to keep school docs, grades, and forms in a
+            separate vault under this family.
           </li>
         ) : (
-          members.map((m) => (
+          students.map((s) => (
             <li
-              key={m.id}
+              key={s.id}
               className="flex flex-wrap items-center justify-between gap-2 py-3"
             >
               <div>
-                <p className="text-sm font-medium">{m.display_name}</p>
+                <p className="text-sm font-medium">{s.display_name}</p>
                 <p className="text-xs text-ink-muted">
-                  {m.relationship?.trim() || profileTypeLabel(m.profile_type)}
+                  {[s.school_name, s.grade_level].filter(Boolean).join(" · ") ||
+                    "Student"}
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() => void openVault(m.id)}
-                disabled={openingId === m.id}
+                onClick={() => void openVault(s.id)}
+                disabled={openingId === s.id}
                 className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium hover:bg-stone-50 disabled:opacity-60"
               >
-                {openingId === m.id ? "Opening…" : "Open vault"}
+                {openingId === s.id ? "Opening…" : "Open vault"}
               </button>
             </li>
           ))

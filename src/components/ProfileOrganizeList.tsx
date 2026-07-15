@@ -10,6 +10,7 @@ import {
   canHaveLinkedFamilyMembers,
   canHaveLinkedHomes,
   canHaveLinkedPets,
+  canHaveLinkedStudents,
   canHaveLinkedVehicles,
   clientsOf,
   employeesOf,
@@ -21,6 +22,7 @@ import {
   profileAvatarLabel,
   profileSubtitle,
   profileTypeLabel,
+  studentsOf,
   topLevelProfiles,
   vehiclesOf,
   type GuardianProfile,
@@ -394,6 +396,9 @@ export default function ProfileOrganizeList({
           const nestedFamily = canHaveLinkedFamilyMembers(p.profile_type)
             ? familyMembersOf(profiles, p.id)
             : [];
+          const nestedStudents = canHaveLinkedStudents(p.profile_type)
+            ? studentsOf(profiles, p.id)
+            : [];
           const nestedPets = canHaveLinkedPets(p.profile_type)
             ? petsOf(profiles, p.id)
             : [];
@@ -407,6 +412,7 @@ export default function ProfileOrganizeList({
             ...nestedEmployees,
             ...nestedClients,
             ...nestedFamily,
+            ...nestedStudents,
             ...nestedPets,
             ...nestedHomes,
             ...nestedVehicles,
@@ -634,6 +640,30 @@ export default function ProfileOrganizeList({
                     </li>
                   ) : null}
                   {nestedFamily.map((child) => (
+                    <NestedMemberRow
+                      key={child.id}
+                      child={child}
+                      activeId={activeId}
+                      busy={busy}
+                      editing={editing}
+                      setEditing={setEditing}
+                      onSaveEdit={onSaveEdit}
+                      onSwitch={() => onSwitch(child.id)}
+                      onSetDefault={() => onSetDefault(child.id)}
+                      onRemove={() => onRemove(child)}
+                      dragEnabled
+                      onDragStart={onDragStart}
+                      moveControl={renderMoveSelect(child)}
+                      onRefresh={onRefresh}
+                      onAvatarError={onAvatarError}
+                    />
+                  ))}
+                  {nestedStudents.length > 0 ? (
+                    <li className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">
+                      Students
+                    </li>
+                  ) : null}
+                  {nestedStudents.map((child) => (
                     <NestedMemberRow
                       key={child.id}
                       child={child}

@@ -55,7 +55,7 @@ export default function ProfilesManager() {
   /** If there's exactly one matching container, nest new people/assets under it. */
   const suggestedParentId = useMemo(() => {
     if (!option || !groupId) return null;
-    if (groupId === "family") {
+    if (groupId === "family" || groupId === "student") {
       const families = topLevelProfiles(profiles).filter(
         (p) => p.profile_type === "family"
       );
@@ -320,9 +320,9 @@ export default function ProfilesManager() {
                 Who or what is this for?
               </h2>
               <p className="mt-1 text-sm text-ink-muted">
-                Start with Family, Business, or Other.
+                Start with Family, Business, Student, or Other.
               </p>
-              <ul className="mt-4 grid gap-2 sm:grid-cols-3">
+              <ul className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                 {PROFILE_CREATE_GROUPS.map((g) => (
                   <li key={g.id}>
                     <button
@@ -396,7 +396,7 @@ export default function ProfilesManager() {
               {suggestedParentId ? (
                 <p className="mt-1 text-xs text-ink-muted">
                   Will be nested under your existing{" "}
-                  {groupId === "family" ? "Family" : "Business"} space.
+                  {groupId === "business" ? "Business" : "Family"} space.
                 </p>
               ) : null}
               <div className="mt-4 space-y-3">

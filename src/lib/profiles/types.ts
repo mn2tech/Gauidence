@@ -53,6 +53,14 @@ export const FAMILY_MEMBER_TYPES = [
 
 export type FamilyMemberType = (typeof FAMILY_MEMBER_TYPES)[number];
 
+/** Family people excluding students (students have their own section). */
+export const FAMILY_PEOPLE_TYPES = [
+  "child",
+  "spouse_partner",
+  "parent",
+  "family_member",
+] as const;
+
 /** Creation wizard step-1 options → profile_type */
 export const PROFILE_CREATE_OPTIONS: {
   id: string;
@@ -88,9 +96,9 @@ export const PROFILE_CREATE_OPTIONS: {
   { id: "other", label: "Something else", profileType: "other" },
 ];
 
-export type ProfileCreateGroupId = "family" | "business" | "other";
+export type ProfileCreateGroupId = "family" | "business" | "student" | "other";
 
-/** Guided create buckets: Family / Business / Other. */
+/** Guided create buckets: Family / Business / Student / Other. */
 export const PROFILE_CREATE_GROUPS: {
   id: ProfileCreateGroupId;
   label: string;
@@ -108,7 +116,6 @@ export const PROFILE_CREATE_GROUPS: {
       "spouse",
       "parent",
       "family",
-      "student",
       "pet",
       "home",
       "vehicle",
@@ -126,6 +133,12 @@ export const PROFILE_CREATE_GROUPS: {
       "home",
       "vehicle",
     ],
+  },
+  {
+    id: "student",
+    label: "Student",
+    description: "School records, grades, and student vaults",
+    optionIds: ["student"],
   },
   {
     id: "other",
@@ -273,6 +286,11 @@ export function canHaveLinkedFamilyMembers(type: GuardianProfileType): boolean {
   return type === "family";
 }
 
+/** Students nest under Family (shown as their own section). */
+export function canHaveLinkedStudents(type: GuardianProfileType): boolean {
+  return type === "family";
+}
+
 /** Pets nest under Family. */
 export function canHaveLinkedPets(type: GuardianProfileType): boolean {
   return type === "family";
@@ -367,7 +385,18 @@ export function familyMembersOf(
 ): GuardianProfile[] {
   return profiles.filter(
     (p) =>
-      p.parent_profile_id === parentId && isFamilyMemberType(p.profile_type)
+      p.parent_profile_id === parentId &&
+      isFamilyMemberType(p.profile_type) &&
+      p.profile_type !== "student"
+  );
+}
+
+export function studentsOf(
+  profiles: GuardianProfile[],
+  parentId: string
+): GuardianProfile[] {
+  return profiles.filter(
+    (p) => p.parent_profile_id === parentId && p.profile_type === "student"
   );
 }
 
@@ -412,6 +441,9 @@ export function nestedUnder(
   }
   if (canHaveLinkedFamilyMembers(parent.profile_type)) {
     out.push(...familyMembersOf(profiles, parent.id));
+  }
+  if (canHaveLinkedStudents(parent.profile_type)) {
+    out.push(...studentsOf(profiles, parent.id));
   }
   if (canHaveLinkedPets(parent.profile_type)) {
     out.push(...petsOf(profiles, parent.id));

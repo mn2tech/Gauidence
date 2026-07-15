@@ -133,12 +133,21 @@ async function loadLinkedOrgContext(
       (m) =>
         m.profile_type !== "home" &&
         m.profile_type !== "pet" &&
-        m.profile_type !== "vehicle"
+        m.profile_type !== "vehicle" &&
+        m.profile_type !== "student"
     );
+    const students = (members ?? []).filter((m) => m.profile_type === "student");
     const pets = (members ?? []).filter((m) => m.profile_type === "pet");
     const homes = (members ?? []).filter((m) => m.profile_type === "home");
     const vehicles = (members ?? []).filter((m) => m.profile_type === "vehicle");
     const parts = [formatLinkedFamilyForGideon(active.display_name, people)];
+    if (students.length > 0) {
+      parts.push(
+        `Linked student profiles under this family: ${students
+          .map((s) => s.display_name)
+          .join(", ")}`
+      );
+    }
     if (pets.length > 0) {
       parts.push(
         `Linked pets under this family: ${pets
