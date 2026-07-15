@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   detectDocumentCharacteristics,
   resolveAnalysisInputMode,
+  shouldPreparePageImages,
 } from "../inputMode.ts";
 
 describe("analysis input mode", () => {
@@ -53,5 +54,27 @@ describe("analysis input mode", () => {
       },
     });
     assert.equal(resolveAnalysisInputMode(c), "hybrid");
+  });
+
+  it("does not rasterize scanned PDFs (Claude PDF path)", () => {
+    assert.equal(
+      shouldPreparePageImages({ quality: 0, pageCount: 2 }),
+      false
+    );
+    assert.equal(
+      shouldPreparePageImages({ quality: 0.2, pageCount: 4 }),
+      false
+    );
+  });
+
+  it("rasterizes only short PDFs with usable native text", () => {
+    assert.equal(
+      shouldPreparePageImages({ quality: 0.7, pageCount: 2 }),
+      true
+    );
+    assert.equal(
+      shouldPreparePageImages({ quality: 0.7, pageCount: 6 }),
+      false
+    );
   });
 });

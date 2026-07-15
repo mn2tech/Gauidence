@@ -148,15 +148,9 @@ export async function runAnalysisPipeline(
   const inputMode = resolveAnalysisInputMode(characteristics);
 
   let ocrText: string | undefined;
+  // Visual mode already sends the PDF/image to Claude — a separate OCR pass
+  // doubles latency and commonly pushes past the serverless timeout.
   if (inputMode !== "visual" && extraction.quality < 0.45) {
-    const fallback = await maybeOcrFallback(client, file, extraction);
-    extraction = fallback.extraction;
-    ocrText = fallback.ocrText;
-  } else if (
-    inputMode === "visual" &&
-    extraction.pageImages.length === 0 &&
-    extraction.quality < 0.45
-  ) {
     const fallback = await maybeOcrFallback(client, file, extraction);
     extraction = fallback.extraction;
     ocrText = fallback.ocrText;

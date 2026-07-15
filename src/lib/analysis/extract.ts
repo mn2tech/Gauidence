@@ -12,6 +12,7 @@ import {
   previewText,
   scoreExtractionQuality,
 } from "./extract-quality";
+import { shouldPreparePageImages } from "./inputMode";
 
 export type ExtractionMethod =
   | "native_pdf"
@@ -125,22 +126,36 @@ export function layoutTextFromItems(pages: TextItem[][]): {
   return { text, tablesText };
 }
 
-async function renderPdfPageImages(bytes: Uint8Array, pageCount: number): Promise<PageImage[]> {
+const PAGE_RENDER_BUDGET_MS = 12_000;
+
+async function renderPdfPageImages(
+  bytes: Uint8Array,
+  pageCount: number
+): Promise<PageImage[]> {
   const images: PageImage[] = [];
-  const maxPages = Math.min(pageCount, 4);
+  const maxPages = Math.min(pageCount, 2);
+  const deadline = Date.now() + PAGE_RENDER_BUDGET_MS;
+
   for (let page = 1; page <= maxPages; page++) {
+    if (Date.now() >= deadline) break;
     try {
-      const dataUrl = await renderPageAsImage(bytes, page, {
-        canvasImport: () => import("@napi-rs/canvas"),
-        // 1.5 balances digit clarity vs Claude request size limits
-        scale: 1.5,
-        toDataURL: true,
-      });
+      const remaining = deadline - Date.now();
+      const dataUrl = await Promise.race([
+        renderPageAsImage(bytes, page, {
+          canvasImport: () => import("@napi-rs/canvas"),
+          // Lower scale keeps digit clarity while staying under serverless time/size limits
+          scale: 1.25,
+          toDataURL: true,
+        }),
+        new Promise<null>((resolve) =>
+          setTimeout(() => resolve(null), Math.max(500, remaining))
+        ),
+      ]);
       if (typeof dataUrl === "string" && dataUrl.startsWith("data:")) {
         images.push({ page, dataUrl });
       }
     } catch {
-      // Canvas may be unavailable on some hosts — caller falls back to PDF file OCR.
+      // Canvas may be unavailable on some hosts — caller falls back to PDF document.
     }
   }
   return images;
@@ -184,13 +199,12 @@ export async function extractDocumentText(args: {
         : nativeText;
       const report = assessExtractionQuality(combined);
 
-      // Always prepare page images for short PDFs or poor text (visual / hybrid modes).
-      const shouldRenderPages =
-        report.score < 0.45 ||
-        (pageCount != null && pageCount <= 4) ||
-        (pageCount != null && pageCount <= 8 && report.score < 0.7);
+      const prepareImages = shouldPreparePageImages({
+        quality: report.score,
+        pageCount,
+      });
 
-      const pageImages = shouldRenderPages
+      const pageImages = prepareImages
         ? await renderPdfPageImages(bytes, pageCount ?? 1)
         : [];
 
@@ -206,13 +220,11 @@ export async function extractDocumentText(args: {
         pageImages,
         nativeTextPreview: previewText(combined || "[empty native text layer]", 800),
         reason:
-          report.score >= 0.45 && pageImages.length === 0
-            ? "Native PDF text layer scored usable; page images not required."
-            : report.score >= 0.45 && pageImages.length > 0
+          report.score < 0.45
+            ? "Native PDF text missing or poor (likely scan / Print-to-PDF); Claude will analyze the PDF file directly (no local page rasterization)."
+            : pageImages.length > 0
               ? "Native text available; page images prepared for visual/hybrid analysis."
-              : pageImages.length > 0
-                ? "Native PDF text missing or poor (likely Print-to-PDF / scan); page images prepared for visual analysis."
-                : "Native PDF text missing or poor; visual file fallback required.",
+              : "Native PDF text layer scored usable; page images not required.",
       };
     } catch {
       return {

@@ -75,3 +75,17 @@ export function resolveAnalysisInputMode(
   }
   return "visual";
 }
+
+/**
+ * Only rasterize short PDFs that already have usable native text (hybrid assist).
+ * Scanned / image-only PDFs must NOT be rendered locally — pdf.js CCITT decoding on
+ * serverless routinely exceeds Vercel's timeout. Claude receives those as PDF docs.
+ */
+export function shouldPreparePageImages(args: {
+  quality: number;
+  pageCount: number | null;
+}): boolean {
+  if (args.quality < 0.45) return false;
+  if (args.pageCount == null || args.pageCount < 1) return false;
+  return args.pageCount <= 4;
+}
