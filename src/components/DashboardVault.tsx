@@ -11,6 +11,7 @@ import LinkedClientsPanel from "@/components/LinkedClientsPanel";
 import LinkedFamilyPanel from "@/components/LinkedFamilyPanel";
 import LinkedVehiclesPanel from "@/components/LinkedVehiclesPanel";
 import LinkedHomesPanel from "@/components/LinkedHomesPanel";
+import LinkedPetsPanel from "@/components/LinkedPetsPanel";
 import VaultSection from "@/components/VaultSection";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
@@ -18,6 +19,7 @@ import {
   canHaveLinkedEmployees,
   canHaveLinkedFamilyMembers,
   canHaveLinkedHomes,
+  canHaveLinkedPets,
   canHaveLinkedVehicles,
   vaultLabel,
 } from "@/lib/profiles/types";
@@ -61,7 +63,7 @@ export default function DashboardVault({ userId }: { userId: string }) {
   if (!active) {
     return (
       <p className="text-sm text-ink-muted">
-        No active profile. Open Manage Profiles to continue.
+        No active person or space. Open Manage people & spaces to continue.
       </p>
     );
   }
@@ -89,6 +91,12 @@ export default function DashboardVault({ userId }: { userId: string }) {
       {canHaveLinkedFamilyMembers(active.profile_type) && (
         <VaultSection id={`family-${active.id}`} title="Family members">
           <LinkedFamilyPanel parent={active} />
+        </VaultSection>
+      )}
+
+      {canHaveLinkedPets(active.profile_type) && (
+        <VaultSection id={`pets-${active.id}`} title="Pets">
+          <LinkedPetsPanel parent={active} />
         </VaultSection>
       )}
 

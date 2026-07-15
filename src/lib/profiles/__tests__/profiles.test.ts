@@ -205,6 +205,12 @@ describe("guardian profiles helpers", () => {
   it("links family members and vehicles under container profiles", () => {
     assert.equal(canHaveLinkedFamilyMembers("family"), true);
     assert.equal(canHaveLinkedVehicles("vehicles"), true);
+    assert.equal(canHaveLinkedVehicles("family"), true);
+    assert.equal(canHaveLinkedVehicles("business"), true);
+    assert.equal(canAttachChildToParent("pet", "family"), true);
+    assert.equal(canAttachChildToParent("vehicle", "family"), true);
+    assert.equal(canAttachChildToParent("vehicle", "business"), true);
+    assert.equal(canAttachChildToParent("pet", "business"), false);
     assert.equal(canHaveLinkedFamilyMembers("personal"), false);
 
     const familyId = "fam1";
@@ -272,6 +278,9 @@ describe("guardian profiles helpers", () => {
     assert.equal(canAttachChildToParent("child", "family"), true);
     assert.equal(canAttachChildToParent("spouse_partner", "family"), true);
     assert.equal(canAttachChildToParent("vehicle", "vehicles"), true);
+    assert.equal(canAttachChildToParent("vehicle", "family"), true);
+    assert.equal(canAttachChildToParent("vehicle", "business"), true);
+    assert.equal(canAttachChildToParent("pet", "family"), true);
     assert.equal(canAttachChildToParent("child", "vehicles"), false);
     assert.equal(canAttachChildToParent("employee", "business"), true);
     assert.equal(canAttachChildToParent("home", "family"), true);

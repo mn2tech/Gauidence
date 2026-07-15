@@ -1,10 +1,10 @@
 "use client";
 
 import { useMemo, useState, type FormEvent } from "react";
-import { Home, Loader2, Plus } from "lucide-react";
+import { Loader2, PawPrint, Plus } from "lucide-react";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
-  homesOf,
+  petsOf,
   unlinkedOfTypes,
   type GuardianProfile,
 } from "@/lib/profiles/types";
@@ -13,7 +13,7 @@ type Props = {
   parent: GuardianProfile;
 };
 
-export default function LinkedHomesPanel({ parent }: Props) {
+export default function LinkedPetsPanel({ parent }: Props) {
   const { profiles, refresh, switchProfile } = useActiveProfile();
   const [open, setOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
@@ -23,9 +23,9 @@ export default function LinkedHomesPanel({ parent }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [openingId, setOpeningId] = useState<string | null>(null);
 
-  const homes = useMemo(() => homesOf(profiles, parent.id), [profiles, parent.id]);
+  const pets = useMemo(() => petsOf(profiles, parent.id), [profiles, parent.id]);
   const unlinked = useMemo(
-    () => unlinkedOfTypes(profiles, parent, ["home"]),
+    () => unlinkedOfTypes(profiles, parent, ["pet"]),
     [profiles, parent]
   );
 
@@ -40,7 +40,7 @@ export default function LinkedHomesPanel({ parent }: Props) {
       });
       const body = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
-        setError(body.error ?? "Couldn't link home.");
+        setError(body.error ?? "Couldn't link profile.");
         return;
       }
       setLinkOpen(false);
@@ -50,7 +50,7 @@ export default function LinkedHomesPanel({ parent }: Props) {
     }
   };
 
-  const addHome = async (e: FormEvent) => {
+  const addPet = async (e: FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
     setBusy(true);
@@ -60,7 +60,7 @@ export default function LinkedHomesPanel({ parent }: Props) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          optionId: "home",
+          optionId: "pet",
           displayName: name.trim(),
           description: description.trim() || null,
           parentProfileId: parent.id,
@@ -69,7 +69,7 @@ export default function LinkedHomesPanel({ parent }: Props) {
       });
       const body = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
-        setError(body.error ?? "Couldn't add home.");
+        setError(body.error ?? "Couldn't add pet.");
         return;
       }
       setName("");
@@ -86,7 +86,7 @@ export default function LinkedHomesPanel({ parent }: Props) {
     setError(null);
     try {
       const ok = await switchProfile(id);
-      if (!ok) setError("Couldn't open home vault.");
+      if (!ok) setError("Couldn't open pet vault.");
       else window.dispatchEvent(new CustomEvent("guardian:profile-changed"));
     } finally {
       setOpeningId(null);
@@ -98,12 +98,12 @@ export default function LinkedHomesPanel({ parent }: Props) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-brand-light text-brand">
-            <Home className="h-4 w-4" />
+            <PawPrint className="h-4 w-4" />
           </span>
           <div>
-            <h2 className="text-base font-semibold tracking-tight">Homes</h2>
+            <h2 className="text-base font-semibold tracking-tight">Pets</h2>
             <p className="text-xs text-ink-muted">
-              House and property vaults linked to {parent.display_name}
+              Separate vaults linked to {parent.display_name}
             </p>
           </div>
         </div>
@@ -130,7 +130,7 @@ export default function LinkedHomesPanel({ parent }: Props) {
               className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium hover:bg-stone-50"
             >
               <Plus className="h-3.5 w-3.5" />
-              Add home
+              Add pet
             </button>
           </div>
         )}
@@ -145,7 +145,7 @@ export default function LinkedHomesPanel({ parent }: Props) {
       {linkOpen && unlinked.length > 0 && (
         <ul className="mt-4 space-y-2 border-t border-stone-100 pt-4">
           <li className="text-xs text-ink-muted">
-            Move an existing home under {parent.display_name}:
+            Move an existing pet under {parent.display_name}:
           </li>
           {unlinked.map((p) => (
             <li
@@ -177,7 +177,7 @@ export default function LinkedHomesPanel({ parent }: Props) {
 
       {open && (
         <form
-          onSubmit={addHome}
+          onSubmit={addPet}
           className="mt-4 space-y-3 border-t border-stone-100 pt-4"
         >
           <label className="block text-sm">
@@ -187,16 +187,16 @@ export default function LinkedHomesPanel({ parent }: Props) {
               onChange={(e) => setName(e.target.value)}
               required
               className="mt-1 w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none ring-brand focus:ring-2"
-              placeholder="Oak Street home"
+              placeholder="Buddy"
             />
           </label>
           <label className="block text-sm">
-            <span className="text-ink-muted">Address or notes (optional)</span>
+            <span className="text-ink-muted">Species / notes (optional)</span>
             <input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="mt-1 w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none ring-brand focus:ring-2"
-              placeholder="123 Oak St"
+              placeholder="Golden retriever"
             />
           </label>
           <div className="flex flex-wrap gap-2">
@@ -206,7 +206,7 @@ export default function LinkedHomesPanel({ parent }: Props) {
               className="inline-flex items-center gap-2 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-60"
             >
               {busy && <Loader2 className="h-4 w-4 animate-spin" />}
-              Add home
+              Add pet
             </button>
             <button
               type="button"
@@ -223,30 +223,30 @@ export default function LinkedHomesPanel({ parent }: Props) {
       )}
 
       <ul className="mt-4 divide-y divide-stone-100">
-        {homes.length === 0 ? (
+        {pets.length === 0 ? (
           <li className="py-3 text-sm text-ink-muted">
-            No homes yet. Add or link a house to keep mortgage, insurance, and
-            repair docs under this profile.
+            No pets yet. Add one to keep vet records and care notes in a
+            separate vault under this family.
           </li>
         ) : (
-          homes.map((h) => (
+          pets.map((pet) => (
             <li
-              key={h.id}
+              key={pet.id}
               className="flex flex-wrap items-center justify-between gap-2 py-3"
             >
               <div>
-                <p className="text-sm font-medium">{h.display_name}</p>
+                <p className="text-sm font-medium">{pet.display_name}</p>
                 <p className="text-xs text-ink-muted">
-                  {h.description?.trim() || "Home"}
+                  {pet.description?.trim() || "Pet"}
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() => void openVault(h.id)}
-                disabled={openingId === h.id}
+                onClick={() => void openVault(pet.id)}
+                disabled={openingId === pet.id}
                 className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium hover:bg-stone-50 disabled:opacity-60"
               >
-                {openingId === h.id ? "Opening…" : "Open vault"}
+                {openingId === pet.id ? "Opening…" : "Open vault"}
               </button>
             </li>
           ))

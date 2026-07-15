@@ -6,19 +6,10 @@ import { Check, ChevronDown, Plus } from "lucide-react";
 import ProfileAvatar from "@/components/ProfileAvatar";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
-  canHaveLinkedClients,
-  canHaveLinkedEmployees,
-  canHaveLinkedFamilyMembers,
-  canHaveLinkedHomes,
-  canHaveLinkedVehicles,
-  clientsOf,
-  employeesOf,
-  familyMembersOf,
-  homesOf,
+  nestedUnder,
   profileSubtitle,
   profileTypeLabel,
   topLevelProfiles,
-  vehiclesOf,
   type GuardianProfile,
 } from "@/lib/profiles/types";
 
@@ -110,23 +101,7 @@ export default function ProfileSwitcher() {
           <ul className="max-h-72 overflow-y-auto py-1">
             {topLevel.map((p) => {
               const selected = p.id === active.id;
-              const children = [
-                ...(canHaveLinkedEmployees(p.profile_type)
-                  ? employeesOf(profiles, p.id)
-                  : []),
-                ...(canHaveLinkedClients(p.profile_type)
-                  ? clientsOf(profiles, p.id)
-                  : []),
-                ...(canHaveLinkedFamilyMembers(p.profile_type)
-                  ? familyMembersOf(profiles, p.id)
-                  : []),
-                ...(canHaveLinkedHomes(p.profile_type)
-                  ? homesOf(profiles, p.id)
-                  : []),
-                ...(canHaveLinkedVehicles(p.profile_type)
-                  ? vehiclesOf(profiles, p.id)
-                  : []),
-              ];
+              const children = nestedUnder(profiles, p);
               return (
                 <li key={p.id}>
                   <SwitcherRow
@@ -153,15 +128,15 @@ export default function ProfileSwitcher() {
               onClick={() => setOpen(false)}
               className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-brand hover:bg-stone-50"
             >
-              <Plus className="h-4 w-4" />
-              Add Profile
+                <Plus className="h-4 w-4" />
+              Add someone or something
             </Link>
             <Link
               href="/settings/profiles"
               onClick={() => setOpen(false)}
               className="block px-3 py-2 text-sm text-ink-muted hover:bg-stone-50 hover:text-foreground"
             >
-              Manage Profiles
+              Manage people & spaces
             </Link>
           </div>
         </div>

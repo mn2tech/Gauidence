@@ -31,14 +31,14 @@ export default async function SettingsPage() {
         <section className="mx-auto max-w-2xl px-6 py-14">
           <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
           <p className="mt-2 text-sm text-ink-muted">
-            Manage your account, password, and Guardian profiles.
+            Manage your account, password, and who Guardian watches over.
           </p>
           <p className="mt-4">
             <a
               href="/settings/profiles"
               className="text-sm font-semibold text-brand hover:text-brand-dark"
             >
-              Manage Profiles →
+              Manage people & spaces →
             </a>
           </p>
           <SettingsForm

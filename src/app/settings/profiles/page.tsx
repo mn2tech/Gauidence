@@ -8,7 +8,7 @@ import { ensureDefaultGuardianProfile } from "@/lib/profiles/server";
 import ProfilesManager from "./ProfilesManager";
 
 export const metadata: Metadata = {
-  title: "Profiles — Guardian",
+  title: "People & spaces — Guardian",
 };
 
 export default async function ProfilesSettingsPage() {

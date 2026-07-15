@@ -4,7 +4,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import { Car, Loader2, Plus } from "lucide-react";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
-  unlinkedAttachableTo,
+  unlinkedOfTypes,
   vehiclesOf,
   type GuardianProfile,
 } from "@/lib/profiles/types";
@@ -28,7 +28,7 @@ export default function LinkedVehiclesPanel({ parent }: Props) {
     [profiles, parent.id]
   );
   const unlinked = useMemo(
-    () => unlinkedAttachableTo(profiles, parent),
+    () => unlinkedOfTypes(profiles, parent, ["vehicle"]),
     [profiles, parent]
   );
 

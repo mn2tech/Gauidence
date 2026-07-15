@@ -6,6 +6,7 @@ import {
   canHaveLinkedEmployees,
   canHaveLinkedFamilyMembers,
   canHaveLinkedHomes,
+  canHaveLinkedPets,
   canHaveLinkedVehicles,
   isGroupStyleProfile,
   type GuardianProfileType,
@@ -41,6 +42,7 @@ function linkedTypesForParent(
       "student"
     );
   }
+  if (canHaveLinkedPets(parentType)) types.push("pet");
   if (canHaveLinkedHomes(parentType)) types.push("home");
   if (canHaveLinkedVehicles(parentType)) types.push("vehicle");
   return types;

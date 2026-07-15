@@ -218,8 +218,16 @@ export function canHaveLinkedFamilyMembers(type: GuardianProfileType): boolean {
   return type === "family";
 }
 
+/** Pets nest under Family. */
+export function canHaveLinkedPets(type: GuardianProfileType): boolean {
+  return type === "family";
+}
+
+/** Vehicles nest under Family, Business, Nonprofit, or a Vehicles garage. */
 export function canHaveLinkedVehicles(type: GuardianProfileType): boolean {
-  return type === "vehicles";
+  return (
+    type === "vehicles" || type === "family" || isOrgStyleProfile(type)
+  );
 }
 
 /** Family / business / nonprofit can own linked home (house) profiles. */
@@ -234,6 +242,7 @@ export function isNestableProfileType(type: GuardianProfileType): boolean {
     type === "client" ||
     type === "vehicle" ||
     type === "home" ||
+    type === "pet" ||
     isFamilyMemberType(type)
   );
 }
@@ -243,18 +252,14 @@ export function canAttachChildToParent(
   childType: GuardianProfileType,
   parentType: GuardianProfileType
 ): boolean {
-  if (childType === "home") {
-    return canHaveLinkedHomes(parentType);
+  if (childType === "home") return canHaveLinkedHomes(parentType);
+  if (childType === "vehicle") return canHaveLinkedVehicles(parentType);
+  if (childType === "pet") return canHaveLinkedPets(parentType);
+  if (isFamilyMemberType(childType)) {
+    return canHaveLinkedFamilyMembers(parentType);
   }
-  if (canHaveLinkedFamilyMembers(parentType)) {
-    return isFamilyMemberType(childType);
-  }
-  if (canHaveLinkedVehicles(parentType)) {
-    return childType === "vehicle";
-  }
-  if (canHaveLinkedEmployees(parentType) || canHaveLinkedClients(parentType)) {
-    return childType === "employee" || childType === "client";
-  }
+  if (childType === "employee") return canHaveLinkedEmployees(parentType);
+  if (childType === "client") return canHaveLinkedClients(parentType);
   return false;
 }
 
@@ -268,6 +273,18 @@ export function unlinkedAttachableTo(
       !p.parent_profile_id &&
       p.id !== parent.id &&
       canAttachChildToParent(p.profile_type, parent.profile_type)
+  );
+}
+
+/** Unlinked profiles of specific types that can attach under a container. */
+export function unlinkedOfTypes(
+  profiles: GuardianProfile[],
+  parent: GuardianProfile,
+  types: readonly GuardianProfileType[]
+): GuardianProfile[] {
+  const allowed = new Set(types);
+  return unlinkedAttachableTo(profiles, parent).filter((p) =>
+    allowed.has(p.profile_type)
   );
 }
 
@@ -299,6 +316,15 @@ export function familyMembersOf(
   );
 }
 
+export function petsOf(
+  profiles: GuardianProfile[],
+  parentId: string
+): GuardianProfile[] {
+  return profiles.filter(
+    (p) => p.parent_profile_id === parentId && p.profile_type === "pet"
+  );
+}
+
 export function vehiclesOf(
   profiles: GuardianProfile[],
   parentId: string
@@ -317,20 +343,40 @@ export function homesOf(
   );
 }
 
+/** Nested people/places under a container for switchers and welcome strip. */
+export function nestedUnder(
+  profiles: GuardianProfile[],
+  parent: GuardianProfile
+): GuardianProfile[] {
+  const out: GuardianProfile[] = [];
+  if (canHaveLinkedEmployees(parent.profile_type)) {
+    out.push(...employeesOf(profiles, parent.id));
+  }
+  if (canHaveLinkedClients(parent.profile_type)) {
+    out.push(...clientsOf(profiles, parent.id));
+  }
+  if (canHaveLinkedFamilyMembers(parent.profile_type)) {
+    out.push(...familyMembersOf(profiles, parent.id));
+  }
+  if (canHaveLinkedPets(parent.profile_type)) {
+    out.push(...petsOf(profiles, parent.id));
+  }
+  if (canHaveLinkedHomes(parent.profile_type)) {
+    out.push(...homesOf(profiles, parent.id));
+  }
+  if (canHaveLinkedVehicles(parent.profile_type)) {
+    out.push(...vehiclesOf(profiles, parent.id));
+  }
+  return out;
+}
+
 /** Any nested vault under a container (org, family, or vehicles). */
 export function isLinkedMemberProfile(profile: {
   profile_type: GuardianProfileType;
   parent_profile_id?: string | null;
 }): boolean {
   if (!profile.parent_profile_id) return false;
-  const t = profile.profile_type;
-  return (
-    t === "employee" ||
-    t === "client" ||
-    t === "vehicle" ||
-    t === "home" ||
-    isFamilyMemberType(t)
-  );
+  return isNestableProfileType(profile.profile_type);
 }
 
 /** @deprecated Use isLinkedMemberProfile */

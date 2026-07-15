@@ -4,9 +4,10 @@ import { useMemo, useState, type FormEvent } from "react";
 import { Loader2, Plus, Users } from "lucide-react";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
+  FAMILY_MEMBER_TYPES,
   familyMembersOf,
   profileTypeLabel,
-  unlinkedAttachableTo,
+  unlinkedOfTypes,
   type GuardianProfile,
 } from "@/lib/profiles/types";
 
@@ -37,7 +38,7 @@ export default function LinkedFamilyPanel({ parent }: Props) {
     [profiles, parent.id]
   );
   const unlinked = useMemo(
-    () => unlinkedAttachableTo(profiles, parent),
+    () => unlinkedOfTypes(profiles, parent, FAMILY_MEMBER_TYPES),
     [profiles, parent]
   );
 

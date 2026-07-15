@@ -94,6 +94,20 @@ async function loadLinkedOrgContext(
           .join(", ")}`
       );
     }
+    if (canHaveLinkedVehicles(active.profile_type)) {
+      const { data: vehicles } = await supabase
+        .from("guardian_profiles")
+        .select("display_name, description")
+        .eq("owner_user_id", userId)
+        .eq("parent_profile_id", active.id)
+        .eq("profile_type", "vehicle")
+        .order("display_name", { ascending: true });
+      if ((vehicles ?? []).length > 0) {
+        parts.push(
+          formatLinkedVehiclesForGideon(active.display_name, vehicles ?? [])
+        );
+      }
+    }
     return parts.join("\n\n");
   }
 
@@ -104,18 +118,34 @@ async function loadLinkedOrgContext(
       "parent",
       "family_member",
       "student",
+      "pet",
+      "vehicle",
       ...(canHaveLinkedHomes(active.profile_type) ? (["home"] as const) : []),
     ];
     const { data: members } = await supabase
       .from("guardian_profiles")
-      .select("display_name, profile_type, relationship")
+      .select("display_name, profile_type, relationship, description")
       .eq("owner_user_id", userId)
       .eq("parent_profile_id", active.id)
       .in("profile_type", types)
       .order("display_name", { ascending: true });
-    const people = (members ?? []).filter((m) => m.profile_type !== "home");
+    const people = (members ?? []).filter(
+      (m) =>
+        m.profile_type !== "home" &&
+        m.profile_type !== "pet" &&
+        m.profile_type !== "vehicle"
+    );
+    const pets = (members ?? []).filter((m) => m.profile_type === "pet");
     const homes = (members ?? []).filter((m) => m.profile_type === "home");
+    const vehicles = (members ?? []).filter((m) => m.profile_type === "vehicle");
     const parts = [formatLinkedFamilyForGideon(active.display_name, people)];
+    if (pets.length > 0) {
+      parts.push(
+        `Linked pets under this family: ${pets
+          .map((p) => p.display_name)
+          .join(", ")}`
+      );
+    }
     if (homes.length > 0) {
       parts.push(
         `Linked homes under this family: ${homes
@@ -123,10 +153,21 @@ async function loadLinkedOrgContext(
           .join(", ")}`
       );
     }
+    if (vehicles.length > 0) {
+      parts.push(
+        formatLinkedVehiclesForGideon(
+          active.display_name,
+          vehicles.map((v) => ({
+            display_name: v.display_name,
+            description: v.description ?? null,
+          }))
+        )
+      );
+    }
     return parts.join("\n\n");
   }
 
-  if (canHaveLinkedVehicles(active.profile_type)) {
+  if (active.profile_type === "vehicles") {
     const { data: vehicles } = await supabase
       .from("guardian_profiles")
       .select("display_name, description")

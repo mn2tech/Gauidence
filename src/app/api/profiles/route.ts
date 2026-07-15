@@ -3,11 +3,9 @@ import type { User, SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import {
   isGuardianProfileType,
-  isFamilyMemberType,
   PROFILE_CREATE_OPTIONS,
-  canHaveLinkedEmployees,
-  canHaveLinkedFamilyMembers,
-  canHaveLinkedVehicles,
+  canAttachChildToParent,
+  isOrgStyleProfile,
   profileCompanyContext,
   profileTypeLabel,
   type GuardianProfileType,
@@ -133,52 +131,39 @@ export async function POST(request: Request) {
       option?.profileType ??
       (isGuardianProfileType(body.profileType) ? body.profileType : profileType);
 
-    if (canHaveLinkedEmployees(parent.profile_type)) {
-      if (requestedType === "home") {
-        profileType = "home";
-      } else {
-        const asClient =
-          requestedType === "client" ||
-          body.profileType === "client" ||
-          body.linkedKind === "client";
-        profileType = asClient ? "client" : "employee";
-        if (!organizationName) {
-          organizationName = profileCompanyContext(parent);
-        }
-      }
-    } else if (canHaveLinkedFamilyMembers(parent.profile_type)) {
-      if (requestedType === "home") {
-        profileType = "home";
-      } else if (!isFamilyMemberType(requestedType)) {
-        return NextResponse.json(
-          {
-            error:
-              "Only child, spouse/partner, parent, family member, student, or home can be linked to a Family profile.",
-          },
-          { status: 400 }
-        );
-      } else {
-        profileType = requestedType;
-      }
-    } else if (canHaveLinkedVehicles(parent.profile_type)) {
-      if (requestedType !== "vehicle") {
-        return NextResponse.json(
-          {
-            error: "Only vehicle profiles can be linked to a Vehicles profile.",
-          },
-          { status: 400 }
-        );
-      }
-      profileType = "vehicle";
-    } else {
+    // Org panels historically omitted optionId — default employee / client.
+    let childType = requestedType;
+    if (
+      isOrgStyleProfile(parent.profile_type) &&
+      !option &&
+      !isGuardianProfileType(body.profileType)
+    ) {
+      childType =
+        body.linkedKind === "client" || body.profileType === "client"
+          ? "client"
+          : "employee";
+    }
+
+    if (!canAttachChildToParent(childType, parent.profile_type)) {
       return NextResponse.json(
         {
-          error:
-            "This profile type cannot have linked members. Use a Business, Nonprofit, Family, or Vehicles profile.",
+          error: `A ${profileTypeLabel(childType)} can't be nested under ${
+            parent.display_name
+          } (${profileTypeLabel(parent.profile_type)}).`,
         },
         { status: 400 }
       );
     }
+
+    profileType = childType;
+    if (
+      isOrgStyleProfile(parent.profile_type) &&
+      (profileType === "employee" || profileType === "client") &&
+      !organizationName
+    ) {
+      organizationName = profileCompanyContext(parent);
+    }
+
     parentId = parent.id;
   }
 

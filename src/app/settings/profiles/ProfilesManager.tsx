@@ -246,9 +246,12 @@ export default function ProfilesManager() {
             <ArrowLeft className="h-3.5 w-3.5" />
             Settings
           </Link>
-          <h1 className="mt-2 text-2xl font-bold tracking-tight">Profiles</h1>
+          <h1 className="mt-2 text-2xl font-bold tracking-tight">
+            People & spaces
+          </h1>
           <p className="mt-1 text-sm text-ink-muted">
-            One login, separate vaults. Active:{" "}
+            One login, separate vaults for each person, business, or place.
+            Active:{" "}
             <span className="font-medium text-foreground">
               {active?.display_name ?? "—"}
             </span>
@@ -261,7 +264,7 @@ export default function ProfilesManager() {
             className="inline-flex items-center gap-2 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark"
           >
             <Plus className="h-4 w-4" />
-            Add Profile
+            Add someone or something
           </button>
         )}
       </div>
@@ -277,7 +280,7 @@ export default function ProfilesManager() {
           {step === 1 ? (
             <>
               <h2 className="text-base font-semibold">
-                Who or what is this profile for?
+                Who or what is this for?
               </h2>
               <ul className="mt-4 grid gap-2 sm:grid-cols-2">
                 {PROFILE_CREATE_OPTIONS.map((o) => (
@@ -448,7 +451,7 @@ export default function ProfilesManager() {
                   onClick={() => void create()}
                   className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
                 >
-                  {busy ? "Creating…" : "Create profile"}
+                  {busy ? "Adding…" : "Add to Guardian"}
                 </button>
               </div>
             </>
