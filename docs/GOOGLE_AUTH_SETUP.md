@@ -49,6 +49,10 @@ Supabase Dashboard → **Authentication → URL Configuration**:
   - `http://localhost:3001/auth/callback` (used when port 3000 is taken)
   - `https://guardian-app-delta.vercel.app/auth/callback`
 
+Password reset uses the same `/auth/callback` endpoint (with
+`next=/auth/update-password`). No extra redirect URL is required if the
+callback path above is already allowlisted.
+
 If you later add a custom domain, add `https://yourdomain.com/auth/callback`
 here too and update the Google authorized origins.
 

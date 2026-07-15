@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 /**
- * OAuth / email-confirmation callback.
+ * OAuth / email-confirmation / password-recovery callback.
  * Exchanges the auth code for a session, makes sure a profile row exists
  * (without overwriting user edits), then redirects to the requested page.
  */
