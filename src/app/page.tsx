@@ -22,12 +22,28 @@ const features = [
   },
 ];
 
-export default function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ deleted?: string }>;
+}) {
+  const params = await searchParams;
+  const showDeleted = params.deleted === "1";
+
   return (
     <div className="flex min-h-screen flex-col">
       <SiteHeader />
 
       <main className="flex-1">
+        {showDeleted ? (
+          <div
+            role="status"
+            className="border-b border-brand/20 bg-brand-light px-6 py-3 text-center text-sm text-brand-dark"
+          >
+            Your account has been deleted. You&apos;re signed out — take care.
+          </div>
+        ) : null}
+
         {/* Hero */}
         <section className="relative overflow-hidden">
           <div className="absolute inset-0 -z-10 bg-gradient-to-b from-brand-light via-background to-background" />

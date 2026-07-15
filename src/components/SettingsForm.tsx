@@ -118,10 +118,21 @@ export default function SettingsForm({
     setSavingReminders(false);
   }
 
-  const deleteConfirmed = confirmText.trim() === "DELETE";
+  const deleteConfirmed = confirmText.trim().toUpperCase() === "DELETE";
 
   async function handleDeleteAccount() {
-    if (!supabase || !deleteConfirmed) return;
+    if (!deleteConfirmed) return;
+    if (!supabase) {
+      setDeleteError(
+        "Sign-in isn't available in this browser. Refresh the page and try again."
+      );
+      return;
+    }
+    const ok = window.confirm(
+      "Permanently delete your account and all Guardian data? This cannot be undone."
+    );
+    if (!ok) return;
+
     setDeleteError(null);
     setDeleting(true);
     try {
