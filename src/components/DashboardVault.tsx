@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
 import DocumentManager from "@/components/DocumentManager";
 import AlertsPanel from "@/components/AlertsPanel";
@@ -21,6 +21,27 @@ import {
   canHaveLinkedVehicles,
   vaultLabel,
 } from "@/lib/profiles/types";
+
+function DocumentsSection({
+  userId,
+  profileId,
+  profileName,
+}: {
+  userId: string;
+  profileId: string;
+  profileName: string;
+}) {
+  const searchParams = useSearchParams();
+  const autoOpenCamera = searchParams.get("camera") === "1";
+  return (
+    <DocumentManager
+      userId={userId}
+      profileId={profileId}
+      profileName={profileName}
+      autoOpenCamera={autoOpenCamera}
+    />
+  );
+}
 
 export default function DashboardVault({ userId }: { userId: string }) {
   const router = useRouter();
@@ -92,11 +113,21 @@ export default function DashboardVault({ userId }: { userId: string }) {
       </VaultSection>
 
       <VaultSection id={`documents-${active.id}`} title="Documents">
-        <DocumentManager
-          userId={userId}
-          profileId={active.id}
-          profileName={active.display_name}
-        />
+        <Suspense
+          fallback={
+            <DocumentManager
+              userId={userId}
+              profileId={active.id}
+              profileName={active.display_name}
+            />
+          }
+        >
+          <DocumentsSection
+            userId={userId}
+            profileId={active.id}
+            profileName={active.display_name}
+          />
+        </Suspense>
       </VaultSection>
 
       <div className="flex items-start gap-3 rounded-2xl border border-stone-200 bg-white p-5">

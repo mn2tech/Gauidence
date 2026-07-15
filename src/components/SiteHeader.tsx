@@ -3,13 +3,15 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LogOut, Menu, ShieldCheck, X } from "lucide-react";
+import { Camera, LogOut, Menu, ShieldCheck, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import ProfileSwitcher from "@/components/ProfileSwitcher";
+import { useActiveProfile } from "@/components/ProfileProvider";
 
 export default function SiteHeader() {
   const pathname = usePathname();
   const router = useRouter();
+  const { active } = useActiveProfile();
   const [signedIn, setSignedIn] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -43,6 +45,10 @@ export default function SiteHeader() {
     router.refresh();
   }
 
+  const cameraHref = active
+    ? `/dashboard?camera=1#documents-${active.id}`
+    : "/dashboard?camera=1";
+
   const linkClass =
     "block rounded-lg px-3 py-2.5 text-sm font-medium text-foreground transition hover:bg-stone-100 sm:inline sm:rounded-none sm:px-0 sm:py-0 sm:font-normal sm:text-ink-muted sm:hover:bg-transparent sm:hover:text-foreground";
 
@@ -67,6 +73,15 @@ export default function SiteHeader() {
           {signedIn ? (
             <>
               <ProfileSwitcher />
+              <Link
+                href={cameraHref}
+                aria-label="Scan with camera"
+                title="Scan with camera"
+                className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-3 py-1.5 font-medium text-foreground transition hover:border-stone-400 hover:bg-stone-50"
+              >
+                <Camera className="h-4 w-4 text-brand" />
+                <span className="hidden lg:inline">Scan</span>
+              </Link>
               <Link href="/ask" className="hover:text-foreground">
                 Ask Gideon
               </Link>
@@ -103,17 +118,28 @@ export default function SiteHeader() {
           )}
         </nav>
 
-        {/* Mobile menu toggle */}
-        <button
-          type="button"
-          className="inline-flex items-center justify-center rounded-full p-2 text-foreground hover:bg-stone-100 sm:hidden"
-          aria-expanded={menuOpen}
-          aria-controls="mobile-nav"
-          aria-label={menuOpen ? "Close menu" : "Open menu"}
-          onClick={() => setMenuOpen((o) => !o)}
-        >
-          {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </button>
+        {/* Mobile: scan + menu */}
+        <div className="flex items-center gap-1 sm:hidden">
+          {signedIn ? (
+            <Link
+              href={cameraHref}
+              aria-label="Scan with camera"
+              className="inline-flex items-center justify-center rounded-full p-2 text-brand hover:bg-brand-light"
+            >
+              <Camera className="h-5 w-5" />
+            </Link>
+          ) : null}
+          <button
+            type="button"
+            className="inline-flex items-center justify-center rounded-full p-2 text-foreground hover:bg-stone-100"
+            aria-expanded={menuOpen}
+            aria-controls="mobile-nav"
+            aria-label={menuOpen ? "Close menu" : "Open menu"}
+            onClick={() => setMenuOpen((o) => !o)}
+          >
+            {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+        </div>
       </div>
 
       {/* Mobile drawer */}
@@ -131,6 +157,9 @@ export default function SiteHeader() {
                 <div className="px-3 py-2">
                   <ProfileSwitcher />
                 </div>
+                <Link href={cameraHref} className={linkClass}>
+                  Scan with camera
+                </Link>
                 <Link href="/ask" className={linkClass}>
                   Ask Gideon
                 </Link>

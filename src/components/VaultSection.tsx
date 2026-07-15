@@ -35,9 +35,13 @@ export default function VaultSection({
   }, [id]);
 
   useEffect(() => {
-    const applyHash = () => {
+    const applyDeepLink = () => {
       if (typeof window === "undefined") return;
-      if (window.location.hash !== `#${id}`) return;
+      const hashMatch = window.location.hash === `#${id}`;
+      const cameraDocs =
+        id.startsWith("documents-") &&
+        new URLSearchParams(window.location.search).get("camera") === "1";
+      if (!hashMatch && !cameraDocs) return;
       setOpen(true);
       try {
         localStorage.setItem(storageKey(id), "1");
@@ -51,9 +55,9 @@ export default function VaultSection({
         });
       });
     };
-    applyHash();
-    window.addEventListener("hashchange", applyHash);
-    return () => window.removeEventListener("hashchange", applyHash);
+    applyDeepLink();
+    window.addEventListener("hashchange", applyDeepLink);
+    return () => window.removeEventListener("hashchange", applyDeepLink);
   }, [id]);
 
   const toggle = () => {

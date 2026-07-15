@@ -100,14 +100,18 @@ export default function DocumentManager({
   userId,
   profileId,
   profileName,
+  autoOpenCamera = false,
 }: {
   userId: string;
   profileId: string;
   profileName: string;
+  /** Open the scanner once (deep link /dashboard?camera=1). */
+  autoOpenCamera?: boolean;
 }) {
   const supabase = createClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const cameraDeepLinkConsumed = useRef(false);
   const [documents, setDocuments] = useState<DocumentRow[]>([]);
   const [analyses, setAnalyses] = useState<Record<string, Analysis>>({});
   const [loading, setLoading] = useState(true);
@@ -186,6 +190,55 @@ export default function DocumentManager({
     void loadDocuments();
   }, [loadDocuments]);
 
+  function openCamera() {
+    setError(null);
+    if (
+      typeof navigator !== "undefined" &&
+      typeof navigator.mediaDevices?.getUserMedia === "function"
+    ) {
+      setCameraOpen(true);
+      return;
+    }
+    cameraInputRef.current?.click();
+  }
+
+  /** Deep link / event: open scanner for quick capture into this vault. */
+  useEffect(() => {
+    const stripCameraParam = () => {
+      if (typeof window === "undefined") return;
+      const params = new URLSearchParams(window.location.search);
+      if (!params.has("camera")) return;
+      params.delete("camera");
+      const next = `${window.location.pathname}${
+        params.toString() ? `?${params}` : ""
+      }${window.location.hash}`;
+      window.history.replaceState(null, "", next);
+    };
+
+    const runOpen = () => {
+      openCamera();
+      stripCameraParam();
+    };
+
+    const onRequest = () => runOpen();
+    window.addEventListener("guardian:open-camera", onRequest);
+
+    let timer: number | undefined;
+    if (autoOpenCamera && !cameraDeepLinkConsumed.current) {
+      cameraDeepLinkConsumed.current = true;
+      timer = window.setTimeout(runOpen, 350);
+    }
+    if (!autoOpenCamera) {
+      cameraDeepLinkConsumed.current = false;
+    }
+
+    return () => {
+      window.removeEventListener("guardian:open-camera", onRequest);
+      if (timer) window.clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- openCamera is stable enough for mount/deeplink
+  }, [profileId, autoOpenCamera]);
+
   async function handleFiles(files: FileList | File[] | null) {
     const list = files
       ? Array.isArray(files)
@@ -261,18 +314,6 @@ export default function DocumentManager({
     setUploading(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (cameraInputRef.current) cameraInputRef.current.value = "";
-  }
-
-  function openCamera() {
-    setError(null);
-    if (
-      typeof navigator !== "undefined" &&
-      typeof navigator.mediaDevices?.getUserMedia === "function"
-    ) {
-      setCameraOpen(true);
-      return;
-    }
-    cameraInputRef.current?.click();
   }
 
   async function handleDownload(doc: DocumentRow) {

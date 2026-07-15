@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Camera,
   FileUp,
   MessageCircle,
   NotebookPen,
@@ -96,6 +97,7 @@ export default function GideonNudge() {
   const empty = summary?.empty ?? true;
   const name = active.display_name;
   const docsHref = `/dashboard#documents-${active.id}`;
+  const cameraHref = `/dashboard?camera=1#documents-${active.id}`;
   const logHref = `/dashboard#daily-log-${active.id}`;
   const askHref = "/ask";
   const askLabel = askGideonContextLabel(active);
@@ -103,10 +105,17 @@ export default function GideonNudge() {
   const actions: Action[] = empty
     ? [
         {
+          key: "scan",
+          href: cameraHref,
+          label: "Scan with camera",
+          primary: true,
+          icon: Camera,
+        },
+        {
           key: "upload",
           href: docsHref,
-          label: "Upload documents",
-          primary: true,
+          label: "Upload",
+          primary: false,
           icon: FileUp,
         },
         {
@@ -115,13 +124,6 @@ export default function GideonNudge() {
           label: "Add daily log",
           primary: false,
           icon: NotebookPen,
-        },
-        {
-          key: "ask",
-          href: askHref,
-          label: "Ask Gideon",
-          primary: false,
-          icon: MessageCircle,
         },
       ]
     : [
@@ -133,11 +135,11 @@ export default function GideonNudge() {
           icon: MessageCircle,
         },
         {
-          key: "upload",
-          href: docsHref,
-          label: "Upload",
+          key: "scan",
+          href: cameraHref,
+          label: "Scan",
           primary: false,
-          icon: FileUp,
+          icon: Camera,
         },
         {
           key: "log",

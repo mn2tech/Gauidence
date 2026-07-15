@@ -11,6 +11,7 @@ import Link from "next/link";
 import {
   ExternalLink,
   FileUp,
+  Camera,
   Info,
   Loader2,
   Menu,
@@ -184,6 +185,9 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
   const docsHref = profileId
     ? `/dashboard#documents-${profileId}`
     : "/dashboard";
+  const cameraHref = profileId
+    ? `/dashboard?camera=1#documents-${profileId}`
+    : "/dashboard?camera=1";
   const logHref = profileId
     ? `/dashboard#daily-log-${profileId}`
     : "/dashboard";
@@ -524,8 +528,14 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
               </p>
               <div className="flex flex-wrap gap-2">
                 <Link
-                  href={docsHref}
+                  href={cameraHref}
                   className="inline-flex rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark"
+                >
+                  Scan with camera
+                </Link>
+                <Link
+                  href={docsHref}
+                  className="inline-flex rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-stone-50"
                 >
                   Upload a Document
                 </Link>
@@ -704,6 +714,15 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
               role="menu"
               className="absolute bottom-full left-0 z-20 mb-2 w-52 overflow-hidden rounded-xl border border-stone-200 bg-white py-1 shadow-lg"
             >
+              <Link
+                role="menuitem"
+                href={cameraHref}
+                onClick={() => setPlusOpen(false)}
+                className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-foreground hover:bg-stone-50"
+              >
+                <Camera className="h-4 w-4 text-brand" />
+                Scan with camera
+              </Link>
               <Link
                 role="menuitem"
                 href={docsHref}
