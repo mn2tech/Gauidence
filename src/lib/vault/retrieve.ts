@@ -59,6 +59,8 @@ export type VaultCitation = {
   documentId: string;
   fileName: string;
   profileName?: string;
+  /** True when the source file is an image (UI may show inline preview). */
+  isImage?: boolean;
 };
 
 /**
@@ -120,6 +122,48 @@ export function selectCitationsForAnswer(
     documentId,
     fileName,
     ...(profileName ? { profileName } : {}),
+  }));
+}
+
+/** Top image documents from retrieval, for "show pictures" requests. */
+export function selectImageCitationsFromChunks(
+  chunks: RetrievedChunk[],
+  limit = 4
+): VaultCitation[] {
+  const byDoc = new Map<
+    string,
+    { fileName: string; similarity: number; profileName?: string }
+  >();
+  for (const c of chunks) {
+    if (!/\.(png|jpe?g|gif|webp|heic|heif|bmp)$/i.test(c.file_name)) continue;
+    const prev = byDoc.get(c.document_id);
+    if (!prev || c.similarity > prev.similarity) {
+      byDoc.set(c.document_id, {
+        fileName: c.file_name,
+        similarity: c.similarity,
+        profileName: c.profile_name,
+      });
+    }
+  }
+  return [...byDoc.entries()]
+    .sort((a, b) => b[1].similarity - a[1].similarity)
+    .slice(0, limit)
+    .map(([documentId, meta]) => ({
+      documentId,
+      fileName: meta.fileName,
+      isImage: true,
+      ...(meta.profileName ? { profileName: meta.profileName } : {}),
+    }));
+}
+
+export function markImageCitations(
+  citations: VaultCitation[]
+): VaultCitation[] {
+  return citations.map((c) => ({
+    ...c,
+    isImage:
+      c.isImage ??
+      /\.(png|jpe?g|gif|webp|heic|heif|bmp)$/i.test(c.fileName),
   }));
 }
 

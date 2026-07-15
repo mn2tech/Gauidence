@@ -9,6 +9,8 @@ export type { RetrievedChunk };
 export {
   formatRetrievalContext,
   selectCitationsForAnswer,
+  selectImageCitationsFromChunks,
+  markImageCitations,
   VAULT_CHAT_SYSTEM,
 } from "./retrieve";
 export type { VaultCitation } from "./retrieve";

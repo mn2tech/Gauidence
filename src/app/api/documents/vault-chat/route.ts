@@ -15,8 +15,11 @@ import {
   formatRetrievalContext,
   retrieveVaultChunks,
   selectCitationsForAnswer,
+  selectImageCitationsFromChunks,
+  markImageCitations,
   VAULT_CHAT_SYSTEM,
 } from "@/lib/vault/indexDocument";
+import { wantsShowPictures } from "@/lib/vault/images";
 import { ensureUserVaultIndexed } from "@/lib/vault/ensureIndexed";
 import {
   canRollupLinkedVaultSearch,
@@ -175,7 +178,12 @@ type ChatMessageRow = {
   id: string;
   role: "user" | "assistant";
   content: string;
-  citations?: { documentId: string; fileName: string; profileName?: string }[];
+  citations?: {
+    documentId: string;
+    fileName: string;
+    profileName?: string;
+    isImage?: boolean;
+  }[];
   created_at: string;
 };
 
@@ -627,10 +635,12 @@ export async function POST(request: Request) {
     documentId: string;
     fileName: string;
     profileName?: string;
+    isImage?: boolean;
   }[] = [];
   let answer: string;
 
   try {
+    const showPictures = wantsShowPictures(question);
     const queryEmbedding =
       (chunkCount ?? 0) > 0 ? await embedQuery(question) : null;
     const chunks = queryEmbedding
@@ -639,10 +649,15 @@ export async function POST(request: Request) {
             supabase,
             queryEmbedding,
             searchScopes,
-            10
+            showPictures ? 12 : 10
           )
         : (
-            await retrieveVaultChunks(supabase, queryEmbedding, active.id, 8)
+            await retrieveVaultChunks(
+              supabase,
+              queryEmbedding,
+              active.id,
+              showPictures ? 10 : 8
+            )
           ).map((c) => ({
             ...c,
             profile_id: active.id,
@@ -677,11 +692,15 @@ export async function POST(request: Request) {
               .map((p) => p.display_name)
               .join(", ")}). Attribute facts to the vault owner named in each source. Do not invent links across unrelated people.`
           : "Search only this profile's vault and Daily Logs.";
+      const pictureNote = showPictures
+        ? `The user wants to see pictures. Prefer naming image file names from the retrieved excerpts (jpg/png/webp/etc.) so the UI can display them. If no image files were retrieved, say so clearly.`
+        : "";
 
       const system = `${VAULT_CHAT_SYSTEM}
 
 Active profile: ${active.display_name} (${active.profile_type}).
 ${rollupNote}
+${pictureNote}
 
 --- RETRIEVED EXCERPTS ---
 ${formatted.context.trim() || "(none)"}
@@ -704,7 +723,20 @@ ${linkedContext.trim() || "(none)"}
         answer =
           "I found potentially relevant information, but it needs verification before I can give you a reliable answer.";
       }
-      citations = selectCitationsForAnswer(answer, chunks);
+      let selected = selectCitationsForAnswer(answer, chunks);
+      if (showPictures) {
+        const imageOnes = selectImageCitationsFromChunks(chunks, 4);
+        const seen = new Set(selected.map((c) => c.documentId));
+        for (const img of imageOnes) {
+          if (seen.has(img.documentId)) continue;
+          selected.push(img);
+          seen.add(img.documentId);
+        }
+        if (selected.length === 0 && imageOnes.length > 0) {
+          selected = imageOnes;
+        }
+      }
+      citations = markImageCitations(selected);
     }
   } catch (err) {
     if (err && typeof err === "object" && "status" in err && "message" in err) {

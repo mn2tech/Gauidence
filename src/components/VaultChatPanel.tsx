@@ -30,8 +30,96 @@ import {
   GIDEON_WHY,
   parseGideonSections,
 } from "@/lib/vault/gideon";
+import { isImageFileName } from "@/lib/vault/images";
 
-type Citation = { documentId: string; fileName: string; profileName?: string };
+type Citation = {
+  documentId: string;
+  fileName: string;
+  profileName?: string;
+  isImage?: boolean;
+};
+
+function CitationImagePreview({
+  documentId,
+  fileName,
+  profileName,
+}: {
+  documentId: string;
+  fileName: string;
+  profileName?: string;
+}) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const supabase = createClient();
+      if (!supabase) {
+        if (!cancelled) setFailed(true);
+        return;
+      }
+      const { data: doc } = await supabase
+        .from("documents")
+        .select("file_path")
+        .eq("id", documentId)
+        .maybeSingle();
+      if (!doc?.file_path) {
+        if (!cancelled) setFailed(true);
+        return;
+      }
+      const { data, error } = await supabase.storage
+        .from("documents")
+        .createSignedUrl(doc.file_path, 300);
+      if (cancelled) return;
+      if (error || !data?.signedUrl) {
+        setFailed(true);
+        return;
+      }
+      setUrl(data.signedUrl);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [documentId]);
+
+  if (failed) {
+    return (
+      <p className="text-[11px] text-ink-muted">
+        Couldn&apos;t load preview for {fileName}.
+      </p>
+    );
+  }
+  if (!url) {
+    return (
+      <div className="flex h-32 items-center justify-center rounded-xl border border-stone-200 bg-stone-50 text-xs text-ink-muted">
+        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+        Loading image…
+      </div>
+    );
+  }
+
+  const label = profileName ? `${profileName} · ${fileName}` : fileName;
+
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="block overflow-hidden rounded-xl border border-stone-200 bg-stone-50"
+    >
+      {/* Signed storage URLs are dynamic; use native img. */}
+      <img
+        src={url}
+        alt={label}
+        className="max-h-72 w-full object-contain"
+      />
+      <p className="truncate border-t border-stone-100 px-2 py-1.5 text-[11px] text-ink-muted">
+        {label}
+      </p>
+    </a>
+  );
+}
 
 type VaultMessage = {
   id: string;
@@ -356,7 +444,23 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
           </div>
         ))}
         {uniqueCitations.length > 0 && (
-          <div className="space-y-1.5 pt-1">
+          <div className="space-y-2 pt-1">
+            {uniqueCitations.some(
+              (c) => c.isImage || isImageFileName(c.fileName)
+            ) ? (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {uniqueCitations
+                  .filter((c) => c.isImage || isImageFileName(c.fileName))
+                  .map((c) => (
+                    <CitationImagePreview
+                      key={`img-${c.documentId}`}
+                      documentId={c.documentId}
+                      fileName={c.fileName}
+                      profileName={c.profileName}
+                    />
+                  ))}
+              </div>
+            ) : null}
             {uniqueCitations.map((c) => (
               <div
                 key={c.documentId}
