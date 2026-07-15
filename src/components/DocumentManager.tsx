@@ -509,7 +509,9 @@ export default function DocumentManager({
         setError(
           res.ok
             ? "Analysis finished but returned an unexpected response. Please try again."
-            : "The analysis service failed. Please try again in a moment."
+            : res.status === 504
+              ? "Analysis took too long on this file. Try again, or upload a clearer photo or smaller PDF."
+              : "The analysis service failed. Please try again in a moment."
         );
         setDocuments((docs) =>
           docs.map((d) =>
