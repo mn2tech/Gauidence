@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type DragEvent, type ReactNode } from "react";
 import { ChevronDown, GripVertical, Trash2 } from "lucide-react";
+import ProfileAvatar from "@/components/ProfileAvatar";
 import {
   canAttachChildToParent,
   canHaveLinkedClients,
@@ -15,6 +16,7 @@ import {
   homesOf,
   isGroupStyleProfile,
   isNestableProfileType,
+  profileAvatarLabel,
   profileSubtitle,
   profileTypeLabel,
   topLevelProfiles,
@@ -56,6 +58,8 @@ type Props = {
   onSetDefault: (id: string) => void;
   onRemove: (p: GuardianProfile) => void;
   onMoveUnder: (profileId: string, parentProfileId: string | null) => Promise<void>;
+  onRefresh: () => void | Promise<void>;
+  onAvatarError: (message: string) => void;
 };
 
 function NestedMemberRow({
@@ -71,6 +75,8 @@ function NestedMemberRow({
   dragEnabled,
   onDragStart,
   moveControl,
+  onRefresh,
+  onAvatarError,
 }: {
   child: GuardianProfile;
   activeId?: string;
@@ -84,6 +90,8 @@ function NestedMemberRow({
   dragEnabled: boolean;
   onDragStart: (e: DragEvent, id: string) => void;
   moveControl: ReactNode;
+  onRefresh: () => void | Promise<void>;
+  onAvatarError: (message: string) => void;
 }) {
   if (editing?.id === child.id) {
     return (
@@ -126,13 +134,20 @@ function NestedMemberRow({
         dragEnabled ? "cursor-grab active:cursor-grabbing" : ""
       }`}
     >
-      <div className="flex min-w-0 items-start gap-1.5">
+      <div className="flex min-w-0 items-start gap-2">
         {dragEnabled ? (
           <GripVertical
-            className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink-muted"
+            className="mt-2 h-3.5 w-3.5 shrink-0 text-ink-muted"
             aria-hidden
           />
         ) : null}
+        <ProfileAvatar
+          profile={child}
+          size="sm"
+          editable
+          onUpdated={onRefresh}
+          onError={onAvatarError}
+        />
         <div className="min-w-0">
           <p className="text-sm font-medium">
             {child.display_name}
@@ -206,6 +221,8 @@ export default function ProfileOrganizeList({
   onSetDefault,
   onRemove,
   onMoveUnder,
+  onRefresh,
+  onAvatarError,
 }: Props) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [dragId, setDragId] = useState<string | null>(null);
@@ -342,7 +359,8 @@ export default function ProfileOrganizeList({
       <p className="text-xs text-ink-muted">
         Drag a child, spouse, home, employee, client, or vehicle onto a Family,
         Business, Nonprofit, or Vehicles card — or use Move under. Tap the
-        chevron to collapse nested members.
+        chevron to collapse nested members. Use the camera on a profile to add a{" "}
+        photo or logo.
       </p>
 
       <ul
@@ -463,7 +481,7 @@ export default function ProfileOrganizeList({
                             ? `Expand ${p.display_name}`
                             : `Collapse ${p.display_name}`
                         }
-                        className="mt-0.5 rounded-md p-0.5 text-ink-muted hover:bg-stone-100 hover:text-foreground"
+                        className="mt-2 rounded-md p-0.5 text-ink-muted hover:bg-stone-100 hover:text-foreground"
                       >
                         <ChevronDown
                           className={`h-4 w-4 transition-transform ${
@@ -473,12 +491,19 @@ export default function ProfileOrganizeList({
                       </button>
                     ) : nestable ? (
                       <GripVertical
-                        className="mt-1 h-4 w-4 shrink-0 text-ink-muted"
+                        className="mt-2.5 h-4 w-4 shrink-0 text-ink-muted"
                         aria-hidden
                       />
                     ) : (
-                      <span className="mt-1 w-4 shrink-0" aria-hidden />
+                      <span className="mt-2.5 w-4 shrink-0" aria-hidden />
                     )}
+                    <ProfileAvatar
+                      profile={p}
+                      size="md"
+                      editable
+                      onUpdated={onRefresh}
+                      onError={onAvatarError}
+                    />
                     <div>
                       <p className="font-semibold">
                         {p.display_name}
@@ -500,6 +525,8 @@ export default function ProfileOrganizeList({
                       </p>
                       <p className="text-xs text-ink-muted">
                         {profileSubtitle(p)}
+                        {" · "}
+                        {profileAvatarLabel(p.profile_type)}
                       </p>
                     </div>
                   </div>
@@ -566,6 +593,8 @@ export default function ProfileOrganizeList({
                       dragEnabled
                       onDragStart={onDragStart}
                       moveControl={renderMoveSelect(child)}
+                      onRefresh={onRefresh}
+                      onAvatarError={onAvatarError}
                     />
                   ))}
                   {nestedClients.length > 0 ? (
@@ -588,6 +617,8 @@ export default function ProfileOrganizeList({
                       dragEnabled
                       onDragStart={onDragStart}
                       moveControl={renderMoveSelect(child)}
+                      onRefresh={onRefresh}
+                      onAvatarError={onAvatarError}
                     />
                   ))}
                   {nestedFamily.length > 0 ? (
@@ -610,6 +641,8 @@ export default function ProfileOrganizeList({
                       dragEnabled
                       onDragStart={onDragStart}
                       moveControl={renderMoveSelect(child)}
+                      onRefresh={onRefresh}
+                      onAvatarError={onAvatarError}
                     />
                   ))}
                   {nestedHomes.length > 0 ? (
@@ -632,6 +665,8 @@ export default function ProfileOrganizeList({
                       dragEnabled
                       onDragStart={onDragStart}
                       moveControl={renderMoveSelect(child)}
+                      onRefresh={onRefresh}
+                      onAvatarError={onAvatarError}
                     />
                   ))}
                   {nestedVehicles.length > 0 ? (
@@ -654,6 +689,8 @@ export default function ProfileOrganizeList({
                       dragEnabled
                       onDragStart={onDragStart}
                       moveControl={renderMoveSelect(child)}
+                      onRefresh={onRefresh}
+                      onAvatarError={onAvatarError}
                     />
                   ))}
                 </ul>

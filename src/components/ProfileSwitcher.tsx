@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Check, ChevronDown, Plus, UserRound } from "lucide-react";
+import { Check, ChevronDown, Plus } from "lucide-react";
+import ProfileAvatar from "@/components/ProfileAvatar";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
   canHaveLinkedClients,
@@ -45,6 +46,7 @@ function SwitcherRow({
       <span className="mt-0.5 w-4 shrink-0">
         {selected ? <Check className="h-4 w-4 text-brand" /> : null}
       </span>
+      <ProfileAvatar profile={profile} size="sm" />
       <span className="min-w-0">
         <span className="block truncate font-medium">{profile.display_name}</span>
         <span className="block truncate text-[11px] text-ink-muted">
@@ -93,9 +95,9 @@ export default function ProfileSwitcher() {
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-haspopup="listbox"
-        className="inline-flex max-w-[10rem] items-center gap-1.5 rounded-full border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-stone-50 sm:max-w-[14rem]"
+        className="inline-flex max-w-[10rem] items-center gap-1.5 rounded-full border border-stone-300 bg-white px-2.5 py-1 text-sm font-medium text-foreground transition hover:bg-stone-50 sm:max-w-[14rem]"
       >
-        <UserRound className="h-3.5 w-3.5 shrink-0 text-brand" />
+        <ProfileAvatar profile={active} size="sm" />
         <span className="truncate">{active.display_name}</span>
         <ChevronDown className="h-3.5 w-3.5 shrink-0 text-ink-muted" />
       </button>

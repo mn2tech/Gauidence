@@ -199,6 +199,12 @@ export function isAssetStyleProfile(type: GuardianProfileType): boolean {
   return type === "vehicle" || type === "home" || type === "pet";
 }
 
+/** Label for avatar upload UI — logo for orgs, photo for people/assets. */
+export function profileAvatarLabel(type: GuardianProfileType): string {
+  if (isOrgStyleProfile(type)) return "Logo";
+  return "Photo";
+}
+
 /** Business / nonprofit can own linked employee and client profiles. */
 export function canHaveLinkedEmployees(type: GuardianProfileType): boolean {
   return isOrgStyleProfile(type);

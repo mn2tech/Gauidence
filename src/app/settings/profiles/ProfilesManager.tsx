@@ -466,6 +466,8 @@ export default function ProfilesManager() {
           onSetDefault={(id) => void setDefault(id)}
           onRemove={(p) => void remove(p)}
           onMoveUnder={moveUnder}
+          onRefresh={refresh}
+          onAvatarError={(message) => setError(message || null)}
         />
       )}
     </div>
