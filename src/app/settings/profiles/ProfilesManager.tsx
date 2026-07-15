@@ -39,7 +39,19 @@ export default function ProfilesManager() {
   );
 
   useEffect(() => {
-    if (searchParams.get("add") === "1") setAdding(true);
+    if (searchParams.get("add") === "1") {
+      setAdding(true);
+      const raw = searchParams.get("group");
+      if (
+        raw === "family" ||
+        raw === "business" ||
+        raw === "student" ||
+        raw === "other"
+      ) {
+        setGroupId(raw);
+        setStep(2);
+      }
+    }
   }, [searchParams]);
 
   const startAdd = () => {
@@ -111,7 +123,7 @@ export default function ProfilesManager() {
       }
       await refresh();
       setAdding(false);
-      router.replace("/settings/profiles");
+      router.replace("/dashboard");
       window.dispatchEvent(new CustomEvent("guardian:profile-changed"));
     } finally {
       setBusy(false);

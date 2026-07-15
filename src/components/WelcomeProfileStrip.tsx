@@ -115,10 +115,13 @@ export default function WelcomeProfileStrip({
           <p className="mt-0.5 truncate text-sm text-ink-muted">{ownerEmail}</p>
         ) : null}
         <p className="mt-2 text-sm text-ink-muted">
-          Who are you helping today?
+          {profiles.length === 0
+            ? "Start by choosing a space below."
+            : "Who are you helping today?"}
         </p>
       </div>
 
+      {profiles.length === 0 && !loading ? null : (
       <div>
         <div className="flex items-baseline justify-between gap-3">
           <p className="text-sm font-medium text-foreground">
@@ -234,6 +237,7 @@ export default function WelcomeProfileStrip({
           </p>
         ) : null}
       </div>
+      )}
     </div>
   );
 }

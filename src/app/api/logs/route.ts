@@ -48,6 +48,15 @@ export async function GET(request: Request) {
   let profileId = url.searchParams.get("profileId");
   if (!profileId) {
     const active = await getActiveGuardianProfile(supabase, user);
+    if (!active) {
+      return NextResponse.json(
+        {
+          error:
+            "Create a person or space first — open the dashboard and choose who you're helping.",
+        },
+        { status: 400 }
+      );
+    }
     profileId = active.id;
   } else {
     const owned = await requireOwnedGuardianProfile(
@@ -137,6 +146,15 @@ export async function POST(request: Request) {
     }
   } else {
     const active = await getActiveGuardianProfile(supabase, user);
+    if (!active) {
+      return NextResponse.json(
+        {
+          error:
+            "Create a person or space first — open the dashboard and choose who you're helping.",
+        },
+        { status: 400 }
+      );
+    }
     profileId = active.id;
   }
 

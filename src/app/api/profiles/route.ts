@@ -11,7 +11,6 @@ import {
   type GuardianProfileType,
 } from "@/lib/profiles/types";
 import {
-  ensureDefaultGuardianProfile,
   getActiveGuardianProfile,
   listGuardianProfiles,
   requireOwnedGuardianProfile,
@@ -53,12 +52,15 @@ export async function GET() {
   const { supabase, user } = auth;
 
   try {
-    await ensureDefaultGuardianProfile(supabase, user);
     const [profiles, active] = await Promise.all([
       listGuardianProfiles(supabase, user.id),
       getActiveGuardianProfile(supabase, user),
     ]);
-    return NextResponse.json({ profiles, activeProfileId: active.id, active });
+    return NextResponse.json({
+      profiles,
+      activeProfileId: active?.id ?? null,
+      active,
+    });
   } catch {
     return NextResponse.json(
       { error: "Couldn't load profiles." },
@@ -212,6 +214,11 @@ export async function POST(request: Request) {
     parent_profile_id: parentId,
     is_default: false,
   };
+
+  const existing = await listGuardianProfiles(supabase, user.id);
+  if (existing.length === 0 && !parentId) {
+    row.is_default = true;
+  }
 
   const { data: created, error } = await supabase
     .from("guardian_profiles")

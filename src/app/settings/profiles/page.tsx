@@ -4,7 +4,6 @@ import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
-import { ensureDefaultGuardianProfile } from "@/lib/profiles/server";
 import ProfilesManager from "./ProfilesManager";
 
 export const metadata: Metadata = {
@@ -18,7 +17,6 @@ export default async function ProfilesSettingsPage() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-  await ensureDefaultGuardianProfile(supabase, user);
 
   return (
     <div className="flex min-h-screen flex-col">

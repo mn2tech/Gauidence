@@ -298,6 +298,15 @@ export async function GET(request: Request) {
   const { supabase, user } = auth;
 
   const active = await getActiveGuardianProfile(supabase, user);
+  if (!active) {
+    return NextResponse.json(
+      {
+        error:
+          "Create a person or space first — open the dashboard and choose who you're helping.",
+      },
+      { status: 400 }
+    );
+  }
   const chatId = new URL(request.url).searchParams.get("chatId");
   const chats = await listChats(supabase, user.id, active.id);
 
@@ -416,6 +425,15 @@ export async function PUT() {
   if (!isAuthed(auth)) return auth;
   const { supabase, user } = auth;
   const active = await getActiveGuardianProfile(supabase, user);
+  if (!active) {
+    return NextResponse.json(
+      {
+        error:
+          "Create a person or space first — open the dashboard and choose who you're helping.",
+      },
+      { status: 400 }
+    );
+  }
 
   const { data: created, error } = await supabase
     .from("vault_chats")
@@ -444,6 +462,15 @@ export async function DELETE(request: Request) {
   if (!isAuthed(auth)) return auth;
   const { supabase, user } = auth;
   const active = await getActiveGuardianProfile(supabase, user);
+  if (!active) {
+    return NextResponse.json(
+      {
+        error:
+          "Create a person or space first — open the dashboard and choose who you're helping.",
+      },
+      { status: 400 }
+    );
+  }
 
   const chatId = new URL(request.url).searchParams.get("chatId");
   if (!chatId) {
@@ -535,6 +562,15 @@ export async function POST(request: Request) {
   }
 
   const active = await getActiveGuardianProfile(supabase, user);
+  if (!active) {
+    return NextResponse.json(
+      {
+        error:
+          "Create a person or space first — open the dashboard and choose who you're helping.",
+      },
+      { status: 400 }
+    );
+  }
 
   const linkedProfiles = canRollupLinkedVaultSearch(active.profile_type)
     ? await listLinkedProfilesForVaultRollup(supabase, user.id, active)

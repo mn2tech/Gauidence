@@ -4,7 +4,6 @@ import type { SupabaseClient, User } from "@supabase/supabase-js";
 import {
   isGuardianProfileType,
   type GuardianProfile,
-  type GuardianProfileType,
 } from "./types";
 
 const PROFILE_SELECT =
@@ -38,11 +37,14 @@ function asProfile(row: Record<string, unknown>): GuardianProfile {
   };
 }
 
-/** Ensure the account has a default personal guardian profile; set active if missing. */
+/**
+ * Returns the owner's default profile if one exists, otherwise null.
+ * Does NOT auto-create a "Myself" profile — new users use the setup hub.
+ */
 export async function ensureDefaultGuardianProfile(
   supabase: SupabaseClient,
   user: User
-): Promise<GuardianProfile> {
+): Promise<GuardianProfile | null> {
   const { data: existing } = await supabase
     .from("guardian_profiles")
     .select(PROFILE_SELECT)
@@ -55,51 +57,20 @@ export async function ensureDefaultGuardianProfile(
     return asProfile(existing);
   }
 
-  const { data: account } = await supabase
-    .from("profiles")
-    .select("full_name, email, company_name")
-    .eq("id", user.id)
+  const { data: anyProfile } = await supabase
+    .from("guardian_profiles")
+    .select(PROFILE_SELECT)
+    .eq("owner_user_id", user.id)
+    .order("created_at", { ascending: true })
+    .limit(1)
     .maybeSingle();
 
-  const display =
-    account?.full_name?.trim() ||
-    user.user_metadata?.full_name ||
-    user.user_metadata?.name ||
-    (account?.email ? String(account.email).split("@")[0] : null) ||
-    "Me";
-
-  const { data: created, error } = await supabase
-    .from("guardian_profiles")
-    .insert({
-      owner_user_id: user.id,
-      profile_type: "personal" satisfies GuardianProfileType,
-      display_name: display,
-      relationship: "Myself",
-      organization_name: account?.company_name?.trim() || null,
-      is_default: true,
-    })
-    .select(PROFILE_SELECT)
-    .single();
-
-  if (error || !created) {
-    // Race: another request created default
-    const { data: again } = await supabase
-      .from("guardian_profiles")
-      .select(PROFILE_SELECT)
-      .eq("owner_user_id", user.id)
-      .eq("is_default", true)
-      .maybeSingle();
-    if (again) return asProfile(again);
-    throw new Error("Couldn't create default profile.");
+  if (anyProfile) {
+    await ensureActivePointsSomewhere(supabase, user.id, asProfile(anyProfile));
+    return asProfile(anyProfile);
   }
 
-  const profile = asProfile(created);
-  await supabase
-    .from("profiles")
-    .update({ active_guardian_profile_id: profile.id })
-    .eq("id", user.id);
-
-  return profile;
+  return null;
 }
 
 async function ensureActivePointsSomewhere(
@@ -143,12 +114,13 @@ export async function listGuardianProfiles(
   return (data ?? []).map((row) => asProfile(row));
 }
 
-/** Resolve active profile (ensures default exists; falls back to default). */
+/** Resolve active profile, or null when the user has not created any yet. */
 export async function getActiveGuardianProfile(
   supabase: SupabaseClient,
   user: User
-): Promise<GuardianProfile> {
-  const defaultProfile = await ensureDefaultGuardianProfile(supabase, user);
+): Promise<GuardianProfile | null> {
+  const fallback = await ensureDefaultGuardianProfile(supabase, user);
+  if (!fallback) return null;
 
   const { data: account } = await supabase
     .from("profiles")
@@ -169,10 +141,10 @@ export async function getActiveGuardianProfile(
 
   await supabase
     .from("profiles")
-    .update({ active_guardian_profile_id: defaultProfile.id })
+    .update({ active_guardian_profile_id: fallback.id })
     .eq("id", user.id);
 
-  return defaultProfile;
+  return fallback;
 }
 
 export async function requireOwnedGuardianProfile(

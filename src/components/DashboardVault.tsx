@@ -13,6 +13,7 @@ import LinkedVehiclesPanel from "@/components/LinkedVehiclesPanel";
 import LinkedHomesPanel from "@/components/LinkedHomesPanel";
 import LinkedPetsPanel from "@/components/LinkedPetsPanel";
 import LinkedStudentsPanel from "@/components/LinkedStudentsPanel";
+import ProfileSetupHub from "@/components/ProfileSetupHub";
 import VaultSection from "@/components/VaultSection";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
@@ -49,7 +50,7 @@ function DocumentsSection({
 
 export default function DashboardVault({ userId }: { userId: string }) {
   const router = useRouter();
-  const { active, loading } = useActiveProfile();
+  const { active, profiles, loading } = useActiveProfile();
 
   useEffect(() => {
     const onChange = () => router.refresh();
@@ -57,10 +58,13 @@ export default function DashboardVault({ userId }: { userId: string }) {
     return () => window.removeEventListener("guardian:profile-changed", onChange);
   }, [router]);
 
-  if (loading && !active) {
+  if (loading && !active && profiles.length === 0) {
     return (
-      <p className="text-sm text-ink-muted">Loading profile vault…</p>
+      <p className="text-sm text-ink-muted">Loading…</p>
     );
+  }
+  if (!loading && profiles.length === 0) {
+    return <ProfileSetupHub />;
   }
   if (!active) {
     return (

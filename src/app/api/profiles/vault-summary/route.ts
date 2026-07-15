@@ -44,6 +44,14 @@ export async function GET(request: Request) {
   let profileId = url.searchParams.get("profileId");
   if (!profileId) {
     const active = await getActiveGuardianProfile(supabase, user);
+    if (!active) {
+      return NextResponse.json({
+        profileId: null,
+        documentCount: 0,
+        logCount: 0,
+        empty: true,
+      });
+    }
     profileId = active.id;
   } else {
     const owned = await requireOwnedGuardianProfile(
