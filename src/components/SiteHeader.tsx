@@ -56,7 +56,7 @@ export default function SiteHeader() {
     <header className="sticky top-0 z-40 border-b border-stone-200 bg-white/80 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 sm:h-16 sm:px-6">
         <Link
-          href={signedIn ? "/ask" : "/"}
+          href={signedIn ? "/dashboard" : "/"}
           className="flex shrink-0 items-center gap-2 font-semibold tracking-tight"
         >
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand text-white">

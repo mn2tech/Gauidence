@@ -9,10 +9,10 @@ import { createClient } from "@/lib/supabase/server";
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/ask";
+  const next = searchParams.get("next") ?? "/dashboard";
   // Only allow same-site relative redirects.
   const safeNext =
-    next.startsWith("/") && !next.startsWith("//") ? next : "/ask";
+    next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
 
   // Provider returned an error (e.g. the user canceled the Google consent screen).
   const providerError = searchParams.get("error");

@@ -114,6 +114,9 @@ export default function WelcomeProfileStrip({
         {ownerEmail ? (
           <p className="mt-0.5 truncate text-sm text-ink-muted">{ownerEmail}</p>
         ) : null}
+        <p className="mt-2 text-sm text-ink-muted">
+          Who are you helping today?
+        </p>
       </div>
 
       <div>
