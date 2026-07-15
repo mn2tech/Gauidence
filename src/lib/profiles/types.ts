@@ -88,6 +88,61 @@ export const PROFILE_CREATE_OPTIONS: {
   { id: "other", label: "Something else", profileType: "other" },
 ];
 
+export type ProfileCreateGroupId = "family" | "business" | "other";
+
+/** Guided create buckets: Family / Business / Other. */
+export const PROFILE_CREATE_GROUPS: {
+  id: ProfileCreateGroupId;
+  label: string;
+  description: string;
+  /** PROFILE_CREATE_OPTIONS ids shown under this bucket. */
+  optionIds: string[];
+}[] = [
+  {
+    id: "family",
+    label: "Family",
+    description: "A family group, or people and pets in it",
+    optionIds: [
+      "my_family",
+      "child",
+      "spouse",
+      "parent",
+      "family",
+      "student",
+      "pet",
+      "home",
+      "vehicle",
+    ],
+  },
+  {
+    id: "business",
+    label: "Business",
+    description: "A company or nonprofit, plus employees and clients",
+    optionIds: [
+      "business",
+      "nonprofit",
+      "employee",
+      "client",
+      "home",
+      "vehicle",
+    ],
+  },
+  {
+    id: "other",
+    label: "Other",
+    description: "Yourself, a garage, or something that doesn’t fit above",
+    optionIds: ["myself", "my_vehicles", "vehicle", "home", "other"],
+  },
+];
+
+export function optionsForCreateGroup(groupId: ProfileCreateGroupId) {
+  const group = PROFILE_CREATE_GROUPS.find((g) => g.id === groupId);
+  if (!group) return [];
+  return group.optionIds
+    .map((id) => PROFILE_CREATE_OPTIONS.find((o) => o.id === id))
+    .filter((o): o is (typeof PROFILE_CREATE_OPTIONS)[number] => Boolean(o));
+}
+
 export type GuardianProfile = {
   id: string;
   owner_user_id: string;

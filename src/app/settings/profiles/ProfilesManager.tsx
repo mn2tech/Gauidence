@@ -7,8 +7,12 @@ import { ArrowLeft, Plus } from "lucide-react";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import ProfileOrganizeList from "@/components/ProfileOrganizeList";
 import {
-  PROFILE_CREATE_OPTIONS,
+  PROFILE_CREATE_GROUPS,
+  canAttachChildToParent,
+  optionsForCreateGroup,
+  topLevelProfiles,
   type GuardianProfile,
+  type ProfileCreateGroupId,
 } from "@/lib/profiles/types";
 
 export default function ProfilesManager() {
@@ -16,7 +20,8 @@ export default function ProfilesManager() {
   const searchParams = useSearchParams();
   const { profiles, active, refresh, switchProfile } = useActiveProfile();
   const [adding, setAdding] = useState(searchParams.get("add") === "1");
-  const [step, setStep] = useState<1 | 2>(1);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [groupId, setGroupId] = useState<ProfileCreateGroupId | null>(null);
   const [optionId, setOptionId] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState("");
   const [extra, setExtra] = useState<Record<string, string>>({});
@@ -24,9 +29,13 @@ export default function ProfilesManager() {
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<GuardianProfile | null>(null);
 
+  const groupOptions = useMemo(
+    () => (groupId ? optionsForCreateGroup(groupId) : []),
+    [groupId]
+  );
   const option = useMemo(
-    () => PROFILE_CREATE_OPTIONS.find((o) => o.id === optionId) ?? null,
-    [optionId]
+    () => groupOptions.find((o) => o.id === optionId) ?? null,
+    [groupOptions, optionId]
   );
 
   useEffect(() => {
@@ -36,11 +45,38 @@ export default function ProfilesManager() {
   const startAdd = () => {
     setAdding(true);
     setStep(1);
+    setGroupId(null);
     setOptionId(null);
     setDisplayName("");
     setExtra({});
     setError(null);
   };
+
+  /** If there's exactly one matching container, nest new people/assets under it. */
+  const suggestedParentId = useMemo(() => {
+    if (!option || !groupId) return null;
+    if (groupId === "family") {
+      const families = topLevelProfiles(profiles).filter(
+        (p) => p.profile_type === "family"
+      );
+      if (families.length !== 1) return null;
+      const parent = families[0]!;
+      return canAttachChildToParent(option.profileType, parent.profile_type)
+        ? parent.id
+        : null;
+    }
+    if (groupId === "business") {
+      const orgs = topLevelProfiles(profiles).filter(
+        (p) => p.profile_type === "business" || p.profile_type === "non_profit"
+      );
+      if (orgs.length !== 1) return null;
+      const parent = orgs[0]!;
+      return canAttachChildToParent(option.profileType, parent.profile_type)
+        ? parent.id
+        : null;
+    }
+    return null;
+  }, [option, groupId, profiles]);
 
   const create = async () => {
     if (!option || !displayName.trim()) return;
@@ -64,6 +100,7 @@ export default function ProfilesManager() {
           jobTitle: extra.jobTitle || null,
           department: extra.department || null,
           organizationName: extra.organizationName || null,
+          parentProfileId: suggestedParentId,
           switchTo: true,
         }),
       });
@@ -282,19 +319,25 @@ export default function ProfilesManager() {
               <h2 className="text-base font-semibold">
                 Who or what is this for?
               </h2>
-              <ul className="mt-4 grid gap-2 sm:grid-cols-2">
-                {PROFILE_CREATE_OPTIONS.map((o) => (
-                  <li key={o.id}>
+              <p className="mt-1 text-sm text-ink-muted">
+                Start with Family, Business, or Other.
+              </p>
+              <ul className="mt-4 grid gap-2 sm:grid-cols-3">
+                {PROFILE_CREATE_GROUPS.map((g) => (
+                  <li key={g.id}>
                     <button
                       type="button"
                       onClick={() => {
-                        setOptionId(o.id);
+                        setGroupId(g.id);
+                        setOptionId(null);
                         setStep(2);
-                        setDisplayName("");
                       }}
-                      className="w-full rounded-xl border border-stone-200 px-3 py-2.5 text-left text-sm font-medium transition hover:border-brand hover:bg-brand-light/40"
+                      className="flex h-full w-full flex-col rounded-xl border border-stone-200 px-3 py-3 text-left transition hover:border-brand hover:bg-brand-light/40"
                     >
-                      {o.label}
+                      <span className="text-sm font-semibold">{g.label}</span>
+                      <span className="mt-1 text-xs text-ink-muted">
+                        {g.description}
+                      </span>
                     </button>
                   </li>
                 ))}
@@ -307,11 +350,55 @@ export default function ProfilesManager() {
                 Cancel
               </button>
             </>
+          ) : step === 2 ? (
+            <>
+              <h2 className="text-base font-semibold">
+                {PROFILE_CREATE_GROUPS.find((g) => g.id === groupId)?.label ??
+                  "Choose type"}
+              </h2>
+              <p className="mt-1 text-sm text-ink-muted">
+                Pick what you want to add under this category.
+              </p>
+              <ul className="mt-4 grid gap-2 sm:grid-cols-2">
+                {groupOptions.map((o) => (
+                  <li key={o.id}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOptionId(o.id);
+                        setStep(3);
+                        setDisplayName("");
+                      }}
+                      className="w-full rounded-xl border border-stone-200 px-3 py-2.5 text-left text-sm font-medium transition hover:border-brand hover:bg-brand-light/40"
+                    >
+                      {o.label}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <button
+                type="button"
+                onClick={() => {
+                  setStep(1);
+                  setGroupId(null);
+                  setOptionId(null);
+                }}
+                className="mt-4 text-sm text-ink-muted hover:text-foreground"
+              >
+                Back
+              </button>
+            </>
           ) : (
             <>
               <h2 className="text-base font-semibold">
                 {option?.label ?? "New profile"}
               </h2>
+              {suggestedParentId ? (
+                <p className="mt-1 text-xs text-ink-muted">
+                  Will be nested under your existing{" "}
+                  {groupId === "family" ? "Family" : "Business"} space.
+                </p>
+              ) : null}
               <div className="mt-4 space-y-3">
                 <label className="block text-sm">
                   <span className="font-medium">{nameLabel}</span>
@@ -440,7 +527,10 @@ export default function ProfilesManager() {
               <div className="mt-4 flex flex-wrap gap-2">
                 <button
                   type="button"
-                  onClick={() => setStep(1)}
+                  onClick={() => {
+                    setStep(2);
+                    setOptionId(null);
+                  }}
                   className="rounded-full border border-stone-300 px-4 py-2 text-sm"
                 >
                   Back

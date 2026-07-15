@@ -2,6 +2,8 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   PROFILE_CREATE_OPTIONS,
+  PROFILE_CREATE_GROUPS,
+  optionsForCreateGroup,
   canHaveLinkedClients,
   canHaveLinkedEmployees,
   canHaveLinkedFamilyMembers,
@@ -63,6 +65,21 @@ describe("guardian profiles helpers", () => {
     assert.ok(PROFILE_CREATE_OPTIONS.some((o) => o.profileType === "home"));
     assert.ok(PROFILE_CREATE_OPTIONS.some((o) => o.profileType === "pet"));
     assert.ok(PROFILE_CREATE_OPTIONS.some((o) => o.profileType === "child"));
+  });
+
+  it("groups create options into Family, Business, and Other", () => {
+    assert.deepEqual(
+      PROFILE_CREATE_GROUPS.map((g) => g.id),
+      ["family", "business", "other"]
+    );
+    const family = optionsForCreateGroup("family");
+    assert.ok(family.some((o) => o.id === "child"));
+    assert.ok(family.some((o) => o.id === "my_family"));
+    assert.ok(!family.some((o) => o.id === "employee"));
+    const business = optionsForCreateGroup("business");
+    assert.ok(business.some((o) => o.id === "employee"));
+    assert.ok(business.some((o) => o.id === "client"));
+    assert.ok(!business.some((o) => o.id === "child"));
   });
 
   it("uses business legal/display name for company context", () => {
