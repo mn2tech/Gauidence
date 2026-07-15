@@ -359,7 +359,8 @@ export default function ProfileOrganizeList({
       <p className="text-xs text-ink-muted">
         Drag a child, spouse, home, employee, client, or vehicle onto a Family,
         Business, Nonprofit, or Vehicles card — or use Move under. Tap the
-        chevron to collapse nested members. Use the camera on a profile to add a{" "}
+        chevron to collapse nested members. Use the camera on a profile to pick an
+        avatar or upload a{" "}
         photo or logo.
       </p>
 
