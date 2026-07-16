@@ -30,21 +30,26 @@ export function detectDocumentCharacteristics(args: {
 }): DocumentCharacteristics {
   const isImage = args.mimeType.startsWith("image/");
   const isPdf = args.mimeType === "application/pdf";
+  const isPlainText =
+    args.mimeType === "text/plain" ||
+    args.mimeType === "text/markdown";
   const pageCount = args.extraction.pageCount;
   const nativeTextQuality = args.extraction.quality;
   const hasNativeText = (args.extraction.text ?? "").trim().length >= 40;
 
   const likelyVisuallyStructured =
-    isImage ||
-    (isPdf && (pageCount == null || pageCount <= 4)) ||
-    (isPdf && nativeTextQuality < 0.45);
+    !isPlainText &&
+    (isImage ||
+      (isPdf && (pageCount == null || pageCount <= 4)) ||
+      (isPdf && nativeTextQuality < 0.45));
 
   const likelyTextHeavy =
-    isPdf &&
-    pageCount != null &&
-    pageCount >= 8 &&
-    nativeTextQuality >= 0.5 &&
-    hasNativeText;
+    isPlainText ||
+    (isPdf &&
+      pageCount != null &&
+      pageCount >= 8 &&
+      nativeTextQuality >= 0.5 &&
+      hasNativeText);
 
   return {
     mimeType: args.mimeType,
@@ -67,6 +72,12 @@ export function detectDocumentCharacteristics(args: {
 export function resolveAnalysisInputMode(
   characteristics: DocumentCharacteristics
 ): AnalysisInputMode {
+  if (
+    characteristics.mimeType === "text/plain" ||
+    characteristics.mimeType === "text/markdown"
+  ) {
+    return "text";
+  }
   if (characteristics.isImage) return "visual";
   if (characteristics.likelyTextHeavy) return "text";
   if (characteristics.likelyVisuallyStructured) return "visual";

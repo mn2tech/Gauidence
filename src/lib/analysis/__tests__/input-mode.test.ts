@@ -56,6 +56,21 @@ describe("analysis input mode", () => {
     assert.equal(resolveAnalysisInputMode(c), "hybrid");
   });
 
+  it("routes pasted plain text to text mode", () => {
+    const c = detectDocumentCharacteristics({
+      mimeType: "text/plain",
+      extraction: {
+        quality: 0.9,
+        pageCount: 1,
+        charCount: 500,
+        text: "A".repeat(100),
+      },
+    });
+    assert.equal(c.likelyTextHeavy, true);
+    assert.equal(c.likelyVisuallyStructured, false);
+    assert.equal(resolveAnalysisInputMode(c), "text");
+  });
+
   it("does not rasterize scanned PDFs (Claude PDF path)", () => {
     assert.equal(
       shouldPreparePageImages({ quality: 0, pageCount: 2 }),

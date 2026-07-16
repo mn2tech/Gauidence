@@ -63,7 +63,11 @@ export function createLlmClient(): LlmClient {
       "missing_api_key"
     );
   }
-  return new Anthropic({ apiKey });
+  // The SDK defaults to two retries. Visual analysis makes two sequential
+  // Claude calls (classification + specialist), so brief 5xx/529 incidents
+  // otherwise surface too often as a failed document. The analyze route has a
+  // 120s budget; four retries remain within it when overloads fail quickly.
+  return new Anthropic({ apiKey, maxRetries: 4, timeout: 45_000 });
 }
 
 function dataUrlToImageBlock(
@@ -210,6 +214,13 @@ export function modelForInputMode(mode: AnalysisInputMode | undefined): string {
 function mapAnthropicError(err: unknown): never {
   if (err instanceof AnalysisLlmError) throw err;
   if (err instanceof Anthropic.APIError) {
+    // Safe operational diagnostics only: never log prompts or document data.
+    console.error("Anthropic analysis request failed", {
+      status: err.status,
+      name: err.name,
+      requestId: err.request_id,
+      message: (err.message || "").slice(0, 240),
+    });
     if (err.status === 401 || err.status === 403) {
       throw new AnalysisLlmError(
         "Claude rejected the API key. Check ANTHROPIC_API_KEY in Vercel.",
@@ -222,6 +233,13 @@ function mapAnthropicError(err: unknown): never {
         "Claude rate limit reached. Please try again in a minute.",
         429,
         "rate_limit"
+      );
+    }
+    if (err.status === 500 || err.status === 529) {
+      throw new AnalysisLlmError(
+        "Claude is temporarily busy. Please try this document again in a moment.",
+        503,
+        "overloaded"
       );
     }
     if (err.status === 400) {

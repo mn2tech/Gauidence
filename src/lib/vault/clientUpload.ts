@@ -8,9 +8,14 @@ export const VAULT_ACCEPTED_TYPES: Record<string, string> = {
   "image/jpeg": "JPEG",
   "image/png": "PNG",
   "image/webp": "WebP",
+  "text/plain": "Text",
 };
 
 export const VAULT_MAX_SIZE_BYTES = 15 * 1024 * 1024;
+export {
+  VAULT_PASTE_MAX_CHARS,
+  buildPastedTextFile,
+} from "@/lib/vault/pastedText";
 
 export type VaultUploadResult = {
   documentId: string;
@@ -38,7 +43,7 @@ export async function uploadAndAnalyzeToVault(args: {
 
   if (!VAULT_ACCEPTED_TYPES[args.file.type]) {
     throw new Error(
-      "That file type isn't supported. Upload a PDF, JPG, PNG, or WebP file."
+      "That file type isn't supported. Upload a PDF, JPG, PNG, WebP, or paste text."
     );
   }
   if (args.file.size > VAULT_MAX_SIZE_BYTES) {

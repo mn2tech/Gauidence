@@ -17,6 +17,7 @@ import { shouldPreparePageImages } from "./inputMode";
 export type ExtractionMethod =
   | "native_pdf"
   | "native_pdf_layout"
+  | "native_text"
   | "vision_ocr"
   | "image_fallback"
   | "none";
@@ -170,6 +171,34 @@ export async function extractDocumentText(args: {
   base64: string;
   fileName: string;
 }): Promise<ExtractionResult> {
+  if (
+    args.mimeType === "text/plain" ||
+    args.mimeType === "text/markdown" ||
+    /\.txt$/i.test(args.fileName)
+  ) {
+    const text = Buffer.from(args.base64, "base64")
+      .toString("utf8")
+      .replace(/\r\n/g, "\n")
+      .trim();
+    const report = assessExtractionQuality(text);
+    return {
+      text,
+      tablesText: "",
+      method: "native_text",
+      quality: Math.max(report.score, text.length >= 40 ? 0.85 : report.score),
+      pageCount: 1,
+      charCount: text.length,
+      issues: report.issues,
+      estimatedLineRows: report.estimatedLineRows,
+      pageImages: [],
+      nativeTextPreview: previewText(text || "[empty pasted text]", 800),
+      reason:
+        text.length === 0
+          ? "Pasted text document was empty."
+          : "Plain text / pasted content; using native text for analysis.",
+    };
+  }
+
   if (args.mimeType === "application/pdf") {
     try {
       const bytes = Uint8Array.from(Buffer.from(args.base64, "base64"));

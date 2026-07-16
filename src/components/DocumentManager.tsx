@@ -5,6 +5,7 @@ import {
   Camera,
   Check,
   ChevronDown,
+  ClipboardPaste,
   Download,
   Eye,
   FileImage,
@@ -28,6 +29,10 @@ import {
 } from "@/lib/analysis";
 import { DOCUMENT_CATEGORIES } from "@/lib/categories";
 import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
+import {
+  buildPastedTextFile,
+  VAULT_PASTE_MAX_CHARS,
+} from "@/lib/vault/pastedText";
 import DocumentChatPanel from "@/components/DocumentChatPanel";
 import CameraCaptureModal from "@/components/CameraCaptureModal";
 import ShareDocumentButton from "@/components/ShareDocumentButton";
@@ -79,6 +84,7 @@ const ACCEPTED_TYPES: Record<string, string> = {
   "image/jpeg": "JPG",
   "image/png": "PNG",
   "image/webp": "WebP",
+  "text/plain": "Text",
 };
 const MAX_SIZE_BYTES = 15 * 1024 * 1024;
 
@@ -129,6 +135,10 @@ export default function DocumentManager({
   const [uploading, setUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [pasteTitle, setPasteTitle] = useState("");
+  const [pasteContent, setPasteContent] = useState("");
+  const [pasteSourceUrl, setPasteSourceUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -272,7 +282,9 @@ export default function DocumentManager({
     setError(null);
 
     if (!ACCEPTED_TYPES[file.type]) {
-      setError("That file type isn't supported. Upload a PDF, JPG, PNG, or WebP file.");
+      setError(
+        "That file type isn't supported. Upload a PDF, JPG, PNG, WebP, or paste text."
+      );
       return;
     }
     if (file.size > MAX_SIZE_BYTES) {
@@ -335,6 +347,28 @@ export default function DocumentManager({
     setUploading(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (cameraInputRef.current) cameraInputRef.current.value = "";
+  }
+
+  async function handlePasteSave() {
+    const content = pasteContent.trim();
+    if (!content || uploading) return;
+    if (content.length > VAULT_PASTE_MAX_CHARS) {
+      setError(
+        `Pasted text is too long (max ${VAULT_PASTE_MAX_CHARS.toLocaleString()} characters).`
+      );
+      return;
+    }
+    setError(null);
+    const file = buildPastedTextFile({
+      title: pasteTitle,
+      content,
+      sourceUrl: pasteSourceUrl,
+    });
+    setPasteOpen(false);
+    setPasteTitle("");
+    setPasteContent("");
+    setPasteSourceUrl("");
+    await handleFiles([file]);
   }
 
   async function handleDownload(doc: DocumentRow) {
@@ -685,11 +719,11 @@ export default function DocumentManager({
       >
         <UploadCloud className="h-8 w-8 text-brand" />
         <p className="text-sm text-ink-muted">
-          Drag and drop, choose a file, or scan with your camera
+          Drag and drop, choose a file, scan with your camera, or paste text
         </p>
         <p className="max-w-sm text-xs text-ink-muted">
-          Business cards, receipts, invoices, IDs, and other paper documents
-          work well as photos.
+          Business cards, receipts, invoices, IDs, emails, and web articles work
+          well — files, photos, or pasted text.
         </p>
         <div className="mt-1 flex flex-wrap items-center justify-center gap-2">
           <button
@@ -710,8 +744,22 @@ export default function DocumentManager({
             <Camera className="h-4 w-4 text-brand" />
             Take photo
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              setError(null);
+              setPasteOpen((o) => !o);
+            }}
+            disabled={uploading}
+            className="inline-flex items-center gap-2 rounded-full border border-stone-300 bg-white px-5 py-2 text-sm font-semibold text-foreground transition hover:border-stone-400 hover:bg-stone-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <ClipboardPaste className="h-4 w-4 text-brand" />
+            Paste text
+          </button>
         </div>
-        <p className="text-xs text-ink-muted">PDF, JPG, PNG, or WebP — up to 15 MB</p>
+        <p className="text-xs text-ink-muted">
+          PDF, JPG, PNG, WebP, or pasted text — up to 15 MB
+        </p>
         <input
           ref={fileInputRef}
           type="file"
@@ -734,6 +782,93 @@ export default function DocumentManager({
         onClose={() => setCameraOpen(false)}
         onCapture={(file) => void handleFiles([file])}
       />
+
+      {pasteOpen ? (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void handlePasteSave();
+          }}
+          className="mt-4 space-y-3 rounded-xl border border-stone-200 bg-white p-4 shadow-sm"
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">
+                Paste text into your vault
+              </h3>
+              <p className="mt-0.5 text-xs text-ink-muted">
+                Copy from an email, portal, or webpage. Guardian saves it as a
+                text document and analyzes it like any other upload.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setPasteOpen(false)}
+              aria-label="Close paste form"
+              className="rounded-full p-1 text-ink-muted hover:bg-stone-100 hover:text-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <label className="block text-xs font-medium text-ink-muted">
+            Title (optional)
+            <input
+              value={pasteTitle}
+              onChange={(e) => setPasteTitle(e.target.value)}
+              placeholder="e.g. USCIS Vault software award"
+              maxLength={120}
+              className="mt-1 w-full rounded-xl border border-stone-200 px-3 py-2 text-sm text-foreground outline-none ring-brand focus:ring-2"
+            />
+          </label>
+          <label className="block text-xs font-medium text-ink-muted">
+            Text
+            <textarea
+              value={pasteContent}
+              onChange={(e) => setPasteContent(e.target.value)}
+              required
+              rows={8}
+              maxLength={VAULT_PASTE_MAX_CHARS}
+              placeholder="Paste the full text here…"
+              className="mt-1 w-full rounded-xl border border-stone-200 px-3 py-2 text-sm text-foreground outline-none ring-brand focus:ring-2"
+            />
+          </label>
+          <p className="text-[11px] text-ink-muted">
+            {pasteContent.length.toLocaleString()} /{" "}
+            {VAULT_PASTE_MAX_CHARS.toLocaleString()} characters
+          </p>
+          <label className="block text-xs font-medium text-ink-muted">
+            Source URL (optional)
+            <input
+              value={pasteSourceUrl}
+              onChange={(e) => setPasteSourceUrl(e.target.value)}
+              placeholder="https://…"
+              inputMode="url"
+              className="mt-1 w-full rounded-xl border border-stone-200 px-3 py-2 text-sm text-foreground outline-none ring-brand focus:ring-2"
+            />
+          </label>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="submit"
+              disabled={uploading || !pasteContent.trim()}
+              className="inline-flex items-center gap-2 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50"
+            >
+              {uploading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <ClipboardPaste className="h-4 w-4" />
+              )}
+              {uploading ? "Saving…" : "Save and analyze"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setPasteOpen(false)}
+              className="rounded-full border border-stone-300 px-4 py-2 text-sm"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      ) : null}
 
       {error && (
         <p
@@ -828,10 +963,10 @@ export default function DocumentManager({
               <li key={doc.id} className="py-3">
                 <div className="flex flex-wrap items-center gap-3">
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-light text-brand">
-                    {doc.mime_type === "application/pdf" ? (
-                      <FileText className="h-4 w-4" />
-                    ) : (
+                    {doc.mime_type.startsWith("image/") ? (
                       <FileImage className="h-4 w-4" />
+                    ) : (
+                      <FileText className="h-4 w-4" />
                     )}
                   </span>
                   <div className="min-w-0 flex-1">
@@ -1116,18 +1251,18 @@ export default function DocumentManager({
               </button>
             </div>
             <div className="min-h-0 flex-1 overflow-auto bg-stone-100 p-2">
-              {viewer.mimeType === "application/pdf" ? (
-                <iframe
-                  title={viewer.fileName}
-                  src={viewer.url}
-                  className="h-[75vh] w-full rounded-lg bg-white"
-                />
-              ) : (
+              {viewer.mimeType.startsWith("image/") ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={viewer.url}
                   alt={viewer.fileName}
                   className="mx-auto max-h-[75vh] max-w-full object-contain"
+                />
+              ) : (
+                <iframe
+                  title={viewer.fileName}
+                  src={viewer.url}
+                  className="h-[75vh] w-full rounded-lg bg-white"
                 />
               )}
             </div>
