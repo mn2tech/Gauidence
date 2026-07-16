@@ -5,6 +5,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type FormEvent,
   type MouseEvent,
 } from "react";
 import Link from "next/link";
@@ -24,6 +25,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import GideonAvatar from "@/components/GideonAvatar";
+import CameraCaptureModal from "@/components/CameraCaptureModal";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
   GIDEON_BRAND_LINE,
@@ -32,6 +34,8 @@ import {
   parseGideonSections,
 } from "@/lib/vault/gideon";
 import { isImageFileName } from "@/lib/vault/images";
+import { uploadAndAnalyzeToVault } from "@/lib/vault/clientUpload";
+import { todayLogDate } from "@/lib/logs/types";
 
 type Citation = {
   documentId: string;
@@ -180,19 +184,17 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [whyOpen, setWhyOpen] = useState(false);
   const [plusOpen, setPlusOpen] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [logOpen, setLogOpen] = useState(false);
+  const [logContent, setLogContent] = useState("");
+  const [savingLog, setSavingLog] = useState(false);
+  const [vaultBusy, setVaultBusy] = useState(false);
+  const [vaultStatus, setVaultStatus] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const plusRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const inputId = isPage ? "ask-gideon-page-input" : "ask-gideon-input";
   const profileId = active?.id ?? meta?.profileId ?? null;
-  const docsHref = profileId
-    ? `/dashboard#documents-${profileId}`
-    : "/dashboard";
-  const cameraHref = profileId
-    ? `/dashboard?camera=1#documents-${profileId}`
-    : "/dashboard?camera=1";
-  const logHref = profileId
-    ? `/dashboard#daily-log-${profileId}`
-    : "/dashboard";
 
   const loadMetaAndChats = useCallback(async () => {
     const res = await fetch("/api/documents/vault-chat");
@@ -265,10 +267,14 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, sending]);
+  }, [messages, sending, vaultBusy, vaultStatus]);
 
   useEffect(() => {
-    if (!sending) return;
+    if (!sending && !vaultBusy) return;
+    if (vaultBusy && vaultStatus) {
+      setLoadingLabel(vaultStatus);
+      return;
+    }
     let i = 0;
     setLoadingLabel(GIDEON_LOADING_STATES[0]);
     const t = window.setInterval(() => {
@@ -276,7 +282,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
       setLoadingLabel(GIDEON_LOADING_STATES[i]!);
     }, 2200);
     return () => window.clearInterval(t);
-  }, [sending]);
+  }, [sending, vaultBusy, vaultStatus]);
 
   useEffect(() => {
     if (!plusOpen) return;
@@ -369,9 +375,127 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     void fileName;
   };
 
+  const pushLocalNote = (content: string) => {
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `note-${Date.now()}`,
+        role: "assistant",
+        content,
+        created_at: new Date().toISOString(),
+      },
+    ]);
+  };
+
+  const handleVaultFile = async (file: File) => {
+    if (!profileId || vaultBusy || sending) return;
+    setPlusOpen(false);
+    setCameraOpen(false);
+    setError(null);
+    setVaultBusy(true);
+    setVaultStatus("Uploading…");
+
+    try {
+      const supabase = createClient();
+      if (!supabase) throw new Error("Sign-in isn't available. Refresh and try again.");
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("You need to be signed in.");
+
+      const result = await uploadAndAnalyzeToVault({
+        userId: user.id,
+        profileId,
+        file,
+        onStatus: setVaultStatus,
+      });
+
+      await loadMetaAndChats().catch(() => undefined);
+      setVaultBusy(false);
+      setVaultStatus(null);
+
+      if (!result.analyzed) {
+        pushLocalNote(
+          `I added "${result.fileName}" to your vault, but analysis didn't finish${
+            result.analysisError ? `: ${result.analysisError}` : "."
+          }`
+        );
+        return;
+      }
+
+      await sendQuestion(
+        `I just uploaded ${result.fileName}. What should I know from it?`
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Upload failed. Please try again.");
+      setVaultBusy(false);
+      setVaultStatus(null);
+    }
+  };
+
+  const openCamera = () => {
+    setPlusOpen(false);
+    if (
+      typeof navigator !== "undefined" &&
+      typeof navigator.mediaDevices?.getUserMedia === "function"
+    ) {
+      setCameraOpen(true);
+      return;
+    }
+    fileInputRef.current?.click();
+  };
+
+  const openFilePicker = () => {
+    setPlusOpen(false);
+    fileInputRef.current?.click();
+  };
+
+  const openLogForm = () => {
+    setPlusOpen(false);
+    setLogContent("");
+    setLogOpen(true);
+  };
+
+  const saveInlineLog = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!profileId || !logContent.trim() || savingLog || vaultBusy || sending) {
+      return;
+    }
+    setSavingLog(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/logs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          profileId,
+          content: logContent.trim(),
+          quick: true,
+          logDate: todayLogDate(),
+        }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setError(body.error ?? "Couldn't save Daily Log.");
+        return;
+      }
+      const saved = logContent.trim();
+      setLogOpen(false);
+      setLogContent("");
+      await loadMetaAndChats().catch(() => undefined);
+      await sendQuestion(
+        `I just saved this Daily Log: "${saved.slice(0, 200)}". What stands out?`
+      );
+    } catch {
+      setError("Couldn't save Daily Log. Check your connection and try again.");
+    } finally {
+      setSavingLog(false);
+    }
+  };
+
   const sendQuestion = async (questionRaw: string) => {
     const question = questionRaw.trim();
-    if (!question || sending) return;
+    if (!question || sending || vaultBusy) return;
 
     setSending(true);
     setError(null);
@@ -531,29 +655,35 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
                   : "Your vault is empty for now."}
               </p>
               <p className="text-sm leading-relaxed text-ink-muted">
-                You can still ask general questions. Upload a document or add a
-                Daily Log whenever you want me to remember your specific
-                details.
+                You can still ask general questions. Scan or upload a document
+                here, or add a Daily Log, whenever you want me to remember your
+                specific details.
               </p>
               <div className="flex flex-wrap gap-2">
-                <Link
-                  href={cameraHref}
-                  className="inline-flex rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark"
+                <button
+                  type="button"
+                  disabled={vaultBusy || sending || !profileId}
+                  onClick={openCamera}
+                  className="inline-flex rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark disabled:opacity-50"
                 >
                   Scan with camera
-                </Link>
-                <Link
-                  href={docsHref}
-                  className="inline-flex rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-stone-50"
+                </button>
+                <button
+                  type="button"
+                  disabled={vaultBusy || sending || !profileId}
+                  onClick={openFilePicker}
+                  className="inline-flex rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-stone-50 disabled:opacity-50"
                 >
                   Upload a Document
-                </Link>
-                <Link
-                  href={logHref}
-                  className="inline-flex rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-stone-50"
+                </button>
+                <button
+                  type="button"
+                  disabled={vaultBusy || sending || !profileId}
+                  onClick={openLogForm}
+                  className="inline-flex rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-stone-50 disabled:opacity-50"
                 >
                   Add a Daily Log
-                </Link>
+                </button>
               </div>
             </>
           ) : (
@@ -675,10 +805,10 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
               </div>
             )
           )}
-          {sending && (
+          {(sending || vaultBusy) && (
             <div className="flex items-center gap-2 text-xs text-ink-muted">
               <GideonAvatar size={28} pulse />
-              {loadingLabel}
+              {vaultBusy && vaultStatus ? vaultStatus : loadingLabel}
             </div>
           )}
         </>
@@ -710,7 +840,8 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
             aria-expanded={plusOpen}
             aria-haspopup="menu"
             aria-label="Add to vault"
-            className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${
+            disabled={vaultBusy || sending || !profileId}
+            className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50 ${
               emptyVault
                 ? "border-brand/40 bg-brand-light text-brand hover:bg-brand/15"
                 : "border-stone-300 bg-white text-ink-muted hover:border-stone-400 hover:text-foreground"
@@ -723,36 +854,50 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
               role="menu"
               className="absolute bottom-full left-0 z-20 mb-2 w-52 overflow-hidden rounded-xl border border-stone-200 bg-white py-1 shadow-lg"
             >
-              <Link
+              <button
+                type="button"
                 role="menuitem"
-                href={cameraHref}
-                onClick={() => setPlusOpen(false)}
-                className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-foreground hover:bg-stone-50"
+                disabled={vaultBusy || sending || !profileId}
+                onClick={openCamera}
+                className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-medium text-foreground hover:bg-stone-50 disabled:opacity-50"
               >
                 <Camera className="h-4 w-4 text-brand" />
                 Scan with camera
-              </Link>
-              <Link
+              </button>
+              <button
+                type="button"
                 role="menuitem"
-                href={docsHref}
-                onClick={() => setPlusOpen(false)}
-                className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-foreground hover:bg-stone-50"
+                disabled={vaultBusy || sending || !profileId}
+                onClick={openFilePicker}
+                className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-medium text-foreground hover:bg-stone-50 disabled:opacity-50"
               >
                 <FileUp className="h-4 w-4 text-brand" />
                 Upload document
-              </Link>
-              <Link
+              </button>
+              <button
+                type="button"
                 role="menuitem"
-                href={logHref}
-                onClick={() => setPlusOpen(false)}
-                className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-foreground hover:bg-stone-50"
+                disabled={vaultBusy || sending || !profileId}
+                onClick={openLogForm}
+                className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-medium text-foreground hover:bg-stone-50 disabled:opacity-50"
               >
                 <NotebookPen className="h-4 w-4 text-brand" />
                 Add daily log
-              </Link>
+              </button>
             </div>
           )}
         </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/pdf,image/jpeg,image/png,image/webp"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (file) void handleVaultFile(file);
+          }}
+        />
         <label className="sr-only" htmlFor={inputId}>
           Ask Gideon
         </label>
@@ -761,11 +906,11 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          disabled={sending}
+          disabled={sending || vaultBusy}
           maxLength={2000}
           placeholder={
             emptyVault
-              ? "Ask anything — vault answers when you upload…"
+              ? "Ask anything — or use + to scan / upload…"
               : logsOnly
                 ? "Ask about Daily Logs or anything else…"
                 : "Ask about your documents or anything else…"
@@ -774,11 +919,11 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
         />
         <button
           type="submit"
-          disabled={sending || !input.trim()}
+          disabled={sending || vaultBusy || !input.trim()}
           aria-label="Send question to Gideon"
           className="inline-flex items-center justify-center rounded-full bg-brand px-3 py-2 text-white transition hover:bg-brand-dark focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
         >
-          {sending ? (
+          {sending || vaultBusy ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <Send className="h-4 w-4" />
@@ -786,6 +931,80 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
         </button>
       </div>
     </form>
+  );
+
+  const vaultOverlays = (
+    <>
+      <CameraCaptureModal
+        open={cameraOpen}
+        onClose={() => setCameraOpen(false)}
+        onCapture={(file) => void handleVaultFile(file)}
+      />
+      {logOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="ask-log-title"
+        >
+          <form
+            onSubmit={(e) => void saveInlineLog(e)}
+            className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-5 shadow-xl"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 id="ask-log-title" className="text-base font-semibold">
+                  Add a Daily Log
+                </h3>
+                <p className="mt-1 text-xs text-ink-muted">
+                  Saved to{" "}
+                  {active?.display_name ?? meta?.profileName ?? "this space"}{" "}
+                  — stays on Ask Gideon.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLogOpen(false)}
+                aria-label="Close"
+                className="rounded-full p-1 text-ink-muted hover:bg-stone-100 hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <label className="sr-only" htmlFor="ask-log-content">
+              What happened
+            </label>
+            <textarea
+              id="ask-log-content"
+              value={logContent}
+              onChange={(e) => setLogContent(e.target.value)}
+              rows={4}
+              required
+              maxLength={8000}
+              placeholder="What happened today?"
+              className="mt-4 w-full rounded-xl border border-stone-300 px-3 py-2.5 text-sm outline-none ring-brand focus:ring-2"
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setLogOpen(false)}
+                className="rounded-full px-4 py-2 text-sm font-medium text-ink-muted hover:bg-stone-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={savingLog || !logContent.trim()}
+                className="inline-flex items-center gap-2 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50"
+              >
+                {savingLog ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Save log
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
+    </>
   );
 
   if (needsSetup) {
@@ -851,11 +1070,13 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
           </p>
         )}
         {composer}
+        {vaultOverlays}
       </div>
     );
   }
 
   return (
+    <>
     <div className="flex h-full w-full overflow-hidden bg-white">
       <aside className="hidden h-full w-64 shrink-0 flex-col border-r border-stone-200 bg-stone-50 md:flex">
         {chatList}
@@ -945,5 +1166,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
         {composer}
       </div>
     </div>
+    {vaultOverlays}
+    </>
   );
 }
