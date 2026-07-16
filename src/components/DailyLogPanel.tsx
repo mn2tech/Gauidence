@@ -9,6 +9,7 @@ import {
   Search,
   Trash2,
 } from "lucide-react";
+import MoveDailyLogButton from "@/components/MoveDailyLogButton";
 import {
   categoriesForProfileType,
   formatLogDayHeading,
@@ -209,6 +210,13 @@ export default function DailyLogPanel({
     }
     await load();
   };
+
+  const logMoveLabel = (log: DailyLog) =>
+    log.title?.trim() ||
+    (log.content.length > 48
+      ? `${log.content.slice(0, 48).trim()}…`
+      : log.content.trim()) ||
+    "Daily Log";
 
   const grouped = useMemo(() => {
     const map = new Map<string, DailyLog[]>();
@@ -482,6 +490,14 @@ export default function DailyLogPanel({
                           <span>Tags: {log.tags.join(", ")}</span>
                         )}
                         <span className="ml-auto flex gap-1">
+                          <MoveDailyLogButton
+                            logId={log.id}
+                            logLabel={logMoveLabel(log)}
+                            currentProfileId={profileId}
+                            onMoved={() => {
+                              setLogs((prev) => prev.filter((l) => l.id !== log.id));
+                            }}
+                          />
                           <button
                             type="button"
                             onClick={() => setEditing(log)}
