@@ -289,10 +289,14 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, sending, vaultBusy, vaultStatus]);
+  }, [messages, sending, vaultBusy, vaultStatus, savingLog]);
 
   useEffect(() => {
-    if (!sending && !vaultBusy) return;
+    if (!sending && !vaultBusy && !savingLog) return;
+    if (savingLog) {
+      setLoadingLabel("Saving to your vault…");
+      return;
+    }
     if (vaultBusy && vaultStatus) {
       setLoadingLabel(vaultStatus);
       return;
@@ -304,7 +308,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
       setLoadingLabel(GIDEON_LOADING_STATES[i]!);
     }, 2200);
     return () => window.clearInterval(t);
-  }, [sending, vaultBusy, vaultStatus]);
+  }, [sending, vaultBusy, vaultStatus, savingLog]);
 
   useEffect(() => {
     if (!plusOpen) return;
