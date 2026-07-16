@@ -27,6 +27,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import GideonAvatar from "@/components/GideonAvatar";
 import CameraCaptureModal from "@/components/CameraCaptureModal";
+import ImminentReminderBanner from "@/components/ImminentReminderBanner";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
   GIDEON_BRAND_LINE,
@@ -414,7 +415,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     setCameraOpen(false);
     setError(null);
     setVaultBusy(true);
-    setVaultStatus("Uploading…");
+    setVaultStatus("Uploading to your vault…");
 
     try {
       const supabase = createClient();
@@ -883,10 +884,14 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
               </div>
             )
           )}
-          {(sending || vaultBusy) && (
+          {(sending || vaultBusy || savingLog) && (
             <div className="flex items-center gap-2 text-xs text-ink-muted">
               <GideonAvatar size={28} pulse />
-              {vaultBusy && vaultStatus ? vaultStatus : loadingLabel}
+              {savingLog
+                ? "Saving to your vault…"
+                : vaultBusy && vaultStatus
+                  ? vaultStatus
+                  : loadingLabel}
             </div>
           )}
         </>
@@ -1260,6 +1265,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
             {error}
           </p>
         )}
+        <ImminentReminderBanner profileId={profileId} />
         {composer}
         {vaultOverlays}
       </div>
@@ -1354,6 +1360,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
           </p>
         )}
 
+        <ImminentReminderBanner profileId={profileId} />
         {composer}
       </div>
     </div>

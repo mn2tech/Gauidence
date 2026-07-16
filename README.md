@@ -17,7 +17,7 @@ Marketing landing page for **Guardian**, a private vault for the documents you c
 - `/login` and `/signup` — email/password plus "Continue with Google" via Supabase Auth
 - `/forgot-password` — request a password-reset email; `/auth/update-password` — choose a new password after clicking the link
 - `/dashboard` — protected hub: first-run setup when you have no people/spaces yet, then per-profile vault (upload, view, download, search, categories, AI analysis, Daily Logs, deadline alerts, linked people/vehicles/etc.)
-- `/ask` — Ask Gideon: vault-first Q&A with labeled general-knowledge fallback; **+** menu scans, uploads, adds a Daily Log, or **Add reminder** (date + time) without leaving chat (`/dashboard/chat` redirects here)
+- `/ask` — Ask Gideon: vault-first Q&A with labeled general-knowledge fallback; **+** menu scans, uploads, adds a Daily Log, or **Add reminder** (date + time) without leaving chat; a compact banner appears when a timed reminder is within ~90 minutes (`/dashboard/chat` redirects here)
 - `/settings` — edit profile name, change/set password, toggle email deadline reminders, and permanently delete your account with all data (requires `SUPABASE_SERVICE_ROLE_KEY`, server-side only)
 - `/settings/profiles` — create and switch between multiple Guardian profiles (separate vaults under one login)
 - `/auth/callback` — OAuth, email-confirmation, and password-recovery callback

@@ -45,7 +45,7 @@ export async function uploadAndAnalyzeToVault(args: {
     throw new Error("That file is larger than 15 MB. Please upload a smaller file.");
   }
 
-  args.onStatus?.("Uploading…");
+  args.onStatus?.("Uploading to your vault…");
   const safeName = args.file.name.replace(/[^\w.\- ]/g, "_");
   const path = `${args.userId}/${args.profileId}/${crypto.randomUUID()}-${safeName}`;
 
@@ -79,7 +79,7 @@ export async function uploadAndAnalyzeToVault(args: {
     throw new Error("We couldn't save the document record. Please try again.");
   }
 
-  args.onStatus?.("Analyzing…");
+  args.onStatus?.("Reading the document…");
   try {
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), 110_000);

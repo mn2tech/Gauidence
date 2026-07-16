@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   calendarDateInZone,
   formatReminderWhen,
+  isImminentReminder,
   zonedDateTimeToIso,
 } from "../time.ts";
 
@@ -44,6 +45,26 @@ describe("reminder time helpers", () => {
     assert.equal(
       calendarDateInZone(new Date("2026-07-16T16:00:00.000Z"), "America/New_York"),
       "2026-07-16"
+    );
+  });
+
+  it("flags reminders inside the imminent window", () => {
+    const now = Date.parse("2026-07-16T18:00:00.000Z");
+    assert.equal(
+      isImminentReminder(new Date(now + 30 * 60 * 1000).toISOString(), now),
+      true
+    );
+    assert.equal(
+      isImminentReminder(new Date(now - 30 * 60 * 1000).toISOString(), now),
+      true
+    );
+    assert.equal(
+      isImminentReminder(new Date(now + 3 * 60 * 60 * 1000).toISOString(), now),
+      false
+    );
+    assert.equal(
+      isImminentReminder(new Date(now - 3 * 60 * 60 * 1000).toISOString(), now),
+      false
     );
   });
 });

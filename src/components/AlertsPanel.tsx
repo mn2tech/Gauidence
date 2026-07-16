@@ -76,6 +76,7 @@ export default function AlertsPanel({ profileId }: { profileId: string }) {
       .from("alerts")
       .update({ dismissed_at: new Date().toISOString() })
       .eq("id", id);
+    window.dispatchEvent(new Event("guardian:alerts-updated"));
   };
 
   if (alerts.length === 0) return null;

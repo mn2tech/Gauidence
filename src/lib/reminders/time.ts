@@ -89,6 +89,21 @@ function zonedParts(date: Date, timeZone: string) {
   };
 }
 
+/** Show on Ask Gideon when due within this window (ahead). */
+export const IMMINENT_LOOKAHEAD_MS = 90 * 60 * 1000;
+/** Still nudge if slightly overdue (user may still be chatting). */
+export const IMMINENT_OVERDUE_MS = 2 * 60 * 60 * 1000;
+
+/** True when a timed reminder should surface as a compact Ask nudge. */
+export function isImminentReminder(
+  dueAtIso: string,
+  nowMs: number = Date.now()
+): boolean {
+  const t = new Date(dueAtIso).getTime();
+  if (Number.isNaN(t)) return false;
+  return t >= nowMs - IMMINENT_OVERDUE_MS && t <= nowMs + IMMINENT_LOOKAHEAD_MS;
+}
+
 export function formatReminderWhen(
   dueAt: string | null | undefined,
   dueDate: string,
