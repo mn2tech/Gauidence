@@ -855,7 +855,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
           href={documentsHref}
           className="text-xs font-medium text-ink-muted hover:text-foreground"
         >
-          ← Documents
+          ← Docs
         </Link>
       </div>
     </>
@@ -1344,12 +1344,14 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             <Link
               href={documentsHref}
+              aria-label="Documents"
+              title="Documents"
               className="inline-flex items-center gap-1 rounded-full border border-stone-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50 sm:px-3"
             >
               <span className="text-ink-muted" aria-hidden>
                 ←
               </span>
-              Documents
+              Docs
             </Link>
             <button
               type="button"
