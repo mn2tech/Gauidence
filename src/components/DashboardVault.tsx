@@ -3,7 +3,7 @@
 import { Suspense, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { MessageCircle, ShieldCheck } from "lucide-react";
+import { MessageCircle, Search, ShieldCheck } from "lucide-react";
 import DocumentManager from "@/components/DocumentManager";
 import AlertsPanel from "@/components/AlertsPanel";
 import DailyLogPanel from "@/components/DailyLogPanel";
@@ -89,18 +89,29 @@ export default function DashboardVault({ userId }: { userId: string }) {
         <p className="min-w-0 truncate text-sm text-ink-muted">
           {vaultLabel(active)}
         </p>
-        <Link
-          href="/ask"
-          aria-label="Ask Gideon"
-          title={askGideonContextLabel(active)}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-stone-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50 sm:px-3"
-        >
-          <MessageCircle className="h-3.5 w-3.5 text-brand" aria-hidden />
-          Ask
-          <span className="text-ink-muted" aria-hidden>
-            →
-          </span>
-        </Link>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <Link
+            href="/research"
+            aria-label="Research"
+            title="Research a company or person"
+            className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50 sm:px-3"
+          >
+            <Search className="h-3.5 w-3.5 text-brand" aria-hidden />
+            Research
+          </Link>
+          <Link
+            href="/ask"
+            aria-label="Ask Gideon"
+            title={askGideonContextLabel(active)}
+            className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50 sm:px-3"
+          >
+            <MessageCircle className="h-3.5 w-3.5 text-brand" aria-hidden />
+            Ask
+            <span className="text-ink-muted" aria-hidden>
+              →
+            </span>
+          </Link>
+        </div>
       </div>
 
       <VaultSection id={`attention-${active.id}`} title="Attention">

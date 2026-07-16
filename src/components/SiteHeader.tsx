@@ -52,6 +52,7 @@ export default function SiteHeader() {
       ? `/dashboard?camera=1#documents-${active.id}`
       : "/dashboard?camera=1";
   const askHref = needsSetup ? "/dashboard" : "/ask";
+  const researchHref = needsSetup ? "/dashboard" : "/research";
 
   const linkClass =
     "block rounded-lg px-3 py-2.5 text-sm font-medium text-foreground transition hover:bg-stone-100 sm:inline sm:rounded-none sm:px-0 sm:py-0 sm:font-normal sm:text-ink-muted sm:hover:bg-transparent sm:hover:text-foreground";
@@ -90,6 +91,9 @@ export default function SiteHeader() {
               ) : null}
               <Link href={askHref} className="hover:text-foreground">
                 Ask Gideon
+              </Link>
+              <Link href={researchHref} className="hover:text-foreground">
+                Research
               </Link>
               <Link href="/dashboard" className="hover:text-foreground">
                 Documents
@@ -170,6 +174,9 @@ export default function SiteHeader() {
                 ) : null}
                 <Link href={askHref} className={linkClass}>
                   Ask Gideon
+                </Link>
+                <Link href={researchHref} className={linkClass}>
+                  Research
                 </Link>
                 <Link href="/dashboard" className={linkClass}>
                   Documents
