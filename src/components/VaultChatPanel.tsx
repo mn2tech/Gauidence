@@ -161,12 +161,35 @@ type ChatSummary = {
 type Meta = {
   firstName: string | null;
   documentCount: number;
+  photoCount?: number;
   logCount?: number;
+  documentNames?: string[];
+  photoNames?: string[];
+  logNames?: string[];
+  documentNamesMore?: number;
+  photoNamesMore?: number;
+  logNamesMore?: number;
   suggestions: string[];
   profileId?: string;
   profileName?: string;
   askContextLabel?: string;
 };
+
+function NameList({
+  names,
+  more,
+}: {
+  names: string[];
+  more: number;
+}) {
+  if (names.length === 0) return null;
+  return (
+    <p className="text-[11px] leading-relaxed text-ink-muted">
+      {names.join(" · ")}
+      {more > 0 ? ` · +${more} more` : ""}
+    </p>
+  );
+}
 
 type Props = {
   variant?: "embedded" | "page";
@@ -243,11 +266,21 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
       chats?: ChatSummary[];
       messages?: VaultMessage[];
       chatId?: string;
+      meta?: Partial<Meta>;
     };
     if (!res.ok) throw new Error(body.error ?? "Couldn't load chat.");
     if (body.chats) setChats(body.chats);
     setActiveChatId(body.chatId ?? chatId);
     setMessages(body.messages ?? []);
+    if (body.meta) {
+      setMeta((prev) => ({
+        firstName: prev?.firstName ?? null,
+        documentCount: 0,
+        suggestions: prev?.suggestions ?? [],
+        ...prev,
+        ...body.meta,
+      }));
+    }
   }, []);
 
   const bootstrap = useCallback(async () => {
@@ -714,10 +747,23 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
 
   const welcome = !loadingHistory && messages.length === 0 && !sending;
   const docCount = meta?.documentCount ?? 0;
+  const photoCount = meta?.photoCount ?? 0;
   const logCount = meta?.logCount ?? 0;
-  const emptyVault = docCount === 0 && logCount === 0;
-  const logsOnly = docCount === 0 && logCount > 0;
+  const fileCount = docCount + photoCount;
+  const emptyVault = fileCount === 0 && logCount === 0;
+  const logsOnly = fileCount === 0 && logCount > 0;
   const greetName = meta?.firstName;
+
+  const countBits: string[] = [];
+  if (docCount > 0) {
+    countBits.push(`${docCount} document${docCount === 1 ? "" : "s"}`);
+  }
+  if (photoCount > 0) {
+    countBits.push(`${photoCount} photo${photoCount === 1 ? "" : "s"}`);
+  }
+  if (logCount > 0) {
+    countBits.push(`${logCount} Daily Log${logCount === 1 ? "" : "s"}`);
+  }
 
   const welcomeBlock = welcome && (
     <div className="mx-auto max-w-xl space-y-4 px-1 py-6">
@@ -733,6 +779,55 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
                 `Looking at ${meta.profileName}'s vault`}
             </p>
           )}
+          {!emptyVault && countBits.length > 0 ? (
+            <div className="space-y-2 rounded-xl border border-stone-200 bg-stone-50/80 px-3 py-2.5">
+              <p className="text-xs font-semibold text-foreground">
+                In this vault: {countBits.join(" · ")}
+              </p>
+              {docCount > 0 ? (
+                <div>
+                  <p className="text-[11px] font-medium text-ink-muted">
+                    Documents
+                  </p>
+                  <NameList
+                    names={meta?.documentNames ?? []}
+                    more={meta?.documentNamesMore ?? 0}
+                  />
+                </div>
+              ) : null}
+              {photoCount > 0 ? (
+                <div>
+                  <p className="text-[11px] font-medium text-ink-muted">
+                    Photos
+                  </p>
+                  <NameList
+                    names={meta?.photoNames ?? []}
+                    more={meta?.photoNamesMore ?? 0}
+                  />
+                </div>
+              ) : null}
+              {logCount > 0 ? (
+                <div>
+                  <p className="text-[11px] font-medium text-ink-muted">
+                    Daily Logs
+                  </p>
+                  <NameList
+                    names={meta?.logNames ?? []}
+                    more={meta?.logNamesMore ?? 0}
+                  />
+                </div>
+              ) : null}
+              <p className="text-[11px] text-ink-muted">
+                <Link
+                  href={documentsHref}
+                  className="font-medium text-brand hover:text-brand-dark"
+                >
+                  Open Docs
+                </Link>{" "}
+                to see everything.
+              </p>
+            </div>
+          ) : null}
           {emptyVault ? (
             <>
               <p className="text-sm text-ink-muted">

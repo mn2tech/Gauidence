@@ -20,6 +20,7 @@ import {
   VAULT_CHAT_SYSTEM,
 } from "@/lib/vault/indexDocument";
 import { wantsShowPictures } from "@/lib/vault/images";
+import { buildAskVaultInventory } from "@/lib/vault/askInventory";
 import { ensureUserVaultIndexed } from "@/lib/vault/ensureIndexed";
 import {
   canRollupLinkedVaultSearch,
@@ -291,6 +292,33 @@ async function listChats(
   return (data ?? []) as ChatSummary[];
 }
 
+async function loadAskVaultInventory(
+  supabase: SupabaseClient,
+  userId: string,
+  profileId: string
+) {
+  const [{ data: docs }, { data: logs }] = await Promise.all([
+    supabase
+      .from("documents")
+      .select("id, file_name, mime_type")
+      .eq("user_id", userId)
+      .eq("profile_id", profileId)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("daily_logs")
+      .select("title, log_date, content")
+      .eq("owner_user_id", userId)
+      .eq("profile_id", profileId)
+      .order("log_date", { ascending: false })
+      .limit(40),
+  ]);
+
+  return {
+    docs: docs ?? [],
+    inventory: buildAskVaultInventory(docs ?? [], logs ?? []),
+  };
+}
+
 /** List threads, or load one thread's messages. */
 export async function GET(request: Request) {
   const auth = await requireUser();
@@ -311,19 +339,14 @@ export async function GET(request: Request) {
   const chats = await listChats(supabase, user.id, active.id);
 
   if (!chatId) {
-    const { data: docs } = await supabase
-      .from("documents")
-      .select("id, file_name")
-      .eq("user_id", user.id)
-      .eq("profile_id", active.id);
+    const { docs, inventory } = await loadAskVaultInventory(
+      supabase,
+      user.id,
+      active.id
+    );
 
-    const docCount = docs?.length ?? 0;
-    const { count: logCountRaw } = await supabase
-      .from("daily_logs")
-      .select("id", { count: "exact", head: true })
-      .eq("owner_user_id", user.id)
-      .eq("profile_id", active.id);
-    const logCount = logCountRaw ?? 0;
+    const docCount = inventory.documentCount + inventory.photoCount;
+    const logCount = inventory.logCount;
 
     let suggestions: string[] = [];
     if (docCount > 0) {
@@ -332,7 +355,7 @@ export async function GET(request: Request) {
         .select("document_id, document_type, guardian_status, title")
         .eq("user_id", user.id)
         .eq("profile_id", active.id);
-      const nameById = new Map((docs ?? []).map((d) => [d.id, d.file_name]));
+      const nameById = new Map(docs.map((d) => [d.id, d.file_name]));
       const hints: VaultDocHint[] = (extracted ?? []).map((row) => ({
         documentType: row.document_type,
         guardianStatus: row.guardian_status,
@@ -341,7 +364,7 @@ export async function GET(request: Request) {
       }));
       if (hints.length === 0) {
         hints.push(
-          ...((docs ?? []).map((d) => ({ fileName: d.file_name })) as VaultDocHint[])
+          ...(docs.map((d) => ({ fileName: d.file_name })) as VaultDocHint[])
         );
       }
       suggestions = buildGideonSuggestions(
@@ -370,8 +393,15 @@ export async function GET(request: Request) {
             user.user_metadata?.name ??
             user.email
         ),
-        documentCount: docCount,
-        logCount,
+        documentCount: inventory.documentCount,
+        photoCount: inventory.photoCount,
+        logCount: inventory.logCount,
+        documentNames: inventory.documentNames,
+        photoNames: inventory.photoNames,
+        logNames: inventory.logNames,
+        documentNamesMore: inventory.documentNamesMore,
+        photoNamesMore: inventory.photoNamesMore,
+        logNamesMore: inventory.logNamesMore,
         suggestions,
         profileId: active.id,
         profileName: active.display_name,
@@ -415,6 +445,7 @@ export async function GET(request: Request) {
       profileId: active.id,
       profileName: active.display_name,
       askContextLabel: askGideonContextLabel(active),
+      ...(await loadAskVaultInventory(supabase, user.id, active.id)).inventory,
     },
   });
 }
