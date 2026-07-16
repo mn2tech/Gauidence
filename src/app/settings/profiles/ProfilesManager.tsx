@@ -19,7 +19,8 @@ import {
 export default function ProfilesManager() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { profiles, active, refresh, switchProfile } = useActiveProfile();
+  const { profiles, active, accountName, refresh, switchProfile } =
+    useActiveProfile();
   const [adding, setAdding] = useState(searchParams.get("add") === "1");
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [groupId, setGroupId] = useState<ProfileCreateGroupId | null>(null);
@@ -564,6 +565,7 @@ export default function ProfilesManager() {
         <div className="space-y-6">
           <ProfileVaultMap
             profiles={profiles}
+            ownerLabel={accountName}
             activeId={active?.id}
             onSwitch={(id) => void switchProfile(id)}
           />

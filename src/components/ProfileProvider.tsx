@@ -14,6 +14,7 @@ import type { GuardianProfile } from "@/lib/profiles/types";
 type ProfilesState = {
   profiles: GuardianProfile[];
   active: GuardianProfile | null;
+  accountName: string;
   loading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
@@ -25,6 +26,7 @@ const ProfileContext = createContext<ProfilesState | null>(null);
 export function ProfileProvider({ children }: { children: ReactNode }) {
   const [profiles, setProfiles] = useState<GuardianProfile[]>([]);
   const [active, setActive] = useState<GuardianProfile | null>(null);
+  const [accountName, setAccountName] = useState("You");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,11 +38,13 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         error?: string;
         profiles?: GuardianProfile[];
         active?: GuardianProfile;
+        accountName?: string;
       };
       if (!res.ok) {
         if (res.status === 401) {
           setProfiles([]);
           setActive(null);
+          setAccountName("You");
           return;
         }
         setError(body.error ?? "Couldn't load profiles.");
@@ -48,6 +52,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       }
       setProfiles(body.profiles ?? []);
       setActive(body.active ?? null);
+      setAccountName(body.accountName?.trim() || "You");
     } catch {
       setError("Couldn't load profiles.");
     } finally {
@@ -70,6 +75,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       error?: string;
       profiles?: GuardianProfile[];
       active?: GuardianProfile;
+      accountName?: string;
     };
     if (!res.ok) {
       setError(body.error ?? "Couldn't switch profile.");
@@ -77,6 +83,9 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     }
     setProfiles(body.profiles ?? []);
     setActive(body.active ?? null);
+    if (body.accountName?.trim()) {
+      setAccountName(body.accountName.trim());
+    }
     window.dispatchEvent(
       new CustomEvent("guardian:profile-changed", {
         detail: { profileId: body.active?.id },
@@ -86,8 +95,16 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ profiles, active, loading, error, refresh, switchProfile }),
-    [profiles, active, loading, error, refresh, switchProfile]
+    () => ({
+      profiles,
+      active,
+      accountName,
+      loading,
+      error,
+      refresh,
+      switchProfile,
+    }),
+    [profiles, active, accountName, loading, error, refresh, switchProfile]
   );
 
   return (
@@ -101,6 +118,7 @@ export function useActiveProfile(): ProfilesState {
     return {
       profiles: [],
       active: null,
+      accountName: "You",
       loading: false,
       error: null,
       refresh: async () => {},

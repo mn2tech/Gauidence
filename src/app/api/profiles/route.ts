@@ -52,14 +52,28 @@ export async function GET() {
   const { supabase, user } = auth;
 
   try {
-    const [profiles, active] = await Promise.all([
+    const [profiles, active, accountRow] = await Promise.all([
       listGuardianProfiles(supabase, user.id),
       getActiveGuardianProfile(supabase, user),
+      supabase
+        .from("profiles")
+        .select("full_name, email")
+        .eq("id", user.id)
+        .maybeSingle(),
     ]);
+    const accountName =
+      accountRow.data?.full_name?.trim() ||
+      (typeof user.user_metadata?.full_name === "string"
+        ? user.user_metadata.full_name.trim()
+        : "") ||
+      accountRow.data?.email?.split("@")[0] ||
+      user.email?.split("@")[0] ||
+      "You";
     return NextResponse.json({
       profiles,
       activeProfileId: active?.id ?? null,
       active,
+      accountName,
     });
   } catch {
     return NextResponse.json(
