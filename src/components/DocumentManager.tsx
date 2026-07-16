@@ -326,7 +326,11 @@ export default function DocumentManager({
       if (insertError || !inserted) {
         // Don't leave an orphaned file behind if the record failed.
         await supabase.storage.from("documents").remove([path]);
-        setError("We couldn't save the document record. Please try again.");
+        setError(
+          insertError?.message
+            ? `We couldn't save the document record: ${insertError.message}`
+            : "We couldn't save the document record. Please try again."
+        );
         setUploading(false);
         return;
       }

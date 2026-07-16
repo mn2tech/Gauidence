@@ -17,12 +17,6 @@ import {
   type ResearchSectionKind,
   type ResearchSubjectKind,
 } from "@/lib/research/prompt";
-import {
-  buildPastedTextFile,
-  uploadAndAnalyzeToVault,
-} from "@/lib/vault/clientUpload";
-import { createClient } from "@/lib/supabase/client";
-
 type WebSource = {
   title: string;
   url: string;
@@ -35,6 +29,7 @@ type ResearchResult = {
   brief: string;
   sources: WebSource[];
   vaultContextUsed: boolean;
+  profileId: string;
   profileName: string;
 };
 
@@ -118,6 +113,7 @@ export default function ResearchPanel() {
         brief?: string;
         sources?: WebSource[];
         vaultContextUsed?: boolean;
+        profileId?: string;
         profileName?: string;
       };
       if (!res.ok) {
@@ -130,6 +126,7 @@ export default function ResearchPanel() {
         brief: body.brief ?? "",
         sources: body.sources ?? [],
         vaultContextUsed: Boolean(body.vaultContextUsed),
+        profileId: body.profileId ?? active?.id ?? "",
         profileName: body.profileName ?? active?.display_name ?? "Vault",
       });
     } catch {
@@ -140,60 +137,46 @@ export default function ResearchPanel() {
   };
 
   const saveToVault = async () => {
-    if (!result || !active || saving) return;
+    if (!result || saving) return;
+    const profileId = result.profileId || active?.id;
+    if (!profileId) {
+      setError("Create or select a vault before saving.");
+      return;
+    }
     setSaving(true);
     setError(null);
     setNotice(null);
     try {
-      const supabase = createClient();
-      if (!supabase) {
-        setError("Sign-in isn't available. Refresh and try again.");
+      const res = await fetch("/api/research/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: result.query,
+          brief: result.brief,
+          sources: result.sources,
+          profileId,
+        }),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        profileName?: string;
+        analyzed?: boolean;
+        analysisError?: string;
+      };
+      if (!res.ok) {
+        setError(body.error ?? "Couldn't save this brief to your vault.");
         return;
       }
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        setError("You need to be signed in.");
-        return;
-      }
-
-      const sourceLines = result.sources
-        .map((s, i) => `[${i + 1}] ${s.title}\n${s.url}`)
-        .join("\n\n");
-      const content = [
-        result.brief.trim(),
-        "",
-        "--- Sources ---",
-        sourceLines || "(none)",
-      ].join("\n");
-
-      const file = buildPastedTextFile({
-        title: `Research — ${result.query}`,
-        content,
-        sourceUrl: result.sources[0]?.url,
-      });
-
-      const uploaded = await uploadAndAnalyzeToVault({
-        userId: user.id,
-        profileId: active.id,
-        file,
-      });
+      const vaultName = body.profileName ?? result.profileName;
       setNotice(
-        uploaded.analyzed
-          ? `Saved to ${active.display_name}'s vault and analyzed.`
-          : `Saved to ${active.display_name}'s vault.${
-              uploaded.analysisError
-                ? ` Analysis: ${uploaded.analysisError}`
-                : ""
+        body.analyzed
+          ? `Saved to ${vaultName}'s vault and analyzed.`
+          : `Saved to ${vaultName}'s vault.${
+              body.analysisError ? ` Analysis: ${body.analysisError}` : ""
             }`
       );
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Couldn't save this brief to your vault."
-      );
+    } catch {
+      setError("Couldn't save this brief to your vault. Check your connection.");
     } finally {
       setSaving(false);
     }

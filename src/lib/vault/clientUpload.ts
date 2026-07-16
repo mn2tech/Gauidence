@@ -81,7 +81,19 @@ export async function uploadAndAnalyzeToVault(args: {
 
   if (insertError || !inserted) {
     await supabase.storage.from("documents").remove([path]);
-    throw new Error("We couldn't save the document record. Please try again.");
+    const detail = insertError?.message?.trim();
+    console.error(
+      "Vault document insert failed:",
+      insertError?.code,
+      detail,
+      insertError?.details,
+      insertError?.hint
+    );
+    throw new Error(
+      detail
+        ? `We couldn't save the document record: ${detail}`
+        : "We couldn't save the document record. Please try again."
+    );
   }
 
   args.onStatus?.("Reading the document…");
