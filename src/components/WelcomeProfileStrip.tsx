@@ -2,6 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Plus } from "lucide-react";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
@@ -89,7 +91,20 @@ export default function WelcomeProfileStrip({
   ownerName,
   ownerEmail,
 }: Props) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { profiles, active, loading, switchProfile } = useActiveProfile();
+  const [passwordNotice, setPasswordNotice] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get("passwordUpdated") !== "1") return;
+    setPasswordNotice(true);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("passwordUpdated");
+    const qs = params.toString();
+    router.replace(qs ? `/dashboard?${qs}` : "/dashboard", { scroll: false });
+  }, [searchParams, router]);
+
   const topLevel = topLevelProfiles(profiles);
   const viewingLinked = active && isLinkedMemberProfile(active);
   const chipHighlightId = viewingLinked
@@ -107,6 +122,14 @@ export default function WelcomeProfileStrip({
 
   return (
     <div className="welcome-strip space-y-4 sm:space-y-5">
+      {passwordNotice ? (
+        <p
+          role="status"
+          className="rounded-xl border border-brand/30 bg-brand-light px-4 py-3 text-sm text-brand-dark"
+        >
+          Your password has been updated.
+        </p>
+      ) : null}
       <div>
         <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
           Welcome, {ownerName}

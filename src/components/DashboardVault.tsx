@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
 import DocumentManager from "@/components/DocumentManager";
@@ -69,7 +70,14 @@ export default function DashboardVault({ userId }: { userId: string }) {
   if (!active) {
     return (
       <p className="text-sm text-ink-muted">
-        No active person or space. Open Manage people & spaces to continue.
+        No active person or space.{" "}
+        <Link
+          href="/settings/profiles"
+          className="font-medium text-brand hover:text-brand-dark"
+        >
+          Manage people &amp; spaces
+        </Link>{" "}
+        to continue.
       </p>
     );
   }

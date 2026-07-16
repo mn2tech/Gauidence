@@ -11,7 +11,7 @@ import { useActiveProfile } from "@/components/ProfileProvider";
 export default function SiteHeader() {
   const pathname = usePathname();
   const router = useRouter();
-  const { active } = useActiveProfile();
+  const { active, profiles, loading: profilesLoading } = useActiveProfile();
   const [signedIn, setSignedIn] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -45,9 +45,13 @@ export default function SiteHeader() {
     router.refresh();
   }
 
-  const cameraHref = active
-    ? `/dashboard?camera=1#documents-${active.id}`
-    : "/dashboard?camera=1";
+  const needsSetup = signedIn && !profilesLoading && profiles.length === 0;
+  const cameraHref = needsSetup
+    ? "/dashboard"
+    : active
+      ? `/dashboard?camera=1#documents-${active.id}`
+      : "/dashboard?camera=1";
+  const askHref = needsSetup ? "/dashboard" : "/ask";
 
   const linkClass =
     "block rounded-lg px-3 py-2.5 text-sm font-medium text-foreground transition hover:bg-stone-100 sm:inline sm:rounded-none sm:px-0 sm:py-0 sm:font-normal sm:text-ink-muted sm:hover:bg-transparent sm:hover:text-foreground";
@@ -73,16 +77,18 @@ export default function SiteHeader() {
           {signedIn ? (
             <>
               <ProfileSwitcher />
-              <Link
-                href={cameraHref}
-                aria-label="Scan with camera"
-                title="Scan with camera"
-                className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-3 py-1.5 font-medium text-foreground transition hover:border-stone-400 hover:bg-stone-50"
-              >
-                <Camera className="h-4 w-4 text-brand" />
-                <span className="hidden lg:inline">Scan</span>
-              </Link>
-              <Link href="/ask" className="hover:text-foreground">
+              {!needsSetup ? (
+                <Link
+                  href={cameraHref}
+                  aria-label="Scan with camera"
+                  title="Scan with camera"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-3 py-1.5 font-medium text-foreground transition hover:border-stone-400 hover:bg-stone-50"
+                >
+                  <Camera className="h-4 w-4 text-brand" />
+                  <span className="hidden lg:inline">Scan</span>
+                </Link>
+              ) : null}
+              <Link href={askHref} className="hover:text-foreground">
                 Ask Gideon
               </Link>
               <Link href="/dashboard" className="hover:text-foreground">
@@ -120,7 +126,7 @@ export default function SiteHeader() {
 
         {/* Mobile: scan + menu */}
         <div className="flex items-center gap-1 sm:hidden">
-          {signedIn ? (
+          {signedIn && !needsSetup ? (
             <Link
               href={cameraHref}
               aria-label="Scan with camera"
@@ -157,10 +163,12 @@ export default function SiteHeader() {
                 <div className="px-3 py-2">
                   <ProfileSwitcher />
                 </div>
-                <Link href={cameraHref} className={linkClass}>
-                  Scan with camera
-                </Link>
-                <Link href="/ask" className={linkClass}>
+                {!needsSetup ? (
+                  <Link href={cameraHref} className={linkClass}>
+                    Scan with camera
+                  </Link>
+                ) : null}
+                <Link href={askHref} className={linkClass}>
                   Ask Gideon
                 </Link>
                 <Link href="/dashboard" className={linkClass}>

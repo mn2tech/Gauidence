@@ -58,7 +58,7 @@ export default function UpdatePasswordForm() {
         return;
       }
 
-      router.push("/dashboard");
+      router.push("/dashboard?passwordUpdated=1");
       router.refresh();
     } catch {
       setError(

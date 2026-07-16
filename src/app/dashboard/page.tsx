@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Settings } from "lucide-react";
@@ -58,10 +59,12 @@ export default async function DashboardPage() {
               </Link>
               <SignOutButton />
             </div>
-            <WelcomeProfileStrip
-              ownerName={ownerName}
-              ownerEmail={user.email}
-            />
+            <Suspense fallback={null}>
+              <WelcomeProfileStrip
+                ownerName={ownerName}
+                ownerEmail={user.email}
+              />
+            </Suspense>
           </div>
 
           <div className="mt-8 sm:mt-10">

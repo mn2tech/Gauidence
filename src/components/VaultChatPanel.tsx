@@ -164,7 +164,8 @@ const SECTION_STYLES: Record<string, string> = {
 
 export default function VaultChatPanel({ variant = "embedded" }: Props) {
   const isPage = variant === "page";
-  const { active } = useActiveProfile();
+  const { active, profiles, loading: profilesLoading } = useActiveProfile();
+  const needsSetup = !profilesLoading && profiles.length === 0;
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [messages, setMessages] = useState<VaultMessage[]>([]);
@@ -242,10 +243,16 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
   }, [isPage, loadMetaAndChats, loadThread]);
 
   useEffect(() => {
+    if (profilesLoading) return;
+    if (needsSetup) {
+      setLoadingHistory(false);
+      return;
+    }
     void bootstrap();
-  }, [bootstrap]);
+  }, [bootstrap, needsSetup, profilesLoading]);
 
   useEffect(() => {
+    if (needsSetup) return;
     const onProfile = () => {
       setActiveChatId(null);
       setMessages([]);
@@ -254,7 +261,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     window.addEventListener("guardian:profile-changed", onProfile);
     return () =>
       window.removeEventListener("guardian:profile-changed", onProfile);
-  }, [bootstrap]);
+  }, [bootstrap, needsSetup]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -780,6 +787,41 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
       </div>
     </form>
   );
+
+  if (needsSetup) {
+    const setupBlock = (
+      <div className="mx-auto max-w-md space-y-4 px-1 py-8 text-center">
+        <div className="flex justify-center">
+          <GideonAvatar size={44} />
+        </div>
+        <h2 className="text-lg font-semibold text-foreground">
+          Create a space first
+        </h2>
+        <p className="text-sm leading-relaxed text-ink-muted">
+          Gideon looks at your people and spaces. Choose who you&apos;re helping
+          on the dashboard, then come back to ask questions.
+        </p>
+        <Link
+          href="/dashboard"
+          className="inline-flex rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark"
+        >
+          Set up your first space
+        </Link>
+      </div>
+    );
+    if (!isPage) {
+      return (
+        <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+          {setupBlock}
+        </div>
+      );
+    }
+    return (
+      <div className="flex h-full w-full items-center justify-center bg-white px-4">
+        {setupBlock}
+      </div>
+    );
+  }
 
   if (!isPage) {
     return (

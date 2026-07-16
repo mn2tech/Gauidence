@@ -93,15 +93,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const { error: eventError } = await supabase.from("analysis_events").insert({
-    user_id: user.id,
-  });
-  if (eventError) {
-    return NextResponse.json(
-      { error: "We couldn't start the analysis. Please try again." },
-      { status: 502 }
-    );
-  }
+  // Count successful analyses only (insert after save) so timeouts/failures
+  // do not burn the hourly budget.
 
   const setStatus = async (status: AnalysisStatus) => {
     await supabase
@@ -213,6 +206,8 @@ export async function POST(request: Request) {
         { status: 500 }
       );
     }
+
+    await supabase.from("analysis_events").insert({ user_id: user.id });
 
     let suggestedCategory: string | null = null;
     if (!doc.category) {

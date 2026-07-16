@@ -15,20 +15,25 @@ Marketing landing page for **Guardian**, a private vault for the documents you c
 - `/` — landing page with hero, features, and the "Built for the information you cannot afford to lose" security section
 - `/security` — Security Principles: what data is collected, how auth and access separation work, where files are stored, how AI processing works, what is not yet implemented, deletion, and how to report a concern
 - `/login` and `/signup` — email/password plus "Continue with Google" via Supabase Auth
-- `/dashboard` — protected document vault: upload, view in-browser, download, search, category filters, sorting, rename, AI analysis with source-labeled facts (including an AI-suggested category that never overrides a manual choice; limited to 10 analyses per user per hour), ask-your-document chat, Ask Gideon (vault Q&A), Daily Logs per profile, deadline alerts, and safe deletion
-- `/ask` — Ask Gideon: full-page AI guide chat across your vault (`/dashboard/chat` redirects here)
+- `/forgot-password` — request a password-reset email; `/auth/update-password` — choose a new password after clicking the link
+- `/dashboard` — protected hub: first-run setup when you have no people/spaces yet, then per-profile vault (upload, view, download, search, categories, AI analysis, Daily Logs, deadline alerts, linked people/vehicles/etc.)
+- `/ask` — Ask Gideon: vault-first Q&A with labeled general-knowledge fallback (`/dashboard/chat` redirects here)
 - `/settings` — edit profile name, change/set password, toggle email deadline reminders, and permanently delete your account with all data (requires `SUPABASE_SERVICE_ROLE_KEY`, server-side only)
 - `/settings/profiles` — create and switch between multiple Guardian profiles (separate vaults under one login)
-- `/auth/callback` — OAuth and email-confirmation callback
+- `/auth/callback` — OAuth, email-confirmation, and password-recovery callback
 
 ## Authentication
 
-Auth is powered by Supabase (email/password + Google OAuth). Setup guide:
+Auth is powered by Supabase (email/password + Google OAuth + password reset). Setup guide:
 [docs/GOOGLE_AUTH_SETUP.md](docs/GOOGLE_AUTH_SETUP.md). Copy `.env.example`
 to `.env.local` and fill in the Supabase URL and anon key; run the SQL files
 in `supabase/migrations/` (in order) in the Supabase SQL Editor. Until the
 env vars are configured, auth pages show a friendly notice and the rest of the
 site works normally.
+
+New accounts are **not** given an automatic "Myself" profile — they land on the
+dashboard setup hub and choose Family / Business / Student / Other (see
+migration `0020_no_auto_myself_profile.sql`).
 
 ## AI analysis
 
@@ -45,13 +50,16 @@ After a document is analyzed, you can ask follow-up questions about that file
 only (Ask-your-document chat). Answers are grounded in the stored analysis,
 capped at **30 chat turns per hour**, and deleted with the document.
 
-**Ask Gideon** is Guardian's named AI guide. It searches across *your*
-analyzed documents (embeddings via `OPENAI_API_KEY`, answers via Claude),
-structures answers (documents / calculated / suggestion / needs verification),
-and cites source file names with a View Source action. Run
+**Ask Gideon** is Guardian's named AI guide. It searches your vault first
+(analyzed documents via embeddings when `OPENAI_API_KEY` is set, plus Daily
+Logs and linked profiles), structures answers (documents / logs / profiles /
+calculated / general knowledge / suggestion / needs verification), and cites
+source file names with a View Source action. When the vault has no match, it
+answers under a labeled **General knowledge** section and may suggest uploading
+a document. Empty vaults can still ask general questions. Run
 `supabase/migrations/0010_vault_rag.sql` (and `0011_vault_chat_threads.sql`)
-and set `OPENAI_API_KEY` on Vercel. Re-analyze existing files (or ask Gideon
-once) to backfill the search index.
+and set `OPENAI_API_KEY` on Vercel for document search. Re-analyze existing
+files (or ask Gideon once) to backfill the search index.
 
 ## Error monitoring
 

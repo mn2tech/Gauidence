@@ -45,6 +45,16 @@ type DocumentRow = {
 
 type SortKey = "newest" | "oldest" | "name" | "largest";
 
+const IN_PROGRESS_ANALYSIS: AnalysisStatus[] = [
+  "extracting",
+  "classifying",
+  "analyzing",
+  "validating",
+];
+
+/** Abort before Vercel's 120s hard kill so the UI can show a clear timeout message. */
+const ANALYZE_CLIENT_TIMEOUT_MS = 110_000;
+
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "newest", label: "Newest first" },
   { value: "oldest", label: "Oldest first" },
@@ -159,12 +169,22 @@ export default function DocumentManager({
     if (docsRes.error) {
       setError("We couldn't load your documents. Refresh the page to try again.");
     } else {
-      setDocuments(
-        (docsRes.data ?? []).map((d) => ({
+      const rows = (docsRes.data ?? []).map((d) => {
+        let status = (d.analysis_status as AnalysisStatus) ?? "uploaded";
+        // Recover stuck in-progress rows left by a timed-out or killed request.
+        if (IN_PROGRESS_ANALYSIS.includes(status)) {
+          status = "failed";
+          void supabase
+            .from("documents")
+            .update({ analysis_status: "failed" })
+            .eq("id", d.id);
+        }
+        return {
           ...d,
-          analysis_status: (d.analysis_status as AnalysisStatus) ?? "uploaded",
-        }))
-      );
+          analysis_status: status,
+        };
+      });
+      setDocuments(rows);
       const map: Record<string, Analysis> = {};
       for (const row of analysesRes.data ?? []) {
         map[row.document_id] = {
@@ -482,14 +502,25 @@ export default function DocumentManager({
     }, 2500);
 
     try {
-      const res = await fetch("/api/documents/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          documentId: doc.id,
-          timeZone: GUARDIAN_TIME_ZONE,
-        }),
-      });
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(
+        () => controller.abort(),
+        ANALYZE_CLIENT_TIMEOUT_MS
+      );
+      let res: Response;
+      try {
+        res = await fetch("/api/documents/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            documentId: doc.id,
+            timeZone: GUARDIAN_TIME_ZONE,
+          }),
+          signal: controller.signal,
+        });
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
       let body: {
         error?: string;
         summary?: string;
@@ -566,8 +597,14 @@ export default function DocumentManager({
         setExpandedId(doc.id);
         notifyAlertsUpdated();
       }
-    } catch {
-      setError("We couldn't reach the analysis service. Check your connection and try again.");
+    } catch (err) {
+      const timedOut =
+        err instanceof DOMException && err.name === "AbortError";
+      setError(
+        timedOut
+          ? "Analysis took too long on this file. Try again, or upload a clearer photo or smaller PDF."
+          : "We couldn't reach the analysis service. Check your connection and try again."
+      );
       setDocuments((docs) =>
         docs.map((d) =>
           d.id === doc.id ? { ...d, analysis_status: "failed" } : d
