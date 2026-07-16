@@ -1,13 +1,19 @@
 import {
   clientsOf,
   employeesOf,
+  familyMembersOf,
+  homesOf,
   isOrgStyleProfile,
   nestedUnder,
+  petsOf,
+  studentsOf,
   topLevelProfiles,
+  vehiclesOf,
   type GuardianProfile,
+  type GuardianProfileType,
 } from "@/lib/profiles/types";
 
-/** Labeled roster under an org-style vault (e.g. Employees, Clients). */
+/** Labeled roster under a container (Employees, Clients, Family members, Things). */
 export type VaultMapMemberGroup = {
   label: string;
   members: GuardianProfile[];
@@ -16,9 +22,9 @@ export type VaultMapMemberGroup = {
 /** One top-level space under the account owner. */
 export type VaultMapBranch = {
   profile: GuardianProfile;
-  /** Org-style vaults: Employees / Clients columns. */
+  /** Labeled sections under this space (preferred over flat members). */
   groups: VaultMapMemberGroup[];
-  /** Family, vehicles, and other containers: flat linked members. */
+  /** Fallback flat list when there are no labeled groups. */
   members: GuardianProfile[];
 };
 
@@ -29,6 +35,18 @@ export type VaultMapTree = {
   personalProfile: GuardianProfile | null;
   branches: VaultMapBranch[];
 };
+
+/** Prefer Family, then Business / Nonprofit, then Vehicles, then the rest. */
+const BRANCH_ORDER: Partial<Record<GuardianProfileType, number>> = {
+  family: 0,
+  business: 1,
+  non_profit: 2,
+  vehicles: 3,
+};
+
+function branchRank(type: GuardianProfileType): number {
+  return BRANCH_ORDER[type] ?? 10;
+}
 
 function branchForProfile(
   profiles: GuardianProfile[],
@@ -45,6 +63,26 @@ function branchForProfile(
     };
   }
 
+  if (profile.profile_type === "family") {
+    const people = [
+      ...familyMembersOf(profiles, profile.id),
+      ...studentsOf(profiles, profile.id),
+      ...petsOf(profiles, profile.id),
+    ];
+    const things = [
+      ...homesOf(profiles, profile.id),
+      ...vehiclesOf(profiles, profile.id),
+    ];
+    return {
+      profile,
+      groups: [
+        { label: "Family members", members: people },
+        { label: "Things", members: things },
+      ],
+      members: [],
+    };
+  }
+
   return {
     profile,
     groups: [],
@@ -52,7 +90,7 @@ function branchForProfile(
   };
 }
 
-/** Account-rooted tree: You → Family / Business / … with grouped org rosters. */
+/** Account-rooted tree: You → Family / Business / … as sibling branches. */
 export function buildVaultMapTree(
   profiles: GuardianProfile[],
   ownerLabel: string
@@ -62,6 +100,11 @@ export function buildVaultMapTree(
     tops.find((p) => p.profile_type === "personal") ?? null;
   const branches = tops
     .filter((p) => p.profile_type !== "personal")
+    .sort((a, b) => {
+      const rank = branchRank(a.profile_type) - branchRank(b.profile_type);
+      if (rank !== 0) return rank;
+      return a.display_name.localeCompare(b.display_name);
+    })
     .map((p) => branchForProfile(profiles, p));
 
   if (branches.length === 0 && !personalProfile) return null;

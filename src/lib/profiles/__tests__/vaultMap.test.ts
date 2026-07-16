@@ -4,7 +4,8 @@ import { buildVaultMapTree } from "../vaultMap.ts";
 import type { GuardianProfile } from "../types.ts";
 
 function sample(
-  overrides: Partial<GuardianProfile> & Pick<GuardianProfile, "id" | "display_name" | "profile_type">
+  overrides: Partial<GuardianProfile> &
+    Pick<GuardianProfile, "id" | "display_name" | "profile_type">
 ): GuardianProfile {
   return {
     owner_user_id: "u1",
@@ -29,7 +30,7 @@ function sample(
 }
 
 describe("vault map tree", () => {
-  it("anchors under account owner with family members flat and business grouped", () => {
+  it("anchors under account owner with family and business as sibling branches", () => {
     const familyId = "fam-1";
     const businessId = "biz-1";
     const tree = buildVaultMapTree(
@@ -39,7 +40,16 @@ describe("vault map tree", () => {
           display_name: "Danny",
           profile_type: "personal",
         }),
-        sample({ id: familyId, display_name: "Our Family", profile_type: "family" }),
+        sample({
+          id: businessId,
+          display_name: "Acme Co",
+          profile_type: "business",
+        }),
+        sample({
+          id: familyId,
+          display_name: "Our Family",
+          profile_type: "family",
+        }),
         sample({
           id: "c1",
           display_name: "Nolan",
@@ -52,7 +62,18 @@ describe("vault map tree", () => {
           profile_type: "pet",
           parent_profile_id: familyId,
         }),
-        sample({ id: businessId, display_name: "Acme Co", profile_type: "business" }),
+        sample({
+          id: "home1",
+          display_name: "My House",
+          profile_type: "home",
+          parent_profile_id: familyId,
+        }),
+        sample({
+          id: "car1",
+          display_name: "Highlander",
+          profile_type: "vehicle",
+          parent_profile_id: familyId,
+        }),
         sample({
           id: "e1",
           display_name: "Alex",
@@ -65,6 +86,11 @@ describe("vault map tree", () => {
           profile_type: "client",
           parent_profile_id: businessId,
         }),
+        sample({
+          id: "other1",
+          display_name: "Celebrations",
+          profile_type: "other",
+        }),
       ],
       "Danny"
     );
@@ -72,20 +98,28 @@ describe("vault map tree", () => {
     assert.ok(tree);
     assert.equal(tree.ownerLabel, "Danny");
     assert.equal(tree.personalProfile?.id, "personal");
-    assert.equal(tree.branches.length, 2);
-
-    const family = tree.branches.find((b) => b.profile.id === familyId);
-    assert.ok(family);
-    assert.equal(family.groups.length, 0);
+    assert.equal(tree.branches.length, 3);
+    // Family before Business before Other
     assert.deepEqual(
-      family.members.map((m) => m.display_name).sort(),
-      ["Max", "Nolan"]
+      tree.branches.map((b) => b.profile.profile_type),
+      ["family", "business", "other"]
     );
 
-    const business = tree.branches.find((b) => b.profile.id === businessId);
+    const family = tree.branches[0];
+    assert.ok(family);
+    assert.equal(family.groups[0]?.label, "Family members");
+    assert.deepEqual(
+      family.groups[0]?.members.map((m) => m.display_name).sort(),
+      ["Max", "Nolan"]
+    );
+    assert.equal(family.groups[1]?.label, "Things");
+    assert.deepEqual(
+      family.groups[1]?.members.map((m) => m.display_name).sort(),
+      ["Highlander", "My House"]
+    );
+
+    const business = tree.branches[1];
     assert.ok(business);
-    assert.equal(business.members.length, 0);
-    assert.equal(business.groups.length, 2);
     assert.equal(business.groups[0]?.label, "Employees");
     assert.deepEqual(
       business.groups[0]?.members.map((m) => m.display_name),

@@ -14,15 +14,6 @@ type Props = {
   onSwitch: (id: string) => void;
 };
 
-function Connector({ tall = false }: { tall?: boolean }) {
-  return (
-    <div
-      className={`w-px bg-stone-300 ${tall ? "h-4" : "h-3"}`}
-      aria-hidden
-    />
-  );
-}
-
 function MapNode({
   profile,
   activeId,
@@ -39,7 +30,7 @@ function MapNode({
     <button
       type="button"
       onClick={() => onSwitch(profile.id)}
-      className={`flex min-w-[5.5rem] max-w-[8.5rem] flex-col items-center gap-1.5 rounded-xl border bg-white px-2 py-2.5 text-center transition hover:border-brand/40 hover:bg-brand-light/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${
+      className={`flex w-full max-w-[9rem] flex-col items-center gap-1.5 rounded-xl border bg-white px-2 py-2.5 text-center transition hover:border-brand/40 hover:bg-brand-light/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${
         active
           ? "border-brand ring-2 ring-brand/25 shadow-sm"
           : "border-stone-200 shadow-sm"
@@ -120,14 +111,12 @@ function OwnerNode({
       <span className="line-clamp-2 w-full text-xs font-medium leading-tight text-foreground">
         {label}
       </span>
-      <span className="line-clamp-1 w-full text-[10px] text-ink-muted">
-        You
-      </span>
+      <span className="line-clamp-1 w-full text-[10px] text-ink-muted">You</span>
     </div>
   );
 }
 
-function MemberRow({
+function MemberGrid({
   members,
   activeId,
   onSwitch,
@@ -136,34 +125,23 @@ function MemberRow({
   activeId?: string;
   onSwitch: (id: string) => void;
 }) {
-  if (members.length === 0) return null;
-
   return (
-    <div className="relative w-full px-2 pt-3">
-      {members.length > 1 ? (
-        <div
-          className="absolute left-8 right-8 top-0 h-px bg-stone-300"
-          aria-hidden
-        />
-      ) : null}
-      <ul className="flex flex-wrap items-start justify-center gap-x-4 gap-y-3">
-        {members.map((member) => (
-          <li key={member.id} className="flex flex-col items-center">
-            <Connector />
-            <MapNode
-              profile={member}
-              activeId={activeId}
-              onSwitch={onSwitch}
-              size="sm"
-            />
-          </li>
-        ))}
-      </ul>
-    </div>
+    <ul className="flex flex-wrap justify-center gap-2">
+      {members.map((member) => (
+        <li key={member.id} className="flex justify-center">
+          <MapNode
+            profile={member}
+            activeId={activeId}
+            onSwitch={onSwitch}
+            size="sm"
+          />
+        </li>
+      ))}
+    </ul>
   );
 }
 
-function GroupedBranch({
+function BranchColumn({
   branch,
   activeId,
   onSwitch,
@@ -172,77 +150,43 @@ function GroupedBranch({
   activeId?: string;
   onSwitch: (id: string) => void;
 }) {
-  const { profile, groups } = branch;
-  const visibleGroups = groups.filter((g) => g.members.length > 0);
+  const visibleGroups = branch.groups.filter((g) => g.members.length > 0);
+  const hasGroups = visibleGroups.length > 0;
+  const hasFlat = !hasGroups && branch.members.length > 0;
 
   return (
-    <li className="flex flex-col items-center">
-      <Connector />
-      <MapNode profile={profile} activeId={activeId} onSwitch={onSwitch} />
-      {visibleGroups.length > 0 ? (
-        <>
-          <Connector tall />
-          <div className="relative w-full px-2 pt-3">
-            {visibleGroups.length > 1 ? (
-              <div
-                className="absolute left-8 right-8 top-0 h-px bg-stone-300"
-                aria-hidden
+    <li className="flex min-w-0 flex-col items-center rounded-xl border border-stone-200/80 bg-white/70 p-3">
+      <div className="mb-1 h-3 w-px bg-stone-300" aria-hidden />
+      <MapNode
+        profile={branch.profile}
+        activeId={activeId}
+        onSwitch={onSwitch}
+      />
+      {hasGroups ? (
+        <div className="mt-3 flex w-full flex-col gap-4">
+          {visibleGroups.map((group) => (
+            <div key={group.label} className="w-full">
+              <p className="mb-2 text-center text-[10px] font-semibold uppercase tracking-wide text-ink-muted">
+                {group.label}
+              </p>
+              <MemberGrid
+                members={group.members}
+                activeId={activeId}
+                onSwitch={onSwitch}
               />
-            ) : null}
-            <ul className="flex flex-wrap items-start justify-center gap-x-6 gap-y-4">
-              {visibleGroups.map((group) => (
-                <li key={group.label} className="flex flex-col items-center">
-                  <Connector />
-                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-ink-muted">
-                    {group.label}
-                  </p>
-                  <ul className="flex flex-wrap items-start justify-center gap-x-3 gap-y-2">
-                    {group.members.map((member) => (
-                      <li key={member.id}>
-                        <MapNode
-                          profile={member}
-                          activeId={activeId}
-                          onSwitch={onSwitch}
-                          size="sm"
-                        />
-                      </li>
-                    ))}
-                  </ul>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </>
+            </div>
+          ))}
+        </div>
       ) : null}
-    </li>
-  );
-}
-
-function FlatBranch({
-  branch,
-  activeId,
-  onSwitch,
-}: {
-  branch: VaultMapBranch;
-  activeId?: string;
-  onSwitch: (id: string) => void;
-}) {
-  const { profile, members } = branch;
-
-  if (members.length === 0) {
-    return (
-      <li className="flex flex-col items-center">
-        <Connector />
-        <MapNode profile={profile} activeId={activeId} onSwitch={onSwitch} />
-      </li>
-    );
-  }
-
-  return (
-    <li className="flex flex-col items-center">
-      <Connector />
-      <MapNode profile={profile} activeId={activeId} onSwitch={onSwitch} />
-      <MemberRow members={members} activeId={activeId} onSwitch={onSwitch} />
+      {hasFlat ? (
+        <div className="mt-3 w-full">
+          <MemberGrid
+            members={branch.members}
+            activeId={activeId}
+            onSwitch={onSwitch}
+          />
+        </div>
+      ) : null}
     </li>
   );
 }
@@ -265,12 +209,15 @@ export default function ProfileVaultMap({
       aria-labelledby="vault-map-heading"
     >
       <div className="mb-4">
-        <h2 id="vault-map-heading" className="text-sm font-semibold text-foreground">
+        <h2
+          id="vault-map-heading"
+          className="text-sm font-semibold text-foreground"
+        >
           Vault map
         </h2>
         <p className="mt-0.5 text-xs text-ink-muted">
-          Your account at the top, then Family, Business, and other spaces.
-          Tap any vault to switch.
+          You at the top. Family, Business, and other spaces sit side by side
+          under you — tap any vault to switch.
         </p>
       </div>
       <div className="flex flex-col items-center">
@@ -282,34 +229,25 @@ export default function ProfileVaultMap({
         />
         {hasBranches ? (
           <>
-            <Connector tall />
-            <div className="relative w-full px-2 pt-3">
-              {branches.length > 1 ? (
-                <div
-                  className="absolute left-8 right-8 top-0 h-px bg-stone-300"
-                  aria-hidden
+            <div className="h-4 w-px bg-stone-300" aria-hidden />
+            <ul
+              className={`grid w-full gap-4 ${
+                branches.length === 1
+                  ? "max-w-md grid-cols-1"
+                  : branches.length === 2
+                    ? "grid-cols-1 sm:grid-cols-2"
+                    : "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3"
+              }`}
+            >
+              {branches.map((branch) => (
+                <BranchColumn
+                  key={branch.profile.id}
+                  branch={branch}
+                  activeId={activeId}
+                  onSwitch={onSwitch}
                 />
-              ) : null}
-              <ul className="flex flex-wrap items-start justify-center gap-x-6 gap-y-6">
-                {branches.map((branch) =>
-                  branch.groups.length > 0 ? (
-                    <GroupedBranch
-                      key={branch.profile.id}
-                      branch={branch}
-                      activeId={activeId}
-                      onSwitch={onSwitch}
-                    />
-                  ) : (
-                    <FlatBranch
-                      key={branch.profile.id}
-                      branch={branch}
-                      activeId={activeId}
-                      onSwitch={onSwitch}
-                    />
-                  )
-                )}
-              </ul>
-            </div>
+              ))}
+            </ul>
           </>
         ) : null}
       </div>
