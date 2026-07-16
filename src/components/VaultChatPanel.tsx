@@ -156,6 +156,7 @@ const SECTION_STYLES: Record<string, string> = {
   from_daily_log: "border-emerald-200 bg-emerald-50/80",
   from_profiles: "border-teal-200 bg-teal-50/80",
   calculated: "border-sky-200 bg-sky-50/80",
+  general_knowledge: "border-stone-200 bg-stone-50/90",
   suggestion: "border-violet-200 bg-violet-50/70",
   needs_verification: "border-amber-200 bg-amber-50/80",
   body: "border-transparent bg-transparent",
@@ -519,12 +520,13 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
             <>
               <p className="text-sm text-ink-muted">
                 {meta?.profileName
-                  ? `${meta.profileName}'s vault is empty.`
-                  : "Your vault is empty."}
+                  ? `${meta.profileName}'s vault is empty for now.`
+                  : "Your vault is empty for now."}
               </p>
-              <p className="text-sm text-ink-muted">
-                Upload a document or add a Daily Log for this profile, and
-                I&apos;ll help you understand what matters.
+              <p className="text-sm leading-relaxed text-ink-muted">
+                You can still ask general questions. Upload a document or add a
+                Daily Log whenever you want me to remember your specific
+                details.
               </p>
               <div className="flex flex-wrap gap-2">
                 <Link
@@ -551,8 +553,8 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
             <>
               <p className="text-sm leading-relaxed text-ink-muted">
                 {logsOnly
-                  ? "I can use this profile's Daily Logs to answer questions about recent updates and what you've recorded. What would you like to know?"
-                  : "I can help you understand your documents, Daily Logs, important dates and amounts, and see what may need your attention. What would you like to know?"}
+                  ? "I'll check this profile's Daily Logs first. For other questions I can use general knowledge and clearly say when it's not from your vault."
+                  : "I'll search your vault first. If something isn't there, I can answer with general knowledge and label it clearly. What would you like to know?"}
               </p>
               {meta && meta.suggestions.length > 0 && (
                 <div className="flex flex-wrap gap-2 pt-1">
@@ -752,20 +754,20 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          disabled={sending || emptyVault}
+          disabled={sending}
           maxLength={2000}
           placeholder={
             emptyVault
-              ? "Add a Daily Log or upload a document to ask Gideon…"
+              ? "Ask anything — vault answers when you upload…"
               : logsOnly
-                ? "Ask about Daily Logs…"
-                : "Ask about your documents…"
+                ? "Ask about Daily Logs or anything else…"
+                : "Ask about your documents or anything else…"
           }
           className="min-w-0 flex-1 rounded-full border border-stone-200 bg-white px-3 py-2.5 text-sm outline-none ring-brand focus:ring-2 disabled:opacity-50"
         />
         <button
           type="submit"
-          disabled={sending || !input.trim() || emptyVault}
+          disabled={sending || !input.trim()}
           aria-label="Send question to Gideon"
           className="inline-flex items-center justify-center rounded-full bg-brand px-3 py-2 text-white transition hover:bg-brand-dark focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
         >

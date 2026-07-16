@@ -524,7 +524,7 @@ export async function POST(request: Request) {
   const question = sanitizeChatQuestion(questionRaw);
   if (!question) {
     return NextResponse.json(
-      { error: "Enter a question about your vault." },
+      { error: "Enter a question." },
       { status: 400 }
     );
   }
@@ -615,19 +615,8 @@ export async function POST(request: Request) {
     .eq("owner_user_id", user.id)
     .in("profile_id", searchIds);
 
-  if ((chunkCount ?? 0) === 0 && (logCount ?? 0) === 0) {
-    return NextResponse.json(
-      {
-        error:
-          linkedProfiles.length > 0
-            ? "Analyze a document or add a Daily Log in this profile or a linked member vault so Gideon has something to search."
-            : "Analyze a document or add a Daily Log so Gideon has something to search in this profile.",
-      },
-      { status: 409 }
-    );
-  }
-
-  // Document RAG needs embeddings; Daily Log-only questions do not.
+  // Document RAG needs embeddings; empty vault / Daily Log-only / general
+  // knowledge questions do not.
   if ((chunkCount ?? 0) > 0 && !isVaultEmbeddingConfigured()) {
     return NextResponse.json(
       {
@@ -766,27 +755,29 @@ export async function POST(request: Request) {
       active
     );
 
-    if (!formatted.context.trim() && !logContext.trim() && !linkedContext.trim()) {
-      answer =
-        "I couldn't find that information in your current vault.";
-      citations = [];
-    } else {
-      const client = createLlmClient();
-      const rollupNote =
-        linkedProfiles.length > 0
-          ? `This is a container profile. Search includes this vault plus linked member vaults (${linkedProfiles
-              .map((p) => p.display_name)
-              .join(", ")}). Attribute facts to the vault owner named in each source. Do not invent links across unrelated people.`
-          : "Search only this profile's vault and Daily Logs.";
-      const pictureNote = showPictures
-        ? `The user wants to see pictures. Prefer naming image file names from the retrieved excerpts (jpg/png/webp/etc.) so the UI can display them. If no image files were retrieved, say so clearly.`
+    const client = createLlmClient();
+    const rollupNote =
+      linkedProfiles.length > 0
+        ? `This is a container profile. Search includes this vault plus linked member vaults (${linkedProfiles
+            .map((p) => p.display_name)
+            .join(", ")}). Attribute facts to the vault owner named in each source. Do not invent links across unrelated people.`
+        : "Search this profile's vault and Daily Logs first; use GENERAL KNOWLEDGE when the vault does not contain the answer.";
+    const pictureNote = showPictures
+      ? `The user wants to see pictures. Prefer naming image file names from the retrieved excerpts (jpg/png/webp/etc.) so the UI can display them. If no image files were retrieved, say so clearly.`
+      : "";
+    const vaultEmptyNote =
+      !formatted.context.trim() &&
+      !logContext.trim() &&
+      !linkedContext.trim()
+        ? "No vault excerpts, Daily Logs, or linked profile structure matched this question (or the vault is empty). Do not invent vault facts. Use ## GENERAL KNOWLEDGE for general questions, and ## GIDEON'S SUGGESTION to upload documents when that would help."
         : "";
 
-      const system = `${VAULT_CHAT_SYSTEM}
+    const system = `${VAULT_CHAT_SYSTEM}
 
 Active profile: ${active.display_name} (${active.profile_type}).
 ${rollupNote}
 ${pictureNote}
+${vaultEmptyNote}
 
 --- RETRIEVED EXCERPTS ---
 ${formatted.context.trim() || "(none)"}
@@ -800,30 +791,29 @@ ${logContext.trim() || "(none)"}
 ${linkedContext.trim() || "(none)"}
 --- END LINKED PROFILE STRUCTURE ---`;
 
-      answer = await runChatCompletion(client, {
-        system,
-        model: ANALYSIS_MODEL,
-        messages: [...history, { role: "user", content: question }],
-      });
-      if (!answer) {
-        answer =
-          "I found potentially relevant information, but it needs verification before I can give you a reliable answer.";
-      }
-      let selected = selectCitationsForAnswer(answer, chunks);
-      if (showPictures) {
-        const imageOnes = selectImageCitationsFromChunks(chunks, 4);
-        const seen = new Set(selected.map((c) => c.documentId));
-        for (const img of imageOnes) {
-          if (seen.has(img.documentId)) continue;
-          selected.push(img);
-          seen.add(img.documentId);
-        }
-        if (selected.length === 0 && imageOnes.length > 0) {
-          selected = imageOnes;
-        }
-      }
-      citations = markImageCitations(selected);
+    answer = await runChatCompletion(client, {
+      system,
+      model: ANALYSIS_MODEL,
+      messages: [...history, { role: "user", content: question }],
+    });
+    if (!answer) {
+      answer =
+        "I found potentially relevant information, but it needs verification before I can give you a reliable answer.";
     }
+    let selected = selectCitationsForAnswer(answer, chunks);
+    if (showPictures) {
+      const imageOnes = selectImageCitationsFromChunks(chunks, 4);
+      const seen = new Set(selected.map((c) => c.documentId));
+      for (const img of imageOnes) {
+        if (seen.has(img.documentId)) continue;
+        selected.push(img);
+        seen.add(img.documentId);
+      }
+      if (selected.length === 0 && imageOnes.length > 0) {
+        selected = imageOnes;
+      }
+    }
+    citations = markImageCitations(selected);
   } catch (err) {
     if (err && typeof err === "object" && "status" in err && "message" in err) {
       return NextResponse.json(
