@@ -28,6 +28,10 @@ import { createClient } from "@/lib/supabase/client";
 import GideonAvatar from "@/components/GideonAvatar";
 import CameraCaptureModal from "@/components/CameraCaptureModal";
 import ImminentReminderBanner from "@/components/ImminentReminderBanner";
+import {
+  AskTitleProfileSwitch,
+  AskWelcomeProfileSwitch,
+} from "@/components/ProfileSwitcher";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
   GIDEON_BRAND_LINE,
@@ -774,10 +778,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
             Hi{greetName ? ` ${greetName}` : ""}, I&apos;m Gideon.
           </p>
           {meta?.profileName && (
-            <p className="text-xs font-medium text-ink-muted">
-              {meta.askContextLabel ??
-                `Looking at ${meta.profileName}'s vault`}
-            </p>
+            <AskWelcomeProfileSwitch fallbackName={meta.profileName} />
           )}
           {!emptyVault && countBits.length > 0 ? (
             <div className="space-y-2 rounded-xl border border-stone-200 bg-stone-50/80 px-3 py-2.5">
@@ -1419,14 +1420,16 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
           <GideonAvatar size={32} className="hidden sm:inline-flex" />
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
-              <h1 className="truncate text-sm font-semibold sm:text-base">
-                {chats.find((c) => c.id === activeChatId)?.title ?? "Ask Gideon"}
-              </h1>
+              <AskTitleProfileSwitch
+                title={
+                  chats.find((c) => c.id === activeChatId)?.title ?? "Ask Gideon"
+                }
+              />
               <button
                 type="button"
                 onClick={() => setWhyOpen((o) => !o)}
                 aria-label="About Gideon"
-                className="rounded-full p-1 text-ink-muted hover:bg-stone-100 hover:text-foreground"
+                className="shrink-0 rounded-full p-1 text-ink-muted hover:bg-stone-100 hover:text-foreground"
               >
                 <Info className="h-3.5 w-3.5" />
               </button>
