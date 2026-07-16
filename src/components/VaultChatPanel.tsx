@@ -13,6 +13,7 @@ import {
   ExternalLink,
   FileUp,
   Camera,
+  Bell,
   Info,
   Loader2,
   Menu,
@@ -36,6 +37,21 @@ import {
 import { isImageFileName } from "@/lib/vault/images";
 import { uploadAndAnalyzeToVault } from "@/lib/vault/clientUpload";
 import { todayLogDate } from "@/lib/logs/types";
+import { calendarDateInZone } from "@/lib/reminders/time";
+import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
+
+function defaultReminderDateTime(): { date: string; time: string } {
+  const now = new Date();
+  const inOneHour = new Date(now.getTime() + 60 * 60 * 1000);
+  const date = calendarDateInZone(inOneHour, GUARDIAN_TIME_ZONE);
+  const time = new Intl.DateTimeFormat("en-GB", {
+    timeZone: GUARDIAN_TIME_ZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(inOneHour);
+  return { date, time };
+}
 
 type Citation = {
   documentId: string;
@@ -188,6 +204,11 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
   const [logOpen, setLogOpen] = useState(false);
   const [logContent, setLogContent] = useState("");
   const [savingLog, setSavingLog] = useState(false);
+  const [reminderOpen, setReminderOpen] = useState(false);
+  const [reminderTitle, setReminderTitle] = useState("");
+  const [reminderDate, setReminderDate] = useState("");
+  const [reminderTime, setReminderTime] = useState("");
+  const [savingReminder, setSavingReminder] = useState(false);
   const [vaultBusy, setVaultBusy] = useState(false);
   const [vaultStatus, setVaultStatus] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -454,6 +475,63 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     setPlusOpen(false);
     setLogContent("");
     setLogOpen(true);
+  };
+
+  const openReminderForm = () => {
+    setPlusOpen(false);
+    const defaults = defaultReminderDateTime();
+    setReminderTitle("");
+    setReminderDate(defaults.date);
+    setReminderTime(defaults.time);
+    setReminderOpen(true);
+  };
+
+  const saveInlineReminder = async (e: FormEvent) => {
+    e.preventDefault();
+    if (
+      !profileId ||
+      !reminderTitle.trim() ||
+      savingReminder ||
+      vaultBusy ||
+      sending
+    ) {
+      return;
+    }
+    setSavingReminder(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/reminders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          profileId,
+          title: reminderTitle.trim(),
+          date: reminderDate,
+          time: reminderTime,
+        }),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        whenLabel?: string;
+        reminder?: { title: string };
+      };
+      if (!res.ok) {
+        setError(body.error ?? "Couldn't save reminder.");
+        return;
+      }
+      const title = body.reminder?.title ?? reminderTitle.trim();
+      const when = body.whenLabel ?? `${reminderDate} ${reminderTime}`;
+      setReminderOpen(false);
+      setReminderTitle("");
+      window.dispatchEvent(new Event("guardian:alerts-updated"));
+      pushLocalNote(
+        `Reminder set: "${title}" — ${when}. You'll see it under Attention on the dashboard.`
+      );
+    } catch {
+      setError("Couldn't save reminder. Check your connection and try again.");
+    } finally {
+      setSavingReminder(false);
+    }
   };
 
   const saveInlineLog = async (e: FormEvent) => {
@@ -884,6 +962,16 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
                 <NotebookPen className="h-4 w-4 text-brand" />
                 Add daily log
               </button>
+              <button
+                type="button"
+                role="menuitem"
+                disabled={vaultBusy || sending || !profileId}
+                onClick={openReminderForm}
+                className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-medium text-foreground hover:bg-stone-50 disabled:opacity-50"
+              >
+                <Bell className="h-4 w-4 text-brand" />
+                Add reminder
+              </button>
             </div>
           )}
         </div>
@@ -999,6 +1087,109 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
               >
                 {savingLog ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                 Save log
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
+      {reminderOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="ask-reminder-title"
+        >
+          <form
+            onSubmit={(e) => void saveInlineReminder(e)}
+            className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-5 shadow-xl"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 id="ask-reminder-title" className="text-base font-semibold">
+                  Add a reminder
+                </h3>
+                <p className="mt-1 text-xs text-ink-muted">
+                  Saved for{" "}
+                  {active?.display_name ?? meta?.profileName ?? "this space"}{" "}
+                  (Eastern Time). Shows under Attention on the dashboard.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReminderOpen(false)}
+                aria-label="Close"
+                className="rounded-full p-1 text-ink-muted hover:bg-stone-100 hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <label
+              htmlFor="ask-reminder-what"
+              className="mt-4 block text-sm font-medium"
+            >
+              What
+            </label>
+            <input
+              id="ask-reminder-what"
+              type="text"
+              required
+              maxLength={200}
+              value={reminderTitle}
+              onChange={(e) => setReminderTitle(e.target.value)}
+              placeholder="Bible study"
+              className="mt-1.5 w-full rounded-xl border border-stone-300 px-3 py-2.5 text-sm outline-none ring-brand focus:ring-2"
+            />
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <div>
+                <label
+                  htmlFor="ask-reminder-date"
+                  className="block text-sm font-medium"
+                >
+                  Date
+                </label>
+                <input
+                  id="ask-reminder-date"
+                  type="date"
+                  required
+                  value={reminderDate}
+                  onChange={(e) => setReminderDate(e.target.value)}
+                  className="mt-1.5 w-full rounded-xl border border-stone-300 px-3 py-2.5 text-sm outline-none ring-brand focus:ring-2"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="ask-reminder-time"
+                  className="block text-sm font-medium"
+                >
+                  Time
+                </label>
+                <input
+                  id="ask-reminder-time"
+                  type="time"
+                  required
+                  value={reminderTime}
+                  onChange={(e) => setReminderTime(e.target.value)}
+                  className="mt-1.5 w-full rounded-xl border border-stone-300 px-3 py-2.5 text-sm outline-none ring-brand focus:ring-2"
+                />
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setReminderOpen(false)}
+                className="rounded-full px-4 py-2 text-sm font-medium text-ink-muted hover:bg-stone-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={savingReminder || !reminderTitle.trim()}
+                className="inline-flex items-center gap-2 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50"
+              >
+                {savingReminder ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : null}
+                Save reminder
               </button>
             </div>
           </form>

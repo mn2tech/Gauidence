@@ -4,12 +4,15 @@ import { useCallback, useEffect, useState } from "react";
 import { BellRing, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { daysRelativeTo, formatDisplayDate } from "@/lib/analysis/dates";
+import { formatReminderWhen } from "@/lib/reminders/time";
 import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
 
 type AlertRow = {
   id: string;
   title: string;
   due_date: string;
+  due_at: string | null;
+  source: string | null;
 };
 
 function todayEasternIso(): string {
@@ -22,9 +25,17 @@ function todayEasternIso(): string {
 }
 
 function urgencyStyle(days: number) {
-  if (days <= 7) return "bg-red-50 text-red-700";
-  if (days <= 30) return "bg-amber-50 text-amber-700";
+  if (days <= 0) return "bg-red-50 text-red-700";
+  if (days <= 1) return "bg-red-50 text-red-700";
+  if (days <= 7) return "bg-amber-50 text-amber-700";
   return "bg-brand-light text-brand-dark";
+}
+
+function urgencyLabel(days: number, hasTime: boolean) {
+  if (days < 0) return "Past";
+  if (days === 0) return hasTime ? "Today" : "Today";
+  if (days === 1) return "Tomorrow";
+  return `${days} days`;
 }
 
 export default function AlertsPanel({ profileId }: { profileId: string }) {
@@ -36,12 +47,13 @@ export default function AlertsPanel({ profileId }: { profileId: string }) {
     const today = todayEasternIso();
     const { data } = await supabase
       .from("alerts")
-      .select("id, title, due_date")
+      .select("id, title, due_date, due_at, source")
       .eq("profile_id", profileId)
       .is("dismissed_at", null)
       .gte("due_date", today)
-      .order("due_date", { ascending: true });
-    setAlerts(data ?? []);
+      .order("due_date", { ascending: true })
+      .order("due_at", { ascending: true, nullsFirst: false });
+    setAlerts((data as AlertRow[] | null) ?? []);
   }, [profileId]);
 
   useEffect(() => {
@@ -68,15 +80,20 @@ export default function AlertsPanel({ profileId }: { profileId: string }) {
 
   if (alerts.length === 0) return null;
 
+  const hasUser = alerts.some((a) => a.source === "user");
+
   return (
     <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
       <div className="mb-3 flex items-center gap-2">
         <BellRing className="h-4 w-4 text-brand" />
-        <h2 className="text-sm font-semibold">Upcoming deadlines</h2>
+        <h2 className="text-sm font-semibold">
+          {hasUser ? "Upcoming" : "Upcoming deadlines"}
+        </h2>
       </div>
       <ul className="space-y-2">
         {alerts.map((alert) => {
           const days = daysRelativeTo(alert.due_date);
+          const isUser = alert.source === "user";
           return (
             <li
               key={alert.id}
@@ -85,18 +102,21 @@ export default function AlertsPanel({ profileId }: { profileId: string }) {
               <span
                 className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${urgencyStyle(days)}`}
               >
-                {days === 0 ? "Today" : days === 1 ? "Tomorrow" : `${days} days`}
+                {urgencyLabel(days, Boolean(alert.due_at))}
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{alert.title}</p>
                 <p className="text-xs text-ink-muted">
-                  Due {formatDisplayDate(alert.due_date)}
+                  {isUser ? "Reminder · " : "Due "}
+                  {alert.due_at
+                    ? formatReminderWhen(alert.due_at, alert.due_date)
+                    : formatDisplayDate(alert.due_date)}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => dismiss(alert.id)}
-                aria-label={`Dismiss alert: ${alert.title}`}
+                aria-label={`Dismiss: ${alert.title}`}
                 className="rounded-full p-1.5 text-ink-muted transition hover:bg-stone-100 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
               >
                 <X className="h-4 w-4" />
