@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { FolderInput, Loader2 } from "lucide-react";
+import { FolderInput, Loader2, X } from "lucide-react";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
   nestedUnder,
@@ -16,6 +16,11 @@ type Props = {
   onMoved: (documentId: string) => void;
 };
 
+type PendingMove = {
+  id: string;
+  name: string;
+};
+
 export default function MoveDocumentButton({
   documentId,
   fileName,
@@ -23,40 +28,44 @@ export default function MoveDocumentButton({
   onMoved,
 }: Props) {
   const { profiles } = useActiveProfile();
-  const [open, setOpen] = useState(false);
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [pending, setPending] = useState<PendingMove | null>(null);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
   const destinations = profiles.filter((p) => p.id !== currentProfileId);
   const topLevel = topLevelProfiles(profiles);
 
   useEffect(() => {
-    if (!open) return;
+    if (!menuOpen || pending) return;
     const onDoc = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+      if (!rootRef.current?.contains(e.target as Node)) setMenuOpen(false);
     };
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
-  }, [open]);
+  }, [menuOpen, pending]);
 
   if (destinations.length === 0) return null;
 
-  const moveTo = async (targetProfileId: string, targetName: string) => {
-    if (
-      !window.confirm(
-        `Move "${fileName}" to ${targetName}'s vault?\n\nAnalysis, reminders from this file, and Ask-this-document history move with it.`
-      )
-    ) {
-      return;
-    }
-    setBusyId(targetProfileId);
+  const chooseTarget = (id: string, name: string) => {
     setError(null);
+    setNotice(null);
+    setPending({ id, name });
+    setMenuOpen(false);
+  };
+
+  const confirmMove = async () => {
+    if (!pending || busy) return;
+    setBusy(true);
+    setError(null);
+    setNotice(null);
     try {
       const res = await fetch(`/api/documents/${documentId}/move`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetProfileId }),
+        body: JSON.stringify({ targetProfileId: pending.id }),
       });
       const body = (await res.json().catch(() => ({}))) as {
         error?: string;
@@ -67,14 +76,17 @@ export default function MoveDocumentButton({
         return;
       }
       if (body.warning) {
-        window.alert(body.warning);
+        setNotice(body.warning);
+        setPending(null);
+        onMoved(documentId);
+        return;
       }
-      setOpen(false);
+      setPending(null);
       onMoved(documentId);
     } catch {
       setError("Couldn't move that document. Check your connection.");
     } finally {
-      setBusyId(null);
+      setBusy(false);
     }
   };
 
@@ -84,9 +96,10 @@ export default function MoveDocumentButton({
         type="button"
         onClick={() => {
           setError(null);
-          setOpen((o) => !o);
+          setNotice(null);
+          setMenuOpen((o) => !o);
         }}
-        aria-expanded={open}
+        aria-expanded={menuOpen}
         aria-haspopup="menu"
         aria-label={`Move ${fileName} to another vault`}
         title="Move to another vault"
@@ -95,7 +108,7 @@ export default function MoveDocumentButton({
         <FolderInput className="h-4 w-4" />
       </button>
 
-      {open ? (
+      {menuOpen ? (
         <div
           role="menu"
           className="absolute right-0 z-40 mt-1 w-64 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-stone-200 bg-white py-1 shadow-lg"
@@ -114,15 +127,9 @@ export default function MoveDocumentButton({
                     <button
                       type="button"
                       role="menuitem"
-                      disabled={busyId !== null}
-                      onClick={() => void moveTo(p.id, p.display_name)}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-stone-50 disabled:opacity-50"
+                      onClick={() => chooseTarget(p.id, p.display_name)}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-stone-50"
                     >
-                      {busyId === p.id ? (
-                        <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-brand" />
-                      ) : (
-                        <span className="w-3.5 shrink-0" />
-                      )}
                       <span className="min-w-0">
                         <span className="block truncate font-medium">
                           {p.display_name}
@@ -138,15 +145,9 @@ export default function MoveDocumentButton({
                       key={child.id}
                       type="button"
                       role="menuitem"
-                      disabled={busyId !== null}
-                      onClick={() => void moveTo(child.id, child.display_name)}
-                      className="flex w-full items-center gap-2 py-2 pl-8 pr-3 text-left text-sm hover:bg-stone-50 disabled:opacity-50"
+                      onClick={() => chooseTarget(child.id, child.display_name)}
+                      className="flex w-full items-center gap-2 py-2 pl-8 pr-3 text-left text-sm hover:bg-stone-50"
                     >
-                      {busyId === child.id ? (
-                        <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-brand" />
-                      ) : (
-                        <span className="w-3.5 shrink-0" />
-                      )}
                       <span className="min-w-0">
                         <span className="block truncate font-medium">
                           {child.display_name}
@@ -161,11 +162,111 @@ export default function MoveDocumentButton({
               );
             })}
           </ul>
-          {error ? (
-            <p className="border-t border-stone-100 px-3 py-2 text-xs text-red-700">
-              {error}
-            </p>
-          ) : null}
+        </div>
+      ) : null}
+
+      {pending || notice || (error && !menuOpen) ? (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="move-doc-title"
+        >
+          <div className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-5 shadow-xl">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h3
+                  id="move-doc-title"
+                  className="text-base font-semibold text-foreground"
+                >
+                  {notice
+                    ? "Document moved"
+                    : error && !pending
+                      ? "Couldn't move"
+                      : "Move document?"}
+                </h3>
+                {pending ? (
+                  <>
+                    <p className="mt-2 text-sm text-ink-muted">
+                      Move{" "}
+                      <span className="font-medium text-foreground">
+                        {fileName}
+                      </span>{" "}
+                      to{" "}
+                      <span className="font-medium text-foreground">
+                        {pending.name}
+                      </span>
+                      &apos;s vault?
+                    </p>
+                    <p className="mt-2 text-xs leading-relaxed text-ink-muted">
+                      Analysis, reminders from this file, and Ask-this-document
+                      history move with it.
+                    </p>
+                  </>
+                ) : null}
+                {notice ? (
+                  <p className="mt-2 text-sm text-ink-muted">{notice}</p>
+                ) : null}
+                {error ? (
+                  <p className="mt-2 text-sm text-red-700" role="alert">
+                    {error}
+                  </p>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (busy) return;
+                  setPending(null);
+                  setError(null);
+                  setNotice(null);
+                }}
+                aria-label="Close"
+                className="rounded-full p-1 text-ink-muted hover:bg-stone-100 hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              {pending ? (
+                <>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => {
+                      setPending(null);
+                      setError(null);
+                    }}
+                    className="rounded-full px-4 py-2 text-sm font-medium text-ink-muted hover:bg-stone-50 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void confirmMove()}
+                    className="inline-flex items-center gap-2 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50"
+                  >
+                    {busy ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : null}
+                    Move
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError(null);
+                    setNotice(null);
+                  }}
+                  className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark"
+                >
+                  Done
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       ) : null}
     </div>
