@@ -3,7 +3,7 @@
 import { Suspense, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ShieldCheck } from "lucide-react";
+import { MessageCircle, ShieldCheck } from "lucide-react";
 import DocumentManager from "@/components/DocumentManager";
 import AlertsPanel from "@/components/AlertsPanel";
 import DailyLogPanel from "@/components/DailyLogPanel";
@@ -18,6 +18,7 @@ import ProfileSetupHub from "@/components/ProfileSetupHub";
 import VaultSection from "@/components/VaultSection";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
+  askGideonContextLabel,
   canHaveLinkedClients,
   canHaveLinkedEmployees,
   canHaveLinkedFamilyMembers,
@@ -84,7 +85,23 @@ export default function DashboardVault({ userId }: { userId: string }) {
 
   return (
     <div className="space-y-6">
-      <p className="text-sm text-ink-muted">{vaultLabel(active)}</p>
+      <div className="sticky top-14 z-30 -mx-4 flex items-center justify-between gap-3 border-b border-stone-200 bg-background/95 px-4 py-2.5 backdrop-blur sm:top-16 sm:mx-0 sm:rounded-xl sm:border sm:bg-white/95 sm:px-3 sm:shadow-sm">
+        <p className="min-w-0 truncate text-sm text-ink-muted">
+          {vaultLabel(active)}
+        </p>
+        <Link
+          href="/ask"
+          aria-label="Ask Gideon"
+          title={askGideonContextLabel(active)}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-stone-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50 sm:px-3"
+        >
+          <MessageCircle className="h-3.5 w-3.5 text-brand" aria-hidden />
+          Ask
+          <span className="text-ink-muted" aria-hidden>
+            →
+          </span>
+        </Link>
+      </div>
 
       <VaultSection id={`attention-${active.id}`} title="Attention">
         <AlertsPanel profileId={active.id} />

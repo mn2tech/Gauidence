@@ -292,11 +292,13 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     setError(null);
     try {
       const list = await loadMetaAndChats();
-      // Fresh landing: show welcome (no auto-open of old thread)
-      setActiveChatId(null);
-      setMessages([]);
-      if (!isPage && list[0]) {
+      // Resume the most recent chat for this profile (Docs ↔ Ask continuity).
+      // New chat still starts blank via startNewChat.
+      if (list[0]) {
         await loadThread(list[0].id);
+      } else {
+        setActiveChatId(null);
+        setMessages([]);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't load Ask Gideon.");
@@ -304,7 +306,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     } finally {
       setLoadingHistory(false);
     }
-  }, [isPage, loadMetaAndChats, loadThread]);
+  }, [loadMetaAndChats, loadThread]);
 
   useEffect(() => {
     if (profilesLoading) return;
