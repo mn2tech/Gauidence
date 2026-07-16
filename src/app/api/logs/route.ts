@@ -171,16 +171,16 @@ export async function POST(request: Request) {
         .slice(0, 12)
     : [];
 
+  const title =
+    typeof body.title === "string" ? body.title.trim().slice(0, 200) || null : null;
+
   const { data, error } = await supabase
     .from("daily_logs")
     .insert({
       owner_user_id: user.id,
       profile_id: profileId,
       log_date: logDate,
-      title:
-        !quick && typeof body.title === "string"
-          ? body.title.trim() || null
-          : null,
+      title,
       content,
       category:
         !quick && typeof body.category === "string"

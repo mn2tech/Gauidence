@@ -230,6 +230,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
   const [plusOpen, setPlusOpen] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [logOpen, setLogOpen] = useState(false);
+  const [logTitle, setLogTitle] = useState("");
   const [logContent, setLogContent] = useState("");
   const [savingLog, setSavingLog] = useState(false);
   const [reminderOpen, setReminderOpen] = useState(false);
@@ -520,6 +521,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
 
   const openLogForm = () => {
     setPlusOpen(false);
+    setLogTitle("");
     setLogContent("");
     setLogOpen(true);
   };
@@ -588,6 +590,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     }
     setSavingLog(true);
     setError(null);
+    const title = logTitle.trim().slice(0, 200);
     try {
       const res = await fetch("/api/logs", {
         method: "POST",
@@ -595,6 +598,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
         body: JSON.stringify({
           profileId,
           content: logContent.trim(),
+          title: title || undefined,
           quick: true,
           logDate: todayLogDate(),
         }),
@@ -606,10 +610,11 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
       }
       const saved = logContent.trim();
       setLogOpen(false);
+      setLogTitle("");
       setLogContent("");
       await loadMetaAndChats().catch(() => undefined);
       await sendQuestion(
-        `I just saved this Daily Log: "${saved.slice(0, 200)}". What stands out?`
+        `I just saved this Daily Log${title ? ` ("${title}")` : ""}: "${saved.slice(0, 200)}". What stands out?`
       );
     } catch {
       setError("Couldn't save Daily Log. Check your connection and try again.");
@@ -1169,6 +1174,21 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
                 <X className="h-4 w-4" />
               </button>
             </div>
+            <label
+              htmlFor="ask-log-entry-title"
+              className="mt-4 block text-sm font-medium"
+            >
+              Title <span className="font-normal text-ink-muted">(optional)</span>
+            </label>
+            <input
+              id="ask-log-entry-title"
+              type="text"
+              maxLength={200}
+              value={logTitle}
+              onChange={(e) => setLogTitle(e.target.value)}
+              placeholder="School pickup"
+              className="mt-1.5 w-full rounded-xl border border-stone-300 px-3 py-2.5 text-sm outline-none ring-brand focus:ring-2"
+            />
             <label className="sr-only" htmlFor="ask-log-content">
               What happened
             </label>
@@ -1180,7 +1200,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
               required
               maxLength={8000}
               placeholder="What happened today?"
-              className="mt-4 w-full rounded-xl border border-stone-300 px-3 py-2.5 text-sm outline-none ring-brand focus:ring-2"
+              className="mt-3 w-full rounded-xl border border-stone-300 px-3 py-2.5 text-sm outline-none ring-brand focus:ring-2"
             />
             <div className="mt-4 flex justify-end gap-2">
               <button
