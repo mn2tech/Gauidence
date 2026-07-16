@@ -19,7 +19,7 @@ Marketing landing page for **Guardian**, a private vault for the documents you c
 - `/dashboard` — protected hub: first-run setup when you have no people/spaces yet, then per-profile vault (upload, view, download, **move between vaults**, search, categories, AI analysis, Daily Logs, deadline alerts, linked people/vehicles/etc.); sticky **Ask →** returns to Ask Gideon
 - `/ask` — Ask Gideon: vault-first Q&A with labeled general-knowledge fallback; **+** menu scans, uploads, adds a Daily Log, or **Add reminder** (date + time) without leaving chat; welcome shows vault counts and sample names (documents / photos / Daily Logs); tap the Ask title ▾ to switch person/space; resumes your last chat when you return from Docs; a compact banner appears when a timed reminder is within ~90 minutes; **Docs** in the Ask header returns to the active profile’s vault (`/dashboard/chat` redirects here)
 - `/settings` — edit profile name, change/set password, toggle email deadline reminders, and permanently delete your account with all data (requires `SUPABASE_SERVICE_ROLE_KEY`, server-side only)
-- `/settings/profiles` — create and switch between multiple Guardian profiles (separate vaults under one login)
+- `/settings/profiles` — create and switch between multiple Guardian profiles (separate vaults under one login); **Vault map** shows each top-level space with linked members and tap-to-switch
 - `/auth/callback` — OAuth, email-confirmation, and password-recovery callback
 
 ## Authentication

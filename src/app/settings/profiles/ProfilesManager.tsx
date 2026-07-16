@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Plus } from "lucide-react";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import ProfileOrganizeList from "@/components/ProfileOrganizeList";
+import ProfileVaultMap from "@/components/ProfileVaultMap";
 import {
   PROFILE_CREATE_GROUPS,
   canAttachChildToParent,
@@ -560,7 +561,13 @@ export default function ProfilesManager() {
           )}
         </div>
       ) : (
-        <ProfileOrganizeList
+        <div className="space-y-6">
+          <ProfileVaultMap
+            profiles={profiles}
+            activeId={active?.id}
+            onSwitch={(id) => void switchProfile(id)}
+          />
+          <ProfileOrganizeList
           profiles={profiles}
           activeId={active?.id}
           busy={busy}
@@ -574,6 +581,7 @@ export default function ProfilesManager() {
           onRefresh={refresh}
           onAvatarError={(message) => setError(message || null)}
         />
+        </div>
       )}
     </div>
   );
