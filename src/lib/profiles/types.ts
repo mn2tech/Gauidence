@@ -308,6 +308,11 @@ export function canHaveLinkedHomes(type: GuardianProfileType): boolean {
   return type === "family" || isOrgStyleProfile(type);
 }
 
+/** Family / business / nonprofit can own misc "other" spaces (e.g. Celebrations). */
+export function canHaveLinkedOtherSpaces(type: GuardianProfileType): boolean {
+  return type === "family" || isOrgStyleProfile(type);
+}
+
 /** Profile types that can nest under a container (not the containers themselves). */
 export function isNestableProfileType(type: GuardianProfileType): boolean {
   return (
@@ -316,6 +321,7 @@ export function isNestableProfileType(type: GuardianProfileType): boolean {
     type === "vehicle" ||
     type === "home" ||
     type === "pet" ||
+    type === "other" ||
     isFamilyMemberType(type)
   );
 }
@@ -333,6 +339,7 @@ export function canAttachChildToParent(
   }
   if (childType === "employee") return canHaveLinkedEmployees(parentType);
   if (childType === "client") return canHaveLinkedClients(parentType);
+  if (childType === "other") return canHaveLinkedOtherSpaces(parentType);
   return false;
 }
 
@@ -427,6 +434,15 @@ export function homesOf(
   );
 }
 
+export function otherSpacesOf(
+  profiles: GuardianProfile[],
+  parentId: string
+): GuardianProfile[] {
+  return profiles.filter(
+    (p) => p.parent_profile_id === parentId && p.profile_type === "other"
+  );
+}
+
 /** Nested people/places under a container for switchers and welcome strip. */
 export function nestedUnder(
   profiles: GuardianProfile[],
@@ -453,6 +469,9 @@ export function nestedUnder(
   }
   if (canHaveLinkedVehicles(parent.profile_type)) {
     out.push(...vehiclesOf(profiles, parent.id));
+  }
+  if (canHaveLinkedOtherSpaces(parent.profile_type)) {
+    out.push(...otherSpacesOf(profiles, parent.id));
   }
   return out;
 }

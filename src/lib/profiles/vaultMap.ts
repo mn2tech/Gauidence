@@ -5,6 +5,7 @@ import {
   homesOf,
   isOrgStyleProfile,
   nestedUnder,
+  otherSpacesOf,
   petsOf,
   studentsOf,
   topLevelProfiles,
@@ -53,11 +54,15 @@ function branchForProfile(
   profile: GuardianProfile
 ): VaultMapBranch {
   if (isOrgStyleProfile(profile.profile_type)) {
+    const others = otherSpacesOf(profiles, profile.id);
     return {
       profile,
       groups: [
         { label: "Employees", members: employeesOf(profiles, profile.id) },
         { label: "Clients", members: clientsOf(profiles, profile.id) },
+        ...(others.length > 0
+          ? [{ label: "Other", members: others }]
+          : []),
       ],
       members: [],
     };
@@ -73,11 +78,15 @@ function branchForProfile(
       ...homesOf(profiles, profile.id),
       ...vehiclesOf(profiles, profile.id),
     ];
+    const others = otherSpacesOf(profiles, profile.id);
     return {
       profile,
       groups: [
         { label: "Family members", members: people },
         { label: "Things", members: things },
+        ...(others.length > 0
+          ? [{ label: "Other", members: others }]
+          : []),
       ],
       members: [],
     };

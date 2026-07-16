@@ -90,6 +90,7 @@ describe("vault map tree", () => {
           id: "other1",
           display_name: "Celebrations",
           profile_type: "other",
+          parent_profile_id: familyId,
         }),
       ],
       "Danny"
@@ -98,11 +99,11 @@ describe("vault map tree", () => {
     assert.ok(tree);
     assert.equal(tree.ownerLabel, "Danny");
     assert.equal(tree.personalProfile?.id, "personal");
-    assert.equal(tree.branches.length, 3);
-    // Family before Business before Other
+    assert.equal(tree.branches.length, 2);
+    // Family before Business; top-level other stays at root
     assert.deepEqual(
       tree.branches.map((b) => b.profile.profile_type),
-      ["family", "business", "other"]
+      ["family", "business"]
     );
 
     const family = tree.branches[0];
@@ -116,6 +117,11 @@ describe("vault map tree", () => {
     assert.deepEqual(
       family.groups[1]?.members.map((m) => m.display_name).sort(),
       ["Highlander", "My House"]
+    );
+    assert.equal(family.groups[2]?.label, "Other");
+    assert.deepEqual(
+      family.groups[2]?.members.map((m) => m.display_name),
+      ["Celebrations"]
     );
 
     const business = tree.branches[1];

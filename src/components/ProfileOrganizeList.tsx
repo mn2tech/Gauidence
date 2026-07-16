@@ -9,6 +9,7 @@ import {
   canHaveLinkedEmployees,
   canHaveLinkedFamilyMembers,
   canHaveLinkedHomes,
+  canHaveLinkedOtherSpaces,
   canHaveLinkedPets,
   canHaveLinkedStudents,
   canHaveLinkedVehicles,
@@ -16,6 +17,7 @@ import {
   employeesOf,
   familyMembersOf,
   homesOf,
+  otherSpacesOf,
   isGroupStyleProfile,
   isNestableProfileType,
   petsOf,
@@ -361,8 +363,8 @@ export default function ProfileOrganizeList({
   return (
     <div className="space-y-3">
       <p className="text-xs text-ink-muted">
-        Drag a child, spouse, home, employee, client, or vehicle onto a Family,
-        Business, Nonprofit, or Vehicles card — or use Move under. Tap the
+        Drag a child, spouse, home, employee, client, vehicle, or other space
+        onto a Family, Business, or Nonprofit card — or use Move under. Tap the
         chevron to collapse nested members. Use the camera on a profile to pick an
         avatar or upload a{" "}
         photo or logo.
@@ -408,6 +410,9 @@ export default function ProfileOrganizeList({
           const nestedVehicles = canHaveLinkedVehicles(p.profile_type)
             ? vehiclesOf(profiles, p.id)
             : [];
+          const nestedOthers = canHaveLinkedOtherSpaces(p.profile_type)
+            ? otherSpacesOf(profiles, p.id)
+            : [];
           const nested = [
             ...nestedEmployees,
             ...nestedClients,
@@ -416,6 +421,7 @@ export default function ProfileOrganizeList({
             ...nestedPets,
             ...nestedHomes,
             ...nestedVehicles,
+            ...nestedOthers,
           ];
           const isContainer = isGroupStyleProfile(p.profile_type);
           const isCollapsed = Boolean(collapsed[p.id]);
@@ -736,6 +742,30 @@ export default function ProfileOrganizeList({
                     </li>
                   ) : null}
                   {nestedVehicles.map((child) => (
+                    <NestedMemberRow
+                      key={child.id}
+                      child={child}
+                      activeId={activeId}
+                      busy={busy}
+                      editing={editing}
+                      setEditing={setEditing}
+                      onSaveEdit={onSaveEdit}
+                      onSwitch={() => onSwitch(child.id)}
+                      onSetDefault={() => onSetDefault(child.id)}
+                      onRemove={() => onRemove(child)}
+                      dragEnabled
+                      onDragStart={onDragStart}
+                      moveControl={renderMoveSelect(child)}
+                      onRefresh={onRefresh}
+                      onAvatarError={onAvatarError}
+                    />
+                  ))}
+                  {nestedOthers.length > 0 ? (
+                    <li className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">
+                      Other
+                    </li>
+                  ) : null}
+                  {nestedOthers.map((child) => (
                     <NestedMemberRow
                       key={child.id}
                       child={child}
