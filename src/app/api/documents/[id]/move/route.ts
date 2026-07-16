@@ -38,6 +38,74 @@ function safeFileName(name: string) {
 }
 
 /**
+ * Relocate a storage object under a new path.
+ * Prefer move(); fall back to download+upload+delete when UPDATE policy is missing.
+ */
+async function relocateStorageObject(
+  supabase: SupabaseClient,
+  oldPath: string,
+  newPath: string,
+  contentType: string | null
+): Promise<{ error: string | null }> {
+  const { error: moveError } = await supabase.storage
+    .from("documents")
+    .move(oldPath, newPath);
+
+  if (!moveError) return { error: null };
+
+  console.warn(
+    "Document storage.move failed, trying copy:",
+    moveError.message
+  );
+
+  const { data: blob, error: downloadError } = await supabase.storage
+    .from("documents")
+    .download(oldPath);
+
+  if (downloadError || !blob) {
+    console.error(
+      "Document storage download failed:",
+      downloadError?.message ?? "empty"
+    );
+    return {
+      error:
+        "Couldn't read the file to move it. Check your connection and try again.",
+    };
+  }
+
+  const { error: uploadError } = await supabase.storage
+    .from("documents")
+    .upload(newPath, blob, {
+      contentType: contentType || undefined,
+      upsert: false,
+    });
+
+  if (uploadError) {
+    console.error("Document storage upload failed:", uploadError.message);
+    return {
+      error:
+        "Couldn't copy the file into the other vault. Check your connection and try again.",
+    };
+  }
+
+  const { error: removeError } = await supabase.storage
+    .from("documents")
+    .remove([oldPath]);
+
+  if (removeError) {
+    console.error(
+      "Document storage remove-after-copy failed:",
+      removeError.message
+    );
+    // New copy exists; leave it and surface a soft failure on old cleanup.
+    // Caller still updates DB to newPath — orphan old object is better than abort mid-move.
+    console.warn("Left orphan at old path after move copy:", oldPath);
+  }
+
+  return { error: null };
+}
+
+/**
  * Move a document to another vault (guardian profile) you own.
  * Body: { targetProfileId: string }
  */
@@ -65,7 +133,7 @@ export async function POST(request: Request, ctx: Ctx) {
 
   const { data: doc } = await supabase
     .from("documents")
-    .select("id, user_id, profile_id, file_path, file_name")
+    .select("id, user_id, profile_id, file_path, file_name, mime_type")
     .eq("id", documentId)
     .eq("user_id", user.id)
     .maybeSingle();
@@ -101,19 +169,14 @@ export async function POST(request: Request, ctx: Ctx) {
   const newPath = `${user.id}/${targetProfileId}/${crypto.randomUUID()}-${safeFileName(doc.file_name)}`;
   const oldPath = doc.file_path;
 
-  const { error: moveError } = await supabase.storage
-    .from("documents")
-    .move(oldPath, newPath);
-
-  if (moveError) {
-    console.error("Document storage move failed:", moveError.message);
-    return NextResponse.json(
-      {
-        error:
-          "Couldn't move the file in storage. Check your connection and try again.",
-      },
-      { status: 502 }
-    );
+  const relocated = await relocateStorageObject(
+    supabase,
+    oldPath,
+    newPath,
+    doc.mime_type
+  );
+  if (relocated.error) {
+    return NextResponse.json({ error: relocated.error }, { status: 502 });
   }
 
   const { error: docError } = await supabase
@@ -124,8 +187,8 @@ export async function POST(request: Request, ctx: Ctx) {
 
   if (docError) {
     console.error("Document profile update failed:", docError.message);
-    // Best-effort rollback of storage move
-    await supabase.storage.from("documents").move(newPath, oldPath);
+    // Best-effort rollback of storage
+    await relocateStorageObject(supabase, newPath, oldPath, doc.mime_type);
     return NextResponse.json(
       { error: "Couldn't update the document record. Please try again." },
       { status: 502 }
@@ -166,7 +229,6 @@ export async function POST(request: Request, ctx: Ctx) {
       "Document related profile update failed:",
       childFailed.error.message
     );
-    // Document already moved; surface a soft warning rather than rolling back storage.
     return NextResponse.json(
       {
         documentId,
