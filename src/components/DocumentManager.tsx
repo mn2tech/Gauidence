@@ -31,6 +31,7 @@ import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
 import DocumentChatPanel from "@/components/DocumentChatPanel";
 import CameraCaptureModal from "@/components/CameraCaptureModal";
 import ShareDocumentButton from "@/components/ShareDocumentButton";
+import MoveDocumentButton from "@/components/MoveDocumentButton";
 
 type DocumentRow = {
   id: string;
@@ -977,6 +978,21 @@ export default function DocumentManager({
                       <ShareDocumentButton
                         documentId={doc.id}
                         fileName={doc.file_name}
+                      />
+                      <MoveDocumentButton
+                        documentId={doc.id}
+                        fileName={doc.file_name}
+                        currentProfileId={profileId}
+                        onMoved={(id) => {
+                          setDocuments((prev) => prev.filter((d) => d.id !== id));
+                          setAnalyses((prev) => {
+                            const next = { ...prev };
+                            delete next[id];
+                            return next;
+                          });
+                          if (expandedId === id) setExpandedId(null);
+                          notifyAlertsUpdated();
+                        }}
                       />
                       <button
                         type="button"
