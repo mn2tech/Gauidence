@@ -217,6 +217,9 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputId = isPage ? "ask-gideon-page-input" : "ask-gideon-input";
   const profileId = active?.id ?? meta?.profileId ?? null;
+  const documentsHref = profileId
+    ? `/dashboard#documents-${profileId}`
+    : "/dashboard";
 
   const loadMetaAndChats = useCallback(async () => {
     const res = await fetch("/api/documents/vault-chat");
@@ -849,7 +852,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
       </div>
       <div className="border-t border-stone-200 p-3">
         <Link
-          href="/dashboard"
+          href={documentsHref}
           className="text-xs font-medium text-ink-muted hover:text-foreground"
         >
           ← Documents
@@ -1338,15 +1341,26 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
                 "Your AI guide to everything in your vault."}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => void startNewChat()}
-            disabled={sending}
-            className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold transition hover:bg-stone-50 md:hidden"
-          >
-            <MessageSquarePlus className="h-3.5 w-3.5" />
-            New
-          </button>
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+            <Link
+              href={documentsHref}
+              className="inline-flex items-center gap-1 rounded-full border border-stone-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50 sm:px-3"
+            >
+              <span className="text-ink-muted" aria-hidden>
+                ←
+              </span>
+              Documents
+            </Link>
+            <button
+              type="button"
+              onClick={() => void startNewChat()}
+              disabled={sending}
+              className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold transition hover:bg-stone-50 md:hidden"
+            >
+              <MessageSquarePlus className="h-3.5 w-3.5" />
+              New
+            </button>
+          </div>
         </header>
 
         {whyOpen && (
