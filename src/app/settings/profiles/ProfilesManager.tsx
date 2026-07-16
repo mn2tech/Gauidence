@@ -567,7 +567,9 @@ export default function ProfilesManager() {
             profiles={profiles}
             ownerLabel={accountName}
             activeId={active?.id}
+            busy={busy}
             onSwitch={(id) => void switchProfile(id)}
+            onMoveUnder={moveUnder}
           />
           <ProfileOrganizeList
           profiles={profiles}
