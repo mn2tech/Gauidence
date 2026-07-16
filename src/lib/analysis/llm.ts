@@ -218,7 +218,7 @@ function mapAnthropicError(err: unknown): never {
     console.error("Anthropic analysis request failed", {
       status: err.status,
       name: err.name,
-      requestId: err.request_id,
+      requestId: err.requestID,
       message: (err.message || "").slice(0, 240),
     });
     if (err.status === 401 || err.status === 403) {
