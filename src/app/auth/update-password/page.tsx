@@ -9,17 +9,14 @@ export const metadata: Metadata = {
   title: "Choose a new password — Guardian",
 };
 
+/**
+ * Do not hard-redirect away when the session cookie is briefly missing after
+ * the auth callback redirect — the client form verifies the recovery session.
+ */
 export default async function UpdatePasswordPage() {
   const supabase = await createClient();
   if (!supabase) {
     redirect("/login?error=not_configured");
-  }
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    redirect("/forgot-password");
   }
 
   return (
