@@ -30,6 +30,15 @@ export default function ProfileSetupHub() {
         Choose a starting space. You can add more people, businesses, and
         students anytime from Manage.
       </p>
+      <p className="mt-3 text-sm text-ink-muted">
+        Need a walkthrough?{" "}
+        <Link
+          href="/help"
+          className="font-semibold text-brand hover:text-brand-dark"
+        >
+          Open Help &amp; Quick Start
+        </Link>
+      </p>
       <ul className="mt-6 grid gap-3 sm:grid-cols-2">
         {PROFILE_CREATE_GROUPS.map((g) => {
           const Icon = ICONS[g.id];

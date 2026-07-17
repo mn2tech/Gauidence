@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test src/lib/analysis/__tests__/*.test.ts src/lib/vault/__tests__/*.test.ts src/lib/profiles/__tests__/*.test.ts src/lib/logs/__tests__/*.test.ts src/lib/reminders/__tests__/*.test.ts src/lib/research/__tests__/*.test.ts src/lib/search/__tests__/*.test.ts",
+    "test": "tsx --test src/lib/analysis/__tests__/*.test.ts src/lib/vault/__tests__/*.test.ts src/lib/profiles/__tests__/*.test.ts src/lib/logs/__tests__/*.test.ts src/lib/reminders/__tests__/*.test.ts src/lib/research/__tests__/*.test.ts src/lib/search/__tests__/*.test.ts src/lib/help/__tests__/*.test.ts",
     "compare:analyzers": "tsx --require ./scripts/stub-server-only.cjs scripts/compare-analyzers.ts"
   },
   "dependencies": {

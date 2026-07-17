@@ -90,6 +90,9 @@ export default function SiteHeader() {
           <Link href="/security" className="hover:text-foreground">
             Security Principles
           </Link>
+          <Link href="/help" className="hover:text-foreground">
+            Help
+          </Link>
           {signedIn ? (
             <>
               <ProfileSwitcher />
@@ -201,6 +204,9 @@ export default function SiteHeader() {
           <nav className="flex flex-col gap-1">
             <Link href="/security" className={linkClass}>
               Security Principles
+            </Link>
+            <Link href="/help" className={linkClass}>
+              Help &amp; Quick Start
             </Link>
             {signedIn ? (
               <>
