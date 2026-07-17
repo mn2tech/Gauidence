@@ -517,6 +517,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
       const result = await uploadAndAnalyzeToVault({
         userId: user.id,
         profileId,
+        ownerUserId: active?.owner_user_id,
         file,
         onStatus: setVaultStatus,
       });

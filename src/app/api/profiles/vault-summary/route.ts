@@ -3,7 +3,7 @@ import type { User, SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import {
   getActiveGuardianProfile,
-  requireOwnedGuardianProfile,
+  requireAccessibleGuardianProfile,
 } from "@/lib/profiles/server";
 
 export const runtime = "nodejs";
@@ -54,12 +54,12 @@ export async function GET(request: Request) {
     }
     profileId = active.id;
   } else {
-    const owned = await requireOwnedGuardianProfile(
+    const accessible = await requireAccessibleGuardianProfile(
       supabase,
       user.id,
       profileId
     );
-    if (!owned) {
+    if (!accessible) {
       return NextResponse.json({ error: "Profile not found." }, { status: 404 });
     }
   }
@@ -68,12 +68,10 @@ export async function GET(request: Request) {
     supabase
       .from("documents")
       .select("id", { count: "exact", head: true })
-      .eq("user_id", user.id)
       .eq("profile_id", profileId),
     supabase
       .from("daily_logs")
       .select("id", { count: "exact", head: true })
-      .eq("owner_user_id", user.id)
       .eq("profile_id", profileId),
   ]);
 

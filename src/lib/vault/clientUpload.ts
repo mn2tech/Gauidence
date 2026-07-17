@@ -31,6 +31,8 @@ export type VaultUploadResult = {
 export async function uploadAndAnalyzeToVault(args: {
   userId: string;
   profileId: string;
+  /** Vault owner account id — used for storage path so editors write into the shared vault folder. */
+  ownerUserId?: string;
   file: File;
   onStatus?: (label: string) => void;
 }): Promise<VaultUploadResult> {
@@ -52,7 +54,8 @@ export async function uploadAndAnalyzeToVault(args: {
 
   args.onStatus?.("Uploading to your vault…");
   const safeName = args.file.name.replace(/[^\w.\- ]/g, "_");
-  const path = `${args.userId}/${args.profileId}/${crypto.randomUUID()}-${safeName}`;
+  const storageOwner = args.ownerUserId || args.userId;
+  const path = `${storageOwner}/${args.profileId}/${crypto.randomUUID()}-${safeName}`;
 
   const { error: uploadError } = await supabase.storage
     .from("documents")

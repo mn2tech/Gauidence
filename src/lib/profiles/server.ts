@@ -4,12 +4,16 @@ import type { SupabaseClient, User } from "@supabase/supabase-js";
 import {
   isGuardianProfileType,
   type GuardianProfile,
+  type GuardianProfileAccessRole,
 } from "./types";
 
 const PROFILE_SELECT =
   "id, owner_user_id, profile_type, display_name, relationship, avatar_url, date_of_birth, school_name, grade_level, business_legal_name, industry, website, description, job_title, department, organization_name, parent_profile_id, is_default, created_at, updated_at";
 
-function asProfile(row: Record<string, unknown>): GuardianProfile {
+function asProfile(
+  row: Record<string, unknown>,
+  accessRole?: GuardianProfileAccessRole
+): GuardianProfile {
   const type = isGuardianProfileType(row.profile_type)
     ? row.profile_type
     : "other";
@@ -34,7 +38,24 @@ function asProfile(row: Record<string, unknown>): GuardianProfile {
     is_default: Boolean(row.is_default),
     created_at: String(row.created_at ?? ""),
     updated_at: String(row.updated_at ?? ""),
+    access_role: accessRole,
   };
+}
+
+async function membershipRoleMap(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<Map<string, GuardianProfileAccessRole>> {
+  const { data } = await supabase
+    .from("guardian_profile_members")
+    .select("profile_id, role")
+    .eq("user_id", userId);
+  const map = new Map<string, GuardianProfileAccessRole>();
+  for (const row of data ?? []) {
+    const role = row.role === "owner" || row.role === "editor" ? row.role : null;
+    if (role && row.profile_id) map.set(String(row.profile_id), role);
+  }
+  return map;
 }
 
 /**
@@ -45,29 +66,76 @@ export async function ensureDefaultGuardianProfile(
   supabase: SupabaseClient,
   user: User
 ): Promise<GuardianProfile | null> {
+  const roles = await membershipRoleMap(supabase, user.id);
+  const ownedIds = [...roles.entries()]
+    .filter(([, role]) => role === "owner")
+    .map(([id]) => id);
+
+  if (ownedIds.length === 0) {
+    // Fallback for pre-migration DBs: owner_user_id only
+    const { data: existing } = await supabase
+      .from("guardian_profiles")
+      .select(PROFILE_SELECT)
+      .eq("owner_user_id", user.id)
+      .eq("is_default", true)
+      .maybeSingle();
+    if (existing) {
+      await ensureActivePointsSomewhere(
+        supabase,
+        user.id,
+        asProfile(existing, "owner")
+      );
+      return asProfile(existing, "owner");
+    }
+    const { data: anyOwned } = await supabase
+      .from("guardian_profiles")
+      .select(PROFILE_SELECT)
+      .eq("owner_user_id", user.id)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (anyOwned) {
+      await ensureActivePointsSomewhere(
+        supabase,
+        user.id,
+        asProfile(anyOwned, "owner")
+      );
+      return asProfile(anyOwned, "owner");
+    }
+    return null;
+  }
+
   const { data: existing } = await supabase
     .from("guardian_profiles")
     .select(PROFILE_SELECT)
-    .eq("owner_user_id", user.id)
+    .in("id", ownedIds)
     .eq("is_default", true)
     .maybeSingle();
 
   if (existing) {
-    await ensureActivePointsSomewhere(supabase, user.id, asProfile(existing));
-    return asProfile(existing);
+    await ensureActivePointsSomewhere(
+      supabase,
+      user.id,
+      asProfile(existing, "owner")
+    );
+    return asProfile(existing, "owner");
   }
 
   const { data: anyProfile } = await supabase
     .from("guardian_profiles")
     .select(PROFILE_SELECT)
-    .eq("owner_user_id", user.id)
+    .in("id", ownedIds)
     .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle();
 
   if (anyProfile) {
-    await ensureActivePointsSomewhere(supabase, user.id, asProfile(anyProfile));
-    return asProfile(anyProfile);
+    await ensureActivePointsSomewhere(
+      supabase,
+      user.id,
+      asProfile(anyProfile, "owner")
+    );
+    return asProfile(anyProfile, "owner");
   }
 
   return null;
@@ -86,13 +154,12 @@ async function ensureActivePointsSomewhere(
 
   const activeId = account?.active_guardian_profile_id as string | null;
   if (activeId) {
-    const { data: active } = await supabase
-      .from("guardian_profiles")
-      .select("id")
-      .eq("id", activeId)
-      .eq("owner_user_id", userId)
-      .maybeSingle();
-    if (active) return;
+    const accessible = await requireAccessibleGuardianProfile(
+      supabase,
+      userId,
+      activeId
+    );
+    if (accessible) return;
   }
 
   await supabase
@@ -105,22 +172,48 @@ export async function listGuardianProfiles(
   supabase: SupabaseClient,
   userId: string
 ): Promise<GuardianProfile[]> {
+  const roles = await membershipRoleMap(supabase, userId);
+  const profileIds = [...roles.keys()];
+
+  if (profileIds.length === 0) {
+    // Pre-migration fallback
+    const { data } = await supabase
+      .from("guardian_profiles")
+      .select(PROFILE_SELECT)
+      .eq("owner_user_id", userId)
+      .order("is_default", { ascending: false })
+      .order("created_at", { ascending: true });
+    return (data ?? []).map((row) => asProfile(row, "owner"));
+  }
+
   const { data } = await supabase
     .from("guardian_profiles")
     .select(PROFILE_SELECT)
-    .eq("owner_user_id", userId)
+    .in("id", profileIds)
     .order("is_default", { ascending: false })
     .order("created_at", { ascending: true });
-  return (data ?? []).map((row) => asProfile(row));
+
+  return (data ?? []).map((row) => {
+    const id = String(row.id);
+    const role =
+      roles.get(id) ??
+      (String(row.owner_user_id) === userId ? "owner" : "editor");
+    return asProfile(row, role);
+  });
 }
 
-/** Resolve active profile, or null when the user has not created any yet. */
+/** Resolve active profile, or null when the user has not created/joined any yet. */
 export async function getActiveGuardianProfile(
   supabase: SupabaseClient,
   user: User
 ): Promise<GuardianProfile | null> {
-  const fallback = await ensureDefaultGuardianProfile(supabase, user);
-  if (!fallback) return null;
+  const profiles = await listGuardianProfiles(supabase, user.id);
+  if (profiles.length === 0) return null;
+
+  const fallback =
+    profiles.find((p) => p.access_role === "owner" && p.is_default) ??
+    profiles.find((p) => p.access_role === "owner") ??
+    profiles[0];
 
   const { data: account } = await supabase
     .from("profiles")
@@ -130,13 +223,8 @@ export async function getActiveGuardianProfile(
 
   const activeId = account?.active_guardian_profile_id as string | null;
   if (activeId) {
-    const { data: active } = await supabase
-      .from("guardian_profiles")
-      .select(PROFILE_SELECT)
-      .eq("id", activeId)
-      .eq("owner_user_id", user.id)
-      .maybeSingle();
-    if (active) return asProfile(active);
+    const active = profiles.find((p) => p.id === activeId);
+    if (active) return active;
   }
 
   await supabase
@@ -147,18 +235,67 @@ export async function getActiveGuardianProfile(
   return fallback;
 }
 
-export async function requireOwnedGuardianProfile(
+export async function requireAccessibleGuardianProfile(
   supabase: SupabaseClient,
   userId: string,
   profileId: string
 ): Promise<GuardianProfile | null> {
+  const { data: member } = await supabase
+    .from("guardian_profile_members")
+    .select("role")
+    .eq("profile_id", profileId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (member?.role === "owner" || member?.role === "editor") {
+    const { data } = await supabase
+      .from("guardian_profiles")
+      .select(PROFILE_SELECT)
+      .eq("id", profileId)
+      .maybeSingle();
+    return data ? asProfile(data, member.role) : null;
+  }
+
+  // Pre-migration fallback
   const { data } = await supabase
     .from("guardian_profiles")
     .select(PROFILE_SELECT)
     .eq("id", profileId)
     .eq("owner_user_id", userId)
     .maybeSingle();
-  return data ? asProfile(data) : null;
+  return data ? asProfile(data, "owner") : null;
+}
+
+export async function requireEditableGuardianProfile(
+  supabase: SupabaseClient,
+  userId: string,
+  profileId: string
+): Promise<GuardianProfile | null> {
+  const profile = await requireAccessibleGuardianProfile(
+    supabase,
+    userId,
+    profileId
+  );
+  if (!profile) return null;
+  if (profile.access_role === "owner" || profile.access_role === "editor") {
+    return profile;
+  }
+  return null;
+}
+
+/** Owner-only profile access (settings, invites, shares, delete). */
+export async function requireOwnedGuardianProfile(
+  supabase: SupabaseClient,
+  userId: string,
+  profileId: string
+): Promise<GuardianProfile | null> {
+  const profile = await requireAccessibleGuardianProfile(
+    supabase,
+    userId,
+    profileId
+  );
+  if (!profile || profile.access_role !== "owner") return null;
+  return profile;
 }
 
 export async function setActiveGuardianProfile(
@@ -166,11 +303,15 @@ export async function setActiveGuardianProfile(
   userId: string,
   profileId: string
 ): Promise<GuardianProfile | null> {
-  const owned = await requireOwnedGuardianProfile(supabase, userId, profileId);
-  if (!owned) return null;
+  const accessible = await requireAccessibleGuardianProfile(
+    supabase,
+    userId,
+    profileId
+  );
+  if (!accessible) return null;
   await supabase
     .from("profiles")
-    .update({ active_guardian_profile_id: owned.id })
+    .update({ active_guardian_profile_id: accessible.id })
     .eq("id", userId);
-  return owned;
+  return accessible;
 }

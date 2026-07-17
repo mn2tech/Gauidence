@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { User, SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
-import { requireOwnedGuardianProfile } from "@/lib/profiles/server";
+import { requireEditableGuardianProfile } from "@/lib/profiles/server";
 import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
 import { VAULT_PASTE_MAX_CHARS } from "@/lib/vault/pastedText";
 
@@ -71,7 +71,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const profile = await requireOwnedGuardianProfile(
+  const profile = await requireEditableGuardianProfile(
     supabase,
     user.id,
     profileId
@@ -109,7 +109,7 @@ export async function POST(request: Request) {
   }
 
   const fileName = `Research - ${safeFileName(query)}.txt`;
-  const path = `${user.id}/${profile.id}/${crypto.randomUUID()}-${safeFileName(fileName)}`;
+  const path = `${profile.owner_user_id}/${profile.id}/${crypto.randomUUID()}-${safeFileName(fileName)}`;
   const bytes = Buffer.from(content, "utf8");
 
   const { error: uploadError } = await supabase.storage

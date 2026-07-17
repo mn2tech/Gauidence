@@ -61,7 +61,6 @@ export async function listLinkedProfilesForVaultRollup(
   const { data, error } = await supabase
     .from("guardian_profiles")
     .select("id, display_name, profile_type")
-    .eq("owner_user_id", userId)
     .eq("parent_profile_id", parent.id)
     .in("profile_type", types)
     .order("display_name", { ascending: true });

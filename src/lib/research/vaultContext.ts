@@ -28,30 +28,26 @@ export async function loadResearchVaultContext(
     supabase
       .from("documents")
       .select("file_name")
-      .eq("user_id", args.userId)
       .eq("profile_id", args.profileId)
       .ilike("file_name", pattern)
       .limit(8),
     supabase
       .from("extracted_data")
       .select("title, summary, document_type")
-      .eq("user_id", args.userId)
       .eq("profile_id", args.profileId)
       .order("created_at", { ascending: false })
       .limit(40),
     supabase
       .from("daily_logs")
       .select("log_date, title, content")
-      .eq("owner_user_id", args.userId)
       .eq("profile_id", args.profileId)
       .order("log_date", { ascending: false })
       .limit(40),
     supabase
       .from("guardian_profiles")
       .select("display_name, profile_type")
-      .eq("owner_user_id", args.userId)
-      .ilike("display_name", pattern)
-      .limit(8),
+      .eq("id", args.profileId)
+      .limit(1),
   ]);
 
   const parts: string[] = [];

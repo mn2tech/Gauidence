@@ -40,6 +40,11 @@ export default function AuthForm({ mode }: { mode: Mode }) {
 
   const configured = supabase !== null;
   const isSignup = mode === "signup";
+  const rawNext = searchParams.get("next");
+  const safeNext =
+    rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//")
+      ? rawNext
+      : "/dashboard";
 
   async function handleGoogle() {
     if (!supabase) {
@@ -64,7 +69,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
+          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(safeNext)}`,
         },
       });
       if (error) {
@@ -96,13 +101,13 @@ export default function AuthForm({ mode }: { mode: Mode }) {
           password,
           options: {
             data: { full_name: fullName },
-            emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
+            emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(safeNext)}`,
           },
         });
         if (error) {
           setError(error.message);
         } else if (data.session) {
-          router.push("/dashboard");
+          router.push(safeNext);
           router.refresh();
           return;
         } else {
@@ -122,7 +127,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
               : error.message
           );
         } else {
-          router.push("/dashboard");
+          router.push(safeNext);
           router.refresh();
           return;
         }

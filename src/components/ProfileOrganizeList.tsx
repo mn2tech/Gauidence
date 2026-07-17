@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type DragEvent, type ReactNode } from "react";
-import { ChevronDown, GripVertical, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { ChevronDown, GripVertical, Trash2, Users } from "lucide-react";
 import ProfileAvatar from "@/components/ProfileAvatar";
 import {
   canAttachChildToParent,
@@ -13,6 +14,7 @@ import {
   canHaveLinkedPets,
   canHaveLinkedStudents,
   canHaveLinkedVehicles,
+  canManageProfileAccess,
   clientsOf,
   employeesOf,
   familyMembersOf,
@@ -20,6 +22,7 @@ import {
   otherSpacesOf,
   isGroupStyleProfile,
   isNestableProfileType,
+  isProfileOwner,
   petsOf,
   profileAvatarLabel,
   profileSubtitle,
@@ -519,7 +522,7 @@ export default function ProfileOrganizeList({
                     <ProfileAvatar
                       profile={p}
                       size="md"
-                      editable
+                      editable={isProfileOwner(p)}
                       onUpdated={onRefresh}
                       onError={onAvatarError}
                     />
@@ -536,6 +539,11 @@ export default function ProfileOrganizeList({
                             Active
                           </span>
                         ) : null}
+                        {p.access_role === "editor" ? (
+                          <span className="ml-2 text-[11px] font-medium text-brand">
+                            Shared
+                          </span>
+                        ) : null}
                         {nested.length > 0 ? (
                           <span className="ml-2 text-[11px] font-medium text-ink-muted">
                             {nested.length} nested
@@ -550,7 +558,7 @@ export default function ProfileOrganizeList({
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {renderMoveSelect(p)}
+                    {isProfileOwner(p) ? renderMoveSelect(p) : null}
                     {activeId !== p.id && (
                       <button
                         type="button"
@@ -560,7 +568,16 @@ export default function ProfileOrganizeList({
                         Switch
                       </button>
                     )}
-                    {!p.is_default && (
+                    {canManageProfileAccess(p) ? (
+                      <Link
+                        href={`/settings/profiles/${p.id}/collaborators`}
+                        className="inline-flex items-center gap-1 rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium"
+                      >
+                        <Users className="h-3 w-3" />
+                        Manage access
+                      </Link>
+                    ) : null}
+                    {isProfileOwner(p) && !p.is_default ? (
                       <button
                         type="button"
                         disabled={busy}
@@ -569,23 +586,58 @@ export default function ProfileOrganizeList({
                       >
                         Make default
                       </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setEditing(p)}
-                      className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onRemove(p)}
-                      aria-label={`Delete ${p.display_name}`}
-                      className="inline-flex items-center gap-1 rounded-full border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                      Delete
-                    </button>
+                    ) : null}
+                    {isProfileOwner(p) ? (
+                      <button
+                        type="button"
+                        onClick={() => setEditing(p)}
+                        className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium"
+                      >
+                        Edit
+                      </button>
+                    ) : null}
+                    {isProfileOwner(p) ? (
+                      <button
+                        type="button"
+                        onClick={() => onRemove(p)}
+                        aria-label={`Delete ${p.display_name}`}
+                        className="inline-flex items-center gap-1 rounded-full border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                        Delete
+                      </button>
+                    ) : p.access_role === "editor" ? (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={async () => {
+                          if (
+                            !window.confirm(
+                              "Leave this shared vault? You can rejoin if invited again."
+                            )
+                          ) {
+                            return;
+                          }
+                          const res = await fetch(
+                            `/api/profiles/${p.id}/collaborators/me`,
+                            { method: "DELETE" }
+                          );
+                          if (!res.ok) {
+                            const body = (await res
+                              .json()
+                              .catch(() => ({}))) as { error?: string };
+                            onAvatarError(
+                              body.error ?? "Couldn't leave this vault."
+                            );
+                            return;
+                          }
+                          await onRefresh();
+                        }}
+                        className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium"
+                      >
+                        Leave
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               )}

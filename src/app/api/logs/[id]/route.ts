@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { User, SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
-import { requireOwnedGuardianProfile } from "@/lib/profiles/server";
+import { requireEditableGuardianProfile } from "@/lib/profiles/server";
 import { isValidLogDate } from "@/lib/logs/types";
 
 export const runtime = "nodejs";
@@ -46,17 +46,16 @@ export async function PATCH(request: Request, ctx: Ctx) {
     .from("daily_logs")
     .select("id, profile_id")
     .eq("id", id)
-    .eq("owner_user_id", user.id)
     .maybeSingle();
   if (!existing) {
     return NextResponse.json({ error: "Log not found." }, { status: 404 });
   }
-  const owned = await requireOwnedGuardianProfile(
+  const editable = await requireEditableGuardianProfile(
     supabase,
     user.id,
     existing.profile_id
   );
-  if (!owned) {
+  if (!editable) {
     return NextResponse.json({ error: "Log not found." }, { status: 404 });
   }
 
@@ -103,7 +102,6 @@ export async function PATCH(request: Request, ctx: Ctx) {
     .from("daily_logs")
     .update(patch)
     .eq("id", id)
-    .eq("owner_user_id", user.id)
     .select(SELECT)
     .single();
 
@@ -122,11 +120,24 @@ export async function DELETE(_request: Request, ctx: Ctx) {
   const { supabase, user } = auth;
   const { id } = await ctx.params;
 
-  const { error } = await supabase
+  const { data: existing } = await supabase
     .from("daily_logs")
-    .delete()
+    .select("id, profile_id")
     .eq("id", id)
-    .eq("owner_user_id", user.id);
+    .maybeSingle();
+  if (!existing) {
+    return NextResponse.json({ error: "Log not found." }, { status: 404 });
+  }
+  const editable = await requireEditableGuardianProfile(
+    supabase,
+    user.id,
+    existing.profile_id
+  );
+  if (!editable) {
+    return NextResponse.json({ error: "Log not found." }, { status: 404 });
+  }
+
+  const { error } = await supabase.from("daily_logs").delete().eq("id", id);
 
   if (error) {
     return NextResponse.json(

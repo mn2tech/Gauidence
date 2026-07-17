@@ -32,6 +32,13 @@ const HOW_TO = [
     linkLabel: "Manage people & spaces",
   },
   {
+    icon: Users,
+    title: "Shared business & client vaults",
+    body: "Invite another Guardian user as an Editor on a business or client vault. They can add documents and Daily Logs and Ask Gideon. Gideon chats stay private to each person. Only the owner manages access.",
+    href: "/settings/profiles",
+    linkLabel: "Manage people & spaces",
+  },
+  {
     icon: Camera,
     title: "Documents",
     body: "Scan with your camera or upload a PDF/photo. Analyze to extract dates and key facts. Rename, categorize, or share with an expiring link.",

@@ -156,6 +156,8 @@ export function optionsForCreateGroup(groupId: ProfileCreateGroupId) {
     .filter((o): o is (typeof PROFILE_CREATE_OPTIONS)[number] => Boolean(o));
 }
 
+export type GuardianProfileAccessRole = "owner" | "editor";
+
 export type GuardianProfile = {
   id: string;
   owner_user_id: string;
@@ -177,7 +179,33 @@ export type GuardianProfile = {
   is_default: boolean;
   created_at: string;
   updated_at: string;
+  /** Present when loaded for the current user (owned or shared). */
+  access_role?: GuardianProfileAccessRole;
 };
+
+/** Business and client vaults can invite Editor collaborators. */
+export function canShareGuardianProfile(
+  profile: Pick<GuardianProfile, "profile_type">
+): boolean {
+  return profile.profile_type === "business" || profile.profile_type === "client";
+}
+
+export function isProfileOwner(
+  profile: Pick<GuardianProfile, "access_role" | "owner_user_id">,
+  userId?: string | null
+): boolean {
+  if (profile.access_role === "owner") return true;
+  if (profile.access_role === "editor") return false;
+  if (userId) return profile.owner_user_id === userId;
+  return false;
+}
+
+export function canManageProfileAccess(
+  profile: Pick<GuardianProfile, "access_role" | "owner_user_id" | "profile_type">,
+  userId?: string | null
+): boolean {
+  return isProfileOwner(profile, userId) && canShareGuardianProfile(profile);
+}
 
 export function isGuardianProfileType(v: unknown): v is GuardianProfileType {
   return (
@@ -227,14 +255,16 @@ export function profileCompanyContext(profile: GuardianProfile): string | null {
 
 export function vaultLabel(profile: GuardianProfile): string {
   const name = profile.display_name.trim() || "Profile";
+  const shared =
+    profile.access_role === "editor" ? " (shared)" : "";
   if (
     isGroupStyleProfile(profile.profile_type) ||
     isAssetStyleProfile(profile.profile_type)
   ) {
-    return `${name} Vault`;
+    return `${name} Vault${shared}`;
   }
-  if (name.toLowerCase().endsWith("s")) return `${name}' Vault`;
-  return `${name}'s Vault`;
+  if (name.toLowerCase().endsWith("s")) return `${name}' Vault${shared}`;
+  return `${name}'s Vault${shared}`;
 }
 
 export function askGideonContextLabel(profile: GuardianProfile): string {

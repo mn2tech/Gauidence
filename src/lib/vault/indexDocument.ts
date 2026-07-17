@@ -43,8 +43,7 @@ export async function indexDocumentForVault(
   await args.supabase
     .from("document_chunks")
     .delete()
-    .eq("document_id", args.documentId)
-    .eq("user_id", args.userId);
+    .eq("document_id", args.documentId);
 
   if (chunks.length === 0) {
     return { indexed: 0 };

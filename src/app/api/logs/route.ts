@@ -3,7 +3,7 @@ import type { User, SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import {
   getActiveGuardianProfile,
-  requireOwnedGuardianProfile,
+  requireEditableGuardianProfile,
 } from "@/lib/profiles/server";
 import { isValidLogDate, todayLogDate } from "@/lib/logs/types";
 
@@ -59,7 +59,7 @@ export async function GET(request: Request) {
     }
     profileId = active.id;
   } else {
-    const owned = await requireOwnedGuardianProfile(
+    const owned = await requireEditableGuardianProfile(
       supabase,
       user.id,
       profileId
@@ -72,7 +72,6 @@ export async function GET(request: Request) {
   let query = supabase
     .from("daily_logs")
     .select(SELECT)
-    .eq("owner_user_id", user.id)
     .eq("profile_id", profileId)
     .order("log_date", { ascending: false })
     .order("created_at", { ascending: false })
@@ -89,7 +88,6 @@ export async function GET(request: Request) {
     const { data, error } = await supabase
       .from("daily_logs")
       .select(SELECT)
-      .eq("owner_user_id", user.id)
       .eq("profile_id", profileId)
       .eq("id", logId)
       .maybeSingle();
@@ -154,7 +152,7 @@ export async function POST(request: Request) {
   let profileId =
     typeof body.profileId === "string" ? body.profileId : null;
   if (profileId) {
-    const owned = await requireOwnedGuardianProfile(
+    const owned = await requireEditableGuardianProfile(
       supabase,
       user.id,
       profileId

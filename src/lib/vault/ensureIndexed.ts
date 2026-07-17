@@ -31,7 +31,6 @@ export async function ensureUserVaultIndexed(
     .select(
       "document_id, summary, facts, title, document_type, warnings, specialist"
     )
-    .eq("user_id", userId)
     .eq("profile_id", profileId);
 
   if (error || !extracted?.length) {
@@ -41,7 +40,6 @@ export async function ensureUserVaultIndexed(
   const { data: docs } = await supabase
     .from("documents")
     .select("id, file_name")
-    .eq("user_id", userId)
     .eq("profile_id", profileId)
     .in(
       "id",
@@ -53,7 +51,6 @@ export async function ensureUserVaultIndexed(
   const { data: existing } = await supabase
     .from("document_chunks")
     .select("document_id")
-    .eq("user_id", userId)
     .eq("profile_id", profileId);
 
   const already = new Set((existing ?? []).map((r) => r.document_id));

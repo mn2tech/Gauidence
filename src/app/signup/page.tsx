@@ -10,13 +10,24 @@ export const metadata: Metadata = {
   title: "Sign up — Guardian",
 };
 
-export default async function SignupPage() {
+export default async function SignupPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>;
+}) {
+  const params = await searchParams;
+  const rawNext = params.next;
+  const safeNext =
+    rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//")
+      ? rawNext
+      : "/dashboard";
+
   const supabase = await createClient();
   if (supabase) {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (user) redirect("/dashboard");
+    if (user) redirect(safeNext);
   }
 
   return (

@@ -35,10 +35,12 @@ function DocumentsSection({
   userId,
   profileId,
   profileName,
+  ownerUserId,
 }: {
   userId: string;
   profileId: string;
   profileName: string;
+  ownerUserId: string;
 }) {
   const searchParams = useSearchParams();
   const autoOpenCamera = searchParams.get("camera") === "1";
@@ -49,6 +51,7 @@ function DocumentsSection({
       userId={userId}
       profileId={profileId}
       profileName={profileName}
+      ownerUserId={ownerUserId}
       autoOpenCamera={autoOpenCamera}
       highlightDocumentId={highlightDocumentId}
       searchTerm={searchTerm}
@@ -229,6 +232,7 @@ export default function DashboardVault({ userId }: { userId: string }) {
               userId={userId}
               profileId={active.id}
               profileName={active.display_name}
+              ownerUserId={active.owner_user_id}
             />
           }
         >
@@ -236,6 +240,7 @@ export default function DashboardVault({ userId }: { userId: string }) {
             userId={userId}
             profileId={active.id}
             profileName={active.display_name}
+            ownerUserId={active.owner_user_id}
           />
         </Suspense>
       </VaultSection>

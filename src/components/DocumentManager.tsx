@@ -118,6 +118,7 @@ export default function DocumentManager({
   userId,
   profileId,
   profileName,
+  ownerUserId,
   autoOpenCamera = false,
   highlightDocumentId = null,
   searchTerm = null,
@@ -125,6 +126,8 @@ export default function DocumentManager({
   userId: string;
   profileId: string;
   profileName: string;
+  /** Vault owner — storage paths stay under the owner folder for shared vaults. */
+  ownerUserId?: string;
   /** Open the scanner once (deep link /dashboard?camera=1). */
   autoOpenCamera?: boolean;
   /** Deep-link from universal search: expand/scroll this document. */
@@ -316,7 +319,8 @@ export default function DocumentManager({
 
     setUploading(true);
     const safeName = file.name.replace(/[^\w.\- ]/g, "_");
-    const path = `${userId}/${profileId}/${crypto.randomUUID()}-${safeName}`;
+    const storageOwner = ownerUserId || userId;
+    const path = `${storageOwner}/${profileId}/${crypto.randomUUID()}-${safeName}`;
 
     try {
       const { error: uploadError } = await supabase.storage

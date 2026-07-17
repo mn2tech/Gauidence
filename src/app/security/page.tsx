@@ -32,8 +32,8 @@ const sections = [
     id: "access-separation",
     title: "How user access is separated",
     paragraphs: [
-      "Every document, profile, alert, and document chat in the database is tied to the account that created it. Row Level Security (RLS) policies are enforced at the database level, which means the database itself refuses to return another user's rows — even if application code contains a bug.",
-      "This is user-level access control: you can only read and change data that belongs to you.",
+      "Every document, profile, alert, and document chat in the database is tied to an account and a vault. Row Level Security (RLS) policies are enforced at the database level, which means the database itself refuses to return rows you are not allowed to see — even if application code contains a bug.",
+      "By default, vaults belong to one owner. On business and client vaults, the owner can invite another signed-in Guardian user as an Editor. Editors can add documents and Daily Logs and Ask Gideon on that exact vault. Gideon conversations stay private to each person. Other vaults on either account remain private.",
     ],
   },
   {
@@ -75,7 +75,7 @@ const sections = [
       "Guaranteed protection from all breaches — no service can honestly promise this",
     ],
     paragraphsAfter: [
-      "What we can accurately say today: data is encrypted in transit, protected by authenticated access, and separated by user-level access controls. Opt-in document share links are time-limited and revocable.",
+      "What we can accurately say today: data is encrypted in transit, protected by authenticated access, and separated by account and vault membership. Opt-in document share links are time-limited and revocable. Business/client vault collaborator invites are owner-controlled and revocable.",
     ],
   },
   {

@@ -11,6 +11,7 @@ import {
   sortAndCapResults,
   type SearchResult,
 } from "@/lib/search";
+import { listGuardianProfiles } from "@/lib/profiles/server";
 
 export const runtime = "nodejs";
 
@@ -73,12 +74,18 @@ export async function GET(request: Request) {
   const pattern = buildIlikePattern(query);
   const lower = query.toLowerCase();
 
+  const accessible = await listGuardianProfiles(supabase, user.id);
+  if (accessible.length === 0) {
+    return NextResponse.json({ results: [], query });
+  }
+  const accessibleIds = accessible.map((p) => p.id);
+
   const { data: allProfiles, error: profilesError } = await supabase
     .from("guardian_profiles")
     .select(
       "id, display_name, parent_profile_id, profile_type, relationship, organization_name, business_legal_name, school_name, job_title, department, description, updated_at"
     )
-    .eq("owner_user_id", user.id)
+    .in("id", accessibleIds)
     .order("display_name", { ascending: true });
 
   if (profilesError) {
@@ -103,7 +110,7 @@ export async function GET(request: Request) {
       .select(
         "id, profile_id, log_date, title, content, category, tags, updated_at"
       )
-      .eq("owner_user_id", user.id)
+      .in("profile_id", accessibleIds)
       .or(
         `title.ilike.${pattern},content.ilike.${pattern},category.ilike.${pattern}`
       )
@@ -114,7 +121,7 @@ export async function GET(request: Request) {
       .select(
         "id, profile_id, file_name, category, analysis_status, created_at"
       )
-      .eq("user_id", user.id)
+      .in("profile_id", accessibleIds)
       .or(`file_name.ilike.${pattern},category.ilike.${pattern}`)
       .order("created_at", { ascending: false })
       .limit(40),
@@ -123,7 +130,7 @@ export async function GET(request: Request) {
       .select(
         "document_id, profile_id, title, summary, document_type, facts, updated_at"
       )
-      .eq("user_id", user.id)
+      .in("profile_id", accessibleIds)
       .or(`title.ilike.${pattern},summary.ilike.${pattern}`)
       .order("updated_at", { ascending: false })
       .limit(40),
@@ -131,6 +138,7 @@ export async function GET(request: Request) {
       .from("vault_chats")
       .select("id, profile_id, title, updated_at")
       .eq("user_id", user.id)
+      .in("profile_id", accessibleIds)
       .ilike("title", pattern)
       .order("updated_at", { ascending: false })
       .limit(40),
@@ -210,7 +218,7 @@ export async function GET(request: Request) {
       .select(
         "id, profile_id, log_date, title, content, category, tags, updated_at"
       )
-      .eq("owner_user_id", user.id)
+      .in("profile_id", accessibleIds)
       .contains("tags", [query])
       .limit(20);
     const seen = new Set(results.filter((r) => r.kind === "daily_log").map((r) => r.id));
@@ -312,7 +320,6 @@ export async function GET(request: Request) {
     const { data: named } = await supabase
       .from("documents")
       .select("id, file_name")
-      .eq("user_id", user.id)
       .in("id", missingDocIds);
     const names = new Map((named ?? []).map((d) => [d.id, d.file_name]));
     for (const r of results) {
