@@ -22,12 +22,15 @@ type Props = {
   profileId: string;
   profileName: string;
   profileType: GuardianProfileType;
+  /** Deep-link from universal search: scroll/highlight this log. */
+  highlightLogId?: string | null;
 };
 
 export default function DailyLogPanel({
   profileId,
   profileName,
   profileType,
+  highlightLogId = null,
 }: Props) {
   const [logs, setLogs] = useState<DailyLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,6 +49,7 @@ export default function DailyLogPanel({
   const [filterCategory, setFilterCategory] = useState("");
   const [filterFrom, setFilterFrom] = useState("");
   const [filterTo, setFilterTo] = useState("");
+  const [flashLogId, setFlashLogId] = useState<string | null>(null);
 
   const categories = useMemo(
     () => categoriesForProfileType(profileType),
@@ -87,6 +91,54 @@ export default function DailyLogPanel({
     setEditing(null);
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!highlightLogId || loading) return;
+    let cancelled = false;
+    let focusTimer: number | undefined;
+    let clearTimer: number | undefined;
+
+    async function focusLog() {
+      let hasLog = logs.some((l) => l.id === highlightLogId);
+      if (!hasLog) {
+        const params = new URLSearchParams({
+          profileId,
+          id: highlightLogId!,
+        });
+        const res = await fetch(`/api/logs?${params}`);
+        const body = (await res.json().catch(() => ({}))) as {
+          logs?: DailyLog[];
+        };
+        if (cancelled) return;
+        const found = body.logs?.[0];
+        if (found) {
+          setLogs((prev) =>
+            prev.some((l) => l.id === found.id) ? prev : [found, ...prev]
+          );
+          hasLog = true;
+        }
+      }
+      if (!hasLog && !logs.some((l) => l.id === highlightLogId)) return;
+      focusTimer = window.setTimeout(() => {
+        if (cancelled) return;
+        const el = document.getElementById(`log-${highlightLogId}`);
+        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+        setFlashLogId(highlightLogId);
+        clearTimer = window.setTimeout(() => {
+          if (!cancelled) setFlashLogId(null);
+        }, 2200);
+      }, 120);
+    }
+
+    void focusLog();
+    return () => {
+      cancelled = true;
+      if (focusTimer) window.clearTimeout(focusTimer);
+      if (clearTimer) window.clearTimeout(clearTimer);
+    };
+    // Intentionally omit `logs` to avoid re-focus loops after merge.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- focus once per highlightLogId/load
+  }, [highlightLogId, loading, profileId]);
 
   useEffect(() => {
     const onProfile = () => {
@@ -474,7 +526,12 @@ export default function DailyLogPanel({
                   ) : (
                     <li
                       key={log.id}
-                      className="rounded-xl bg-stone-50 px-3 py-3"
+                      id={`log-${log.id}`}
+                      className={`rounded-xl px-3 py-3 transition ${
+                        flashLogId === log.id
+                          ? "border border-brand/40 bg-brand-light/50 ring-2 ring-brand/30"
+                          : "bg-stone-50"
+                      }`}
                     >
                       {log.title && (
                         <p className="text-sm font-semibold">{log.title}</p>

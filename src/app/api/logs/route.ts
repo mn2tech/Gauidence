@@ -78,11 +78,29 @@ export async function GET(request: Request) {
     .order("created_at", { ascending: false })
     .limit(100);
 
+  const logId = url.searchParams.get("id")?.trim();
   const q = url.searchParams.get("q")?.trim();
   const category = url.searchParams.get("category")?.trim();
   const tag = url.searchParams.get("tag")?.trim();
   const from = url.searchParams.get("from");
   const to = url.searchParams.get("to");
+
+  if (logId) {
+    const { data, error } = await supabase
+      .from("daily_logs")
+      .select(SELECT)
+      .eq("owner_user_id", user.id)
+      .eq("profile_id", profileId)
+      .eq("id", logId)
+      .maybeSingle();
+    if (error) {
+      return NextResponse.json(
+        { error: "Couldn't load Daily Logs." },
+        { status: 502 }
+      );
+    }
+    return NextResponse.json({ logs: data ? [data] : [] });
+  }
 
   if (category) query = query.eq("category", category);
   if (isValidLogDate(from)) query = query.gte("log_date", from);

@@ -9,6 +9,7 @@ import {
   type MouseEvent,
 } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   ExternalLink,
   FileUp,
@@ -212,7 +213,11 @@ const SECTION_STYLES: Record<string, string> = {
 
 export default function VaultChatPanel({ variant = "embedded" }: Props) {
   const isPage = variant === "page";
-  const { active, profiles, loading: profilesLoading } = useActiveProfile();
+  const searchParams = useSearchParams();
+  const requestedChatId = searchParams.get("chatId");
+  const requestedProfileId = searchParams.get("profileId");
+  const { active, profiles, loading: profilesLoading, switchProfile } =
+    useActiveProfile();
   const needsSetup = !profilesLoading && profiles.length === 0;
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
@@ -243,6 +248,8 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const plusRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const profileSwitchRef = useRef(false);
+  const deepLinkChatConsumed = useRef<string | null>(null);
   const inputId = isPage ? "ask-gideon-page-input" : "ask-gideon-input";
   const profileId = active?.id ?? meta?.profileId ?? null;
   const documentsHref = profileId
@@ -293,9 +300,16 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     setError(null);
     try {
       const list = await loadMetaAndChats();
-      // Resume the most recent chat for this profile (Docs ↔ Ask continuity).
-      // New chat still starts blank via startNewChat.
-      if (list[0]) {
+      const deepChat =
+        requestedChatId &&
+        deepLinkChatConsumed.current !== requestedChatId
+          ? requestedChatId
+          : null;
+      if (deepChat) {
+        deepLinkChatConsumed.current = deepChat;
+        await loadThread(deepChat);
+      } else if (list[0]) {
+        // Resume the most recent chat for this profile (Docs ↔ Ask continuity).
         await loadThread(list[0].id);
       } else {
         setActiveChatId(null);
@@ -307,7 +321,25 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     } finally {
       setLoadingHistory(false);
     }
-  }, [loadMetaAndChats, loadThread]);
+  }, [loadMetaAndChats, loadThread, requestedChatId]);
+
+  useEffect(() => {
+    if (profilesLoading || needsSetup || profileSwitchRef.current) return;
+    if (!requestedProfileId) return;
+    if (active?.id === requestedProfileId) return;
+    if (!profiles.some((p) => p.id === requestedProfileId)) return;
+    profileSwitchRef.current = true;
+    void switchProfile(requestedProfileId).finally(() => {
+      profileSwitchRef.current = false;
+    });
+  }, [
+    requestedProfileId,
+    active?.id,
+    profilesLoading,
+    needsSetup,
+    profiles,
+    switchProfile,
+  ]);
 
   useEffect(() => {
     if (profilesLoading) return;
@@ -315,8 +347,18 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
       setLoadingHistory(false);
       return;
     }
+    if (requestedProfileId && active?.id !== requestedProfileId) {
+      // Wait until profile switch lands before loading chats.
+      return;
+    }
     void bootstrap();
-  }, [bootstrap, needsSetup, profilesLoading]);
+  }, [
+    bootstrap,
+    needsSetup,
+    profilesLoading,
+    requestedProfileId,
+    active?.id,
+  ]);
 
   useEffect(() => {
     if (needsSetup) return;

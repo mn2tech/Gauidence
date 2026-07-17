@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import SiteHeader from "@/components/SiteHeader";
@@ -23,7 +24,13 @@ export default async function AskGideonPage() {
     <div className="flex h-[100dvh] flex-col overflow-hidden">
       <SiteHeader />
       <div className="min-h-0 flex-1">
-        <VaultChatPanel variant="page" />
+        <Suspense
+          fallback={
+            <p className="p-6 text-sm text-ink-muted">Loading Ask Gideon…</p>
+          }
+        >
+          <VaultChatPanel variant="page" />
+        </Suspense>
       </div>
     </div>
   );

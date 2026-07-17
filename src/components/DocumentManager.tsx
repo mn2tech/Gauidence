@@ -118,12 +118,15 @@ export default function DocumentManager({
   profileId,
   profileName,
   autoOpenCamera = false,
+  highlightDocumentId = null,
 }: {
   userId: string;
   profileId: string;
   profileName: string;
   /** Open the scanner once (deep link /dashboard?camera=1). */
   autoOpenCamera?: boolean;
+  /** Deep-link from universal search: expand/scroll this document. */
+  highlightDocumentId?: string | null;
 }) {
   const supabase = createClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -220,6 +223,21 @@ export default function DocumentManager({
     setLoading(true);
     void loadDocuments();
   }, [loadDocuments]);
+
+  useEffect(() => {
+    if (!highlightDocumentId || loading) return;
+    const exists = documents.some((d) => d.id === highlightDocumentId);
+    if (!exists) return;
+    setExpandedId(highlightDocumentId);
+    setQuery("");
+    setCategoryFilter("all");
+    const t = window.setTimeout(() => {
+      document
+        .getElementById(`document-${highlightDocumentId}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 120);
+    return () => window.clearTimeout(t);
+  }, [highlightDocumentId, loading, documents]);
 
   function openCamera() {
     setError(null);
@@ -964,7 +982,15 @@ export default function DocumentManager({
             const analysis = analyses[doc.id];
             const expanded = expandedId === doc.id;
             return (
-              <li key={doc.id} className="py-3">
+              <li
+                key={doc.id}
+                id={`document-${doc.id}`}
+                className={`py-3 ${
+                  highlightDocumentId === doc.id
+                    ? "rounded-xl bg-brand-light/40 px-2 ring-2 ring-brand/30"
+                    : ""
+                }`}
+              >
                 <div className="flex flex-wrap items-center gap-3">
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-light text-brand">
                     {doc.mime_type.startsWith("image/") ? (

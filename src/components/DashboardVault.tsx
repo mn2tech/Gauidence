@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { MessageCircle, Search, ShieldCheck } from "lucide-react";
@@ -27,6 +27,7 @@ import {
   canHaveLinkedStudents,
   canHaveLinkedVehicles,
   vaultLabel,
+  type GuardianProfileType,
 } from "@/lib/profiles/types";
 
 function DocumentsSection({
@@ -40,25 +41,61 @@ function DocumentsSection({
 }) {
   const searchParams = useSearchParams();
   const autoOpenCamera = searchParams.get("camera") === "1";
+  const highlightDocumentId = searchParams.get("documentId");
   return (
     <DocumentManager
       userId={userId}
       profileId={profileId}
       profileName={profileName}
       autoOpenCamera={autoOpenCamera}
+      highlightDocumentId={highlightDocumentId}
+    />
+  );
+}
+
+function DailyLogSection({
+  profileId,
+  profileName,
+  profileType,
+}: {
+  profileId: string;
+  profileName: string;
+  profileType: GuardianProfileType;
+}) {
+  const searchParams = useSearchParams();
+  const highlightLogId = searchParams.get("logId");
+  return (
+    <DailyLogPanel
+      profileId={profileId}
+      profileName={profileName}
+      profileType={profileType}
+      highlightLogId={highlightLogId}
     />
   );
 }
 
 export default function DashboardVault({ userId }: { userId: string }) {
   const router = useRouter();
-  const { active, profiles, loading } = useActiveProfile();
+  const searchParams = useSearchParams();
+  const { active, profiles, loading, switchProfile } = useActiveProfile();
+  const requestedProfileId = searchParams.get("profileId");
+  const switchingRef = useRef(false);
 
   useEffect(() => {
     const onChange = () => router.refresh();
     window.addEventListener("guardian:profile-changed", onChange);
     return () => window.removeEventListener("guardian:profile-changed", onChange);
   }, [router]);
+
+  useEffect(() => {
+    if (!requestedProfileId || loading || switchingRef.current) return;
+    if (active?.id === requestedProfileId) return;
+    if (!profiles.some((p) => p.id === requestedProfileId)) return;
+    switchingRef.current = true;
+    void switchProfile(requestedProfileId).finally(() => {
+      switchingRef.current = false;
+    });
+  }, [requestedProfileId, active?.id, loading, profiles, switchProfile]);
 
   if (loading && !active && profiles.length === 0) {
     return (
@@ -161,11 +198,21 @@ export default function DashboardVault({ userId }: { userId: string }) {
       )}
 
       <VaultSection id={`daily-log-${active.id}`} title="Daily Log">
-        <DailyLogPanel
-          profileId={active.id}
-          profileName={active.display_name}
-          profileType={active.profile_type}
-        />
+        <Suspense
+          fallback={
+            <DailyLogPanel
+              profileId={active.id}
+              profileName={active.display_name}
+              profileType={active.profile_type}
+            />
+          }
+        >
+          <DailyLogSection
+            profileId={active.id}
+            profileName={active.display_name}
+            profileType={active.profile_type}
+          />
+        </Suspense>
       </VaultSection>
 
       <VaultSection id={`documents-${active.id}`} title="Documents">

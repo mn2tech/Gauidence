@@ -68,7 +68,11 @@ export default async function DashboardPage() {
           </div>
 
           <div className="mt-8 sm:mt-10">
-            <DashboardVault userId={user.id} />
+            <Suspense
+              fallback={<p className="text-sm text-ink-muted">Loading vault…</p>}
+            >
+              <DashboardVault userId={user.id} />
+            </Suspense>
           </div>
         </section>
       </main>

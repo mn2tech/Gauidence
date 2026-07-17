@@ -3,10 +3,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Camera, LogOut, Menu, ShieldCheck, X } from "lucide-react";
+import { Camera, LogOut, Menu, Search, ShieldCheck, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import ProfileSwitcher from "@/components/ProfileSwitcher";
 import { useActiveProfile } from "@/components/ProfileProvider";
+import GlobalVaultSearch from "@/components/GlobalVaultSearch";
 
 export default function SiteHeader() {
   const pathname = usePathname();
@@ -14,6 +15,7 @@ export default function SiteHeader() {
   const { active, profiles, loading: profilesLoading } = useActiveProfile();
   const [signedIn, setSignedIn] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
@@ -36,6 +38,19 @@ export default function SiteHeader() {
     setMenuOpen(false);
   }, [pathname]);
 
+  const needsSetup = signedIn && !profilesLoading && profiles.length === 0;
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "k") return;
+      if (!signedIn || needsSetup) return;
+      e.preventDefault();
+      setSearchOpen(true);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [signedIn, needsSetup]);
+
   async function handleSignOut() {
     const supabase = createClient();
     if (!supabase) return;
@@ -45,7 +60,6 @@ export default function SiteHeader() {
     router.refresh();
   }
 
-  const needsSetup = signedIn && !profilesLoading && profiles.length === 0;
   const cameraHref = needsSetup
     ? "/dashboard"
     : active
@@ -79,15 +93,30 @@ export default function SiteHeader() {
             <>
               <ProfileSwitcher />
               {!needsSetup ? (
-                <Link
-                  href={cameraHref}
-                  aria-label="Scan with camera"
-                  title="Scan with camera"
-                  className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-3 py-1.5 font-medium text-foreground transition hover:border-stone-400 hover:bg-stone-50"
-                >
-                  <Camera className="h-4 w-4 text-brand" />
-                  <span className="hidden lg:inline">Scan</span>
-                </Link>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setSearchOpen(true)}
+                    aria-label="Search vaults"
+                    title="Search (Ctrl+K)"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-3 py-1.5 font-medium text-foreground transition hover:border-stone-400 hover:bg-stone-50"
+                  >
+                    <Search className="h-4 w-4 text-brand" />
+                    <span className="hidden lg:inline">Search</span>
+                    <kbd className="hidden rounded border border-stone-200 bg-stone-50 px-1.5 py-0.5 text-[10px] font-medium text-ink-muted xl:inline">
+                      ⌘K
+                    </kbd>
+                  </button>
+                  <Link
+                    href={cameraHref}
+                    aria-label="Scan with camera"
+                    title="Scan with camera"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-3 py-1.5 font-medium text-foreground transition hover:border-stone-400 hover:bg-stone-50"
+                  >
+                    <Camera className="h-4 w-4 text-brand" />
+                    <span className="hidden lg:inline">Scan</span>
+                  </Link>
+                </>
               ) : null}
               <Link href={askHref} className="hover:text-foreground">
                 Ask Gideon
@@ -131,13 +160,23 @@ export default function SiteHeader() {
         {/* Mobile: scan + menu */}
         <div className="flex items-center gap-1 sm:hidden">
           {signedIn && !needsSetup ? (
-            <Link
-              href={cameraHref}
-              aria-label="Scan with camera"
-              className="inline-flex items-center justify-center rounded-full p-2 text-brand hover:bg-brand-light"
-            >
-              <Camera className="h-5 w-5" />
-            </Link>
+            <>
+              <button
+                type="button"
+                onClick={() => setSearchOpen(true)}
+                aria-label="Search vaults"
+                className="inline-flex items-center justify-center rounded-full p-2 text-brand hover:bg-brand-light"
+              >
+                <Search className="h-5 w-5" />
+              </button>
+              <Link
+                href={cameraHref}
+                aria-label="Scan with camera"
+                className="inline-flex items-center justify-center rounded-full p-2 text-brand hover:bg-brand-light"
+              >
+                <Camera className="h-5 w-5" />
+              </Link>
+            </>
           ) : null}
           <button
             type="button"
@@ -168,9 +207,21 @@ export default function SiteHeader() {
                   <ProfileSwitcher />
                 </div>
                 {!needsSetup ? (
-                  <Link href={cameraHref} className={linkClass}>
-                    Scan with camera
-                  </Link>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setSearchOpen(true);
+                      }}
+                      className={linkClass}
+                    >
+                      Search vaults
+                    </button>
+                    <Link href={cameraHref} className={linkClass}>
+                      Scan with camera
+                    </Link>
+                  </>
                 ) : null}
                 <Link href={askHref} className={linkClass}>
                   Ask Gideon
@@ -209,6 +260,12 @@ export default function SiteHeader() {
           </nav>
         </div>
       )}
+      {signedIn && !needsSetup ? (
+        <GlobalVaultSearch
+          open={searchOpen}
+          onClose={() => setSearchOpen(false)}
+        />
+      ) : null}
     </header>
   );
 }
