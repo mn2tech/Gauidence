@@ -9,6 +9,7 @@ import {
   useState,
   type KeyboardEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
   FileText,
@@ -24,6 +25,7 @@ import {
   groupSearchResults,
   type SearchResult,
   type SearchResultKind,
+  withSearchTerm,
 } from "@/lib/search";
 
 const KIND_META: Record<
@@ -46,6 +48,7 @@ export default function GlobalVaultSearch({ open, onClose }: Props) {
   const { switchProfile, active } = useActiveProfile();
   const inputRef = useRef<HTMLInputElement>(null);
   const listId = useId();
+  const [mounted, setMounted] = useState(false);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -54,13 +57,30 @@ export default function GlobalVaultSearch({ open, onClose }: Props) {
   const [navigating, setNavigating] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
     if (!open) return;
     setQuery("");
     setResults([]);
     setError(null);
     setActiveIndex(0);
-    const t = window.setTimeout(() => inputRef.current?.focus(), 40);
+    // Prefer immediate focus so iOS still treats it as part of the tap gesture.
+    inputRef.current?.focus({ preventScroll: true });
+    const t = window.setTimeout(() => {
+      inputRef.current?.focus({ preventScroll: true });
+    }, 0);
     return () => window.clearTimeout(t);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
   }, [open]);
 
   useEffect(() => {
@@ -135,13 +155,13 @@ export default function GlobalVaultSearch({ open, onClose }: Props) {
           }
         }
         onClose();
-        router.push(result.href);
+        router.push(withSearchTerm(result.href, query));
         router.refresh();
       } finally {
         setNavigating(false);
       }
     },
-    [active?.id, navigating, onClose, router, switchProfile]
+    [active?.id, navigating, onClose, query, router, switchProfile]
   );
 
   const onInputKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -158,7 +178,7 @@ export default function GlobalVaultSearch({ open, onClose }: Props) {
     }
   };
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
   const sections: { key: SearchResultKind; items: SearchResult[] }[] = [
     { key: "profile", items: grouped.profiles },
@@ -169,28 +189,36 @@ export default function GlobalVaultSearch({ open, onClose }: Props) {
 
   let runningIndex = -1;
 
-  return (
+  const overlay = (
     <div
-      className="fixed inset-0 z-[60] flex items-start justify-center bg-stone-900/40 p-0 sm:items-start sm:p-6 sm:pt-[12vh]"
+      className="fixed inset-0 z-[100] flex items-stretch justify-center bg-stone-900/50 p-0 sm:items-start sm:p-6 sm:pt-[10vh]"
       role="dialog"
       aria-modal="true"
       aria-label="Search your vaults"
-      onMouseDown={(e) => {
+      onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="flex h-full w-full flex-col overflow-hidden bg-white shadow-2xl sm:h-auto sm:max-h-[min(70vh,560px)] sm:max-w-xl sm:rounded-2xl sm:border sm:border-stone-200">
-        <div className="flex items-center gap-2 border-b border-stone-200 px-3 py-2.5 sm:px-4">
+      <div
+        className="flex h-[100dvh] w-full max-w-none flex-col overflow-hidden bg-white shadow-2xl sm:h-auto sm:max-h-[min(70vh,560px)] sm:max-w-xl sm:rounded-2xl sm:border sm:border-stone-200"
+        style={{ paddingTop: "env(safe-area-inset-top)" }}
+      >
+        <div className="flex shrink-0 items-center gap-2 border-b border-stone-200 px-3 py-3 sm:px-4 sm:py-2.5">
           <Search className="h-4 w-4 shrink-0 text-ink-muted" aria-hidden />
           <input
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onInputKeyDown}
-            placeholder="Search people, logs, documents, conversations…"
+            placeholder="Search people, logs, documents…"
+            enterKeyHint="search"
+            autoCapitalize="off"
+            autoCorrect="off"
+            autoComplete="off"
+            spellCheck={false}
             aria-controls={listId}
             aria-autocomplete="list"
-            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-ink-muted"
+            className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-ink-muted sm:text-sm"
           />
           {loading || navigating ? (
             <Loader2 className="h-4 w-4 animate-spin text-ink-muted" />
@@ -198,17 +226,18 @@ export default function GlobalVaultSearch({ open, onClose }: Props) {
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-ink-muted hover:bg-stone-100 hover:text-foreground"
+            className="rounded-lg p-2 text-ink-muted hover:bg-stone-100 hover:text-foreground"
             aria-label="Close search"
           >
-            <X className="h-4 w-4" />
+            <X className="h-5 w-5" />
           </button>
         </div>
 
         <div
           id={listId}
           role="listbox"
-          className="min-h-0 flex-1 overflow-y-auto px-2 py-2 sm:px-3"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2 sm:px-3"
+          style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         >
           {error ? (
             <p className="px-2 py-3 text-sm text-red-700" role="alert">
@@ -261,7 +290,7 @@ export default function GlobalVaultSearch({ open, onClose }: Props) {
                           aria-selected={selected}
                           onMouseEnter={() => setActiveIndex(index)}
                           onClick={() => void openResult(item)}
-                          className={`flex w-full flex-col rounded-xl px-3 py-2 text-left transition ${
+                          className={`flex w-full flex-col rounded-xl px-3 py-2.5 text-left transition active:bg-brand-light ${
                             selected
                               ? "bg-brand-light text-brand-dark"
                               : "hover:bg-stone-50"
@@ -290,4 +319,6 @@ export default function GlobalVaultSearch({ open, onClose }: Props) {
       </div>
     </div>
   );
+
+  return createPortal(overlay, document.body);
 }

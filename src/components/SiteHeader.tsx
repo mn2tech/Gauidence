@@ -72,7 +72,8 @@ export default function SiteHeader() {
     "block rounded-lg px-3 py-2.5 text-sm font-medium text-foreground transition hover:bg-stone-100 sm:inline sm:rounded-none sm:px-0 sm:py-0 sm:font-normal sm:text-ink-muted sm:hover:bg-transparent sm:hover:text-foreground";
 
   return (
-    <header className="sticky top-0 z-40 border-b border-stone-200 bg-white/80 backdrop-blur">
+    <>
+      <header className="sticky top-0 z-40 border-b border-stone-200 bg-white/80 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 sm:h-16 sm:px-6">
         <Link
           href={signedIn ? "/dashboard" : "/"}
@@ -260,12 +261,13 @@ export default function SiteHeader() {
           </nav>
         </div>
       )}
+    </header>
       {signedIn && !needsSetup ? (
         <GlobalVaultSearch
           open={searchOpen}
           onClose={() => setSearchOpen(false)}
         />
       ) : null}
-    </header>
+    </>
   );
 }

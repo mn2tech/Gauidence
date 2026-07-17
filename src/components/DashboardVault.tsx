@@ -42,6 +42,7 @@ function DocumentsSection({
   const searchParams = useSearchParams();
   const autoOpenCamera = searchParams.get("camera") === "1";
   const highlightDocumentId = searchParams.get("documentId");
+  const searchTerm = searchParams.get("searchTerm");
   return (
     <DocumentManager
       userId={userId}
@@ -49,6 +50,7 @@ function DocumentsSection({
       profileName={profileName}
       autoOpenCamera={autoOpenCamera}
       highlightDocumentId={highlightDocumentId}
+      searchTerm={searchTerm}
     />
   );
 }
@@ -64,12 +66,14 @@ function DailyLogSection({
 }) {
   const searchParams = useSearchParams();
   const highlightLogId = searchParams.get("logId");
+  const searchTerm = searchParams.get("searchTerm");
   return (
     <DailyLogPanel
       profileId={profileId}
       profileName={profileName}
       profileType={profileType}
       highlightLogId={highlightLogId}
+      searchTerm={searchTerm}
     />
   );
 }

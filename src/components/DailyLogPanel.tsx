@@ -17,6 +17,7 @@ import {
   type DailyLog,
 } from "@/lib/logs/types";
 import type { GuardianProfileType } from "@/lib/profiles/types";
+import SearchHighlight from "@/components/SearchHighlight";
 
 type Props = {
   profileId: string;
@@ -24,6 +25,8 @@ type Props = {
   profileType: GuardianProfileType;
   /** Deep-link from universal search: scroll/highlight this log. */
   highlightLogId?: string | null;
+  /** Exact universal-search term to mark inside the selected log. */
+  searchTerm?: string | null;
 };
 
 export default function DailyLogPanel({
@@ -31,6 +34,7 @@ export default function DailyLogPanel({
   profileName,
   profileType,
   highlightLogId = null,
+  searchTerm = null,
 }: Props) {
   const [logs, setLogs] = useState<DailyLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -534,17 +538,37 @@ export default function DailyLogPanel({
                       }`}
                     >
                       {log.title && (
-                        <p className="text-sm font-semibold">{log.title}</p>
+                        <p className="text-sm font-semibold">
+                          <SearchHighlight
+                            text={log.title}
+                            term={highlightLogId === log.id ? searchTerm : null}
+                          />
+                        </p>
                       )}
                       <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
-                        {log.content}
+                        <SearchHighlight
+                          text={log.content}
+                          term={highlightLogId === log.id ? searchTerm : null}
+                        />
                       </p>
                       <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-ink-muted">
                         {log.category && (
-                          <span>Category: {log.category}</span>
+                          <span>
+                            Category:{" "}
+                            <SearchHighlight
+                              text={log.category}
+                              term={highlightLogId === log.id ? searchTerm : null}
+                            />
+                          </span>
                         )}
                         {log.tags?.length > 0 && (
-                          <span>Tags: {log.tags.join(", ")}</span>
+                          <span>
+                            Tags:{" "}
+                            <SearchHighlight
+                              text={log.tags.join(", ")}
+                              term={highlightLogId === log.id ? searchTerm : null}
+                            />
+                          </span>
                         )}
                         <span className="ml-auto flex gap-1">
                           <MoveDailyLogButton

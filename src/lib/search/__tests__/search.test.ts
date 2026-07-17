@@ -9,6 +9,7 @@ import {
   scoreMatch,
   snippetAroundMatch,
   sortAndCapResults,
+  withSearchTerm,
   type SearchResult,
 } from "../index.ts";
 
@@ -67,6 +68,13 @@ describe("universal vault search helpers", () => {
     assert.match(
       hrefForResult({ kind: "chat", id: "c1", profileId: "p1" }),
       /^\/ask\?/
+    );
+    assert.equal(
+      withSearchTerm(
+        "/dashboard?profileId=p1&logId=l1#daily-log-p1",
+        "Sephora & Co"
+      ),
+      "/dashboard?profileId=p1&logId=l1&searchTerm=Sephora%20%26%20Co#daily-log-p1"
     );
   });
 

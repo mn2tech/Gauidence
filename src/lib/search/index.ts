@@ -124,6 +124,17 @@ export function hrefForResult(args: {
   return `/ask?profileId=${encodeURIComponent(profileId)}&chatId=${encodeURIComponent(id)}`;
 }
 
+/** Add the matched term to an existing relative deep link, preserving its hash. */
+export function withSearchTerm(href: string, query: string): string {
+  const term = query.trim();
+  if (!term) return href;
+  const [path, hash] = href.split("#", 2);
+  const separator = path.includes("?") ? "&" : "?";
+  return `${path}${separator}searchTerm=${encodeURIComponent(term)}${
+    hash ? `#${hash}` : ""
+  }`;
+}
+
 export function sortAndCapResults(
   results: SearchResult[],
   maxTotal = SEARCH_MAX_RESULTS

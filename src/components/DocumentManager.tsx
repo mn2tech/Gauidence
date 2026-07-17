@@ -37,6 +37,7 @@ import DocumentChatPanel from "@/components/DocumentChatPanel";
 import CameraCaptureModal from "@/components/CameraCaptureModal";
 import ShareDocumentButton from "@/components/ShareDocumentButton";
 import MoveDocumentButton from "@/components/MoveDocumentButton";
+import SearchHighlight from "@/components/SearchHighlight";
 
 type DocumentRow = {
   id: string;
@@ -119,6 +120,7 @@ export default function DocumentManager({
   profileName,
   autoOpenCamera = false,
   highlightDocumentId = null,
+  searchTerm = null,
 }: {
   userId: string;
   profileId: string;
@@ -127,6 +129,8 @@ export default function DocumentManager({
   autoOpenCamera?: boolean;
   /** Deep-link from universal search: expand/scroll this document. */
   highlightDocumentId?: string | null;
+  /** Exact universal-search term to mark inside the selected document. */
+  searchTerm?: string | null;
 }) {
   const supabase = createClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1037,7 +1041,14 @@ export default function DocumentManager({
                         </button>
                       </div>
                     ) : (
-                      <p className="truncate text-sm font-medium">{doc.file_name}</p>
+                      <p className="truncate text-sm font-medium">
+                        <SearchHighlight
+                          text={doc.file_name}
+                          term={
+                            highlightDocumentId === doc.id ? searchTerm : null
+                          }
+                        />
+                      </p>
                     )}
                     <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-muted">
                       <span>
@@ -1207,9 +1218,23 @@ export default function DocumentManager({
                       ) : null}
                     </div>
                     {analysis.title && (
-                      <p className="text-sm font-semibold">{analysis.title}</p>
+                      <p className="text-sm font-semibold">
+                        <SearchHighlight
+                          text={analysis.title}
+                          term={
+                            highlightDocumentId === doc.id ? searchTerm : null
+                          }
+                        />
+                      </p>
                     )}
-                    <p className="mt-1 text-sm leading-relaxed">{analysis.summary}</p>
+                    <p className="mt-1 text-sm leading-relaxed">
+                      <SearchHighlight
+                        text={analysis.summary}
+                        term={
+                          highlightDocumentId === doc.id ? searchTerm : null
+                        }
+                      />
+                    </p>
                     {analysis.facts.length > 0 && (
                       <ul className="mt-3 space-y-2">
                         {analysis.facts.map((fact, i) => (
@@ -1222,8 +1247,27 @@ export default function DocumentManager({
                             >
                               {SOURCE_LABELS[fact.source]}
                             </span>
-                            <span className="font-medium">{fact.label}:</span>
-                            <span className="text-ink-muted">{fact.value}</span>
+                            <span className="font-medium">
+                              <SearchHighlight
+                                text={fact.label}
+                                term={
+                                  highlightDocumentId === doc.id
+                                    ? searchTerm
+                                    : null
+                                }
+                              />
+                              :
+                            </span>
+                            <span className="text-ink-muted">
+                              <SearchHighlight
+                                text={fact.value}
+                                term={
+                                  highlightDocumentId === doc.id
+                                    ? searchTerm
+                                    : null
+                                }
+                              />
+                            </span>
                           </li>
                         ))}
                       </ul>
