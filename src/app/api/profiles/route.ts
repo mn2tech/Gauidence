@@ -16,6 +16,7 @@ import {
   requireOwnedGuardianProfile,
   setActiveGuardianProfile,
 } from "@/lib/profiles/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
@@ -234,38 +235,84 @@ export async function POST(request: Request) {
     row.is_default = true;
   }
 
-  const { data: created, error } = await supabase
-    .from("guardian_profiles")
-    .insert(row)
-    .select(
-      "id, owner_user_id, profile_type, display_name, relationship, avatar_url, date_of_birth, school_name, grade_level, business_legal_name, industry, website, description, job_title, department, organization_name, parent_profile_id, is_default, created_at, updated_at"
-    )
-    .single();
+  const profileSelect =
+    "id, owner_user_id, profile_type, display_name, relationship, avatar_url, date_of_birth, school_name, grade_level, business_legal_name, industry, website, description, job_title, department, organization_name, parent_profile_id, is_default, created_at, updated_at";
 
-  if (error || !created) {
-    console.error(
-      "guardian_profiles insert failed:",
-      error?.code,
-      error?.message,
-      error?.details,
-      error?.hint
-    );
+  const admin = createAdminClient();
+  // Prefer service-role insert so shared-vault RLS/trigger edge cases can't block owners.
+  let created: Record<string, unknown> | null = null;
+  let errorMessage: string | null = null;
+
+  if (admin) {
+    const { data, error } = await admin
+      .from("guardian_profiles")
+      .insert(row)
+      .select(profileSelect)
+      .single();
+    if (error || !data) {
+      errorMessage = error?.message ?? null;
+      console.error(
+        "guardian_profiles admin insert failed:",
+        error?.code,
+        error?.message,
+        error?.details,
+        error?.hint
+      );
+    } else {
+      created = data as Record<string, unknown>;
+      await admin.from("guardian_profile_members").upsert(
+        {
+          profile_id: created.id,
+          user_id: user.id,
+          role: "owner",
+          invited_by: user.id,
+        },
+        { onConflict: "profile_id,user_id" }
+      );
+    }
+  } else {
+    const { data, error } = await supabase
+      .from("guardian_profiles")
+      .insert(row)
+      .select(profileSelect)
+      .single();
+    if (error || !data) {
+      errorMessage = error?.message ?? null;
+      console.error(
+        "guardian_profiles insert failed:",
+        error?.code,
+        error?.message,
+        error?.details,
+        error?.hint
+      );
+    } else {
+      created = data as Record<string, unknown>;
+    }
+  }
+
+  if (!created?.id) {
     return NextResponse.json(
       {
-        error: error?.message?.includes("Parent profile")
+        error: errorMessage?.includes("Parent profile")
           ? "That parent vault isn't available. Refresh and try again."
-          : "Couldn't create profile. If shared vaults were just enabled, run migration 0026 in Supabase.",
+          : errorMessage
+            ? `Couldn't create profile: ${errorMessage}`
+            : "Couldn't create profile. Run migration 0027 in Supabase, then try again.",
       },
       { status: 502 }
     );
   }
 
+  const createdId = String(created.id);
   const switchTo = body.switchTo !== false;
   if (switchTo) {
-    await setActiveGuardianProfile(supabase, user.id, created.id);
+    await setActiveGuardianProfile(supabase, user.id, createdId);
   }
 
   const profiles = await listGuardianProfiles(supabase, user.id);
   const active = await getActiveGuardianProfile(supabase, user);
-  return NextResponse.json({ profile: created, profiles, active }, { status: 201 });
+  return NextResponse.json(
+    { profile: created, profiles, active },
+    { status: 201 }
+  );
 }
