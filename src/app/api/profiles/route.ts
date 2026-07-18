@@ -254,7 +254,7 @@ export async function POST(request: Request) {
       {
         error: error?.message?.includes("Parent profile")
           ? "That parent vault isn't available. Refresh and try again."
-          : "Couldn't create profile. If you just enabled shared vaults, run migration 0025 in Supabase.",
+          : "Couldn't create profile. If shared vaults were just enabled, run migration 0026 in Supabase.",
       },
       { status: 502 }
     );
