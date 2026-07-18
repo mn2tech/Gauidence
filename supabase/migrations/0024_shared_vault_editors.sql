@@ -38,6 +38,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = public
+set row_security = off
 as $$
 begin
   insert into public.guardian_profile_members (profile_id, user_id, role, invited_by)
@@ -188,6 +189,19 @@ create policy "Owners can insert memberships"
   with check (
     public.can_manage_guardian_profile(profile_id)
     and role = 'editor'
+  );
+
+create policy "Owners can insert own owner membership"
+  on public.guardian_profile_members for insert
+  with check (
+    role = 'owner'
+    and user_id = auth.uid()
+    and exists (
+      select 1
+      from public.guardian_profiles gp
+      where gp.id = profile_id
+        and gp.owner_user_id = auth.uid()
+    )
   );
 
 create policy "Owners can update memberships"

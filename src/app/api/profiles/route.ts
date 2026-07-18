@@ -243,8 +243,19 @@ export async function POST(request: Request) {
     .single();
 
   if (error || !created) {
+    console.error(
+      "guardian_profiles insert failed:",
+      error?.code,
+      error?.message,
+      error?.details,
+      error?.hint
+    );
     return NextResponse.json(
-      { error: "Couldn't create profile." },
+      {
+        error: error?.message?.includes("Parent profile")
+          ? "That parent vault isn't available. Refresh and try again."
+          : "Couldn't create profile. If you just enabled shared vaults, run migration 0025 in Supabase.",
+      },
       { status: 502 }
     );
   }
