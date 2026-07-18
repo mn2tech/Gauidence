@@ -1,5 +1,14 @@
 import { GIDEON_SYSTEM } from "./gideon";
 
+/** Cap each retrieved excerpt so vault context stays lean. */
+const CHUNK_CONTENT_MAX_CHARS = 700;
+
+function trimChunkContent(content: string): string {
+  const trimmed = content.trim();
+  if (trimmed.length <= CHUNK_CONTENT_MAX_CHARS) return trimmed;
+  return `${trimmed.slice(0, CHUNK_CONTENT_MAX_CHARS).trimEnd()}…`;
+}
+
 export type RetrievedChunk = {
   id: string;
   document_id: string;
@@ -37,7 +46,7 @@ export function formatRetrievalContext(chunks: RetrievedChunk[]): {
       ? `${c.profile_name.trim()} · ${c.file_name}`
       : c.file_name;
     blocks.push(
-      `[Source: ${label}${vault} | doc:${c.document_id} | chunk:${c.chunk_index} | sim:${c.similarity.toFixed(3)}]\n${c.content}`
+      `[Source: ${label}${vault} | doc:${c.document_id} | chunk:${c.chunk_index} | sim:${c.similarity.toFixed(3)}]\n${trimChunkContent(c.content)}`
     );
   }
 

@@ -703,10 +703,11 @@ export async function POST(request: Request) {
 
   const history = (priorMessages ?? [])
     .filter((m) => m.role === "user" || m.role === "assistant")
-    .slice(-CHAT_HISTORY_MAX_TURNS * 2)
+    // Keep recent turns only — long history dominates token cost.
+    .slice(-Math.min(CHAT_HISTORY_MAX_TURNS, 6) * 2)
     .map((m) => ({
       role: m.role as "user" | "assistant",
-      content: String(m.content),
+      content: String(m.content).slice(0, 1200),
     }));
 
   if (!isNewChat && history.length === 0) {
@@ -755,14 +756,14 @@ export async function POST(request: Request) {
             supabase,
             queryEmbedding,
             searchScopes,
-            showPictures ? 12 : 10
+            showPictures ? 8 : 5
           )
         : (
             await retrieveVaultChunks(
               supabase,
               queryEmbedding,
               active.id,
-              showPictures ? 10 : 8
+              showPictures ? 6 : 4
             )
           ).map((c) => ({
             ...c,
@@ -777,7 +778,7 @@ export async function POST(request: Request) {
       profileIds: searchIds,
       profileNames,
       question,
-      limit: linkedProfiles.length > 0 ? 8 : 6,
+      limit: linkedProfiles.length > 0 ? 4 : 3,
     });
     const logContext = formatDailyLogsForGideon(dailyLogs, profileNames);
     const linkedContext = await loadLinkedOrgContext(
@@ -825,6 +826,7 @@ ${linkedContext.trim() || "(none)"}
     answer = await runChatCompletion(client, {
       system,
       model: ANALYSIS_MODEL,
+      maxTokens: 900,
       messages: [...history, { role: "user", content: question }],
     });
     if (!answer) {
