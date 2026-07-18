@@ -3,7 +3,7 @@ import type { User, SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import {
   getActiveGuardianProfile,
-  requireOwnedGuardianProfile,
+  requireEditableGuardianProfile,
 } from "@/lib/profiles/server";
 import {
   calendarDateInZone,
@@ -98,12 +98,12 @@ export async function POST(request: Request) {
   let profileId =
     typeof body.profileId === "string" ? body.profileId : null;
   if (profileId) {
-    const owned = await requireOwnedGuardianProfile(
+    const editable = await requireEditableGuardianProfile(
       supabase,
       user.id,
       profileId
     );
-    if (!owned) {
+    if (!editable) {
       return NextResponse.json({ error: "Profile not found." }, { status: 404 });
     }
   } else {

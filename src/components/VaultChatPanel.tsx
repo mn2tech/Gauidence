@@ -44,6 +44,12 @@ import { isImageFileName } from "@/lib/vault/images";
 import { uploadAndAnalyzeToVault } from "@/lib/vault/clientUpload";
 import { todayLogDate } from "@/lib/logs/types";
 import { calendarDateInZone } from "@/lib/reminders/time";
+import {
+  parseProposedReminder,
+  proposedReminderWhenLabel,
+  stripProposedReminderSection,
+  type ProposedReminder,
+} from "@/lib/reminders/propose";
 import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
 
 function defaultReminderDateTime(): { date: string; time: string } {
@@ -243,6 +249,12 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
   const [reminderDate, setReminderDate] = useState("");
   const [reminderTime, setReminderTime] = useState("");
   const [savingReminder, setSavingReminder] = useState(false);
+  const [confirmingReminderId, setConfirmingReminderId] = useState<string | null>(
+    null
+  );
+  const [confirmedReminderIds, setConfirmedReminderIds] = useState<Set<string>>(
+    () => new Set()
+  );
   const [vaultBusy, setVaultBusy] = useState(false);
   const [vaultStatus, setVaultStatus] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -626,6 +638,50 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     }
   };
 
+  const confirmProposedReminder = async (
+    messageId: string,
+    proposal: ProposedReminder
+  ) => {
+    if (!profileId || confirmingReminderId || savingReminder || vaultBusy || sending) {
+      return;
+    }
+    setConfirmingReminderId(messageId);
+    setError(null);
+    try {
+      const res = await fetch("/api/reminders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          profileId,
+          title: proposal.title,
+          date: proposal.date,
+          time: proposal.time,
+        }),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        whenLabel?: string;
+        reminder?: { title: string };
+      };
+      if (!res.ok) {
+        setError(body.error ?? "Couldn't save reminder.");
+        return;
+      }
+      setConfirmedReminderIds((prev) => new Set(prev).add(messageId));
+      window.dispatchEvent(new Event("guardian:alerts-updated"));
+      const title = body.reminder?.title ?? proposal.title;
+      const when =
+        body.whenLabel ?? proposedReminderWhenLabel(proposal);
+      pushLocalNote(
+        `Reminder set: "${title}" — ${when}. You'll see it under Attention on the dashboard.`
+      );
+    } catch {
+      setError("Couldn't save reminder. Check your connection and try again.");
+    } finally {
+      setConfirmingReminderId(null);
+    }
+  };
+
   const saveInlineLog = async (e: FormEvent) => {
     e.preventDefault();
     if (!profileId || !logContent.trim() || savingLog || vaultBusy || sending) {
@@ -731,11 +787,17 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
   };
 
   const renderAssistantContent = (m: VaultMessage) => {
-    const sections = parseGideonSections(m.content);
+    const proposed = parseProposedReminder(m.content);
+    const displayContent = stripProposedReminderSection(m.content);
+    const sections = parseGideonSections(
+      displayContent || (proposed ? "" : m.content)
+    );
     const citations = Array.isArray(m.citations) ? m.citations : [];
     const uniqueCitations = [
       ...new Map(citations.map((c) => [c.documentId, c])).values(),
     ];
+    const alreadySet = confirmedReminderIds.has(m.id);
+    const confirming = confirmingReminderId === m.id;
 
     return (
       <div className="min-w-0 flex-1 space-y-2">
@@ -752,6 +814,53 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
             <p className="whitespace-pre-wrap text-foreground/90">{sec.content}</p>
           </div>
         ))}
+        {proposed ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50/90 px-3 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-900/70">
+              Proposed reminder
+            </p>
+            <p className="mt-1 text-sm font-medium text-foreground">
+              {proposed.title}
+            </p>
+            <p className="mt-0.5 text-xs text-ink-muted">
+              {proposedReminderWhenLabel(proposed)}
+            </p>
+            {alreadySet ? (
+              <p className="mt-2 text-xs font-medium text-emerald-800">
+                Reminder saved. You decide what happens next.
+              </p>
+            ) : (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={confirming || savingReminder || sending || vaultBusy}
+                  onClick={() => void confirmProposedReminder(m.id, proposed)}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand/90 disabled:opacity-60"
+                >
+                  {confirming ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Bell className="h-3.5 w-3.5" />
+                  )}
+                  Create reminder
+                </button>
+                <button
+                  type="button"
+                  disabled={confirming || savingReminder}
+                  onClick={() => {
+                    setReminderTitle(proposed.title);
+                    setReminderDate(proposed.date);
+                    setReminderTime(proposed.time);
+                    setReminderOpen(true);
+                  }}
+                  className="inline-flex items-center rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50"
+                >
+                  Edit first
+                </button>
+              </div>
+            )}
+          </div>
+        ) : null}
         {uniqueCitations.length > 0 && (
           <div className="space-y-2 pt-1">
             {uniqueCitations.some(

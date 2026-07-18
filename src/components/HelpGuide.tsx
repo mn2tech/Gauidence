@@ -62,7 +62,7 @@ const HOW_TO = [
   {
     icon: MessageCircle,
     title: "Ask Gideon",
-    body: "Ask questions about the active vault. Answers draw from documents and Daily Logs. Always verify important decisions against the original file.",
+    body: "Ask questions about the active vault. Say “remind me…” to propose a reminder from a vault date — you confirm before it is saved. Always verify important decisions against the original file.",
     href: "/ask",
     linkLabel: "Ask Gideon",
   },

@@ -51,6 +51,11 @@ import {
   formatDailyLogsForGideon,
   retrieveRelevantDailyLogs,
 } from "@/lib/logs/retrieve";
+import {
+  parseProposedReminder,
+  wantsReminderAgent,
+  REMINDER_AGENT_SYSTEM_NOTE,
+} from "@/lib/reminders/propose";
 
 async function loadLinkedOrgContext(
   supabase: SupabaseClient,
@@ -804,12 +809,16 @@ export async function POST(request: Request) {
         ? "No vault excerpts, Daily Logs, or linked profile structure matched this question (or the vault is empty). Do not invent vault facts. Use ## GENERAL KNOWLEDGE for general questions, and ## GIDEON'S SUGGESTION to upload documents when that would help."
         : "";
 
+    const reminderAgent = wantsReminderAgent(question);
+    const reminderNote = reminderAgent ? REMINDER_AGENT_SYSTEM_NOTE : "";
+
     const system = `${VAULT_CHAT_SYSTEM}
 
 Active profile: ${active.display_name} (${active.profile_type}).
 ${rollupNote}
 ${pictureNote}
 ${vaultEmptyNote}
+${reminderNote}
 
 --- RETRIEVED EXCERPTS ---
 ${formatted.context.trim() || "(none)"}
@@ -826,7 +835,7 @@ ${linkedContext.trim() || "(none)"}
     answer = await runChatCompletion(client, {
       system,
       model: ANALYSIS_MODEL,
-      maxTokens: 900,
+      maxTokens: reminderAgent ? 1100 : 900,
       messages: [...history, { role: "user", content: question }],
     });
     if (!answer) {
@@ -889,10 +898,12 @@ ${linkedContext.trim() || "(none)"}
     .eq("id", chatId);
 
   const chats = await listChats(supabase, user.id, active.id);
+  const proposedReminder = parseProposedReminder(answer);
 
   return NextResponse.json({
     chatId,
     chats,
     messages: [userMsg, assistantMsg] as ChatMessageRow[],
+    proposedReminder,
   });
 }
