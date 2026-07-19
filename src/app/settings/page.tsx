@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 import SettingsForm from "@/components/SettingsForm";
+import { isPlatformAdmin } from "@/lib/admin";
 
 export const metadata: Metadata = {
   title: "Settings — Guardian",
@@ -24,6 +25,8 @@ export default async function SettingsPage() {
     .eq("id", user.id)
     .maybeSingle();
 
+  const showUsage = isPlatformAdmin(user.email);
+
   return (
     <div className="flex min-h-screen flex-col">
       <SiteHeader />
@@ -41,6 +44,16 @@ export default async function SettingsPage() {
               Manage people & spaces →
             </a>
           </p>
+          {showUsage ? (
+            <p className="mt-2">
+              <a
+                href="/settings/usage"
+                className="text-sm font-semibold text-brand hover:text-brand-dark"
+              >
+                AI usage (admin) →
+              </a>
+            </p>
+          ) : null}
           <SettingsForm
             userId={user.id}
             email={user.email ?? ""}

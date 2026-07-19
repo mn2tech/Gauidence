@@ -18,6 +18,7 @@ import {
   sanitizeResearchQuery,
 } from "@/lib/research/prompt";
 import { loadResearchVaultContext } from "@/lib/research/vaultContext";
+import { withLlmUsage } from "@/lib/usage/record";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -179,17 +180,21 @@ ${vaultContext.trim() || "(none matching this query in the active vault)"}
 --- END GUARDIAN VAULT CONTEXT ---`;
 
     const client = createLlmClient();
-    const brief = await runChatCompletion(client, {
-      system,
-      model: ANALYSIS_MODEL,
-      maxTokens: 2500,
-      messages: [
-        {
-          role: "user",
-          content: `Write a Research brief for: ${query}`,
-        },
-      ],
-    });
+    const brief = await withLlmUsage(
+      { userId: user.id, feature: "research" },
+      () =>
+        runChatCompletion(client, {
+          system,
+          model: ANALYSIS_MODEL,
+          maxTokens: 2500,
+          messages: [
+            {
+              role: "user",
+              content: `Write a Research brief for: ${query}`,
+            },
+          ],
+        })
+    );
 
     return NextResponse.json({
       query,

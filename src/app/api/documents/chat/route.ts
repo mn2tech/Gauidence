@@ -14,6 +14,7 @@ import {
   CHAT_HISTORY_MAX_TURNS,
   type ChatFactInput,
 } from "@/lib/chat/context";
+import { withLlmUsage } from "@/lib/usage/record";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -293,11 +294,15 @@ ${contextResult.context}
   let answer: string;
   try {
     const client = createLlmClient();
-    answer = await runChatCompletion(client, {
-      system,
-      model: ANALYSIS_MODEL,
-      messages: [...history, { role: "user", content: question }],
-    });
+    answer = await withLlmUsage(
+      { userId: user.id, feature: "document_chat" },
+      () =>
+        runChatCompletion(client, {
+          system,
+          model: ANALYSIS_MODEL,
+          messages: [...history, { role: "user", content: question }],
+        })
+    );
     if (!answer) {
       answer =
         "I couldn't generate an answer from this document. Try rephrasing your question.";

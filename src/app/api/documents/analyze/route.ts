@@ -6,6 +6,7 @@ import { toDisplayFacts, collectDeadlines } from "@/lib/analysis/display";
 import { documentTypeToCategory } from "@/lib/analysis/llm";
 import type { AnalysisStatus } from "@/lib/analysis/types";
 import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
+import { withLlmUsage } from "@/lib/usage/record";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -144,20 +145,24 @@ export async function POST(request: Request) {
     null;
 
   try {
-    const result = await runAnalysisPipeline(
-      {
-        mimeType: doc.mime_type,
-        fileName: doc.file_name,
-        base64,
-      },
-      {
-        fullName:
-          guardianProfile?.display_name ?? accountProfile?.full_name ?? null,
-        email: accountProfile?.email ?? user.email ?? null,
-        companyName,
-        timeZone: timeZone ?? null,
-      },
-      setStatus
+    const result = await withLlmUsage(
+      { userId: user.id, feature: "analyze" },
+      () =>
+        runAnalysisPipeline(
+          {
+            mimeType: doc.mime_type,
+            fileName: doc.file_name,
+            base64,
+          },
+          {
+            fullName:
+              guardianProfile?.display_name ?? accountProfile?.full_name ?? null,
+            email: accountProfile?.email ?? user.email ?? null,
+            companyName,
+            timeZone: timeZone ?? null,
+          },
+          setStatus
+        )
     );
 
     const { analysis, classification, routedTo, model } = result;

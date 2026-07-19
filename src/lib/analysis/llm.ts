@@ -6,6 +6,7 @@ import type { DocumentType } from "./types";
 import type { ExtractionResult, PageImage } from "./extract";
 import type { ParsedInvoiceAnchors } from "./invoiceText";
 import type { AnalysisInputMode } from "./inputMode";
+import { captureAnthropicUsage } from "@/lib/usage/record";
 
 /** Claude model for text-heavy docs. Override with CLAUDE_MODEL or ANTHROPIC_MODEL. */
 export const ANALYSIS_MODEL =
@@ -310,10 +311,12 @@ export async function runStructuredJson<T>(
     });
 
     if (response.parsed_output != null) {
+      captureAnthropicUsage(model, response.usage);
       return response.parsed_output as T;
     }
     const textBlock = response.content.find((b) => b.type === "text");
     if (textBlock && textBlock.type === "text") {
+      captureAnthropicUsage(model, response.usage);
       return extractJsonObject(textBlock.text) as T;
     }
   } catch (err) {
@@ -348,6 +351,7 @@ ${JSON.stringify(args.schema)}`,
         "empty_response"
       );
     }
+    captureAnthropicUsage(model, response.usage);
     return extractJsonObject(textBlock.text) as T;
   } catch (err) {
     mapAnthropicError(err);
@@ -363,13 +367,15 @@ export async function runPlainText(
   }
 ): Promise<string> {
   try {
+    const model = args.model ?? ANALYSIS_MODEL;
     const response = await client.messages.create({
-      model: args.model ?? ANALYSIS_MODEL,
+      model,
       max_tokens: 8192,
       temperature: 0,
       system: args.system,
       messages: [{ role: "user", content: args.userContent }],
     });
+    captureAnthropicUsage(model, response.usage);
     const textBlock = response.content.find((b) => b.type === "text");
     return textBlock && textBlock.type === "text" ? textBlock.text.trim() : "";
   } catch (err) {
@@ -388,8 +394,9 @@ export async function runChatCompletion(
   }
 ): Promise<string> {
   try {
+    const model = args.model ?? ANALYSIS_MODEL;
     const response = await client.messages.create({
-      model: args.model ?? ANALYSIS_MODEL,
+      model,
       max_tokens: args.maxTokens ?? 2048,
       temperature: 0,
       system: args.system,
@@ -398,6 +405,7 @@ export async function runChatCompletion(
         content: m.content,
       })),
     });
+    captureAnthropicUsage(model, response.usage);
     const textBlock = response.content.find((b) => b.type === "text");
     return textBlock && textBlock.type === "text" ? textBlock.text.trim() : "";
   } catch (err) {

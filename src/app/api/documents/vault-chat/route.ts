@@ -56,6 +56,7 @@ import {
   wantsReminderAgent,
   REMINDER_AGENT_SYSTEM_NOTE,
 } from "@/lib/reminders/propose";
+import { withLlmUsage } from "@/lib/usage/record";
 
 async function loadLinkedOrgContext(
   supabase: SupabaseClient,
@@ -832,12 +833,16 @@ ${logContext.trim() || "(none)"}
 ${linkedContext.trim() || "(none)"}
 --- END LINKED PROFILE STRUCTURE ---`;
 
-    answer = await runChatCompletion(client, {
-      system,
-      model: ANALYSIS_MODEL,
-      maxTokens: reminderAgent ? 1100 : 900,
-      messages: [...history, { role: "user", content: question }],
-    });
+    answer = await withLlmUsage(
+      { userId: user.id, feature: "vault_chat" },
+      () =>
+        runChatCompletion(client, {
+          system,
+          model: ANALYSIS_MODEL,
+          maxTokens: reminderAgent ? 1100 : 900,
+          messages: [...history, { role: "user", content: question }],
+        })
+    );
     if (!answer) {
       answer =
         "I found potentially relevant information, but it needs verification before I can give you a reliable answer.";
