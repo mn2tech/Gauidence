@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { appBaseUrl, getStripe, isStripeBillingConfigured } from "@/lib/billing/stripe";
+import {
+  appBaseUrl,
+  getStripe,
+  isStripeBillingConfigured,
+  personalPriceId,
+  PERSONAL_UNIT_AMOUNT_CENTS,
+} from "@/lib/billing/stripe";
 
 export const runtime = "nodejs";
 
@@ -14,7 +20,6 @@ export async function POST(request: Request) {
   }
 
   const stripe = getStripe();
-  const priceId = process.env.STRIPE_PRICE_PERSONAL!.trim();
   if (!stripe) {
     return NextResponse.json(
       { error: "Billing isn't set up yet on this deployment." },
@@ -68,12 +73,31 @@ export async function POST(request: Request) {
       .eq("id", user.id);
   }
 
+  const savedPrice = personalPriceId();
+  const lineItems = savedPrice
+    ? [{ price: savedPrice, quantity: 1 }]
+    : [
+        {
+          quantity: 1,
+          price_data: {
+            currency: "usd",
+            unit_amount: PERSONAL_UNIT_AMOUNT_CENTS,
+            recurring: { interval: "month" as const },
+            product_data: {
+              name: "Guardian Personal",
+              description:
+                "100 analyses, 500 Ask Gideon turns, and 50 Research briefs per month.",
+            },
+          },
+        },
+      ];
+
   const base = appBaseUrl(request);
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
     customer: customerId,
     client_reference_id: user.id,
-    line_items: [{ price: priceId, quantity: 1 }],
+    line_items: lineItems,
     success_url: `${base}/settings?billing=success`,
     cancel_url: `${base}/settings?billing=canceled`,
     metadata: { supabase_user_id: user.id },

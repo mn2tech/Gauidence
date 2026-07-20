@@ -80,12 +80,13 @@ files (or ask Gideon once) to backfill the search index.
 | Free | $0 | 5 | 30 | 3 |
 | Personal | $12/mo | 100 | 500 | 50 |
 
-1. Create a Product + monthly Price ($12) in Stripe; set `STRIPE_PRICE_PERSONAL`.
-2. Set `STRIPE_SECRET_KEY` (and optional `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`).
-3. Add webhook endpoint `/api/billing/webhook` for `checkout.session.completed`
+1. Set `STRIPE_SECRET_KEY` on Vercel (Checkout defines Personal at $12/mo
+   inline — no Dashboard product required). Optional: `STRIPE_PRICE_PERSONAL`
+   if you prefer a saved Price ID.
+2. Add webhook endpoint `/api/billing/webhook` for `checkout.session.completed`
    and `customer.subscription.*`; set `STRIPE_WEBHOOK_SECRET`.
-4. Run `0030_billing.sql` in Supabase.
-5. Users upgrade from **Settings → Plan & billing**.
+3. Run `0030_billing.sql` in Supabase.
+4. Users upgrade from **Settings → Plan & billing**.
 
 ### Admin AI usage
 

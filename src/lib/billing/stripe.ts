@@ -19,11 +19,17 @@ export function getStripe(): Stripe | null {
 }
 
 export function isStripeBillingConfigured(): boolean {
-  return Boolean(
-    process.env.STRIPE_SECRET_KEY?.trim() &&
-      process.env.STRIPE_PRICE_PERSONAL?.trim()
-  );
+  return Boolean(process.env.STRIPE_SECRET_KEY?.trim());
 }
+
+/** Prefer a saved Price ID when set; otherwise Checkout uses inline price_data. */
+export function personalPriceId(): string | null {
+  const id = process.env.STRIPE_PRICE_PERSONAL?.trim();
+  return id || null;
+}
+
+export const PERSONAL_UNIT_AMOUNT_CENTS = 1200; // $12.00
+
 
 export function isStripeWebhookConfigured(): boolean {
   return Boolean(
