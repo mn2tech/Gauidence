@@ -38,10 +38,23 @@ export function estimateClaudeCostUsd(args: {
   inputTokens: number;
   outputTokens: number;
 }): number {
+  const parts = estimateClaudeCostParts(args);
+  return parts.inputUsd + parts.outputUsd;
+}
+
+/** Split estimated USD into input vs output for a call or aggregate. */
+export function estimateClaudeCostParts(args: {
+  model?: string | null;
+  inputTokens: number;
+  outputTokens: number;
+}): { inputUsd: number; outputUsd: number } {
   const rate = rateForModel(args.model);
   const input = Math.max(0, args.inputTokens);
   const output = Math.max(0, args.outputTokens);
-  return (input * rate.inputPerMTok + output * rate.outputPerMTok) / 1_000_000;
+  return {
+    inputUsd: (input * rate.inputPerMTok) / 1_000_000,
+    outputUsd: (output * rate.outputPerMTok) / 1_000_000,
+  };
 }
 
 export function formatUsd(amount: number): string {

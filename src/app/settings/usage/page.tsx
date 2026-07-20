@@ -104,7 +104,7 @@ export default async function AdminUsagePage() {
     <div className="flex min-h-screen flex-col">
       <SiteHeader />
       <main className="flex-1">
-        <section className="mx-auto max-w-3xl px-6 py-14">
+        <section className="mx-auto max-w-4xl px-6 py-14">
           <p className="text-sm">
             <Link
               href="/settings"
@@ -137,12 +137,14 @@ export default async function AdminUsagePage() {
                     {formatUsd(summary.last7Days.estimatedCostUsd)}
                   </p>
                   <p className="mt-1 text-xs text-ink-muted">
-                    {formatTokens(summary.last7Days.totalTokens)} tokens ·{" "}
+                    {formatUsd(summary.last7Days.inputCostUsd)} in ·{" "}
+                    {formatUsd(summary.last7Days.outputCostUsd)} out ·{" "}
                     {summary.last7Days.calls} calls
                   </p>
                   <p className="mt-0.5 text-xs text-ink-muted">
                     {formatTokens(summary.last7Days.inputTokens)} in ·{" "}
-                    {formatTokens(summary.last7Days.outputTokens)} out
+                    {formatTokens(summary.last7Days.outputTokens)} out ·{" "}
+                    {formatTokens(summary.last7Days.totalTokens)} total
                   </p>
                 </div>
                 <div className="rounded-xl border border-stone-200 bg-stone-50/80 px-4 py-3">
@@ -153,12 +155,14 @@ export default async function AdminUsagePage() {
                     {formatUsd(summary.thisMonth.estimatedCostUsd)}
                   </p>
                   <p className="mt-1 text-xs text-ink-muted">
-                    {formatTokens(summary.thisMonth.totalTokens)} tokens ·{" "}
+                    {formatUsd(summary.thisMonth.inputCostUsd)} in ·{" "}
+                    {formatUsd(summary.thisMonth.outputCostUsd)} out ·{" "}
                     {summary.thisMonth.calls} calls
                   </p>
                   <p className="mt-0.5 text-xs text-ink-muted">
                     {formatTokens(summary.thisMonth.inputTokens)} in ·{" "}
-                    {formatTokens(summary.thisMonth.outputTokens)} out
+                    {formatTokens(summary.thisMonth.outputTokens)} out ·{" "}
+                    {formatTokens(summary.thisMonth.totalTokens)} total
                   </p>
                 </div>
               </div>
@@ -188,7 +192,10 @@ export default async function AdminUsagePage() {
                         <tr>
                           <th className="px-3 py-2 font-semibold">Feature</th>
                           <th className="px-3 py-2 font-semibold">Calls</th>
-                          <th className="px-3 py-2 font-semibold">Tokens</th>
+                          <th className="px-3 py-2 font-semibold">In</th>
+                          <th className="px-3 py-2 font-semibold">Out</th>
+                          <th className="px-3 py-2 font-semibold">$ in</th>
+                          <th className="px-3 py-2 font-semibold">$ out</th>
                           <th className="px-3 py-2 font-semibold">Est. $</th>
                         </tr>
                       </thead>
@@ -205,9 +212,18 @@ export default async function AdminUsagePage() {
                               {row.calls}
                             </td>
                             <td className="px-3 py-2 tabular-nums">
-                              {formatTokens(row.totalTokens)}
+                              {formatTokens(row.inputTokens)}
                             </td>
                             <td className="px-3 py-2 tabular-nums">
+                              {formatTokens(row.outputTokens)}
+                            </td>
+                            <td className="px-3 py-2 tabular-nums">
+                              {formatUsd(row.inputCostUsd)}
+                            </td>
+                            <td className="px-3 py-2 tabular-nums">
+                              {formatUsd(row.outputCostUsd)}
+                            </td>
+                            <td className="px-3 py-2 tabular-nums font-medium">
                               {formatUsd(row.estimatedCostUsd)}
                             </td>
                           </tr>
@@ -237,7 +253,10 @@ export default async function AdminUsagePage() {
                           <th className="px-3 py-2 font-semibold">Last login</th>
                           <th className="px-3 py-2 font-semibold">Joined</th>
                           <th className="px-3 py-2 font-semibold">Calls</th>
-                          <th className="px-3 py-2 font-semibold">Tokens</th>
+                          <th className="px-3 py-2 font-semibold">In</th>
+                          <th className="px-3 py-2 font-semibold">Out</th>
+                          <th className="px-3 py-2 font-semibold">$ in</th>
+                          <th className="px-3 py-2 font-semibold">$ out</th>
                           <th className="px-3 py-2 font-semibold">Est. $</th>
                         </tr>
                       </thead>
@@ -260,9 +279,18 @@ export default async function AdminUsagePage() {
                               {row.calls}
                             </td>
                             <td className="px-3 py-2 tabular-nums">
-                              {formatTokens(row.totalTokens)}
+                              {formatTokens(row.inputTokens)}
                             </td>
                             <td className="px-3 py-2 tabular-nums">
+                              {formatTokens(row.outputTokens)}
+                            </td>
+                            <td className="px-3 py-2 tabular-nums">
+                              {formatUsd(row.inputCostUsd)}
+                            </td>
+                            <td className="px-3 py-2 tabular-nums">
+                              {formatUsd(row.outputCostUsd)}
+                            </td>
+                            <td className="px-3 py-2 tabular-nums font-medium">
                               {formatUsd(row.estimatedCostUsd)}
                             </td>
                           </tr>

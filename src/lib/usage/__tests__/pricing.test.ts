@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  estimateClaudeCostParts,
   estimateClaudeCostUsd,
   formatUsd,
   rateForModel,
@@ -20,6 +21,16 @@ describe("usage pricing helpers", () => {
       outputTokens: 1_000_000,
     });
     assert.equal(cost, 18);
+  });
+
+  it("splits input and output USD", () => {
+    const parts = estimateClaudeCostParts({
+      model: "claude-sonnet-4-5",
+      inputTokens: 1_000_000,
+      outputTokens: 200_000,
+    });
+    assert.equal(parts.inputUsd, 3);
+    assert.equal(parts.outputUsd, 3);
   });
 
   it("formats small amounts with more decimals", () => {

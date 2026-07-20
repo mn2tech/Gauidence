@@ -7,7 +7,7 @@ import {
   lastSevenDayKeys,
   weekdayLabel,
 } from "./days";
-import { estimateClaudeCostUsd } from "./pricing";
+import { estimateClaudeCostParts } from "./pricing";
 
 export type UsageTotals = {
   calls: number;
@@ -15,6 +15,8 @@ export type UsageTotals = {
   outputTokens: number;
   totalTokens: number;
   estimatedCostUsd: number;
+  inputCostUsd: number;
+  outputCostUsd: number;
 };
 
 export type UsageFeatureRow = {
@@ -24,14 +26,20 @@ export type UsageFeatureRow = {
   outputTokens: number;
   totalTokens: number;
   estimatedCostUsd: number;
+  inputCostUsd: number;
+  outputCostUsd: number;
 };
 
 export type UsageUserRow = {
   userId: string;
   email: string | null;
   calls: number;
+  inputTokens: number;
+  outputTokens: number;
   totalTokens: number;
   estimatedCostUsd: number;
+  inputCostUsd: number;
+  outputCostUsd: number;
   lastSignInAt: string | null;
   createdAt: string | null;
 };
@@ -83,35 +91,47 @@ function emptyTotals(): UsageTotals {
     outputTokens: 0,
     totalTokens: 0,
     estimatedCostUsd: 0,
+    inputCostUsd: 0,
+    outputCostUsd: 0,
   };
 }
 
-function eventCost(e: EventRow): number {
-  return estimateClaudeCostUsd({
+function eventCostParts(e: EventRow): { inputUsd: number; outputUsd: number } {
+  return estimateClaudeCostParts({
     model: e.model,
     inputTokens: e.input_tokens,
     outputTokens: e.output_tokens,
   });
 }
 
+function eventCost(e: EventRow): number {
+  const parts = eventCostParts(e);
+  return parts.inputUsd + parts.outputUsd;
+}
+
 function sumWindow(events: EventRow[], sinceIso: string): UsageTotals {
   let calls = 0;
   let inputTokens = 0;
   let outputTokens = 0;
-  let estimatedCostUsd = 0;
+  let inputCostUsd = 0;
+  let outputCostUsd = 0;
   for (const e of events) {
     if (e.created_at < sinceIso) continue;
     calls += 1;
     inputTokens += e.input_tokens;
     outputTokens += e.output_tokens;
-    estimatedCostUsd += eventCost(e);
+    const parts = eventCostParts(e);
+    inputCostUsd += parts.inputUsd;
+    outputCostUsd += parts.outputUsd;
   }
   return {
     calls,
     inputTokens,
     outputTokens,
     totalTokens: inputTokens + outputTokens,
-    estimatedCostUsd,
+    estimatedCostUsd: inputCostUsd + outputCostUsd,
+    inputCostUsd,
+    outputCostUsd,
   };
 }
 
@@ -211,7 +231,15 @@ async function loadRecentAccounts(
   admin: NonNullable<ReturnType<typeof createAdminClient>>,
   usageByUser: Map<
     string,
-    { calls: number; totalTokens: number; estimatedCostUsd: number }
+    {
+      calls: number;
+      inputTokens: number;
+      outputTokens: number;
+      totalTokens: number;
+      estimatedCostUsd: number;
+      inputCostUsd: number;
+      outputCostUsd: number;
+    }
   >
 ): Promise<UsageUserRow[]> {
   try {
@@ -226,15 +254,23 @@ async function loadRecentAccounts(
     const rows: UsageUserRow[] = data.users.map((u) => {
       const usage = usageByUser.get(u.id) ?? {
         calls: 0,
+        inputTokens: 0,
+        outputTokens: 0,
         totalTokens: 0,
         estimatedCostUsd: 0,
+        inputCostUsd: 0,
+        outputCostUsd: 0,
       };
       return {
         userId: u.id,
         email: u.email ?? null,
         calls: usage.calls,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
         totalTokens: usage.totalTokens,
         estimatedCostUsd: usage.estimatedCostUsd,
+        inputCostUsd: usage.inputCostUsd,
+        outputCostUsd: usage.outputCostUsd,
         lastSignInAt: u.last_sign_in_at ?? null,
         createdAt: u.created_at ?? null,
       };
@@ -315,12 +351,17 @@ export async function loadUsageSummary(): Promise<UsageSummary | null> {
       outputTokens: 0,
       totalTokens: 0,
       estimatedCostUsd: 0,
+      inputCostUsd: 0,
+      outputCostUsd: 0,
     };
+    const parts = eventCostParts(e);
     cur.calls += 1;
     cur.inputTokens += e.input_tokens;
     cur.outputTokens += e.output_tokens;
     cur.totalTokens += e.input_tokens + e.output_tokens;
-    cur.estimatedCostUsd += eventCost(e);
+    cur.inputCostUsd += parts.inputUsd;
+    cur.outputCostUsd += parts.outputUsd;
+    cur.estimatedCostUsd += parts.inputUsd + parts.outputUsd;
     featureMap.set(e.feature, cur);
   }
   const byFeature = [...featureMap.values()].sort(
@@ -329,18 +370,35 @@ export async function loadUsageSummary(): Promise<UsageSummary | null> {
 
   const userMap = new Map<
     string,
-    { calls: number; totalTokens: number; estimatedCostUsd: number }
+    {
+      calls: number;
+      inputTokens: number;
+      outputTokens: number;
+      totalTokens: number;
+      estimatedCostUsd: number;
+      inputCostUsd: number;
+      outputCostUsd: number;
+    }
   >();
   for (const e of events) {
     if (e.created_at < since7d) continue;
     const cur = userMap.get(e.user_id) ?? {
       calls: 0,
+      inputTokens: 0,
+      outputTokens: 0,
       totalTokens: 0,
       estimatedCostUsd: 0,
+      inputCostUsd: 0,
+      outputCostUsd: 0,
     };
+    const parts = eventCostParts(e);
     cur.calls += 1;
+    cur.inputTokens += e.input_tokens;
+    cur.outputTokens += e.output_tokens;
     cur.totalTokens += e.input_tokens + e.output_tokens;
-    cur.estimatedCostUsd += eventCost(e);
+    cur.inputCostUsd += parts.inputUsd;
+    cur.outputCostUsd += parts.outputUsd;
+    cur.estimatedCostUsd += parts.inputUsd + parts.outputUsd;
     userMap.set(e.user_id, cur);
   }
 
@@ -359,8 +417,12 @@ export async function loadUsageSummary(): Promise<UsageSummary | null> {
         userId: id,
         email: m?.email ?? null,
         calls: u.calls,
+        inputTokens: u.inputTokens,
+        outputTokens: u.outputTokens,
         totalTokens: u.totalTokens,
         estimatedCostUsd: u.estimatedCostUsd,
+        inputCostUsd: u.inputCostUsd,
+        outputCostUsd: u.outputCostUsd,
         lastSignInAt: m?.lastSignInAt ?? null,
         createdAt: m?.createdAt ?? null,
       };
