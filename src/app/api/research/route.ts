@@ -142,7 +142,7 @@ export async function POST(request: Request) {
   try {
     const searchQuery =
       subjectKind === "company"
-        ? `${query} company business`
+        ? `${query} company business team sports club`
         : subjectKind === "person"
           ? `${query} professional biography`
           : query;
@@ -162,7 +162,7 @@ export async function POST(request: Request) {
       subjectKind === "person"
         ? "Subject kind: person. Stick to public professional/business information only."
         : subjectKind === "company"
-          ? "Subject kind: company / organization."
+          ? "Subject kind: company, organization, or sports team."
           : "Subject kind: general topic.";
 
     const system = `${RESEARCH_SYSTEM}

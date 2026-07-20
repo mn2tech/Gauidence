@@ -39,11 +39,13 @@ import {
   askGideonContextLabel,
   canHaveLinkedEmployees,
   canHaveLinkedFamilyMembers,
+  canHaveLinkedHobbies,
   canHaveLinkedHomes,
   canHaveLinkedVehicles,
   formatLinkedClientsForGideon,
   formatLinkedEmployeesForGideon,
   formatLinkedFamilyForGideon,
+  formatLinkedHobbiesForGideon,
   formatLinkedVehiclesForGideon,
   type GuardianProfileType,
 } from "@/lib/profiles/types";
@@ -127,6 +129,7 @@ async function loadLinkedOrgContext(
       "student",
       "pet",
       "vehicle",
+      "hobby",
       ...(canHaveLinkedHomes(active.profile_type) ? (["home"] as const) : []),
     ];
     const { data: members } = await supabase
@@ -141,10 +144,12 @@ async function loadLinkedOrgContext(
         m.profile_type !== "home" &&
         m.profile_type !== "pet" &&
         m.profile_type !== "vehicle" &&
+        m.profile_type !== "hobby" &&
         m.profile_type !== "student"
     );
     const students = (members ?? []).filter((m) => m.profile_type === "student");
     const pets = (members ?? []).filter((m) => m.profile_type === "pet");
+    const hobbies = (members ?? []).filter((m) => m.profile_type === "hobby");
     const homes = (members ?? []).filter((m) => m.profile_type === "home");
     const vehicles = (members ?? []).filter((m) => m.profile_type === "vehicle");
     const parts = [formatLinkedFamilyForGideon(active.display_name, people)];
@@ -160,6 +165,17 @@ async function loadLinkedOrgContext(
         `Linked pets under this family: ${pets
           .map((p) => p.display_name)
           .join(", ")}`
+      );
+    }
+    if (hobbies.length > 0) {
+      parts.push(
+        formatLinkedHobbiesForGideon(
+          active.display_name,
+          hobbies.map((h) => ({
+            display_name: h.display_name,
+            description: h.description ?? null,
+          }))
+        )
       );
     }
     if (homes.length > 0) {
@@ -181,6 +197,21 @@ async function loadLinkedOrgContext(
       );
     }
     return parts.join("\n\n");
+  }
+
+  if (
+    canHaveLinkedHobbies(active.profile_type) &&
+    active.profile_type !== "family"
+  ) {
+    const { data: hobbies } = await supabase
+      .from("guardian_profiles")
+      .select("display_name, description")
+      .eq("owner_user_id", userId)
+      .eq("parent_profile_id", active.id)
+      .eq("profile_type", "hobby")
+      .order("display_name", { ascending: true });
+    if ((hobbies ?? []).length === 0) return "";
+    return formatLinkedHobbiesForGideon(active.display_name, hobbies ?? []);
   }
 
   if (active.profile_type === "vehicles") {
@@ -209,7 +240,7 @@ function suggestionKindFrom(
   ) {
     return type === "non_profit" ? "business" : type;
   }
-  if (type === "vehicle" || type === "home" || type === "pet") {
+  if (type === "vehicle" || type === "home" || type === "pet" || type === "hobby") {
     return type;
   }
   if (

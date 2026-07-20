@@ -65,6 +65,7 @@ export type SuggestionProfileKind =
   | "vehicle"
   | "home"
   | "pet"
+  | "hobby"
   | "other";
 
 /**
@@ -100,6 +101,13 @@ export function buildGideonLogSuggestions(
       "What happened recently in the Daily Log?",
       "Any recent vet or medication notes?",
       "Summarize the latest pet care updates.",
+    ];
+  }
+  if (profileKind === "hobby") {
+    return [
+      "What happened recently in the Daily Log?",
+      "Summarize recent practices or games.",
+      "Any league, club, or equipment updates?",
     ];
   }
   if (
@@ -152,7 +160,8 @@ export function buildGideonSuggestions(
   const isAsset =
     profileKind === "vehicle" ||
     profileKind === "home" ||
-    profileKind === "pet";
+    profileKind === "pet" ||
+    profileKind === "hobby";
 
   if (hasAttention) {
     suggestions.push("What needs my attention this month?");
@@ -174,6 +183,10 @@ export function buildGideonSuggestions(
     suggestions.push("What pet records are in this vault?");
     suggestions.push("Any upcoming vet or vaccination dates?");
     suggestions.push("Summarize the latest pet document.");
+  } else if (profileKind === "hobby") {
+    suggestions.push("What hobby or sport documents are in this vault?");
+    suggestions.push("Any upcoming games, lessons, or renewals?");
+    suggestions.push("Summarize the latest hobby document.");
   } else if (profileKind === "business") {
     suggestions.push("How many employees are linked to this profile?");
     suggestions.push("How many clients are linked to this profile?");

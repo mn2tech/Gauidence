@@ -9,6 +9,7 @@ import {
   canHaveLinkedClients,
   canHaveLinkedEmployees,
   canHaveLinkedFamilyMembers,
+  canHaveLinkedHobbies,
   canHaveLinkedHomes,
   canHaveLinkedOtherSpaces,
   canHaveLinkedPets,
@@ -18,6 +19,7 @@ import {
   clientsOf,
   employeesOf,
   familyMembersOf,
+  hobbiesOf,
   homesOf,
   otherSpacesOf,
   isGroupStyleProfile,
@@ -407,6 +409,9 @@ export default function ProfileOrganizeList({
           const nestedPets = canHaveLinkedPets(p.profile_type)
             ? petsOf(profiles, p.id)
             : [];
+          const nestedHobbies = canHaveLinkedHobbies(p.profile_type)
+            ? hobbiesOf(profiles, p.id)
+            : [];
           const nestedHomes = canHaveLinkedHomes(p.profile_type)
             ? homesOf(profiles, p.id)
             : [];
@@ -422,11 +427,14 @@ export default function ProfileOrganizeList({
             ...nestedFamily,
             ...nestedStudents,
             ...nestedPets,
+            ...nestedHobbies,
             ...nestedHomes,
             ...nestedVehicles,
             ...nestedOthers,
           ];
-          const isContainer = isGroupStyleProfile(p.profile_type);
+          const isContainer =
+            isGroupStyleProfile(p.profile_type) ||
+            canHaveLinkedHobbies(p.profile_type);
           const isCollapsed = Boolean(collapsed[p.id]);
           const canDropHere = isContainer && acceptDrop(p);
           const isDropHighlight = dropTargetId === p.id && canDropHere;

@@ -33,7 +33,9 @@ site works normally.
 
 New accounts are **not** given an automatic "Myself" profile — they land on the
 dashboard setup hub and choose Family / Business / Student / Other (see
-migration `0020_no_auto_myself_profile.sql`).
+migration `0020_no_auto_myself_profile.sql`). People and family vaults can
+link **hobby / sport** spaces (golf, soccer, etc.) under them; run
+`supabase/migrations/0029_hobby_profile_type.sql` so creates succeed.
 
 User reminders (Ask Gideon **+ → Add reminder**) store a date+time on `alerts`
 (`due_at`, `source = 'user'`). Run `supabase/migrations/0021_user_reminders.sql`

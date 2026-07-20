@@ -7,6 +7,7 @@ import {
   canHaveLinkedClients,
   canHaveLinkedEmployees,
   canHaveLinkedFamilyMembers,
+  canHaveLinkedHobbies,
   canHaveLinkedVehicles,
   canAttachChildToParent,
   clientsOf,
@@ -64,6 +65,7 @@ describe("guardian profiles helpers", () => {
     assert.ok(PROFILE_CREATE_OPTIONS.some((o) => o.profileType === "vehicle"));
     assert.ok(PROFILE_CREATE_OPTIONS.some((o) => o.profileType === "home"));
     assert.ok(PROFILE_CREATE_OPTIONS.some((o) => o.profileType === "pet"));
+    assert.ok(PROFILE_CREATE_OPTIONS.some((o) => o.profileType === "hobby"));
     assert.ok(PROFILE_CREATE_OPTIONS.some((o) => o.profileType === "child"));
   });
 
@@ -228,6 +230,12 @@ describe("guardian profiles helpers", () => {
     assert.equal(canHaveLinkedVehicles("family"), true);
     assert.equal(canHaveLinkedVehicles("business"), true);
     assert.equal(canAttachChildToParent("pet", "family"), true);
+    assert.equal(canAttachChildToParent("hobby", "personal"), true);
+    assert.equal(canAttachChildToParent("hobby", "child"), true);
+    assert.equal(canAttachChildToParent("hobby", "family"), true);
+    assert.equal(canAttachChildToParent("hobby", "business"), false);
+    assert.equal(canHaveLinkedHobbies("personal"), true);
+    assert.equal(canHaveLinkedHobbies("business"), false);
     assert.equal(canAttachChildToParent("vehicle", "family"), true);
     assert.equal(canAttachChildToParent("vehicle", "business"), true);
     assert.equal(canAttachChildToParent("pet", "business"), false);
@@ -301,6 +309,8 @@ describe("guardian profiles helpers", () => {
     assert.equal(canAttachChildToParent("vehicle", "family"), true);
     assert.equal(canAttachChildToParent("vehicle", "business"), true);
     assert.equal(canAttachChildToParent("pet", "family"), true);
+    assert.equal(canAttachChildToParent("hobby", "personal"), true);
+    assert.equal(canAttachChildToParent("hobby", "student"), true);
     assert.equal(canAttachChildToParent("child", "vehicles"), false);
     assert.equal(canAttachChildToParent("employee", "business"), true);
     assert.equal(canAttachChildToParent("home", "family"), true);

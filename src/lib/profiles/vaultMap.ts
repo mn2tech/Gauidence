@@ -7,6 +7,7 @@ import {
   nestedUnder,
   otherSpacesOf,
   petsOf,
+  hobbiesOf,
   studentsOf,
   topLevelProfiles,
   vehiclesOf,
@@ -77,6 +78,7 @@ function branchForProfile(
     const things = [
       ...homesOf(profiles, profile.id),
       ...vehiclesOf(profiles, profile.id),
+      ...hobbiesOf(profiles, profile.id),
     ];
     const others = otherSpacesOf(profiles, profile.id);
     return {

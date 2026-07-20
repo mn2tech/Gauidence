@@ -256,6 +256,7 @@ export default function ProfilesManager() {
   const isVehicle = option?.profileType === "vehicle";
   const isHome = option?.profileType === "home";
   const isPet = option?.profileType === "pet";
+  const isHobby = option?.profileType === "hobby";
   const orgNameLabel =
     option?.profileType === "non_profit" ? "Nonprofit name" : "Business name";
   const nameLabel = isBiz
@@ -266,7 +267,9 @@ export default function ProfilesManager() {
         ? "Home name"
         : isPet
           ? "Pet name"
-          : "Display name";
+          : isHobby
+            ? "Hobby or sport name"
+            : "Display name";
   const namePlaceholder = isBiz
     ? option?.profileType === "non_profit"
       ? "Community Foundation"
@@ -277,14 +280,18 @@ export default function ProfilesManager() {
         ? "Oak Street home"
         : isPet
           ? "Buddy"
-          : "Name";
+          : isHobby
+            ? "Golf"
+            : "Name";
   const detailsLabel = isVehicle
     ? "Year / make / model notes (optional)"
     : isHome
       ? "Address or notes (optional)"
       : isPet
         ? "Species / breed (optional)"
-        : null;
+        : isHobby
+          ? "League / club notes (optional)"
+          : null;
 
   return (
     <div className="space-y-6">

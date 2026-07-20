@@ -230,7 +230,7 @@ export default function ResearchPanel() {
         <div className="mt-3 flex flex-wrap gap-2">
           {(
             [
-              { id: "company", label: "Company", icon: Building2 },
+              { id: "company", label: "Company / team", icon: Building2 },
               { id: "person", label: "Person", icon: UserRound },
               { id: "other", label: "Other", icon: Globe2 },
             ] as const
@@ -303,7 +303,7 @@ export default function ResearchPanel() {
               </h2>
               <p className="mt-0.5 text-xs text-ink-muted">
                 {result.subjectKind === "company"
-                  ? "Company"
+                  ? "Company / team"
                   : result.subjectKind === "person"
                     ? "Person"
                     : "Topic"}{" "}

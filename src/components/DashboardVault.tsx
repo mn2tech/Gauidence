@@ -13,6 +13,7 @@ import LinkedFamilyPanel from "@/components/LinkedFamilyPanel";
 import LinkedVehiclesPanel from "@/components/LinkedVehiclesPanel";
 import LinkedHomesPanel from "@/components/LinkedHomesPanel";
 import LinkedPetsPanel from "@/components/LinkedPetsPanel";
+import LinkedHobbiesPanel from "@/components/LinkedHobbiesPanel";
 import LinkedStudentsPanel from "@/components/LinkedStudentsPanel";
 import ProfileSetupHub from "@/components/ProfileSetupHub";
 import GettingStartedStrip from "@/components/GettingStartedStrip";
@@ -23,6 +24,7 @@ import {
   canHaveLinkedClients,
   canHaveLinkedEmployees,
   canHaveLinkedFamilyMembers,
+  canHaveLinkedHobbies,
   canHaveLinkedHomes,
   canHaveLinkedPets,
   canHaveLinkedStudents,
@@ -192,6 +194,12 @@ export default function DashboardVault({ userId }: { userId: string }) {
       {canHaveLinkedPets(active.profile_type) && (
         <VaultSection id={`pets-${active.id}`} title="Pets">
           <LinkedPetsPanel parent={active} />
+        </VaultSection>
+      )}
+
+      {canHaveLinkedHobbies(active.profile_type) && (
+        <VaultSection id={`hobbies-${active.id}`} title="Hobbies & sports">
+          <LinkedHobbiesPanel parent={active} />
         </VaultSection>
       )}
 

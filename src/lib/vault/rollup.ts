@@ -5,6 +5,7 @@ import {
   canHaveLinkedClients,
   canHaveLinkedEmployees,
   canHaveLinkedFamilyMembers,
+  canHaveLinkedHobbies,
   canHaveLinkedHomes,
   canHaveLinkedPets,
   canHaveLinkedVehicles,
@@ -20,11 +21,11 @@ export type LinkedVaultProfile = {
   profile_type: GuardianProfileType;
 };
 
-/** Family / Business / Nonprofit / Vehicles containers roll up linked vaults. */
+/** Family / Business / Nonprofit / Vehicles / people with hobbies roll up linked vaults. */
 export function canRollupLinkedVaultSearch(
   type: GuardianProfileType
 ): boolean {
-  return isGroupStyleProfile(type);
+  return isGroupStyleProfile(type) || canHaveLinkedHobbies(type);
 }
 
 function linkedTypesForParent(
@@ -43,6 +44,7 @@ function linkedTypesForParent(
     );
   }
   if (canHaveLinkedPets(parentType)) types.push("pet");
+  if (canHaveLinkedHobbies(parentType)) types.push("hobby");
   if (canHaveLinkedHomes(parentType)) types.push("home");
   if (canHaveLinkedVehicles(parentType)) types.push("vehicle");
   return types;

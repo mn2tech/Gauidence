@@ -18,6 +18,7 @@ export const GUARDIAN_PROFILE_TYPES = [
   "vehicles",
   "home",
   "pet",
+  "hobby",
   "other",
 ] as const;
 
@@ -39,6 +40,7 @@ export const PROFILE_TYPE_LABELS: Record<GuardianProfileType, string> = {
   vehicles: "Vehicles",
   home: "Home",
   pet: "Pet",
+  hobby: "Hobby / sport",
   other: "Other",
 };
 
@@ -93,6 +95,7 @@ export const PROFILE_CREATE_OPTIONS: {
   { id: "vehicle", label: "A vehicle", profileType: "vehicle" },
   { id: "home", label: "A home / house", profileType: "home" },
   { id: "pet", label: "A pet", profileType: "pet" },
+  { id: "hobby", label: "A hobby or sport", profileType: "hobby" },
   { id: "other", label: "Something else", profileType: "other" },
 ];
 
@@ -109,7 +112,7 @@ export const PROFILE_CREATE_GROUPS: {
   {
     id: "family",
     label: "Family",
-    description: "A family group, or people and pets in it",
+    description: "A family group, or people, pets, and hobbies in it",
     optionIds: [
       "my_family",
       "child",
@@ -117,6 +120,7 @@ export const PROFILE_CREATE_GROUPS: {
       "parent",
       "family",
       "pet",
+      "hobby",
       "home",
       "vehicle",
     ],
@@ -143,8 +147,8 @@ export const PROFILE_CREATE_GROUPS: {
   {
     id: "other",
     label: "Other",
-    description: "Yourself, a garage, or something that doesn’t fit above",
-    optionIds: ["myself", "my_vehicles", "vehicle", "home", "other"],
+    description: "Yourself, hobbies, a garage, or something that doesn’t fit above",
+    optionIds: ["myself", "hobby", "my_vehicles", "vehicle", "home", "other"],
   },
 ];
 
@@ -292,9 +296,24 @@ export function isGroupStyleProfile(type: GuardianProfileType): boolean {
   );
 }
 
-/** Vehicle, home, pet — named assets, not people. */
+/** Vehicle, home, pet, hobby — named assets, not people. */
 export function isAssetStyleProfile(type: GuardianProfileType): boolean {
-  return type === "vehicle" || type === "home" || type === "pet";
+  return (
+    type === "vehicle" ||
+    type === "home" ||
+    type === "pet" ||
+    type === "hobby"
+  );
+}
+
+/** People (and family) who can own linked hobby / sport vaults. */
+export function canHaveLinkedHobbies(type: GuardianProfileType): boolean {
+  return (
+    type === "personal" ||
+    type === "family" ||
+    type === "student" ||
+    isFamilyMemberType(type)
+  );
 }
 
 /** Label for avatar upload UI — logo for orgs, photo for people/assets. */
@@ -351,6 +370,7 @@ export function isNestableProfileType(type: GuardianProfileType): boolean {
     type === "vehicle" ||
     type === "home" ||
     type === "pet" ||
+    type === "hobby" ||
     type === "other" ||
     isFamilyMemberType(type)
   );
@@ -364,6 +384,7 @@ export function canAttachChildToParent(
   if (childType === "home") return canHaveLinkedHomes(parentType);
   if (childType === "vehicle") return canHaveLinkedVehicles(parentType);
   if (childType === "pet") return canHaveLinkedPets(parentType);
+  if (childType === "hobby") return canHaveLinkedHobbies(parentType);
   if (isFamilyMemberType(childType)) {
     return canHaveLinkedFamilyMembers(parentType);
   }
@@ -446,6 +467,15 @@ export function petsOf(
   );
 }
 
+export function hobbiesOf(
+  profiles: GuardianProfile[],
+  parentId: string
+): GuardianProfile[] {
+  return profiles.filter(
+    (p) => p.parent_profile_id === parentId && p.profile_type === "hobby"
+  );
+}
+
 export function vehiclesOf(
   profiles: GuardianProfile[],
   parentId: string
@@ -493,6 +523,9 @@ export function nestedUnder(
   }
   if (canHaveLinkedPets(parent.profile_type)) {
     out.push(...petsOf(profiles, parent.id));
+  }
+  if (canHaveLinkedHobbies(parent.profile_type)) {
+    out.push(...hobbiesOf(profiles, parent.id));
   }
   if (canHaveLinkedHomes(parent.profile_type)) {
     out.push(...homesOf(profiles, parent.id));
@@ -613,6 +646,28 @@ export function formatLinkedVehiclesForGideon(
   const lines = vehicles.map((v, i) => {
     const note = v.description?.trim();
     return `${i + 1}. ${v.display_name}${note ? ` — ${note}` : ""}`;
+  });
+  return `${header}\n${lines.join("\n")}`;
+}
+
+export type LinkedHobbySummary = {
+  display_name: string;
+  description?: string | null;
+};
+
+/** Context block for Gideon: linked hobbies / sports under a person or family. */
+export function formatLinkedHobbiesForGideon(
+  ownerName: string,
+  hobbies: LinkedHobbySummary[]
+): string {
+  const count = hobbies.length;
+  const header = `Profile: ${ownerName}\nLinked hobby / sport vaults in Guardian: ${count}`;
+  if (count === 0) {
+    return `${header}\n(None linked yet.)`;
+  }
+  const lines = hobbies.map((h, i) => {
+    const note = h.description?.trim();
+    return `${i + 1}. ${h.display_name}${note ? ` — ${note}` : ""}`;
   });
   return `${header}\n${lines.join("\n")}`;
 }
