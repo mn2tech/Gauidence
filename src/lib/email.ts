@@ -1,7 +1,6 @@
 import "server-only";
 
 import { Resend } from "resend";
-import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
 
 export type ReminderItem = {
   title: string;
@@ -19,11 +18,13 @@ function escapeHtml(value: string) {
 
 function formatDueDate(isoDate: string) {
   const [y, m, d] = isoDate.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-US", {
+  // Noon UTC + UTC zone: avoid Eastern shifting YYYY-MM-DD back one day.
+  return new Date(Date.UTC(y, m - 1, d, 12)).toLocaleDateString("en-US", {
     weekday: "long",
     month: "long",
     day: "numeric",
-    timeZone: GUARDIAN_TIME_ZONE,
+    year: "numeric",
+    timeZone: "UTC",
   });
 }
 

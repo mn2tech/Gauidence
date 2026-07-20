@@ -41,6 +41,19 @@ describe("date display", () => {
     assert.match(label, /remaining/);
     assert.equal(daysRelativeTo("2026-07-31", now, "UTC"), 20);
   });
+
+  it("keeps the civil calendar day in Eastern (no UTC midnight shift)", () => {
+    const now = new Date("2026-07-20T16:00:00Z"); // afternoon ET
+    const label = formatDateRelativeLabel(
+      "2026-07-20",
+      "deadline",
+      now,
+      "America/New_York"
+    );
+    assert.match(label, /July 20, 2026/);
+    assert.match(label, /due today/);
+    assert.doesNotMatch(label, /July 19/);
+  });
 });
 
 describe("router", () => {

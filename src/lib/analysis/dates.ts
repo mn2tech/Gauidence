@@ -12,17 +12,23 @@ export function daysRelativeTo(
   return Math.round((target.getTime() - today.getTime()) / 86_400_000);
 }
 
+/**
+ * Format a calendar ISO date (YYYY-MM-DD) for display.
+ * Uses noon UTC + UTC zone so US Eastern (and similar) do not shift the
+ * civil day back when midnight UTC is still the previous local evening.
+ * `timeZone` is accepted for API compatibility but does not change the day.
+ */
 export function formatDisplayDate(
   isoDate: string,
-  timeZone: string = GUARDIAN_TIME_ZONE
+  _timeZone: string = GUARDIAN_TIME_ZONE
 ): string {
   const [y, m, d] = isoDate.split("-").map(Number);
   if (!y || !m || !d) return isoDate;
-  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-US", {
+  return new Date(Date.UTC(y, m - 1, d, 12)).toLocaleDateString("en-US", {
     month: "long",
     day: "numeric",
     year: "numeric",
-    timeZone,
+    timeZone: "UTC",
   });
 }
 
