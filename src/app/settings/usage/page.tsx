@@ -100,6 +100,48 @@ export default async function AdminUsagePage() {
 
   const summary = await loadUsageSummary();
 
+  const featureTotals = summary
+    ? summary.byFeature.reduce(
+        (acc, row) => ({
+          calls: acc.calls + row.calls,
+          inputTokens: acc.inputTokens + row.inputTokens,
+          outputTokens: acc.outputTokens + row.outputTokens,
+          inputCostUsd: acc.inputCostUsd + row.inputCostUsd,
+          outputCostUsd: acc.outputCostUsd + row.outputCostUsd,
+          estimatedCostUsd: acc.estimatedCostUsd + row.estimatedCostUsd,
+        }),
+        {
+          calls: 0,
+          inputTokens: 0,
+          outputTokens: 0,
+          inputCostUsd: 0,
+          outputCostUsd: 0,
+          estimatedCostUsd: 0,
+        }
+      )
+    : null;
+
+  const userTotals = summary
+    ? summary.topUsers.reduce(
+        (acc, row) => ({
+          calls: acc.calls + row.calls,
+          inputTokens: acc.inputTokens + row.inputTokens,
+          outputTokens: acc.outputTokens + row.outputTokens,
+          inputCostUsd: acc.inputCostUsd + row.inputCostUsd,
+          outputCostUsd: acc.outputCostUsd + row.outputCostUsd,
+          estimatedCostUsd: acc.estimatedCostUsd + row.estimatedCostUsd,
+        }),
+        {
+          calls: 0,
+          inputTokens: 0,
+          outputTokens: 0,
+          inputCostUsd: 0,
+          outputCostUsd: 0,
+          estimatedCostUsd: 0,
+        }
+      )
+    : null;
+
   return (
     <div className="flex min-h-screen flex-col">
       <SiteHeader />
@@ -131,7 +173,7 @@ export default async function AdminUsagePage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="rounded-xl border border-stone-200 bg-stone-50/80 px-4 py-3">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
-                    Last 7 days
+                    Last 7 days — total
                   </p>
                   <p className="mt-1 text-2xl font-semibold tabular-nums">
                     {formatUsd(summary.last7Days.estimatedCostUsd)}
@@ -144,12 +186,12 @@ export default async function AdminUsagePage() {
                   <p className="mt-0.5 text-xs text-ink-muted">
                     {formatTokens(summary.last7Days.inputTokens)} in ·{" "}
                     {formatTokens(summary.last7Days.outputTokens)} out ·{" "}
-                    {formatTokens(summary.last7Days.totalTokens)} total
+                    {formatTokens(summary.last7Days.totalTokens)} tokens
                   </p>
                 </div>
                 <div className="rounded-xl border border-stone-200 bg-stone-50/80 px-4 py-3">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
-                    This month
+                    This month — total
                   </p>
                   <p className="mt-1 text-2xl font-semibold tabular-nums">
                     {formatUsd(summary.thisMonth.estimatedCostUsd)}
@@ -162,7 +204,7 @@ export default async function AdminUsagePage() {
                   <p className="mt-0.5 text-xs text-ink-muted">
                     {formatTokens(summary.thisMonth.inputTokens)} in ·{" "}
                     {formatTokens(summary.thisMonth.outputTokens)} out ·{" "}
-                    {formatTokens(summary.thisMonth.totalTokens)} total
+                    {formatTokens(summary.thisMonth.totalTokens)} tokens
                   </p>
                 </div>
               </div>
@@ -196,7 +238,7 @@ export default async function AdminUsagePage() {
                           <th className="px-3 py-2 font-semibold">Out</th>
                           <th className="px-3 py-2 font-semibold">$ in</th>
                           <th className="px-3 py-2 font-semibold">$ out</th>
-                          <th className="px-3 py-2 font-semibold">Est. $</th>
+                          <th className="px-3 py-2 font-semibold">Total $</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -229,6 +271,31 @@ export default async function AdminUsagePage() {
                           </tr>
                         ))}
                       </tbody>
+                      {featureTotals ? (
+                        <tfoot>
+                          <tr className="border-t-2 border-stone-200 bg-stone-50 font-semibold">
+                            <td className="px-3 py-2">Total</td>
+                            <td className="px-3 py-2 tabular-nums">
+                              {featureTotals.calls}
+                            </td>
+                            <td className="px-3 py-2 tabular-nums">
+                              {formatTokens(featureTotals.inputTokens)}
+                            </td>
+                            <td className="px-3 py-2 tabular-nums">
+                              {formatTokens(featureTotals.outputTokens)}
+                            </td>
+                            <td className="px-3 py-2 tabular-nums">
+                              {formatUsd(featureTotals.inputCostUsd)}
+                            </td>
+                            <td className="px-3 py-2 tabular-nums">
+                              {formatUsd(featureTotals.outputCostUsd)}
+                            </td>
+                            <td className="px-3 py-2 tabular-nums">
+                              {formatUsd(featureTotals.estimatedCostUsd)}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      ) : null}
                     </table>
                   </div>
                 )}
@@ -240,7 +307,7 @@ export default async function AdminUsagePage() {
                 </h2>
                 <p className="mt-1 text-xs text-ink-muted">
                   Sorted by estimated spend, then last sign-in. Includes
-                  accounts with no AI use yet.
+                  accounts with no AI use yet. Total row sums AI usage only.
                 </p>
                 {summary.topUsers.length === 0 ? (
                   <p className="mt-2 text-sm text-ink-muted">No users found.</p>
@@ -257,7 +324,7 @@ export default async function AdminUsagePage() {
                           <th className="px-3 py-2 font-semibold">Out</th>
                           <th className="px-3 py-2 font-semibold">$ in</th>
                           <th className="px-3 py-2 font-semibold">$ out</th>
-                          <th className="px-3 py-2 font-semibold">Est. $</th>
+                          <th className="px-3 py-2 font-semibold">Total $</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -296,6 +363,33 @@ export default async function AdminUsagePage() {
                           </tr>
                         ))}
                       </tbody>
+                      {userTotals ? (
+                        <tfoot>
+                          <tr className="border-t-2 border-stone-200 bg-stone-50 font-semibold">
+                            <td className="px-3 py-2" colSpan={3}>
+                              Total
+                            </td>
+                            <td className="px-3 py-2 tabular-nums">
+                              {userTotals.calls}
+                            </td>
+                            <td className="px-3 py-2 tabular-nums">
+                              {formatTokens(userTotals.inputTokens)}
+                            </td>
+                            <td className="px-3 py-2 tabular-nums">
+                              {formatTokens(userTotals.outputTokens)}
+                            </td>
+                            <td className="px-3 py-2 tabular-nums">
+                              {formatUsd(userTotals.inputCostUsd)}
+                            </td>
+                            <td className="px-3 py-2 tabular-nums">
+                              {formatUsd(userTotals.outputCostUsd)}
+                            </td>
+                            <td className="px-3 py-2 tabular-nums">
+                              {formatUsd(userTotals.estimatedCostUsd)}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      ) : null}
                     </table>
                   </div>
                 )}
