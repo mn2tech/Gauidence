@@ -10,6 +10,7 @@ import {
   type FilePayload,
   type LlmClient,
 } from "../llm";
+import { analysisDateRules } from "../dateResolve";
 
 const SCHEMA = {
   type: "object",
@@ -49,20 +50,23 @@ const SCHEMA = {
   ],
 } as const;
 
-const SYSTEM = `You are Guardian's Insurance Analyzer.
+function buildSystem(): string {
+  return `You are Guardian's Insurance Analyzer.
 Rules:
 - Distinguish effective, expiration, and renewal dates. Do not treat every date as expiration.
 - Mark effective_date as is_past_event when it is a start date; expiration/renewal as is_deadline.
 - Flag exclusions or ambiguous coverage with needs_verification.
 - Do not provide legal or insurance guarantees.
-- Extract only what is stated.`;
+- Extract only what is stated.
+${analysisDateRules()}`;
+}
 
 export async function analyzeInsurance(
   client: LlmClient,
   file: FilePayload
 ): Promise<GuardianAnalysis> {
   const parsed = await runStructuredJson<Record<string, unknown>>(client, {
-    system: SYSTEM,
+    system: buildSystem(),
     userContent: buildFileContent(file, "Analyze this insurance document."),
     schemaName: "insurance_analysis",
     schema: SCHEMA as unknown as Record<string, unknown>,

@@ -10,6 +10,7 @@ import {
   type FilePayload,
   type LlmClient,
 } from "../llm";
+import { analysisDateRules } from "../dateResolve";
 
 const ITEM = {
   type: "object",
@@ -62,19 +63,22 @@ const SCHEMA = {
   ],
 } as const;
 
-const SYSTEM = `You are Guardian's Receipt Analyzer.
+function buildSystem(): string {
+  return `You are Guardian's Receipt Analyzer.
 Rules:
 - Distinguish subtotal, tax, tip, and total.
 - Do not invent missing quantities.
 - Flag unreadable line items with low confidence and needs_verification.
-- Transaction date is a past event (is_past_event=true), not a deadline.`;
+- Transaction date is a past event (is_past_event=true), not a deadline.
+${analysisDateRules()}`;
+}
 
 export async function analyzeReceipt(
   client: LlmClient,
   file: FilePayload
 ): Promise<GuardianAnalysis> {
   const parsed = await runStructuredJson<Record<string, unknown>>(client, {
-    system: SYSTEM,
+    system: buildSystem(),
     userContent: buildFileContent(file, "Analyze this receipt."),
     schemaName: "receipt_analysis",
     schema: SCHEMA as unknown as Record<string, unknown>,

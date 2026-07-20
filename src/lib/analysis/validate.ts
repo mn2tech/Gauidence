@@ -1,6 +1,7 @@
 import type { GuardianAnalysis, GuardianStatus } from "./types";
 import { CONFIDENCE_MEDIUM } from "./types";
 import { daysRelativeTo } from "./dates";
+import { sanitizeAnalysisDates } from "./dateResolve";
 import { buildInvoiceCanonicalFacts } from "./invoiceDisplay";
 
 const MONEY_TOLERANCE = 0.02;
@@ -25,7 +26,10 @@ function asDate(v: unknown): string | null {
 }
 
 /** Deterministic validation after AI extraction. Never silently corrects values. */
-export function validateAnalysis(result: GuardianAnalysis): GuardianAnalysis {
+export function validateAnalysis(
+  result: GuardianAnalysis,
+  now = new Date()
+): GuardianAnalysis {
   const warnings = [...result.warnings];
   let overall = result.overall_confidence;
   const specialist = { ...result.specialist };
@@ -217,14 +221,20 @@ export function validateAnalysis(result: GuardianAnalysis): GuardianAnalysis {
     }
   }
 
-  const guardian_status = deriveGuardianStatus(
-    { ...result, warnings, overall_confidence: overall },
-    overall
+  const withDates = sanitizeAnalysisDates(
+    {
+      ...result,
+      warnings,
+      overall_confidence: overall,
+      specialist,
+    },
+    now
   );
 
+  const guardian_status = deriveGuardianStatus(withDates, overall, now);
+
   return {
-    ...result,
-    warnings,
+    ...withDates,
     overall_confidence: overall,
     guardian_status,
     specialist,
@@ -233,7 +243,8 @@ export function validateAnalysis(result: GuardianAnalysis): GuardianAnalysis {
 
 export function deriveGuardianStatus(
   result: GuardianAnalysis,
-  overall = result.overall_confidence
+  overall = result.overall_confidence,
+  now = new Date()
 ): GuardianStatus {
   if (overall < CONFIDENCE_MEDIUM) return "needs_verification";
 
@@ -247,7 +258,7 @@ export function deriveGuardianStatus(
 
   for (const d of deadlines) {
     if (!d.date) continue;
-    const days = daysRelativeTo(d.date);
+    const days = daysRelativeTo(d.date, now);
     if (days < 0) hasOverdue = true;
     else if (days <= 30) hasUpcoming = true;
   }
@@ -258,7 +269,7 @@ export function deriveGuardianStatus(
     const renewal = asDate(result.specialist.renewal_date);
     const check = renewal ?? expiration;
     if (check) {
-      const days = daysRelativeTo(check);
+      const days = daysRelativeTo(check, now);
       if (days < 0) return "action_needed";
       if (days <= 30) return "upcoming";
       return "protected";

@@ -308,9 +308,10 @@ export default function SettingsForm({
               <h2 className="text-base font-semibold">Email reminders</h2>
             </div>
             <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-              We email {email} when a deadline from your documents is a week
-              away, and again the day before it&apos;s due. Dismissed alerts
-              are never emailed.
+              We email {email}
+              {" "}
+              when a deadline from your documents is a week away, and again
+              the day before it&apos;s due. Dismissed alerts are never emailed.
             </p>
             {remindersError && (
               <p role="alert" className="mt-2 text-sm text-red-700">

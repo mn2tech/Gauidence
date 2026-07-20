@@ -10,6 +10,7 @@ import {
   type FilePayload,
   type LlmClient,
 } from "../llm";
+import { analysisDateRules } from "../dateResolve";
 
 const SCHEMA = {
   type: "object",
@@ -53,21 +54,24 @@ const SCHEMA = {
   ],
 } as const;
 
-const SYSTEM = `You are Guardian's Contract Analyzer.
+function buildSystem(): string {
+  return `You are Guardian's Contract Analyzer.
 Rules:
 - Distinguish facts from legal interpretation. Extract deadlines and obligations as stated.
 - Flag unclear or conflicting clauses in warnings.
 - Recommendations are organizational guidance, not legal advice.
 - Always include this suggested action when material rights are involved:
 "Consider reviewing this clause with a qualified professional if it materially affects your rights or obligations."
-- Mark end/renewal/termination dates as deadlines when they require action.`;
+- Mark end/renewal/termination dates as deadlines when they require action.
+${analysisDateRules()}`;
+}
 
 export async function analyzeContract(
   client: LlmClient,
   file: FilePayload
 ): Promise<GuardianAnalysis> {
   const parsed = await runStructuredJson<Record<string, unknown>>(client, {
-    system: SYSTEM,
+    system: buildSystem(),
     userContent: buildFileContent(file, "Analyze this contract."),
     schemaName: "contract_analysis",
     schema: SCHEMA as unknown as Record<string, unknown>,

@@ -10,6 +10,7 @@ import {
   type FilePayload,
   type LlmClient,
 } from "../llm";
+import { analysisDateRules } from "../dateResolve";
 
 /** Stub schemas for types that still route to the general analyzer. */
 export const PASSPORT_FIELDS = [
@@ -59,7 +60,8 @@ const SCHEMA = {
   required: [...BASE_REQUIRED, "document_purpose", "likely_next_steps"],
 } as const;
 
-const SYSTEM = `You are Guardian's General Document Analyzer.
+function buildSystem(): string {
+  return `You are Guardian's General Document Analyzer.
 Use for unknown types, low-confidence classifications, and unsupported specialists
 (passport, driver's license, warranty, tax documents until dedicated analyzers ship).
 Rules:
@@ -67,7 +69,9 @@ Rules:
 - Do not force specialized invoice/insurance/contract fields.
 - Be cautious: if a date's purpose is unclear, say so and mark needs_verification.
 - Example cautious wording: "I found this date, but I could not confidently determine its purpose."
-- Prefer omitting uncertain values over inventing them.`;
+- Prefer omitting uncertain values over inventing them.
+${analysisDateRules()}`;
+}
 
 export async function analyzeGeneral(
   client: LlmClient,
@@ -79,7 +83,7 @@ export async function analyzeGeneral(
     : "No reliable specialist type. Extract only general fields.";
 
   const parsed = await runStructuredJson<Record<string, unknown>>(client, {
-    system: SYSTEM,
+    system: buildSystem(),
     userContent: buildFileContent(file, `Analyze this document carefully.\n${hint}`),
     schemaName: "general_analysis",
     schema: SCHEMA as unknown as Record<string, unknown>,
