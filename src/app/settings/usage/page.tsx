@@ -173,39 +173,73 @@ export default async function AdminUsagePage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="rounded-xl border border-stone-200 bg-stone-50/80 px-4 py-3">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
-                    Last 7 days — total
+                    Last 7 days
                   </p>
                   <p className="mt-1 text-2xl font-semibold tabular-nums">
                     {formatUsd(summary.last7Days.estimatedCostUsd)}
                   </p>
-                  <p className="mt-1 text-xs text-ink-muted">
-                    {formatUsd(summary.last7Days.inputCostUsd)} in ·{" "}
-                    {formatUsd(summary.last7Days.outputCostUsd)} out ·{" "}
-                    {summary.last7Days.calls} calls
-                  </p>
                   <p className="mt-0.5 text-xs text-ink-muted">
-                    {formatTokens(summary.last7Days.inputTokens)} in ·{" "}
-                    {formatTokens(summary.last7Days.outputTokens)} out ·{" "}
-                    {formatTokens(summary.last7Days.totalTokens)} tokens
+                    Combined total · {summary.last7Days.calls} calls
                   </p>
+                  <div className="mt-3 grid grid-cols-2 gap-2 border-t border-stone-200/80 pt-3">
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-muted">
+                        Total $ in
+                      </p>
+                      <p className="mt-0.5 text-lg font-semibold tabular-nums">
+                        {formatUsd(summary.last7Days.inputCostUsd)}
+                      </p>
+                      <p className="text-[11px] text-ink-muted">
+                        {formatTokens(summary.last7Days.inputTokens)} tokens
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-muted">
+                        Total $ out
+                      </p>
+                      <p className="mt-0.5 text-lg font-semibold tabular-nums">
+                        {formatUsd(summary.last7Days.outputCostUsd)}
+                      </p>
+                      <p className="text-[11px] text-ink-muted">
+                        {formatTokens(summary.last7Days.outputTokens)} tokens
+                      </p>
+                    </div>
+                  </div>
                 </div>
                 <div className="rounded-xl border border-stone-200 bg-stone-50/80 px-4 py-3">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
-                    This month — total
+                    This month
                   </p>
                   <p className="mt-1 text-2xl font-semibold tabular-nums">
                     {formatUsd(summary.thisMonth.estimatedCostUsd)}
                   </p>
-                  <p className="mt-1 text-xs text-ink-muted">
-                    {formatUsd(summary.thisMonth.inputCostUsd)} in ·{" "}
-                    {formatUsd(summary.thisMonth.outputCostUsd)} out ·{" "}
-                    {summary.thisMonth.calls} calls
-                  </p>
                   <p className="mt-0.5 text-xs text-ink-muted">
-                    {formatTokens(summary.thisMonth.inputTokens)} in ·{" "}
-                    {formatTokens(summary.thisMonth.outputTokens)} out ·{" "}
-                    {formatTokens(summary.thisMonth.totalTokens)} tokens
+                    Combined total · {summary.thisMonth.calls} calls
                   </p>
+                  <div className="mt-3 grid grid-cols-2 gap-2 border-t border-stone-200/80 pt-3">
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-muted">
+                        Total $ in
+                      </p>
+                      <p className="mt-0.5 text-lg font-semibold tabular-nums">
+                        {formatUsd(summary.thisMonth.inputCostUsd)}
+                      </p>
+                      <p className="text-[11px] text-ink-muted">
+                        {formatTokens(summary.thisMonth.inputTokens)} tokens
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-muted">
+                        Total $ out
+                      </p>
+                      <p className="mt-0.5 text-lg font-semibold tabular-nums">
+                        {formatUsd(summary.thisMonth.outputCostUsd)}
+                      </p>
+                      <p className="text-[11px] text-ink-muted">
+                        {formatTokens(summary.thisMonth.outputTokens)} tokens
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -236,9 +270,9 @@ export default async function AdminUsagePage() {
                           <th className="px-3 py-2 font-semibold">Calls</th>
                           <th className="px-3 py-2 font-semibold">In</th>
                           <th className="px-3 py-2 font-semibold">Out</th>
-                          <th className="px-3 py-2 font-semibold">$ in</th>
-                          <th className="px-3 py-2 font-semibold">$ out</th>
-                          <th className="px-3 py-2 font-semibold">Total $</th>
+                          <th className="px-3 py-2 font-semibold">Total $ in</th>
+                          <th className="px-3 py-2 font-semibold">Total $ out</th>
+                          <th className="px-3 py-2 font-semibold">Combined $</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -322,9 +356,9 @@ export default async function AdminUsagePage() {
                           <th className="px-3 py-2 font-semibold">Calls</th>
                           <th className="px-3 py-2 font-semibold">In</th>
                           <th className="px-3 py-2 font-semibold">Out</th>
-                          <th className="px-3 py-2 font-semibold">$ in</th>
-                          <th className="px-3 py-2 font-semibold">$ out</th>
-                          <th className="px-3 py-2 font-semibold">Total $</th>
+                          <th className="px-3 py-2 font-semibold">Total $ in</th>
+                          <th className="px-3 py-2 font-semibold">Total $ out</th>
+                          <th className="px-3 py-2 font-semibold">Combined $</th>
                         </tr>
                       </thead>
                       <tbody>
