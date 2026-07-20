@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 import SettingsForm from "@/components/SettingsForm";
+import BillingSection from "@/components/BillingSection";
 import { isPlatformAdmin } from "@/lib/admin";
 
 export const metadata: Metadata = {
@@ -34,7 +36,7 @@ export default async function SettingsPage() {
         <section className="mx-auto max-w-2xl px-6 py-14">
           <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
           <p className="mt-2 text-sm text-ink-muted">
-            Manage your account, password, and who Guardian watches over.
+            Manage your account, plan, password, and who Guardian watches over.
           </p>
           <p className="mt-4">
             <a
@@ -54,6 +56,17 @@ export default async function SettingsPage() {
               </a>
             </p>
           ) : null}
+          <div className="mt-8">
+            <Suspense
+              fallback={
+                <div className="rounded-2xl border border-stone-200 bg-white p-6 text-sm text-ink-muted">
+                  Loading plan…
+                </div>
+              }
+            >
+              <BillingSection />
+            </Suspense>
+          </div>
           <SettingsForm
             userId={user.id}
             email={user.email ?? ""}

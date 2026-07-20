@@ -52,12 +52,15 @@ button returns a friendly "not set up yet" message. Analyze defaults to Sonnet;
 Ask Gideon, document chat, and Research default to Haiku (`CLAUDE_CHAT_MODEL`)
 to keep high-volume chat cheaper.
 
-Each signed-in user can run up to **10 analyses per hour**. Further requests
-return a clear "try again later" message so Claude usage stays bounded.
+AI usage is gated by **plan** (Settings → Plan & billing). Free and Personal
+monthly quotas apply to Analyze, Ask Gideon / document chat, and Research, with
+hourly burst caps for abuse protection. Run
+`supabase/migrations/0030_billing.sql` and configure Stripe env vars to enable
+upgrades.
 
 After a document is analyzed, you can ask follow-up questions about that file
-only (Ask-your-document chat). Answers are grounded in the stored analysis,
-capped at **30 chat turns per hour**, and deleted with the document.
+only (Ask-your-document chat). Answers are grounded in the stored analysis and
+deleted with the document.
 
 **Ask Gideon** is Guardian's named AI guide. It searches your vault first
 (analyzed documents via embeddings when `OPENAI_API_KEY` is set, plus Daily
@@ -69,6 +72,20 @@ a document. Empty vaults can still ask general questions. Run
 `supabase/migrations/0010_vault_rag.sql` (and `0011_vault_chat_threads.sql`)
 and set `OPENAI_API_KEY` on Vercel for document search. Re-analyze existing
 files (or ask Gideon once) to backfill the search index.
+
+### Plans & Stripe
+
+| Plan | Price | Analyze / mo | Chat / mo | Research / mo |
+|------|-------|--------------|-----------|---------------|
+| Free | $0 | 5 | 30 | 3 |
+| Personal | $12/mo | 100 | 500 | 50 |
+
+1. Create a Product + monthly Price ($12) in Stripe; set `STRIPE_PRICE_PERSONAL`.
+2. Set `STRIPE_SECRET_KEY` (and optional `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`).
+3. Add webhook endpoint `/api/billing/webhook` for `checkout.session.completed`
+   and `customer.subscription.*`; set `STRIPE_WEBHOOK_SECRET`.
+4. Run `0030_billing.sql` in Supabase.
+5. Users upgrade from **Settings → Plan & billing**.
 
 ### Admin AI usage
 

@@ -59,6 +59,7 @@ import {
   REMINDER_AGENT_SYSTEM_NOTE,
 } from "@/lib/reminders/propose";
 import { withLlmUsage } from "@/lib/usage/record";
+import { assertBillingQuota, recordChatEvent } from "@/lib/billing/quota";
 
 async function loadLinkedOrgContext(
   supabase: SupabaseClient,
@@ -259,8 +260,6 @@ function suggestionKindFrom(
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
-
-const CHAT_LIMIT_PER_HOUR = 30;
 
 type ChatMessageRow = {
   id: string;
@@ -597,31 +596,10 @@ export async function POST(request: Request) {
     );
   }
 
-  const hourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-  const { count, error: countError } = await supabase
-    .from("chat_events")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", user.id)
-    .gte("created_at", hourAgo);
-  if (countError) {
-    return NextResponse.json(
-      { error: "We couldn't start vault chat. Please try again." },
-      { status: 502 }
-    );
-  }
-  if ((count ?? 0) >= CHAT_LIMIT_PER_HOUR) {
-    return NextResponse.json(
-      {
-        error:
-          "You've reached the chat limit for now. Try again in about an hour.",
-      },
-      { status: 429 }
-    );
-  }
+  const quota = await assertBillingQuota(supabase, user.id, "chat");
+  if (!quota.ok) return quota.response;
 
-  const { error: eventError } = await supabase.from("chat_events").insert({
-    user_id: user.id,
-  });
+  const { error: eventError } = await recordChatEvent(supabase, user.id, "chat");
   if (eventError) {
     return NextResponse.json(
       { error: "We couldn't start vault chat. Please try again." },

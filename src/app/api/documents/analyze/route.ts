@@ -7,12 +7,12 @@ import { documentTypeToCategory } from "@/lib/analysis/llm";
 import type { AnalysisStatus } from "@/lib/analysis/types";
 import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
 import { withLlmUsage } from "@/lib/usage/record";
+import { assertBillingQuota } from "@/lib/billing/quota";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
 const MAX_ANALYZE_BYTES = 15 * 1024 * 1024;
-const ANALYZE_LIMIT_PER_HOUR = 10;
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -72,30 +72,11 @@ export async function POST(request: Request) {
     );
   }
 
-  const hourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-  const { count, error: countError } = await supabase
-    .from("analysis_events")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", user.id)
-    .gte("created_at", hourAgo);
-  if (countError) {
-    return NextResponse.json(
-      { error: "We couldn't start the analysis. Please try again." },
-      { status: 502 }
-    );
-  }
-  if ((count ?? 0) >= ANALYZE_LIMIT_PER_HOUR) {
-    return NextResponse.json(
-      {
-        error:
-          "You've reached the analysis limit for now. Try again in about an hour.",
-      },
-      { status: 429 }
-    );
-  }
+  const quota = await assertBillingQuota(supabase, user.id, "analyze");
+  if (!quota.ok) return quota.response;
 
   // Count successful analyses only (insert after save) so timeouts/failures
-  // do not burn the hourly budget.
+  // do not burn the monthly budget.
 
   const setStatus = async (status: AnalysisStatus) => {
     await supabase
