@@ -3,7 +3,7 @@ import type { User, SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveGuardianProfile } from "@/lib/profiles/server";
 import {
-  ANALYSIS_MODEL,
+  CHAT_MODEL,
   createLlmClient,
   runChatCompletion,
 } from "@/lib/analysis/llm";
@@ -185,7 +185,7 @@ ${vaultContext.trim() || "(none matching this query in the active vault)"}
       () =>
         runChatCompletion(client, {
           system,
-          model: ANALYSIS_MODEL,
+          model: CHAT_MODEL,
           maxTokens: 2500,
           messages: [
             {

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { User, SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import {
-  ANALYSIS_MODEL,
+  CHAT_MODEL,
   createLlmClient,
   runChatCompletion,
 } from "@/lib/analysis/llm";
@@ -869,7 +869,7 @@ ${linkedContext.trim() || "(none)"}
       () =>
         runChatCompletion(client, {
           system,
-          model: ANALYSIS_MODEL,
+          model: CHAT_MODEL,
           maxTokens: reminderAgent ? 1100 : 900,
           messages: [...history, { role: "user", content: question }],
         })

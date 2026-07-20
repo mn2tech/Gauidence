@@ -15,6 +15,13 @@ export const ANALYSIS_MODEL =
   "claude-sonnet-4-5";
 
 /**
+ * Claude model for Ask Gideon / document chat / research (cheaper, high volume).
+ * Override with CLAUDE_CHAT_MODEL; defaults to Haiku 4.5.
+ */
+export const CHAT_MODEL =
+  process.env.CLAUDE_CHAT_MODEL ?? "claude-haiku-4-5";
+
+/**
  * Claude model for visual/multimodal document understanding.
  * Override with CLAUDE_VISUAL_MODEL; defaults to ANALYSIS_MODEL.
  */

@@ -3,7 +3,7 @@ import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
-  ANALYSIS_MODEL,
+  CHAT_MODEL,
   createLlmClient,
   runChatCompletion,
 } from "@/lib/analysis/llm";
@@ -299,7 +299,7 @@ ${contextResult.context}
       () =>
         runChatCompletion(client, {
           system,
-          model: ANALYSIS_MODEL,
+          model: CHAT_MODEL,
           messages: [...history, { role: "user", content: question }],
         })
     );
