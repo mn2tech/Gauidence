@@ -64,6 +64,16 @@ export const PLAN_PRICE_DISPLAY: Record<PaidPlanId, string> = {
   business: "$49/mo",
 };
 
+/** Short marketing lines for /pricing and Settings. */
+export const PLAN_TAGLINES: Record<PlanId, string> = {
+  free: "Try Guardian with light monthly AI use.",
+  personal: "For one person keeping life’s documents under control.",
+  family: "For households with shared people, pets, and homes.",
+  business: "For teams, clients, and higher AI volume.",
+};
+
+export const FREE_PRICE_DISPLAY = "$0";
+
 /** @deprecated use PLAN_PRICE_DISPLAY.personal */
 export const PERSONAL_PRICE_DISPLAY = PLAN_PRICE_DISPLAY.personal;
 

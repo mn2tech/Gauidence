@@ -69,12 +69,17 @@ export default async function Home({
                 <ArrowRight className="h-4 w-4" />
               </Link>
               <Link
-                href="/security"
+                href="/pricing"
                 className="inline-flex items-center gap-2 rounded-full border border-stone-300 bg-white px-6 py-3 font-semibold text-foreground transition hover:border-brand hover:text-brand"
               >
-                Read our Security Principles
+                See pricing
               </Link>
             </div>
+            <p className="mt-4 text-sm text-ink-muted">
+              <Link href="/security" className="underline-offset-2 hover:underline">
+                Read our Security Principles
+              </Link>
+            </p>
           </div>
         </section>
 

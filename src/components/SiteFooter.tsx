@@ -7,6 +7,9 @@ export default function SiteFooter() {
       <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-6 py-8 text-sm text-ink-muted sm:flex-row">
         <p>© {new Date().getFullYear()} Guardian. All rights reserved.</p>
         <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
+          <Link href="/pricing" className="hover:text-foreground">
+            Pricing
+          </Link>
           <Link href="/help" className="hover:text-foreground">
             Help
           </Link>

@@ -87,6 +87,9 @@ export default function SiteHeader() {
 
         {/* Desktop nav */}
         <nav className="hidden items-center gap-6 text-sm text-ink-muted sm:flex">
+          <Link href="/pricing" className="hover:text-foreground">
+            Pricing
+          </Link>
           <Link href="/security" className="hover:text-foreground">
             Security Principles
           </Link>
@@ -202,6 +205,9 @@ export default function SiteHeader() {
           className="border-t border-stone-200 bg-white px-4 py-3 sm:hidden"
         >
           <nav className="flex flex-col gap-1">
+            <Link href="/pricing" className={linkClass}>
+              Pricing
+            </Link>
             <Link href="/security" className={linkClass}>
               Security Principles
             </Link>
