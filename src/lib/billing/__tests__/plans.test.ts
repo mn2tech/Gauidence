@@ -13,11 +13,13 @@ describe("billing plans", () => {
     assert.equal(normalizePlan("personal"), "personal");
   });
 
-  it("exposes Free and Personal monthly quotas", () => {
+  it("exposes Free, Personal, Family, and Business monthly quotas", () => {
     assert.equal(PLAN_LIMITS.free.analyzePerMonth, 5);
     assert.equal(PLAN_LIMITS.personal.analyzePerMonth, 100);
-    assert.equal(PLAN_LIMITS.personal.chatPerMonth, 500);
-    assert.equal(PLAN_LIMITS.personal.researchPerMonth, 50);
+    assert.equal(PLAN_LIMITS.family.analyzePerMonth, 200);
+    assert.equal(PLAN_LIMITS.business.analyzePerMonth, 500);
+    assert.equal(normalizePlan("family"), "family");
+    assert.equal(normalizePlan("business"), "business");
   });
 
   it("treats active and trialing as paid", () => {

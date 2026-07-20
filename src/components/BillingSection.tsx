@@ -4,21 +4,35 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CreditCard, Loader2, Sparkles } from "lucide-react";
 import {
-  PERSONAL_PRICE_DISPLAY,
   PLAN_LABELS,
+  PLAN_PRICE_DISPLAY,
+  type PaidPlanId,
   type PlanId,
 } from "@/lib/billing/plans";
 
-type StatusPayload = {
-  billingConfigured: boolean;
-  plan: PlanId;
-  planLabel: string;
-  personalPrice: string;
+type CatalogItem = {
+  id: PaidPlanId;
+  label: string;
+  price: string;
   limits: {
     analyzePerMonth: number;
     chatPerMonth: number;
     researchPerMonth: number;
   };
+  canUpgradeTo: boolean;
+};
+
+type StatusPayload = {
+  billingConfigured: boolean;
+  plan: PlanId;
+  planLabel: string;
+  prices: typeof PLAN_PRICE_DISPLAY;
+  limits: {
+    analyzePerMonth: number;
+    chatPerMonth: number;
+    researchPerMonth: number;
+  };
+  catalog: CatalogItem[];
   usage: {
     analyze: number;
     chat: number;
@@ -61,7 +75,7 @@ export default function BillingSection() {
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<StatusPayload | null>(null);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<"checkout" | "portal" | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [banner, setBanner] = useState<string | null>(null);
 
@@ -91,21 +105,30 @@ export default function BillingSection() {
 
   useEffect(() => {
     const billing = searchParams.get("billing");
+    const planParam = searchParams.get("plan");
     if (billing === "success") {
-      setBanner("Personal plan activated — thanks for supporting Guardian.");
+      const label =
+        planParam && planParam in PLAN_LABELS
+          ? PLAN_LABELS[planParam as PlanId]
+          : "Paid";
+      setBanner(`${label} plan activated — thanks for supporting Guardian.`);
       router.replace("/settings", { scroll: false });
       void load();
     } else if (billing === "canceled") {
-      setBanner("Checkout canceled — you're still on Free.");
+      setBanner("Checkout canceled — your plan was not changed.");
       router.replace("/settings", { scroll: false });
     }
   }, [searchParams, router, load]);
 
-  async function startCheckout() {
-    setBusy("checkout");
+  async function startCheckout(plan: PaidPlanId) {
+    setBusy(plan);
     setError(null);
     try {
-      const res = await fetch("/api/billing/checkout", { method: "POST" });
+      const res = await fetch("/api/billing/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan }),
+      });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(body.error ?? "Couldn't start checkout.");
@@ -138,7 +161,8 @@ export default function BillingSection() {
   }
 
   const plan = status?.plan ?? "free";
-  const isPersonal = plan === "personal";
+  const isPaid = plan !== "free";
+  const upgrades = status?.catalog.filter((c) => c.canUpgradeTo) ?? [];
 
   return (
     <section className="rounded-2xl border border-stone-200 bg-white p-6">
@@ -149,8 +173,9 @@ export default function BillingSection() {
             <h2 className="text-base font-semibold">Plan & billing</h2>
           </div>
           <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-            Free includes light monthly AI use. Personal ({PERSONAL_PRICE_DISPLAY})
-            raises Analyze, Ask Gideon, and Research allowances.
+            Free for light use. Personal {PLAN_PRICE_DISPLAY.personal}, Family{" "}
+            {PLAN_PRICE_DISPLAY.family}, or Business {PLAN_PRICE_DISPLAY.business}{" "}
+            for higher Analyze, Ask Gideon, and Research limits.
           </p>
         </div>
         {status ? (
@@ -199,22 +224,39 @@ export default function BillingSection() {
         </div>
       ) : null}
 
+      {status?.catalog ? (
+        <ul className="mt-5 space-y-2 text-sm text-ink-muted">
+          {status.catalog.map((c) => (
+            <li key={c.id} className="flex flex-wrap items-baseline gap-x-2">
+              <span className="font-semibold text-foreground">{c.label}</span>
+              <span>{c.price}</span>
+              <span>
+                · {c.limits.analyzePerMonth} analyses · {c.limits.chatPerMonth}{" "}
+                chat · {c.limits.researchPerMonth} research
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
       <div className="mt-5 flex flex-wrap gap-2">
-        {!isPersonal ? (
+        {upgrades.map((c) => (
           <button
+            key={c.id}
             type="button"
-            onClick={() => void startCheckout()}
+            onClick={() => void startCheckout(c.id)}
             disabled={busy !== null || !status?.billingConfigured}
             className="inline-flex items-center gap-1.5 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
           >
-            {busy === "checkout" ? (
+            {busy === c.id ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Sparkles className="h-4 w-4" />
             )}
-            Upgrade to Personal — {PERSONAL_PRICE_DISPLAY}
+            {plan === "free" ? "Get" : "Upgrade to"} {c.label} — {c.price}
           </button>
-        ) : (
+        ))}
+        {isPaid ? (
           <button
             type="button"
             onClick={() => void openPortal()}
@@ -228,7 +270,7 @@ export default function BillingSection() {
             )}
             Manage billing
           </button>
-        )}
+        ) : null}
       </div>
 
       {status && !status.billingConfigured ? (

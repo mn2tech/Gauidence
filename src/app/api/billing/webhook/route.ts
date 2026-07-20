@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getStripe } from "@/lib/billing/stripe";
+import { getStripe, resolvePlanFromSubscription } from "@/lib/billing/stripe";
 import {
+  isPaidPlanId,
   isPaidSubscriptionStatus,
   type PlanId,
 } from "@/lib/billing/plans";
@@ -12,10 +13,36 @@ export const runtime = "nodejs";
 async function applySubscription(
   admin: NonNullable<ReturnType<typeof createAdminClient>>,
   userId: string,
-  sub: Stripe.Subscription
+  sub: Stripe.Subscription,
+  planHint?: string | null
 ) {
   const paid = isPaidSubscriptionStatus(sub.status);
-  const plan: PlanId = paid ? "personal" : "free";
+  const fromSub = resolvePlanFromSubscription(sub);
+  const fromHint = isPaidPlanId(planHint) ? planHint : null;
+  const plan: PlanId = paid ? fromSub ?? fromHint ?? "personal" : "free";
+
+  const { data: existing } = await admin
+    .from("profiles")
+    .select("stripe_subscription_id")
+    .eq("id", userId)
+    .maybeSingle();
+
+  const previousSubId = existing?.stripe_subscription_id as string | null | undefined;
+  if (
+    previousSubId &&
+    previousSubId !== sub.id &&
+    paid
+  ) {
+    const stripe = getStripe();
+    if (stripe) {
+      try {
+        await stripe.subscriptions.cancel(previousSubId);
+      } catch (err) {
+        console.error("Could not cancel previous subscription:", previousSubId, err);
+      }
+    }
+  }
+
   await admin
     .from("profiles")
     .update({
@@ -91,7 +118,12 @@ export async function POST(request: Request) {
             : session.subscription?.id;
         if (!userId || !subId) break;
         const sub = await stripe.subscriptions.retrieve(subId);
-        await applySubscription(admin, userId, sub);
+        await applySubscription(
+          admin,
+          userId,
+          sub,
+          session.metadata?.guardian_plan
+        );
         break;
       }
       case "customer.subscription.updated":
@@ -105,11 +137,22 @@ export async function POST(request: Request) {
         const sub = event.data.object as Stripe.Subscription;
         const userId = await resolveUserId(admin, sub);
         if (!userId) break;
+        const { data: profile } = await admin
+          .from("profiles")
+          .select("stripe_subscription_id")
+          .eq("id", userId)
+          .maybeSingle();
+        // Ignore deletes of an old sub after an upgrade replaced it.
+        if (
+          profile?.stripe_subscription_id &&
+          profile.stripe_subscription_id !== sub.id
+        ) {
+          break;
+        }
         await admin
           .from("profiles")
           .update({
             plan: "free",
-            stripe_subscription_id: sub.id,
             stripe_subscription_status: "canceled",
             updated_at: new Date().toISOString(),
           })

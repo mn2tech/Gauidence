@@ -79,13 +79,15 @@ files (or ask Gideon once) to backfill the search index.
 |------|-------|--------------|-----------|---------------|
 | Free | $0 | 5 | 30 | 3 |
 | Personal | $12/mo | 100 | 500 | 50 |
+| Family | $24/mo | 200 | 1,000 | 100 |
+| Business | $49/mo | 500 | 3,000 | 300 |
 
-1. Set `STRIPE_SECRET_KEY` on Vercel (Checkout defines Personal at $12/mo
-   inline — no Dashboard product required). Optional: `STRIPE_PRICE_PERSONAL`
-   if you prefer a saved Price ID.
+1. Set `STRIPE_SECRET_KEY` on Vercel (Checkout defines each plan inline —
+   no Dashboard product required). Optional saved Price IDs:
+   `STRIPE_PRICE_PERSONAL`, `STRIPE_PRICE_FAMILY`, `STRIPE_PRICE_BUSINESS`.
 2. Add webhook endpoint `/api/billing/webhook` for `checkout.session.completed`
    and `customer.subscription.*`; set `STRIPE_WEBHOOK_SECRET`.
-3. Run `0030_billing.sql` in Supabase.
+3. Run `0030_billing.sql` and `0031_billing_family_business.sql` in Supabase.
 4. Users upgrade from **Settings → Plan & billing**.
 
 ### Admin AI usage

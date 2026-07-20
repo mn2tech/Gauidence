@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { parseCheckoutPlan } from "@/lib/billing/plans";
 import {
   appBaseUrl,
+  checkoutLineItem,
   getStripe,
   isStripeBillingConfigured,
-  personalPriceId,
-  PERSONAL_UNIT_AMOUNT_CENTS,
 } from "@/lib/billing/stripe";
 
 export const runtime = "nodejs";
@@ -24,6 +24,21 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: "Billing isn't set up yet on this deployment." },
       { status: 503 }
+    );
+  }
+
+  let requestedPlan: unknown = "personal";
+  try {
+    const body = await request.json();
+    if (body?.plan != null) requestedPlan = body.plan;
+  } catch {
+    // default personal
+  }
+  const plan = parseCheckoutPlan(requestedPlan);
+  if (!plan) {
+    return NextResponse.json(
+      { error: "Choose Personal, Family, or Business." },
+      { status: 400 }
     );
   }
 
@@ -52,7 +67,7 @@ export async function POST(request: Request) {
 
   const { data: profile } = await admin
     .from("profiles")
-    .select("stripe_customer_id, plan, email")
+    .select("stripe_customer_id, plan, email, stripe_subscription_id")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -73,36 +88,23 @@ export async function POST(request: Request) {
       .eq("id", user.id);
   }
 
-  const savedPrice = personalPriceId();
-  const lineItems = savedPrice
-    ? [{ price: savedPrice, quantity: 1 }]
-    : [
-        {
-          quantity: 1,
-          price_data: {
-            currency: "usd",
-            unit_amount: PERSONAL_UNIT_AMOUNT_CENTS,
-            recurring: { interval: "month" as const },
-            product_data: {
-              name: "Guardian Personal",
-              description:
-                "100 analyses, 500 Ask Gideon turns, and 50 Research briefs per month.",
-            },
-          },
-        },
-      ];
-
   const base = appBaseUrl(request);
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
     customer: customerId,
     client_reference_id: user.id,
-    line_items: lineItems,
-    success_url: `${base}/settings?billing=success`,
+    line_items: [checkoutLineItem(plan)],
+    success_url: `${base}/settings?billing=success&plan=${plan}`,
     cancel_url: `${base}/settings?billing=canceled`,
-    metadata: { supabase_user_id: user.id },
+    metadata: {
+      supabase_user_id: user.id,
+      guardian_plan: plan,
+    },
     subscription_data: {
-      metadata: { supabase_user_id: user.id },
+      metadata: {
+        supabase_user_id: user.id,
+        guardian_plan: plan,
+      },
     },
     allow_promotion_codes: true,
   });
@@ -114,5 +116,5 @@ export async function POST(request: Request) {
     );
   }
 
-  return NextResponse.json({ url: session.url });
+  return NextResponse.json({ url: session.url, plan });
 }

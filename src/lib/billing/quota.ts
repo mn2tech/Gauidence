@@ -77,9 +77,12 @@ function hourLimit(limits: PlanLimits, feature: BillingFeature): number {
 
 function upgradeHint(plan: PlanId): string {
   if (plan === "free") {
-    return " Upgrade to Personal ($12/mo) in Settings for higher limits.";
+    return " Upgrade to Personal, Family, or Business in Settings for higher limits.";
   }
-  return " Your Personal monthly allowance resets at the start of next month.";
+  if (plan === "personal" || plan === "family") {
+    return " Upgrade your plan in Settings for a higher monthly allowance.";
+  }
+  return " Your Business monthly allowance resets at the start of next month.";
 }
 
 /**

@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getPlanSnapshot, getUsageCounts } from "@/lib/billing/quota";
-import { PLAN_LABELS, PERSONAL_PRICE_DISPLAY } from "@/lib/billing/plans";
+import {
+  PAID_PLAN_IDS,
+  PLAN_LABELS,
+  PLAN_LIMITS,
+  PLAN_PRICE_DISPLAY,
+  planRank,
+} from "@/lib/billing/plans";
 import { isStripeBillingConfigured } from "@/lib/billing/stripe";
 
 export const runtime = "nodejs";
@@ -24,13 +30,22 @@ export async function GET() {
 
   const snap = await getPlanSnapshot(supabase, user.id);
   const usage = await getUsageCounts(supabase, user.id);
+  const rank = planRank(snap.plan);
 
   return NextResponse.json({
     billingConfigured: isStripeBillingConfigured(),
     plan: snap.plan,
     planLabel: PLAN_LABELS[snap.plan],
-    personalPrice: PERSONAL_PRICE_DISPLAY,
+    prices: PLAN_PRICE_DISPLAY,
+    personalPrice: PLAN_PRICE_DISPLAY.personal,
     limits: snap.limits,
+    catalog: PAID_PLAN_IDS.map((id) => ({
+      id,
+      label: PLAN_LABELS[id],
+      price: PLAN_PRICE_DISPLAY[id],
+      limits: PLAN_LIMITS[id],
+      canUpgradeTo: planRank(id) > rank,
+    })),
     usage: {
       analyze: usage.analyze,
       chat: usage.chat,
