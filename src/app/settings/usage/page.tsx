@@ -6,6 +6,7 @@ import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 import { isPlatformAdmin } from "@/lib/admin";
 import { loadUsageSummary } from "@/lib/usage/summary";
+import { formatUsd } from "@/lib/usage/pricing";
 
 export const metadata: Metadata = {
   title: "AI usage — Guardian",
@@ -44,7 +45,8 @@ export default async function AdminUsagePage() {
           </p>
           <h1 className="mt-4 text-2xl font-bold tracking-tight">AI usage</h1>
           <p className="mt-2 text-sm text-ink-muted">
-            Admin-only view of Claude tokens recorded by Guardian.
+            Admin-only view of Claude tokens and estimated spend recorded by
+            Guardian.
           </p>
 
           {!summary ? (
@@ -62,10 +64,13 @@ export default async function AdminUsagePage() {
                     Last 7 days
                   </p>
                   <p className="mt-1 text-2xl font-semibold tabular-nums">
-                    {formatTokens(summary.last7Days.totalTokens)}
+                    {formatUsd(summary.last7Days.estimatedCostUsd)}
                   </p>
                   <p className="mt-1 text-xs text-ink-muted">
-                    {summary.last7Days.calls} calls ·{" "}
+                    {formatTokens(summary.last7Days.totalTokens)} tokens ·{" "}
+                    {summary.last7Days.calls} calls
+                  </p>
+                  <p className="mt-0.5 text-xs text-ink-muted">
                     {formatTokens(summary.last7Days.inputTokens)} in ·{" "}
                     {formatTokens(summary.last7Days.outputTokens)} out
                   </p>
@@ -75,10 +80,13 @@ export default async function AdminUsagePage() {
                     This month
                   </p>
                   <p className="mt-1 text-2xl font-semibold tabular-nums">
-                    {formatTokens(summary.thisMonth.totalTokens)}
+                    {formatUsd(summary.thisMonth.estimatedCostUsd)}
                   </p>
                   <p className="mt-1 text-xs text-ink-muted">
-                    {summary.thisMonth.calls} calls ·{" "}
+                    {formatTokens(summary.thisMonth.totalTokens)} tokens ·{" "}
+                    {summary.thisMonth.calls} calls
+                  </p>
+                  <p className="mt-0.5 text-xs text-ink-muted">
                     {formatTokens(summary.thisMonth.inputTokens)} in ·{" "}
                     {formatTokens(summary.thisMonth.outputTokens)} out
                   </p>
@@ -99,6 +107,7 @@ export default async function AdminUsagePage() {
                           <th className="px-3 py-2 font-semibold">Feature</th>
                           <th className="px-3 py-2 font-semibold">Calls</th>
                           <th className="px-3 py-2 font-semibold">Tokens</th>
+                          <th className="px-3 py-2 font-semibold">Est. $</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -115,6 +124,9 @@ export default async function AdminUsagePage() {
                             </td>
                             <td className="px-3 py-2 tabular-nums">
                               {formatTokens(row.totalTokens)}
+                            </td>
+                            <td className="px-3 py-2 tabular-nums">
+                              {formatUsd(row.estimatedCostUsd)}
                             </td>
                           </tr>
                         ))}
@@ -138,6 +150,7 @@ export default async function AdminUsagePage() {
                           <th className="px-3 py-2 font-semibold">Email</th>
                           <th className="px-3 py-2 font-semibold">Calls</th>
                           <th className="px-3 py-2 font-semibold">Tokens</th>
+                          <th className="px-3 py-2 font-semibold">Est. $</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -154,6 +167,9 @@ export default async function AdminUsagePage() {
                             </td>
                             <td className="px-3 py-2 tabular-nums">
                               {formatTokens(row.totalTokens)}
+                            </td>
+                            <td className="px-3 py-2 tabular-nums">
+                              {formatUsd(row.estimatedCostUsd)}
                             </td>
                           </tr>
                         ))}

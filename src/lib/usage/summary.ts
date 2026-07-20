@@ -2,6 +2,15 @@ import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
+import { estimateClaudeCostUsd } from "./pricing";
+
+export type UsageTotals = {
+  calls: number;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  estimatedCostUsd: number;
+};
 
 export type UsageFeatureRow = {
   feature: string;
@@ -9,6 +18,7 @@ export type UsageFeatureRow = {
   inputTokens: number;
   outputTokens: number;
   totalTokens: number;
+  estimatedCostUsd: number;
 };
 
 export type UsageUserRow = {
@@ -16,21 +26,12 @@ export type UsageUserRow = {
   email: string | null;
   calls: number;
   totalTokens: number;
+  estimatedCostUsd: number;
 };
 
 export type UsageSummary = {
-  last7Days: {
-    calls: number;
-    inputTokens: number;
-    outputTokens: number;
-    totalTokens: number;
-  };
-  thisMonth: {
-    calls: number;
-    inputTokens: number;
-    outputTokens: number;
-    totalTokens: number;
-  };
+  last7Days: UsageTotals;
+  thisMonth: UsageTotals;
   byFeature: UsageFeatureRow[];
   topUsers: UsageUserRow[];
   since: string | null;
@@ -51,30 +52,48 @@ function monthStartIso(now = new Date()): string {
 type EventRow = {
   user_id: string;
   feature: string;
+  model: string | null;
   input_tokens: number;
   output_tokens: number;
   created_at: string;
 };
 
-function emptyTotals() {
-  return { calls: 0, inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+function emptyTotals(): UsageTotals {
+  return {
+    calls: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    totalTokens: 0,
+    estimatedCostUsd: 0,
+  };
 }
 
-function sumWindow(events: EventRow[], sinceIso: string) {
+function eventCost(e: EventRow): number {
+  return estimateClaudeCostUsd({
+    model: e.model,
+    inputTokens: e.input_tokens,
+    outputTokens: e.output_tokens,
+  });
+}
+
+function sumWindow(events: EventRow[], sinceIso: string): UsageTotals {
   let calls = 0;
   let inputTokens = 0;
   let outputTokens = 0;
+  let estimatedCostUsd = 0;
   for (const e of events) {
     if (e.created_at < sinceIso) continue;
     calls += 1;
     inputTokens += e.input_tokens;
     outputTokens += e.output_tokens;
+    estimatedCostUsd += eventCost(e);
   }
   return {
     calls,
     inputTokens,
     outputTokens,
     totalTokens: inputTokens + outputTokens,
+    estimatedCostUsd,
   };
 }
 
@@ -88,7 +107,7 @@ export async function loadUsageSummary(): Promise<UsageSummary | null> {
 
   const { data, error } = await admin
     .from("llm_usage_events")
-    .select("user_id, feature, input_tokens, output_tokens, created_at")
+    .select("user_id, feature, model, input_tokens, output_tokens, created_at")
     .gte("created_at", older)
     .order("created_at", { ascending: false })
     .limit(20_000);
@@ -125,27 +144,37 @@ export async function loadUsageSummary(): Promise<UsageSummary | null> {
       inputTokens: 0,
       outputTokens: 0,
       totalTokens: 0,
+      estimatedCostUsd: 0,
     };
     cur.calls += 1;
     cur.inputTokens += e.input_tokens;
     cur.outputTokens += e.output_tokens;
     cur.totalTokens += e.input_tokens + e.output_tokens;
+    cur.estimatedCostUsd += eventCost(e);
     featureMap.set(e.feature, cur);
   }
   const byFeature = [...featureMap.values()].sort(
-    (a, b) => b.totalTokens - a.totalTokens
+    (a, b) => b.estimatedCostUsd - a.estimatedCostUsd
   );
 
-  const userMap = new Map<string, { calls: number; totalTokens: number }>();
+  const userMap = new Map<
+    string,
+    { calls: number; totalTokens: number; estimatedCostUsd: number }
+  >();
   for (const e of events) {
     if (e.created_at < since7d) continue;
-    const cur = userMap.get(e.user_id) ?? { calls: 0, totalTokens: 0 };
+    const cur = userMap.get(e.user_id) ?? {
+      calls: 0,
+      totalTokens: 0,
+      estimatedCostUsd: 0,
+    };
     cur.calls += 1;
     cur.totalTokens += e.input_tokens + e.output_tokens;
+    cur.estimatedCostUsd += eventCost(e);
     userMap.set(e.user_id, cur);
   }
   const topIds = [...userMap.entries()]
-    .sort((a, b) => b[1].totalTokens - a[1].totalTokens)
+    .sort((a, b) => b[1].estimatedCostUsd - a[1].estimatedCostUsd)
     .slice(0, 15)
     .map(([id]) => id);
 
@@ -167,6 +196,7 @@ export async function loadUsageSummary(): Promise<UsageSummary | null> {
       email: emailById.get(id) ?? null,
       calls: u.calls,
       totalTokens: u.totalTokens,
+      estimatedCostUsd: u.estimatedCostUsd,
     };
   });
 
@@ -186,6 +216,6 @@ export async function loadUsageSummary(): Promise<UsageSummary | null> {
     note:
       events.length === 0
         ? "No token events yet. Usage is recorded from the next Claude call after migration 0028 is applied."
-        : "Guardian-recorded Claude usage only (not Anthropic Console billing totals).",
+        : "Estimated USD from list prices (Sonnet $3/$15 per MTok in/out). Not Anthropic Console invoice totals.",
   };
 }
