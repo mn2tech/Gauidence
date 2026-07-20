@@ -175,7 +175,7 @@ export default function BillingSection() {
           <p className="mt-2 text-sm leading-relaxed text-ink-muted">
             Free for light use. Personal {PLAN_PRICE_DISPLAY.personal}, Family{" "}
             {PLAN_PRICE_DISPLAY.family}, or Business {PLAN_PRICE_DISPLAY.business}{" "}
-            for higher Analyze, Ask Gideon, and Research limits.
+            for higher analyses, Ask Gideon, and Research limits.
           </p>
         </div>
         {status ? (

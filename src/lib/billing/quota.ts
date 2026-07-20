@@ -149,7 +149,7 @@ export async function assertBillingQuota(
         response: NextResponse.json(
           {
             error:
-              "You've reached the analysis limit for now. Try again in about an hour.",
+              "You've reached the analyses limit for now. Try again in about an hour.",
             code: "hourly_limit",
             plan: snap.plan,
             feature,
