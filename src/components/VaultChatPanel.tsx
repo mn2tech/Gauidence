@@ -19,6 +19,7 @@ import {
   Loader2,
   Menu,
   MessageSquarePlus,
+  Mic,
   NotebookPen,
   Plus,
   Send,
@@ -51,6 +52,7 @@ import {
   type ProposedReminder,
 } from "@/lib/reminders/propose";
 import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
+import { useGideonVoiceInput } from "@/hooks/useGideonVoiceInput";
 
 function defaultReminderDateTime(): { date: string; time: string } {
   const now = new Date();
@@ -262,8 +264,25 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const profileSwitchRef = useRef(false);
   const deepLinkChatConsumed = useRef<string | null>(null);
+  const sendQuestionRef = useRef<(questionRaw: string) => Promise<void>>(
+    async () => {}
+  );
   const inputId = isPage ? "ask-gideon-page-input" : "ask-gideon-input";
   const profileId = active?.id ?? meta?.profileId ?? null;
+
+  const {
+    listening: voiceListening,
+    toggle: toggleVoice,
+    stop: stopVoice,
+    supported: voiceSupported,
+  } = useGideonVoiceInput({
+    onFinalTranscript: (text) => {
+      void sendQuestionRef.current(text);
+    },
+    onInterimTranscript: setInput,
+    onError: (msg) => setError(msg),
+    disabled: sending || vaultBusy || !profileId,
+  });
   const documentsHref = profileId
     ? `/dashboard#documents-${profileId}`
     : "/dashboard";
@@ -780,6 +799,11 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
       setSending(false);
     }
   };
+  sendQuestionRef.current = sendQuestion;
+
+  useEffect(() => {
+    if (sending) stopVoice();
+  }, [sending, stopVoice]);
 
   const send = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1261,17 +1285,39 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          disabled={sending || vaultBusy}
+          disabled={sending || vaultBusy || voiceListening}
           maxLength={2000}
           placeholder={
-            emptyVault
-              ? "Ask anything — or use + to scan / upload…"
-              : logsOnly
-                ? "Ask about Daily Logs or anything else…"
-                : "Ask about your documents or anything else…"
+            voiceListening
+              ? "Listening…"
+              : emptyVault
+                ? "Ask anything — or use + to scan / upload…"
+                : logsOnly
+                  ? "Ask about Daily Logs or anything else…"
+                  : "Ask about your documents or anything else…"
           }
-          className="min-w-0 flex-1 rounded-full border border-stone-200 bg-white px-3 py-2.5 text-sm outline-none ring-brand focus:ring-2 disabled:opacity-50"
+          className={`min-w-0 flex-1 rounded-full border bg-white px-3 py-2.5 text-sm outline-none ring-brand focus:ring-2 disabled:opacity-50 ${
+            voiceListening
+              ? "border-brand/50 ring-1 ring-brand/30"
+              : "border-stone-200"
+          }`}
         />
+        {voiceSupported ? (
+          <button
+            type="button"
+            onClick={toggleVoice}
+            aria-label={voiceListening ? "Stop listening" : "Talk to Gideon"}
+            aria-pressed={voiceListening}
+            disabled={sending || vaultBusy || !profileId}
+            className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50 ${
+              voiceListening
+                ? "border-red-300 bg-red-50 text-red-600 hover:bg-red-100"
+                : "border-stone-300 bg-white text-ink-muted hover:border-stone-400 hover:text-foreground"
+            }`}
+          >
+            <Mic className="h-4 w-4" />
+          </button>
+        ) : null}
         <button
           type="submit"
           disabled={sending || vaultBusy || !input.trim()}
