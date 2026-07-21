@@ -3,6 +3,7 @@ import { ArrowRight, BellRing, FileText, ShieldCheck } from "lucide-react";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 import SecuritySection from "@/components/SecuritySection";
+import MeetGideonSection from "@/components/MeetGideonSection";
 
 const features = [
   {
@@ -102,6 +103,8 @@ export default async function Home({
             ))}
           </div>
         </section>
+
+        <MeetGideonSection />
 
         <SecuritySection />
       </main>
