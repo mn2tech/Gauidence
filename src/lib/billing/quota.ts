@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isPlatformAdmin } from "@/lib/admin";
 import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
 import {
   normalizePlan,
@@ -75,25 +76,35 @@ function hourLimit(limits: PlanLimits, feature: BillingFeature): number {
   return limits.chatPerHour;
 }
 
-function upgradeHint(plan: PlanId): string {
-  if (plan === "free") {
-    return " Upgrade to Personal, Family, or Business in Settings for higher limits.";
-  }
-  if (plan === "personal" || plan === "family") {
-    return " Upgrade your plan in Settings for a higher monthly allowance.";
-  }
-  return " Your Business monthly allowance resets at the start of next month.";
+async function emailForQuotaCheck(
+  supabase: SupabaseClient,
+  userId: string,
+  userEmail?: string | null
+): Promise<string | null> {
+  if (userEmail?.trim()) return userEmail.trim();
+  const { data } = await supabase
+    .from("profiles")
+    .select("email")
+    .eq("id", userId)
+    .maybeSingle();
+  return (data?.email as string | null) ?? null;
 }
 
 /**
  * Enforce monthly + hourly quotas. Returns a 429 Response when over limit.
+ * Platform admins (ADMIN_EMAILS) are exempt.
  */
 export async function assertBillingQuota(
   supabase: SupabaseClient,
   userId: string,
-  feature: BillingFeature
+  feature: BillingFeature,
+  userEmail?: string | null
 ): Promise<{ ok: true; plan: PlanId } | { ok: false; response: NextResponse }> {
   const snap = await getPlanSnapshot(supabase, userId);
+  const email = await emailForQuotaCheck(supabase, userId, userEmail);
+  if (isPlatformAdmin(email)) {
+    return { ok: true, plan: snap.plan };
+  }
   const monthStart = billingMonthStartIso();
   const hourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   const mLimit = monthLimit(snap.limits, feature);
@@ -119,7 +130,7 @@ export async function assertBillingQuota(
         ok: false,
         response: NextResponse.json(
           {
-            error: `You've used all ${mLimit} document analyses on the ${PLAN_LABELS[snap.plan]} plan this month.${upgradeHint(snap.plan)}`,
+            error: `You've used all ${mLimit} document analyses on the ${PLAN_LABELS[snap.plan]} plan this month.`,
             code: "plan_limit",
             plan: snap.plan,
             feature,
@@ -275,7 +286,7 @@ function quotaMonthMessage(
       : feature === "analyze"
         ? "document analyses"
         : "Ask Gideon / chat turns";
-  return `You've used all ${limit} ${label} on the ${PLAN_LABELS[plan]} plan this month.${upgradeHint(plan)}`;
+  return `You've used all ${limit} ${label} on the ${PLAN_LABELS[plan]} plan this month.`;
 }
 
 export async function recordChatEvent(

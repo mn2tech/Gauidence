@@ -72,7 +72,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const quota = await assertBillingQuota(supabase, user.id, "analyze");
+  const quota = await assertBillingQuota(supabase, user.id, "analyze", user.email);
   if (!quota.ok) return quota.response;
 
   // Count successful analyses only (insert after save) so timeouts/failures

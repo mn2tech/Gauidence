@@ -191,7 +191,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const quota = await assertBillingQuota(supabase, user.id, "chat");
+  const quota = await assertBillingQuota(supabase, user.id, "chat", user.email);
   if (!quota.ok) return quota.response;
 
   const { error: eventError } = await recordChatEvent(supabase, user.id, "chat");
