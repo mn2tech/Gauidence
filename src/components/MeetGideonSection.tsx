@@ -4,6 +4,13 @@ import { GIDEON_BRAND_LINE } from "@/lib/vault/gideon";
 
 const GIDEON_INTRO_VIDEO_ID = "bXbyZ18NDRM";
 
+const embedParams = new URLSearchParams({
+  rel: "0",
+  /** Show your YouTube captions by default when the video plays. */
+  cc_load_policy: "1",
+  cc_lang_pref: "en",
+});
+
 export default function MeetGideonSection() {
   return (
     <section
@@ -15,7 +22,7 @@ export default function MeetGideonSection() {
           <div className="order-2 lg:order-1">
             <div className="overflow-hidden rounded-2xl border border-stone-200 bg-stone-900 shadow-sm">
               <iframe
-                src={`https://www.youtube.com/embed/${GIDEON_INTRO_VIDEO_ID}?rel=0`}
+                src={`https://www.youtube.com/embed/${GIDEON_INTRO_VIDEO_ID}?${embedParams}`}
                 title="Meet Gideon — Guardian"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                 allowFullScreen
