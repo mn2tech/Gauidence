@@ -18,7 +18,7 @@ export default function GideonAvatar({
   if (variant === "portrait") {
     return (
       <span
-        className={`relative inline-flex shrink-0 overflow-hidden rounded-full ring-1 ring-brand/25 ${pulse ? "animate-pulse" : ""} ${className}`}
+        className={`relative inline-flex shrink-0 overflow-hidden rounded-full bg-stone-100 ring-1 ring-brand/30 ${className}`}
         style={{ width: size, height: size }}
         aria-hidden
       >
@@ -27,7 +27,7 @@ export default function GideonAvatar({
           alt=""
           width={size}
           height={size}
-          className="h-full w-full object-cover object-[center_18%]"
+          className={`h-full w-full object-cover object-center ${pulse ? "animate-pulse" : ""}`}
           sizes={`${size}px`}
         />
       </span>

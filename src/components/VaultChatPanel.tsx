@@ -1150,7 +1150,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     >
       {loadingHistory ? (
         <p className="flex items-center gap-2 text-xs text-ink-muted">
-          <GideonAvatar size={32} variant="portrait" pulse />
+          <GideonAvatar size={40} variant="portrait" pulse />
           Gideon is checking your vault…
         </p>
       ) : (
@@ -1165,14 +1165,14 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
               </div>
             ) : (
               <div key={m.id} className="flex items-start gap-2.5">
-                <GideonAvatar size={32} variant="portrait" />
+                <GideonAvatar size={40} variant="portrait" />
                 {renderAssistantContent(m)}
               </div>
             )
           )}
           {(sending || vaultBusy || savingLog) && (
             <div className="flex items-center gap-2 text-xs text-ink-muted">
-              <GideonAvatar size={32} variant="portrait" pulse />
+              <GideonAvatar size={40} variant="portrait" pulse />
               {savingLog
                 ? "Saving to your vault…"
                 : vaultBusy && vaultStatus
