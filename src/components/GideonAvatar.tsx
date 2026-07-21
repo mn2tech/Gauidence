@@ -1,13 +1,39 @@
-/** Minimal shield-inspired avatar for Gideon — not a human face. */
+import Image from "next/image";
+
+type Props = {
+  size?: number;
+  className?: string;
+  pulse?: boolean;
+  /** Shield icon (default) or portrait in chat replies / typing. */
+  variant?: "shield" | "portrait";
+};
+
+/** Gideon avatar — shield icon by default; portrait in Ask Gideon chat thread. */
 export default function GideonAvatar({
   size = 32,
   className = "",
   pulse = false,
-}: {
-  size?: number;
-  className?: string;
-  pulse?: boolean;
-}) {
+  variant = "shield",
+}: Props) {
+  if (variant === "portrait") {
+    return (
+      <span
+        className={`relative inline-flex shrink-0 overflow-hidden rounded-full ring-1 ring-brand/25 ${pulse ? "animate-pulse" : ""} ${className}`}
+        style={{ width: size, height: size }}
+        aria-hidden
+      >
+        <Image
+          src="/gideon/avatar.png"
+          alt=""
+          width={size}
+          height={size}
+          className="h-full w-full object-cover object-[center_18%]"
+          sizes={`${size}px`}
+        />
+      </span>
+    );
+  }
+
   return (
     <span
       className={`inline-flex shrink-0 items-center justify-center rounded-full bg-brand-light ring-1 ring-brand/25 ${pulse ? "animate-pulse" : ""} ${className}`}
