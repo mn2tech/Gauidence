@@ -83,6 +83,14 @@ export async function GET(request: Request) {
       },
       { onConflict: "id", ignoreDuplicates: true }
     );
+    void import("@/lib/retention/run").then(({ trySendWelcomeEmail }) =>
+      trySendWelcomeEmail(user.id).catch((err) => {
+        console.error(
+          "Welcome email failed:",
+          err instanceof Error ? err.message : "error"
+        );
+      })
+    );
   }
 
   return response;

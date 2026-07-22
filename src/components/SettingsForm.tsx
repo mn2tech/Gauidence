@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, BellRing, Check, Loader2, UserRound } from "lucide-react";
+import { AlertTriangle, BellRing, Check, Loader2, Mail, UserRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 type Props = {
@@ -13,6 +13,7 @@ type Props = {
   initialCompanyName: string;
   avatarUrl: string | null;
   initialRemindersEnabled: boolean;
+  initialTipsEnabled: boolean;
 };
 
 export default function SettingsForm({
@@ -22,6 +23,7 @@ export default function SettingsForm({
   initialCompanyName,
   avatarUrl,
   initialRemindersEnabled,
+  initialTipsEnabled,
 }: Props) {
   const supabase = createClient();
   const router = useRouter();
@@ -41,6 +43,10 @@ export default function SettingsForm({
   const [remindersEnabled, setRemindersEnabled] = useState(initialRemindersEnabled);
   const [savingReminders, setSavingReminders] = useState(false);
   const [remindersError, setRemindersError] = useState<string | null>(null);
+
+  const [tipsEnabled, setTipsEnabled] = useState(initialTipsEnabled);
+  const [savingTips, setSavingTips] = useState(false);
+  const [tipsError, setTipsError] = useState<string | null>(null);
 
   const [confirmText, setConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
@@ -117,6 +123,26 @@ export default function SettingsForm({
       setRemindersError("We couldn't save that change. Please try again.");
     }
     setSavingReminders(false);
+  }
+
+  async function handleToggleTips() {
+    if (!supabase || savingTips) return;
+    const next = !tipsEnabled;
+    setTipsError(null);
+    setTipsEnabled(next);
+    setSavingTips(true);
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        email_tips_enabled: next,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", userId);
+    if (error) {
+      setTipsEnabled(!next);
+      setTipsError("We couldn't save that change. Please try again.");
+    }
+    setSavingTips(false);
   }
 
   const deleteConfirmed = confirmText.trim().toUpperCase() === "DELETE";
@@ -339,6 +365,43 @@ export default function SettingsForm({
             <span
               className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
                 remindersEnabled ? "translate-x-[22px]" : "translate-x-0.5"
+              }`}
+            />
+          </button>
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-stone-200 bg-white p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <Mail className="h-5 w-5 text-brand" />
+              <h2 className="text-base font-semibold">Getting started emails</h2>
+            </div>
+            <p className="mt-2 text-sm leading-relaxed text-ink-muted">
+              Short tips to help you set up Guardian — welcome notes and gentle
+              nudges if you haven&apos;t created a vault or added a document yet.
+            </p>
+            {tipsError && (
+              <p role="alert" className="mt-2 text-sm text-red-700">
+                {tipsError}
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={tipsEnabled}
+            aria-label="Getting started emails"
+            onClick={handleToggleTips}
+            disabled={savingTips}
+            className={`relative mt-1 inline-flex h-6 w-11 shrink-0 items-center rounded-full transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-60 ${
+              tipsEnabled ? "bg-brand" : "bg-stone-300"
+            }`}
+          >
+            <span
+              className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
+                tipsEnabled ? "translate-x-[22px]" : "translate-x-0.5"
               }`}
             />
           </button>
