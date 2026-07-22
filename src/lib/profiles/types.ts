@@ -9,6 +9,7 @@ export const GUARDIAN_PROFILE_TYPES = [
   "parent",
   "family_member",
   "student",
+  "teacher",
   "family",
   "business",
   "non_profit",
@@ -31,6 +32,7 @@ export const PROFILE_TYPE_LABELS: Record<GuardianProfileType, string> = {
   parent: "Parent",
   family_member: "Family member",
   student: "Student",
+  teacher: "Teacher",
   family: "Family",
   business: "Business",
   non_profit: "Nonprofit",
@@ -87,6 +89,7 @@ export const PROFILE_CREATE_OPTIONS: {
     relationship: "Family member",
   },
   { id: "student", label: "A student", profileType: "student", relationship: "Student" },
+  { id: "teacher", label: "A teacher", profileType: "teacher", relationship: "Teacher" },
   { id: "business", label: "My business", profileType: "business" },
   { id: "nonprofit", label: "A nonprofit", profileType: "non_profit" },
   { id: "employee", label: "An employee", profileType: "employee" },
@@ -140,9 +143,9 @@ export const PROFILE_CREATE_GROUPS: {
   },
   {
     id: "student",
-    label: "Student",
-    description: "School records, grades, and student vaults",
-    optionIds: ["student"],
+    label: "School",
+    description: "Student and teacher vaults for classes, records, and planning",
+    optionIds: ["student", "teacher"],
   },
   {
     id: "other",
@@ -312,6 +315,7 @@ export function canHaveLinkedHobbies(type: GuardianProfileType): boolean {
     type === "personal" ||
     type === "family" ||
     type === "student" ||
+    type === "teacher" ||
     isFamilyMemberType(type)
   );
 }

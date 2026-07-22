@@ -27,8 +27,8 @@ export default function ProfileSetupHub() {
         Who are you helping?
       </h2>
       <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-        Choose a starting space. You can add more people, businesses, and
-        students anytime from Manage.
+        Choose a starting space. You can add more people, businesses, students,
+        and teachers anytime from Manage.
       </p>
       <p className="mt-3 text-sm text-ink-muted">
         Need a walkthrough?{" "}

@@ -58,6 +58,7 @@ export type SuggestionProfileKind =
   | "personal"
   | "child"
   | "student"
+  | "teacher"
   | "business"
   | "employee"
   | "client"
@@ -75,6 +76,13 @@ export function buildGideonLogSuggestions(
   profileKind: SuggestionProfileKind = "personal"
 ): string[] {
   const isSchool = profileKind === "child" || profileKind === "student";
+  if (profileKind === "teacher") {
+    return [
+      "What happened recently in my classes?",
+      "Summarize recent parent communication notes.",
+      "What should I prepare for this week?",
+    ];
+  }
   if (isSchool) {
     return [
       "What happened recently in the Daily Log?",
@@ -153,6 +161,7 @@ export function buildGideonSuggestions(
   const suggestions: string[] = [];
   const isSchool =
     profileKind === "child" || profileKind === "student";
+  const isTeacher = profileKind === "teacher";
   const isBiz =
     profileKind === "business" ||
     profileKind === "employee" ||
@@ -167,7 +176,11 @@ export function buildGideonSuggestions(
     suggestions.push("What needs my attention this month?");
   }
 
-  if (isSchool) {
+  if (isTeacher) {
+    suggestions.push("What lesson materials are in this vault?");
+    suggestions.push("Summarize my latest class notes.");
+    suggestions.push("Are there upcoming conference or grading deadlines?");
+  } else if (isSchool) {
     suggestions.push("What school documents are in this vault?");
     suggestions.push("Are there any upcoming school deadlines?");
     suggestions.push("Summarize the latest school document.");

@@ -43,6 +43,14 @@ export const LOG_CATEGORIES_BY_PROFILE: Record<
     "Teacher Update",
     "Important Event",
   ],
+  teacher: [
+    "Lesson Plan",
+    "Class Notes",
+    "Parent Communication",
+    "Assessment",
+    "Professional Development",
+    "Important Event",
+  ],
   spouse_partner: [
     "General",
     "Family",

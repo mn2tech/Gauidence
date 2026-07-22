@@ -7,7 +7,7 @@ import HelpGuide from "@/components/HelpGuide";
 export const metadata: Metadata = {
   title: "Help — Guardian",
   description:
-    "Quick Start checklist and guides for vaults, documents, Daily Logs, Work Memory, Search, and Ask Gideon — including tips for students.",
+    "Quick Start checklist and guides for vaults, documents, Daily Logs, Work Memory, Search, and Ask Gideon — including tips for students and teachers.",
 };
 
 export default async function HelpPage() {
@@ -30,7 +30,7 @@ export default async function HelpPage() {
           </h1>
           <p className="mt-2 max-w-xl text-sm leading-relaxed text-ink-muted sm:text-base">
             Set up your first vault, add something useful, then ask Gideon.
-            Students: see the school guide below. Come back anytime you need a
+            Students and teachers: see the school guides below. Come back anytime you need a
             refresher.
           </p>
           <div className="mt-8">

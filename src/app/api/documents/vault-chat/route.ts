@@ -239,6 +239,7 @@ function suggestionKindFrom(
   type: GuardianProfileType
 ): SuggestionProfileKind {
   if (type === "child" || type === "student") return type;
+  if (type === "teacher") return type;
   if (
     type === "business" ||
     type === "non_profit" ||

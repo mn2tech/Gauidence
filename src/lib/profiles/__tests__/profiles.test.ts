@@ -85,6 +85,7 @@ describe("guardian profiles helpers", () => {
     assert.ok(!business.some((o) => o.id === "child"));
     const student = optionsForCreateGroup("student");
     assert.ok(student.some((o) => o.id === "student"));
+    assert.ok(student.some((o) => o.id === "teacher"));
   });
 
   it("uses business legal/display name for company context", () => {

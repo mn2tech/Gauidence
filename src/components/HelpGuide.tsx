@@ -7,6 +7,7 @@ import {
   Camera,
   Check,
   Circle,
+  ClipboardList,
   GraduationCap,
   MessageCircle,
   NotebookPen,
@@ -315,6 +316,99 @@ export default function HelpGuide({ signedIn }: { signedIn: boolean }) {
             <ArrowRight className="h-4 w-4" aria-hidden />
           </Link>
         )}
+      </section>
+
+      <section className="rounded-2xl border border-amber-200 bg-amber-50/40 p-5 shadow-sm sm:p-7">
+        <div className="flex items-start gap-3">
+          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-800">
+            <ClipboardList className="h-5 w-5" aria-hidden />
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-lg font-bold tracking-tight">
+              Guardian for teachers
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-ink-muted">
+              Your teaching binder in one place: lesson plans, rubrics, class
+              notes, and parent communication logs. Ask Gideon what you covered
+              last week or what&apos;s coming up for conferences — without
+              digging through folders. Avoid storing sensitive student records
+              unless your school allows it.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          <div className="rounded-xl border border-amber-100 bg-white/80 p-4">
+            <h3 className="text-sm font-semibold">What to save</h3>
+            <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-ink-muted">
+              <li>Lesson plans and unit outlines</li>
+              <li>Rubrics and assessment guides</li>
+              <li>Conference and PD notes</li>
+              <li>Class schedules and pacing guides</li>
+            </ul>
+          </div>
+          <div className="rounded-xl border border-amber-100 bg-white/80 p-4">
+            <h3 className="text-sm font-semibold">Daily Log examples</h3>
+            <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-ink-muted">
+              <li>&quot;Unit 4 test — need more review on photosynthesis&quot;</li>
+              <li>&quot;Parent email about late work policy&quot;</li>
+              <li>&quot;Prep sub plans for Friday&quot;</li>
+            </ul>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-xl border border-amber-100 bg-white/80 p-4">
+          <h3 className="text-sm font-semibold">Ask Gideon things like</h3>
+          <ul className="mt-2 flex flex-wrap gap-2">
+            {[
+              "What did I cover in Unit 3?",
+              "Summarize my latest class notes",
+              "Any upcoming deadlines in my vault?",
+              "What should I prepare this week?",
+            ].map((q) => (
+              <li
+                key={q}
+                className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-xs text-foreground"
+              >
+                {q}
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <ol className="mt-5 space-y-2 text-sm text-ink-muted">
+          <li>
+            <span className="font-semibold text-foreground">1.</span> Create a{" "}
+            <strong>Teacher</strong> vault under School (add subject and grades
+            if you like).
+          </li>
+          <li>
+            <span className="font-semibold text-foreground">2.</span> Upload a
+            lesson plan or pacing guide.
+          </li>
+          <li>
+            <span className="font-semibold text-foreground">3.</span> Log what
+            each class did today.
+          </li>
+          <li>
+            <span className="font-semibold text-foreground">4.</span> Use Work
+            Memory for semester units or big projects.
+          </li>
+          <li>
+            <span className="font-semibold text-foreground">5.</span> Ask Gideon
+            before parent conferences or grading weeks.
+          </li>
+        </ol>
+
+        {signedIn ? (
+          <Link
+            href="/settings/profiles?add=1&group=student"
+            className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark"
+          >
+            Create teacher vault
+            <ArrowRight className="h-4 w-4" aria-hidden />
+          </Link>
+        ) : null}
       </section>
 
       <section>

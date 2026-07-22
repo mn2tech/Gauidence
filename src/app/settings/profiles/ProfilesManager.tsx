@@ -253,6 +253,7 @@ export default function ProfilesManager() {
     option?.profileType === "business" || option?.profileType === "non_profit";
   const isChild =
     option?.profileType === "child" || option?.profileType === "student";
+  const isTeacher = option?.profileType === "teacher";
   const isEmployee = option?.profileType === "employee";
   const isClient = option?.profileType === "client";
   const isVehicle = option?.profileType === "vehicle";
@@ -343,7 +344,7 @@ export default function ProfilesManager() {
                 Who or what is this for?
               </h2>
               <p className="mt-1 text-sm text-ink-muted">
-                Start with Family, Business, Student, or Other.
+                Start with Family, Business, School, or Other.
               </p>
               <ul className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                 {PROFILE_CREATE_GROUPS.map((g) => (
@@ -471,6 +472,42 @@ export default function ProfilesManager() {
                           setExtra((x) => ({ ...x, gradeLevel: e.target.value }))
                         }
                         className="mt-1 w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none ring-brand focus:ring-2"
+                      />
+                    </label>
+                  </>
+                )}
+                {isTeacher && (
+                  <>
+                    <label className="block text-sm">
+                      <span className="text-ink-muted">School / district (optional)</span>
+                      <input
+                        value={extra.schoolName ?? ""}
+                        onChange={(e) =>
+                          setExtra((x) => ({ ...x, schoolName: e.target.value }))
+                        }
+                        className="mt-1 w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none ring-brand focus:ring-2"
+                      />
+                    </label>
+                    <label className="block text-sm">
+                      <span className="text-ink-muted">Subject(s) (optional)</span>
+                      <input
+                        value={extra.jobTitle ?? ""}
+                        onChange={(e) =>
+                          setExtra((x) => ({ ...x, jobTitle: e.target.value }))
+                        }
+                        className="mt-1 w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none ring-brand focus:ring-2"
+                        placeholder="Biology, Chemistry"
+                      />
+                    </label>
+                    <label className="block text-sm">
+                      <span className="text-ink-muted">Grades taught (optional)</span>
+                      <input
+                        value={extra.gradeLevel ?? ""}
+                        onChange={(e) =>
+                          setExtra((x) => ({ ...x, gradeLevel: e.target.value }))
+                        }
+                        className="mt-1 w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none ring-brand focus:ring-2"
+                        placeholder="9–12"
                       />
                     </label>
                   </>
