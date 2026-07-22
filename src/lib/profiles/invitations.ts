@@ -31,7 +31,7 @@ export function appBaseUrl(): string {
     process.env.NEXT_PUBLIC_APP_URL?.trim() ||
     process.env.APP_URL?.trim() ||
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "");
-  return configured.replace(/\/$/, "") || "https://guardian-app-delta.vercel.app";
+  return configured.replace(/\/$/, "") || "https://guardian.nm2tech.com";
 }
 
 export function inviteAcceptUrl(token: string): string {

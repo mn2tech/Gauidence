@@ -22,14 +22,26 @@ function initialFor(profile: GuardianProfile): string {
   return name.charAt(0).toUpperCase();
 }
 
+/** Re-open the Ask Gideon nudge for the current vault without switching. */
+function showVaultNudge(profileId: string) {
+  window.dispatchEvent(
+    new CustomEvent("guardian:profile-changed", {
+      detail: { profileId, nudgeAt: Date.now() },
+    })
+  );
+}
+
 function ProfileChip({
   profile,
   selected,
+  expanded,
   indented,
   onSelect,
 }: {
   profile: GuardianProfile;
   selected: boolean;
+  /** Parent container is open because a nested vault is active. */
+  expanded?: boolean;
   indented?: boolean;
   onSelect: () => void;
 }) {
@@ -44,7 +56,9 @@ function ProfileChip({
       } ${
         selected
           ? "border-brand bg-brand-light ring-1 ring-brand/30"
-          : "border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50"
+          : expanded
+            ? "border-stone-300 bg-stone-50 hover:border-stone-400 hover:bg-stone-100"
+            : "border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50"
       }`}
     >
       {profile.avatar_url ? (
@@ -107,14 +121,14 @@ export default function WelcomeProfileStrip({
 
   const topLevel = topLevelProfiles(profiles);
   const viewingLinked = active && isLinkedMemberProfile(active);
-  const chipHighlightId = viewingLinked
+
+  const focusedContainerId = viewingLinked
     ? active.parent_profile_id
     : active?.id;
-
   const focusedContainer =
     profiles.find(
       (p) =>
-        p.id === chipHighlightId && isGroupStyleProfile(p.profile_type)
+        p.id === focusedContainerId && isGroupStyleProfile(p.profile_type)
     ) ?? null;
   const nested = focusedContainer
     ? nestedUnder(profiles, focusedContainer)
@@ -168,7 +182,10 @@ export default function WelcomeProfileStrip({
               aria-label="Guardian profiles"
             >
               {topLevel.map((p, i) => {
-                const selected = p.id === chipHighlightId;
+                const selected = active?.id === p.id;
+                const expanded = Boolean(
+                  viewingLinked && p.id === active.parent_profile_id
+                );
                 return (
                   <li
                     key={p.id}
@@ -178,8 +195,13 @@ export default function WelcomeProfileStrip({
                     <ProfileChip
                       profile={p}
                       selected={selected}
+                      expanded={expanded}
                       onSelect={() => {
-                        if (p.id !== active?.id) void switchProfile(p.id);
+                        if (p.id === active?.id) {
+                          showVaultNudge(p.id);
+                          return;
+                        }
+                        void switchProfile(p.id);
                       }}
                     />
                   </li>
@@ -220,9 +242,11 @@ export default function WelcomeProfileStrip({
                         selected={active?.id === child.id}
                         indented
                         onSelect={() => {
-                          if (child.id !== active?.id) {
-                            void switchProfile(child.id);
+                          if (child.id === active?.id) {
+                            showVaultNudge(child.id);
+                            return;
                           }
+                          void switchProfile(child.id);
                         }}
                       />
                     </li>

@@ -165,7 +165,10 @@ export default function BillingSection() {
   const upgrades = status?.catalog.filter((c) => c.canUpgradeTo) ?? [];
 
   return (
-    <section className="rounded-2xl border border-stone-200 bg-white p-6">
+    <section
+      id="billing"
+      className="rounded-2xl border border-stone-200 bg-white p-6 scroll-mt-24"
+    >
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">

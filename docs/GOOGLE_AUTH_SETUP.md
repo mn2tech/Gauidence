@@ -1,8 +1,7 @@
 # Google Sign-In Setup (Supabase Auth)
 
 This guide covers everything needed to make "Continue with Google" work in
-local development and on the Vercel production deployment
-(`https://guardian-app-delta.vercel.app`).
+local development and on production (`https://guardian.nm2tech.com`).
 
 > **Status: configured and working** (July 11, 2026).
 > Supabase project: `guardian` (ref `xnvmbbxqvuqiysdkwhbh`), Google OAuth
@@ -21,7 +20,8 @@ local development and on the Vercel production deployment
    - Application type: **Web application**
    - **Authorized JavaScript origins:**
      - `http://localhost:3000`
-     - `https://guardian-app-delta.vercel.app`
+     - `https://guardian.nm2tech.com`
+     - `https://guardian-app-delta.vercel.app` (legacy Vercel URL; optional)
    - **Authorized redirect URIs:**
      - `https://YOUR-PROJECT-REF.supabase.co/auth/v1/callback`
        (find your project ref in Supabase → Project Settings → API; this is the
@@ -43,12 +43,13 @@ Supabase Dashboard → **Authentication → Providers → Google**:
 
 Supabase Dashboard → **Authentication → URL Configuration**:
 
-- **Site URL:** `https://guardian-app-delta.vercel.app`
-- **Additional Redirect URLs:**
+- **Site URL:** `https://guardian.nm2tech.com`
+- **Additional Redirect URLs** (add each line; keep localhost for dev):
   - `http://localhost:3000/auth/callback`
   - `http://localhost:3001/auth/callback` (used when port 3000 is taken)
-  - `https://guardian-app-delta.vercel.app/auth/callback`
-  - `http://localhost:3000/auth/callback?**` (wildcard query — optional)
+  - `https://guardian.nm2tech.com/auth/callback`
+  - `https://guardian.nm2tech.com/auth/callback?**`
+  - `https://guardian-app-delta.vercel.app/auth/callback` (legacy; optional)
   - `https://guardian-app-delta.vercel.app/auth/callback?**` (optional)
 
 Password reset uses `/auth/callback?next=/auth/update-password`. If resets

@@ -45,6 +45,7 @@ export default function SettingsForm({
   const [confirmText, setConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 
   async function handleSaveName(e: React.FormEvent) {
     e.preventDefault();
@@ -120,18 +121,13 @@ export default function SettingsForm({
 
   const deleteConfirmed = confirmText.trim().toUpperCase() === "DELETE";
 
-  async function handleDeleteAccount() {
-    if (!deleteConfirmed) return;
+  async function performDeleteAccount() {
     if (!supabase) {
       setDeleteError(
         "Sign-in isn't available in this browser. Refresh the page and try again."
       );
       return;
     }
-    const ok = window.confirm(
-      "Permanently delete your account and all Guardian data? This cannot be undone."
-    );
-    if (!ok) return;
 
     setDeleteError(null);
     setDeleting(true);
@@ -151,6 +147,16 @@ export default function SettingsForm({
       setDeleteError("We couldn't reach the server. Check your connection and try again.");
       setDeleting(false);
     }
+  }
+
+  function handleDeleteAccount() {
+    if (!deleteConfirmed || deleting) return;
+    setDeleteModalOpen(true);
+  }
+
+  async function confirmDeleteAccount() {
+    setDeleteModalOpen(false);
+    await performDeleteAccount();
   }
 
   const inputClass =
@@ -375,6 +381,58 @@ export default function SettingsForm({
           {deleting ? "Deleting your account…" : "Delete my account permanently"}
         </button>
       </section>
+
+      {deleteModalOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-account-title"
+          onClick={() => !deleting && setDeleteModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-red-200 bg-white p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600">
+                <AlertTriangle className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <h3
+                  id="delete-account-title"
+                  className="text-base font-semibold text-foreground"
+                >
+                  Delete your account permanently?
+                </h3>
+                <p className="mt-2 text-sm leading-relaxed text-ink-muted">
+                  This removes your account, profile, documents, extracted data,
+                  alerts, and chat history from Guardian. This cannot be undone.
+                </p>
+              </div>
+            </div>
+            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setDeleteModalOpen(false)}
+                disabled={deleting}
+                className="inline-flex items-center justify-center rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-stone-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmDeleteAccount()}
+                disabled={deleting}
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                {deleting ? "Deleting…" : "Delete permanently"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

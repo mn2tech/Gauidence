@@ -94,9 +94,10 @@ files (or ask Gideon once) to backfill the search index.
 
 Platform admins (emails in `ADMIN_EMAILS`) can open **Settings → AI usage** to
 see Claude token totals recorded by Guardian (7 days / month, by feature and
-user). Run `supabase/migrations/0028_llm_usage_events.sql`, set
-`ADMIN_EMAILS` on Vercel, and redeploy. This is app-recorded usage, not the
-Anthropic Console dashboard.
+user). Admins are also exempt from Free/Personal/Family/Business monthly and
+hourly quotas on Analyze, Ask Gideon, and Research. Run
+`supabase/migrations/0028_llm_usage_events.sql`, set `ADMIN_EMAILS` on Vercel,
+and redeploy. This is app-recorded usage, not the Anthropic Console dashboard.
 
 ## Error monitoring
 

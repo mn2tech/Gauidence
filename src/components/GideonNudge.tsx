@@ -36,16 +36,19 @@ export default function GideonNudge() {
   const { active } = useActiveProfile();
   const [visible, setVisible] = useState(false);
   const [profileKey, setProfileKey] = useState<string | null>(null);
+  const [nudgeAt, setNudgeAt] = useState(0);
   const [summary, setSummary] = useState<VaultSummary | null>(null);
   const [loadingSummary, setLoadingSummary] = useState(false);
 
   useEffect(() => {
     const onChange = (e: Event) => {
       if (pathname.startsWith("/ask")) return;
-      const detail = (e as CustomEvent<{ profileId?: string }>).detail;
+      const detail = (e as CustomEvent<{ profileId?: string; nudgeAt?: number }>)
+        .detail;
       const id = detail?.profileId ?? null;
       window.setTimeout(() => {
         setProfileKey(id);
+        setNudgeAt(detail?.nudgeAt ?? Date.now());
         setSummary(null);
         setVisible(true);
       }, 80);
@@ -80,13 +83,13 @@ export default function GideonNudge() {
     return () => {
       cancelled = true;
     };
-  }, [visible, active, profileKey]);
+  }, [visible, active, profileKey, nudgeAt]);
 
   useEffect(() => {
     if (!visible) return;
     const t = window.setTimeout(() => setVisible(false), 12000);
     return () => window.clearTimeout(t);
-  }, [visible, profileKey]);
+  }, [visible, profileKey, nudgeAt]);
 
   useEffect(() => {
     if (pathname.startsWith("/ask")) setVisible(false);
