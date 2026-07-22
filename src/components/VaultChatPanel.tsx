@@ -55,6 +55,7 @@ import {
 import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
 import { dispatchAwardsFromResponse } from "@/lib/awards/client";
 import { useGideonVoiceInput } from "@/hooks/useGideonVoiceInput";
+import type { WorkProject } from "@/lib/work-memory/types";
 
 function defaultReminderDateTime(): { date: string; time: string } {
   const now = new Date();
@@ -226,6 +227,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
   const searchParams = useSearchParams();
   const requestedChatId = searchParams.get("chatId");
   const requestedProfileId = searchParams.get("profileId");
+  const requestedWorkProjectId = searchParams.get("projectId");
   const { active, profiles, loading: profilesLoading, switchProfile } =
     useActiveProfile();
   const needsSetup = !profilesLoading && profiles.length === 0;
@@ -268,11 +270,13 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
   );
   const [vaultBusy, setVaultBusy] = useState(false);
   const [vaultStatus, setVaultStatus] = useState<string | null>(null);
+  const [workProject, setWorkProject] = useState<WorkProject | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const plusRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const profileSwitchRef = useRef(false);
   const deepLinkChatConsumed = useRef<string | null>(null);
+  const workProjectPrefillDone = useRef(false);
   const sendQuestionRef = useRef<(questionRaw: string) => Promise<void>>(
     async () => {}
   );
@@ -380,6 +384,64 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     profiles,
     switchProfile,
   ]);
+
+  useEffect(() => {
+    if (!requestedWorkProjectId) {
+      setWorkProject(null);
+      workProjectPrefillDone.current = false;
+      return;
+    }
+    let cancelled = false;
+    void fetch(
+      `/api/work-memory/projects/${encodeURIComponent(requestedWorkProjectId)}`
+    )
+      .then((r) => r.json())
+      .then((body: { project?: WorkProject }) => {
+        if (!cancelled && body.project) setWorkProject(body.project);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [requestedWorkProjectId]);
+
+  useEffect(() => {
+    if (profilesLoading || needsSetup || profileSwitchRef.current) return;
+    if (!requestedWorkProjectId || !workProject?.profile_id) return;
+    if (requestedProfileId) return;
+    if (active?.id === workProject.profile_id) return;
+    if (!profiles.some((p) => p.id === workProject.profile_id)) return;
+    profileSwitchRef.current = true;
+    void switchProfile(workProject.profile_id).finally(() => {
+      profileSwitchRef.current = false;
+    });
+  }, [
+    requestedWorkProjectId,
+    workProject?.profile_id,
+    requestedProfileId,
+    active?.id,
+    profilesLoading,
+    needsSetup,
+    profiles,
+    switchProfile,
+  ]);
+
+  useEffect(() => {
+    if (!workProject || workProjectPrefillDone.current) return;
+    workProjectPrefillDone.current = true;
+    setInput((current) => {
+      if (current.trim()) return current;
+      const parts = [`I'm resuming work on "${workProject.name}".`];
+      if (workProject.next_action?.trim()) {
+        parts.push(`My next action is: ${workProject.next_action.trim()}.`);
+      }
+      if (workProject.blockers?.trim()) {
+        parts.push(`I'm blocked by: ${workProject.blockers.trim()}.`);
+      }
+      parts.push("Help me pick up where I left off.");
+      return parts.join(" ");
+    });
+  }, [workProject]);
 
   useEffect(() => {
     if (profilesLoading) return;
@@ -776,6 +838,9 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
         body: JSON.stringify({
           question,
           chatId: activeChatId,
+          ...(requestedWorkProjectId
+            ? { workProjectId: requestedWorkProjectId }
+            : {}),
         }),
       });
       const body = (await res.json().catch(() => ({}))) as {
@@ -1198,6 +1263,31 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     </div>
   );
 
+  const workMemoryBanner = workProject ? (
+    <div
+      className={
+        isPage
+          ? "shrink-0 border-b border-brand/20 bg-brand-light/50 px-4 py-2.5 sm:px-8"
+          : "mb-3 rounded-xl border border-brand/20 bg-brand-light/50 px-3 py-2.5"
+      }
+    >
+      <p className="text-sm font-medium text-brand-dark">
+        Resuming: {workProject.name}
+      </p>
+      {workProject.next_action ? (
+        <p className="mt-0.5 text-xs text-ink-muted">
+          Next action: {workProject.next_action}
+        </p>
+      ) : null}
+      <Link
+        href={`/work-memory/${workProject.id}`}
+        className="mt-1 inline-block text-xs font-semibold text-brand hover:text-brand-dark"
+      >
+        Back to project →
+      </Link>
+    </div>
+  ) : null;
+
   const composer = (
     <form
       onSubmit={send}
@@ -1603,6 +1693,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
           />
         )}
         <ImminentReminderBanner profileId={profileId} />
+        {workMemoryBanner}
         {composer}
         {vaultOverlays}
       </div>
@@ -1715,6 +1806,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
         )}
 
         <ImminentReminderBanner profileId={profileId} />
+        {workMemoryBanner}
         {composer}
       </div>
     </div>

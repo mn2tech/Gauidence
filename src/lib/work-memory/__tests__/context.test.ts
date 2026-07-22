@@ -48,3 +48,17 @@ describe("formatWorkMemoryForGideon", () => {
     assert.match(out, /Built API routes/);
   });
 });
+
+describe("workProjectAskHref", () => {
+  it("builds ask URL with project and profile", async () => {
+    const { workProjectAskHref } = await import("../types.ts");
+    assert.equal(
+      workProjectAskHref({ id: "p1", profile_id: "prof-1" }),
+      "/ask?projectId=p1&profileId=prof-1"
+    );
+    assert.equal(
+      workProjectAskHref({ id: "p1", profile_id: null }),
+      "/ask?projectId=p1"
+    );
+  });
+});

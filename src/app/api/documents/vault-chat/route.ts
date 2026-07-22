@@ -62,7 +62,10 @@ import { withLlmUsage } from "@/lib/usage/record";
 import { assertBillingQuota, recordChatEvent } from "@/lib/billing/quota";
 import { refreshUserAwards } from "@/lib/awards/grant";
 import { formatWorkMemoryForGideon } from "@/lib/work-memory/context";
-import { loadWorkMemoryForGideon } from "@/lib/work-memory/server";
+import {
+  loadWorkMemoryForGideon,
+  loadWorkMemoryProjectForGideon,
+} from "@/lib/work-memory/server";
 
 async function loadLinkedOrgContext(
   supabase: SupabaseClient,
@@ -583,10 +586,12 @@ export async function POST(request: Request) {
 
   let questionRaw: unknown;
   let chatIdRaw: unknown;
+  let workProjectIdRaw: unknown;
   try {
     const body = await request.json();
     questionRaw = body.question;
     chatIdRaw = body.chatId;
+    workProjectIdRaw = body.workProjectId;
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
@@ -804,11 +809,21 @@ export async function POST(request: Request) {
       user.id,
       active
     );
-    const workMemoryBundle = await loadWorkMemoryForGideon(supabase, user.id);
-    const workMemoryContext = formatWorkMemoryForGideon(
+    const workProjectId =
+      typeof workProjectIdRaw === "string" ? workProjectIdRaw.trim() : "";
+    const focusedWorkMemory = workProjectId
+      ? await loadWorkMemoryProjectForGideon(supabase, user.id, workProjectId)
+      : null;
+    const workMemoryBundle =
+      focusedWorkMemory ??
+      (await loadWorkMemoryForGideon(supabase, user.id));
+    const workMemoryBody = formatWorkMemoryForGideon(
       workMemoryBundle.projects,
       workMemoryBundle.sessionsByProject
     );
+    const workMemoryContext = focusedWorkMemory
+      ? `The user clicked "Continue with Gideon" to resume this project. Prioritize this project's mission, step, blockers, and recent sessions.\n\n${workMemoryBody}`
+      : workMemoryBody;
 
     const client = createLlmClient();
     const rollupNote =

@@ -62,7 +62,9 @@ export async function POST(request: Request, context: RouteContext) {
   const projectUpdates: Record<string, unknown> = {
     last_activity_at: now,
     updated_at: now,
-    resume_context: { path: `/work-memory/${id}` },
+    resume_context: {
+      path: `/ask?projectId=${id}${project.profile_id ? `&profileId=${project.profile_id}` : ""}`,
+    },
   };
 
   if (fields.mission !== undefined) projectUpdates.mission = fields.mission;

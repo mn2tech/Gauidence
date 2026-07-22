@@ -7,7 +7,6 @@ import {
   ArrowLeft,
   CheckCircle2,
   Loader2,
-  MessageCircle,
   Pencil,
 } from "lucide-react";
 import EndSessionModal from "@/components/EndSessionModal";
@@ -15,6 +14,7 @@ import {
   formatWorkActivity,
   WORK_PROJECT_STATUSES,
   WORK_STATUS_LABELS,
+  workProjectAskHref,
   type WorkProject,
   type WorkProjectStatus,
   type WorkSession,
@@ -128,7 +128,8 @@ export default function WorkProjectDetail({
 
   const vaultHref = project.profile_id
     ? `/dashboard#documents-${project.profile_id}`
-    : "/dashboard";
+    : null;
+  const continueHref = workProjectAskHref(project);
 
   return (
     <div>
@@ -295,11 +296,19 @@ export default function WorkProjectDetail({
 
       <div className="mt-6 flex flex-wrap gap-2">
         <Link
-          href={vaultHref}
+          href={continueHref}
           className="inline-flex items-center rounded-full bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark"
         >
-          Continue working
+          Continue with Gideon
         </Link>
+        {vaultHref ? (
+          <Link
+            href={vaultHref}
+            className="rounded-full border border-stone-300 px-4 py-2.5 text-sm font-semibold hover:bg-stone-50"
+          >
+            Open vault
+          </Link>
+        ) : null}
         <button
           type="button"
           onClick={() => setEndOpen(true)}
@@ -307,13 +316,6 @@ export default function WorkProjectDetail({
         >
           End session
         </button>
-        <Link
-          href="/ask"
-          className="inline-flex items-center gap-2 rounded-full border border-stone-300 px-4 py-2.5 text-sm font-semibold hover:bg-stone-50"
-        >
-          <MessageCircle className="h-4 w-4" />
-          Ask Gideon
-        </Link>
         {project.status !== "done" ? (
           <button
             type="button"
@@ -327,7 +329,7 @@ export default function WorkProjectDetail({
         ) : null}
       </div>
 
-      {profileName ? (
+      {profileName && vaultHref ? (
         <p className="mt-4 text-sm text-ink-muted">
           Linked vault:{" "}
           <Link href={vaultHref} className="font-semibold text-brand">

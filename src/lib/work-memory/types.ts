@@ -61,6 +61,15 @@ export function isWorkProjectStatus(v: unknown): v is WorkProjectStatus {
   );
 }
 
+export function workProjectAskHref(project: {
+  id: string;
+  profile_id: string | null;
+}): string {
+  const params = new URLSearchParams({ projectId: project.id });
+  if (project.profile_id) params.set("profileId", project.profile_id);
+  return `/ask?${params.toString()}`;
+}
+
 export function formatWorkActivity(when: string | null | undefined): string {
   if (!when) return "No activity yet";
   const date = new Date(when);

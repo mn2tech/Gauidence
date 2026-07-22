@@ -110,3 +110,19 @@ export async function loadWorkMemoryForGideon(
 
   return { projects, sessionsByProject };
 }
+
+/** Single project + recent sessions for focused Gideon resume. */
+export async function loadWorkMemoryProjectForGideon(
+  supabase: SupabaseClient,
+  userId: string,
+  projectId: string
+): Promise<WorkMemoryGideonBundle | null> {
+  const project = await getWorkProject(supabase, userId, projectId);
+  if (!project || project.status === "archived") return null;
+
+  const sessions = await listWorkSessions(supabase, userId, projectId, 3);
+  const sessionsByProject = new Map<string, WorkSession[]>([
+    [project.id, sessions],
+  ]);
+  return { projects: [project], sessionsByProject };
+}
