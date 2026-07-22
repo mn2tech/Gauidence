@@ -7,6 +7,7 @@ import {
   type AwardKey,
 } from "@/lib/awards/definitions";
 import { hasConsecutiveLogStreak } from "@/lib/awards/streak";
+import { notifyAwardsEarned } from "@/lib/awards/notify";
 
 export type UserAwardRow = {
   award_key: AwardKey;
@@ -164,6 +165,15 @@ export async function refreshUserAwards(
   push(
     await maybeGrant(userId, "setup_complete", setupReady, existing)
   );
+
+  if (newlyGranted.length > 0) {
+    void notifyAwardsEarned(userId, newlyGranted).catch((err) => {
+      console.error(
+        "Award notify failed:",
+        err instanceof Error ? err.message : "error"
+      );
+    });
+  }
 
   return newlyGranted;
 }

@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test src/lib/analysis/__tests__/*.test.ts src/lib/vault/__tests__/*.test.ts src/lib/profiles/__tests__/*.test.ts src/lib/logs/__tests__/*.test.ts src/lib/reminders/__tests__/*.test.ts src/lib/research/__tests__/*.test.ts src/lib/search/__tests__/*.test.ts src/lib/help/__tests__/*.test.ts src/lib/billing/__tests__/*.test.ts src/lib/voice/__tests__/*.test.ts src/lib/awards/__tests__/*.test.ts src/lib/retention/__tests__/*.test.ts",
+    "test": "tsx --test src/lib/analysis/__tests__/*.test.ts src/lib/vault/__tests__/*.test.ts src/lib/profiles/__tests__/*.test.ts src/lib/logs/__tests__/*.test.ts src/lib/reminders/__tests__/*.test.ts src/lib/research/__tests__/*.test.ts src/lib/search/__tests__/*.test.ts src/lib/help/__tests__/*.test.ts src/lib/billing/__tests__/*.test.ts src/lib/voice/__tests__/*.test.ts src/lib/awards/__tests__/*.test.ts src/lib/retention/__tests__/*.test.ts src/lib/sms/__tests__/*.test.ts",
     "compare:analyzers": "tsx --require ./scripts/stub-server-only.cjs scripts/compare-analyzers.ts"
   },
   "dependencies": {
@@ -24,13 +24,15 @@
     "resend": "^6.17.2",
     "server-only": "^0.0.1",
     "stripe": "^22.3.2",
-    "unpdf": "^1.6.2"
+    "unpdf": "^1.6.2",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/web-push": "^3.6.4",
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
     "tailwindcss": "^4",

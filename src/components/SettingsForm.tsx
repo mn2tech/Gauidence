@@ -379,8 +379,8 @@ export default function SettingsForm({
               <h2 className="text-base font-semibold">Getting started emails</h2>
             </div>
             <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-              Short tips to help you set up Guardian — welcome notes and gentle
-              nudges if you haven&apos;t created a vault or added a document yet.
+              Short tips to help you set up Guardian — welcome notes, gentle
+              nudges, and congratulations when you earn an award.
             </p>
             {tipsError && (
               <p role="alert" className="mt-2 text-sm text-red-700">

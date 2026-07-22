@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendReminderEmail, type ReminderItem } from "@/lib/email";
+import { sendPushToUser } from "@/lib/push/send";
+import { sendSms } from "@/lib/sms/send";
 import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
+import { appBaseUrl } from "@/lib/profiles/invitations";
 
 export const dynamic = "force-dynamic";
 
@@ -90,7 +93,9 @@ export async function GET(request: Request) {
 
   const { data: profiles, error: profilesError } = await admin
     .from("profiles")
-    .select("id, email, email_reminders_enabled")
+    .select(
+      "id, email, email_reminders_enabled, sms_notifications_enabled, phone_e164"
+    )
     .in("id", [...byUser.keys()]);
   if (profilesError) {
     return NextResponse.json({ error: "Failed to load profiles." }, { status: 502 });
@@ -99,7 +104,11 @@ export async function GET(request: Request) {
   const recipients = new Map(
     (profiles ?? [])
       .filter((p) => p.email && p.email_reminders_enabled !== false)
-      .map((p) => [p.id as string, p.email as string])
+      .map((p) => [p.id as string, p])
+  );
+
+  const profileById = new Map(
+    (profiles ?? []).map((p) => [p.id as string, p])
   );
 
   let usersEmailed = 0;
@@ -109,8 +118,8 @@ export async function GET(request: Request) {
   const stamp1d: string[] = [];
 
   for (const [userId, userAlerts] of byUser) {
-    const email = recipients.get(userId);
-    if (!email) continue;
+    const profile = recipients.get(userId);
+    if (!profile?.email) continue;
 
     const items: ReminderItem[] = userAlerts.map((a) => ({
       title: a.title,
@@ -118,11 +127,40 @@ export async function GET(request: Request) {
       daysLeft: daysUntil(a.due_date, todayMs),
     }));
 
-    const sent = await sendReminderEmail(email, items);
+    const sent = await sendReminderEmail(profile.email, items);
     if (!sent) continue;
 
     usersEmailed += 1;
     alertsIncluded += userAlerts.length;
+
+    const urgent = items.some((i) => i.daysLeft <= 1);
+    if (urgent) {
+      const title =
+        items.length === 1
+          ? `Due tomorrow: ${items[0]!.title}`
+          : `${items.length} deadlines due soon`;
+      const body =
+        items.length === 1
+          ? items[0]!.title
+          : items.map((i) => i.title).join(", ");
+      void sendPushToUser(userId, {
+        title,
+        body,
+        url: "/dashboard",
+      });
+
+      const fullProfile = profileById.get(userId);
+      if (
+        fullProfile?.sms_notifications_enabled &&
+        fullProfile.phone_e164
+      ) {
+        void sendSms(
+          fullProfile.phone_e164,
+          `Guardian: ${title}. ${appBaseUrl()}/dashboard`
+        );
+      }
+    }
+
     for (const a of userAlerts) {
       const daysLeft = daysUntil(a.due_date, todayMs);
       if (!a.reminder_7d_sent_at) stamp7d.push(a.id);
