@@ -24,7 +24,7 @@ export default async function SettingsPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, avatar_url, email, email_reminders_enabled, email_tips_enabled, company_name, phone_e164, sms_notifications_enabled, push_notifications_enabled")
+    .select("full_name, avatar_url, email, email_reminders_enabled, email_tips_enabled, company_name, push_notifications_enabled")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -81,8 +81,6 @@ export default async function SettingsPage() {
             <NotificationSettings
               userId={user.id}
               initialPushEnabled={profile?.push_notifications_enabled !== false}
-              initialSmsEnabled={profile?.sms_notifications_enabled === true}
-              initialPhone={profile?.phone_e164 ?? ""}
             />
           </div>
         </section>

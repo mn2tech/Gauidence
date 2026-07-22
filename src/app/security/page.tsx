@@ -17,7 +17,7 @@ const sections = [
     paragraphs: [
       "Guardian stores the information you give it: your account email, your profile details, the documents you upload, and the data extracted from those documents (such as names, dates, and policy numbers).",
       "We also keep basic operational records — like when a document was uploaded — so the product can work reliably. We do not collect data from your device beyond what you explicitly provide.",
-      "If email reminders are enabled, we send deadline reminder emails to your sign-in address. With getting-started emails enabled, we may send welcome notes, setup tips, and award congratulations. With your permission, we may also send browser push notifications and optional SMS for awards and urgent deadlines. You can turn these off in Settings.",
+      "If email reminders are enabled, we send deadline reminder emails to your sign-in address. With getting-started emails enabled, we may send welcome notes, setup tips, and award congratulations. With your permission, we may also send browser push notifications. You can turn these off in Settings.",
     ],
   },
   {

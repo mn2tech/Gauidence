@@ -131,6 +131,9 @@ export default function SiteHeader() {
               <Link href={researchHref} className="hover:text-foreground">
                 Research
               </Link>
+              <Link href="/work-memory" className="hover:text-foreground">
+                Work Memory
+              </Link>
               <Link href="/dashboard" className="hover:text-foreground">
                 Documents
               </Link>
@@ -241,6 +244,9 @@ export default function SiteHeader() {
                 </Link>
                 <Link href={researchHref} className={linkClass}>
                   Research
+                </Link>
+                <Link href="/work-memory" className={linkClass}>
+                  Work Memory
                 </Link>
                 <Link href="/dashboard" className={linkClass}>
                   Documents

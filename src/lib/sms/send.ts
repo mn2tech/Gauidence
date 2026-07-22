@@ -1,8 +1,11 @@
 import "server-only";
 
+import { smsNotificationsEnabled } from "@/lib/sms/config";
 import { isValidPhoneE164 } from "@/lib/sms/phone";
 
 export async function sendSms(to: string, body: string): Promise<boolean> {
+  if (!smsNotificationsEnabled()) return false;
+
   const sid = process.env.TWILIO_ACCOUNT_SID?.trim();
   const token = process.env.TWILIO_AUTH_TOKEN?.trim();
   const from = process.env.TWILIO_FROM_NUMBER?.trim();

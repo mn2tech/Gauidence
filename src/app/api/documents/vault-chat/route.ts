@@ -61,6 +61,8 @@ import {
 import { withLlmUsage } from "@/lib/usage/record";
 import { assertBillingQuota, recordChatEvent } from "@/lib/billing/quota";
 import { refreshUserAwards } from "@/lib/awards/grant";
+import { formatWorkMemoryForGideon } from "@/lib/work-memory/context";
+import { loadWorkMemoryForGideon } from "@/lib/work-memory/server";
 
 async function loadLinkedOrgContext(
   supabase: SupabaseClient,
@@ -802,6 +804,11 @@ export async function POST(request: Request) {
       user.id,
       active
     );
+    const workMemoryBundle = await loadWorkMemoryForGideon(supabase, user.id);
+    const workMemoryContext = formatWorkMemoryForGideon(
+      workMemoryBundle.projects,
+      workMemoryBundle.sessionsByProject
+    );
 
     const client = createLlmClient();
     const rollupNote =
@@ -841,7 +848,11 @@ ${logContext.trim() || "(none)"}
 
 --- LINKED PROFILE STRUCTURE ---
 ${linkedContext.trim() || "(none)"}
---- END LINKED PROFILE STRUCTURE ---`;
+--- END LINKED PROFILE STRUCTURE ---
+
+--- WORK MEMORY (user's active projects and recent sessions) ---
+${workMemoryContext.trim() || "(none — user has no active work projects)"}
+--- END WORK MEMORY ---`;
 
     answer = await withLlmUsage(
       { userId: user.id, feature: "vault_chat" },
