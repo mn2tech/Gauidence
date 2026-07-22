@@ -2,6 +2,7 @@
 
 import { ProfileProvider } from "@/components/ProfileProvider";
 import GideonNudge from "@/components/GideonNudge";
+import AwardToast from "@/components/AwardToast";
 
 export default function AppProviders({
   children,
@@ -12,6 +13,7 @@ export default function AppProviders({
     <ProfileProvider>
       {children}
       <GideonNudge />
+      <AwardToast />
     </ProfileProvider>
   );
 }

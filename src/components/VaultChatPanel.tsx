@@ -10,6 +10,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import PlanLimitAlert from "@/components/PlanLimitAlert";
 import {
   ExternalLink,
   FileUp,
@@ -52,6 +53,7 @@ import {
   type ProposedReminder,
 } from "@/lib/reminders/propose";
 import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
+import { dispatchAwardsFromResponse } from "@/lib/awards/client";
 import { useGideonVoiceInput } from "@/hooks/useGideonVoiceInput";
 
 function defaultReminderDateTime(): { date: string; time: string } {
@@ -237,7 +239,14 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
   const [loadingLabel, setLoadingLabel] = useState<string>(
     GIDEON_LOADING_STATES[0]
   );
-  const [error, setError] = useState<string | null>(null);
+  const [error, setErrorState] = useState<{
+    message: string;
+    code?: string;
+  } | null>(null);
+  const setError = (message: string | null, code?: string) => {
+    if (message === null) setErrorState(null);
+    else setErrorState(code ? { message, code } : { message });
+  };
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [whyOpen, setWhyOpen] = useState(false);
   const [plusOpen, setPlusOpen] = useState(false);
@@ -771,6 +780,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
       });
       const body = (await res.json().catch(() => ({}))) as {
         error?: string;
+        code?: string;
         messages?: VaultMessage[];
         chatId?: string;
         chats?: ChatSummary[];
@@ -779,7 +789,8 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
         setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
         setInput(question);
         setError(
-          body.error ?? "I couldn't complete that request right now. Please try again."
+          body.error ?? "I couldn't complete that request right now. Please try again.",
+          body.code
         );
         return;
       }
@@ -790,6 +801,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
         ...prev.filter((m) => m.id !== optimisticId),
         ...turn,
       ]);
+      dispatchAwardsFromResponse(body);
       void loadMetaAndChats();
     } catch {
       setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
@@ -1584,9 +1596,11 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
         </div>
         {messageList}
         {error && (
-          <p className="mt-2 text-xs text-red-700" role="alert">
-            {error}
-          </p>
+          <PlanLimitAlert
+            message={error.message}
+            code={error.code}
+            className="mt-2 text-xs text-red-700"
+          />
         )}
         <ImminentReminderBanner profileId={profileId} />
         {composer}
@@ -1693,9 +1707,11 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
         {messageList}
 
         {error && (
-          <p className="shrink-0 px-4 text-xs text-red-700 sm:px-8" role="alert">
-            {error}
-          </p>
+          <PlanLimitAlert
+            message={error.message}
+            code={error.code}
+            className="shrink-0 px-4 text-xs text-red-700 sm:px-8"
+          />
         )}
 
         <ImminentReminderBanner profileId={profileId} />

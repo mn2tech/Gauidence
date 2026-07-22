@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Building2, GraduationCap, Home, Users } from "lucide-react";
+import { Building2, GraduationCap, Home, Trophy, Users } from "lucide-react";
 import {
   PROFILE_CREATE_GROUPS,
   type ProfileCreateGroupId,
@@ -38,6 +38,10 @@ export default function ProfileSetupHub() {
         >
           Open Help &amp; Quick Start
         </Link>
+      </p>
+      <p className="mt-3 flex items-center gap-2 text-sm text-ink-muted">
+        <Trophy className="h-4 w-4 shrink-0 text-amber-600" aria-hidden />
+        Create your first space to earn the <strong>Vault creator</strong> award.
       </p>
       <ul className="mt-6 grid gap-3 sm:grid-cols-2">
         {PROFILE_CREATE_GROUPS.map((g) => {

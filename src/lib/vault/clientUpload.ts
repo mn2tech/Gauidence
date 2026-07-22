@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
+import { syncDocumentAwards } from "@/lib/awards/client";
 
 export const VAULT_ACCEPTED_TYPES: Record<string, string> = {
   "application/pdf": "PDF",
@@ -98,6 +99,8 @@ export async function uploadAndAnalyzeToVault(args: {
         : "We couldn't save the document record. Please try again."
     );
   }
+
+  void syncDocumentAwards(inserted.id);
 
   args.onStatus?.("Reading the document…");
   try {

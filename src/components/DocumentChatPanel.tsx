@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, MessageSquare, Send } from "lucide-react";
+import PlanLimitAlert from "@/components/PlanLimitAlert";
 
 export type DocumentChatMessage = {
   id: string;
@@ -20,7 +21,14 @@ export default function DocumentChatPanel({ documentId, enabled }: Props) {
   const [input, setInput] = useState("");
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [sending, setSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setErrorState] = useState<{
+    message: string;
+    code?: string;
+  } | null>(null);
+  const setError = (message: string | null, code?: string) => {
+    if (message === null) setErrorState(null);
+    else setErrorState(code ? { message, code } : { message });
+  };
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const loadHistory = useCallback(async () => {
@@ -84,12 +92,13 @@ export default function DocumentChatPanel({ documentId, enabled }: Props) {
       });
       const body = (await res.json().catch(() => ({}))) as {
         error?: string;
+        code?: string;
         messages?: DocumentChatMessage[];
       };
       if (!res.ok) {
         setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
         setInput(question);
-        setError(body.error ?? "Couldn't get an answer. Please try again.");
+        setError(body.error ?? "Couldn't get an answer. Please try again.", body.code);
         return;
       }
       const turn = body.messages ?? [];
@@ -154,9 +163,11 @@ export default function DocumentChatPanel({ documentId, enabled }: Props) {
       </div>
 
       {error && (
-        <p className="mt-2 text-xs text-red-700" role="alert">
-          {error}
-        </p>
+        <PlanLimitAlert
+          message={error.message}
+          code={error.code}
+          className="mt-2 text-xs text-red-700"
+        />
       )}
 
       <form onSubmit={send} className="mt-3 flex gap-2">

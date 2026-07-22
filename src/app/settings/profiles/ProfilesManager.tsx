@@ -15,6 +15,7 @@ import {
   type GuardianProfile,
   type ProfileCreateGroupId,
 } from "@/lib/profiles/types";
+import { dispatchAwardsFromResponse } from "@/lib/awards/client";
 
 export default function ProfilesManager() {
   const router = useRouter();
@@ -123,6 +124,7 @@ export default function ProfilesManager() {
         setError(body.error ?? "Couldn't create profile.");
         return;
       }
+      dispatchAwardsFromResponse(body);
       await refresh();
       setAdding(false);
       router.replace("/dashboard");

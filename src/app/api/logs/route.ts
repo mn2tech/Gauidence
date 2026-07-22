@@ -6,6 +6,7 @@ import {
   requireEditableGuardianProfile,
 } from "@/lib/profiles/server";
 import { isValidLogDate, todayLogDate } from "@/lib/logs/types";
+import { refreshUserAwards } from "@/lib/awards/grant";
 
 export const runtime = "nodejs";
 
@@ -215,5 +216,6 @@ export async function POST(request: Request) {
     );
   }
 
-  return NextResponse.json({ log: data }, { status: 201 });
+  const newlyGranted = await refreshUserAwards(user.id, supabase);
+  return NextResponse.json({ log: data, newlyGranted }, { status: 201 });
 }

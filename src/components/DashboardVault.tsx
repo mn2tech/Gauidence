@@ -17,6 +17,7 @@ import LinkedHobbiesPanel from "@/components/LinkedHobbiesPanel";
 import LinkedStudentsPanel from "@/components/LinkedStudentsPanel";
 import ProfileSetupHub from "@/components/ProfileSetupHub";
 import GettingStartedStrip from "@/components/GettingStartedStrip";
+import AwardsPanel from "@/components/AwardsPanel";
 import VaultSection from "@/components/VaultSection";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
@@ -133,6 +134,7 @@ export default function DashboardVault({ userId }: { userId: string }) {
   return (
     <div className="space-y-6">
       <GettingStartedStrip />
+      <AwardsPanel compact />
 
       <div className="sticky top-14 z-30 -mx-4 flex items-center justify-between gap-3 border-b border-stone-200 bg-background/95 px-4 py-2.5 backdrop-blur sm:top-16 sm:mx-0 sm:rounded-xl sm:border sm:bg-white/95 sm:px-3 sm:shadow-sm">
         <p className="min-w-0 truncate text-sm text-ink-muted">

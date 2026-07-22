@@ -60,6 +60,7 @@ import {
 } from "@/lib/reminders/propose";
 import { withLlmUsage } from "@/lib/usage/record";
 import { assertBillingQuota, recordChatEvent } from "@/lib/billing/quota";
+import { refreshUserAwards } from "@/lib/awards/grant";
 
 async function loadLinkedOrgContext(
   supabase: SupabaseClient,
@@ -913,11 +914,13 @@ ${linkedContext.trim() || "(none)"}
 
   const chats = await listChats(supabase, user.id, active.id);
   const proposedReminder = parseProposedReminder(answer);
+  const newlyGranted = await refreshUserAwards(user.id, supabase);
 
   return NextResponse.json({
     chatId,
     chats,
     messages: [userMsg, assistantMsg] as ChatMessageRow[],
     proposedReminder,
+    newlyGranted,
   });
 }

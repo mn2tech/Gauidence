@@ -28,6 +28,7 @@ import {
   type GuardianStatus,
 } from "@/lib/analysis";
 import { DOCUMENT_CATEGORIES } from "@/lib/categories";
+import PlanLimitAlert from "@/components/PlanLimitAlert";
 import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
 import {
   buildPastedTextFile,
@@ -38,6 +39,7 @@ import CameraCaptureModal from "@/components/CameraCaptureModal";
 import ShareDocumentButton from "@/components/ShareDocumentButton";
 import MoveDocumentButton from "@/components/MoveDocumentButton";
 import SearchHighlight from "@/components/SearchHighlight";
+import { syncDocumentAwards } from "@/lib/awards/client";
 
 type DocumentRow = {
   id: string;
@@ -149,7 +151,14 @@ export default function DocumentManager({
   const [pasteTitle, setPasteTitle] = useState("");
   const [pasteContent, setPasteContent] = useState("");
   const [pasteSourceUrl, setPasteSourceUrl] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setErrorState] = useState<{
+    message: string;
+    code?: string;
+  } | null>(null);
+  const setError = (message: string | null, code?: string) => {
+    if (message === null) setErrorState(null);
+    else setErrorState(code ? { message, code } : { message });
+  };
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
@@ -363,6 +372,7 @@ export default function DocumentManager({
 
       await loadDocuments();
       setUploading(false);
+      void syncDocumentAwards(inserted.id);
       if (fileInputRef.current) fileInputRef.current.value = "";
       if (cameraInputRef.current) cameraInputRef.current.value = "";
       // Auto-analyze once after upload — not on every page load.
@@ -588,6 +598,7 @@ export default function DocumentManager({
       }
       let body: {
         error?: string;
+        code?: string;
         summary?: string;
         facts?: Analysis["facts"];
         model?: string;
@@ -617,7 +628,7 @@ export default function DocumentManager({
         return;
       }
       if (!res.ok) {
-        setError(body.error ?? "Analysis failed. Please try again.");
+        setError(body.error ?? "Analysis failed. Please try again.", body.code);
         setDocuments((docs) =>
           docs.map((d) =>
             d.id === doc.id ? { ...d, analysis_status: "failed" } : d
@@ -901,12 +912,11 @@ export default function DocumentManager({
       ) : null}
 
       {error && (
-        <p
-          role="alert"
+        <PlanLimitAlert
+          message={error.message}
+          code={error.code}
           className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800"
-        >
-          {error}
-        </p>
+        />
       )}
 
       {/* Toolbar: search, category filter, sort */}

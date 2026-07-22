@@ -17,6 +17,7 @@ import {
   setActiveGuardianProfile,
 } from "@/lib/profiles/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { refreshUserAwards } from "@/lib/awards/grant";
 
 export const runtime = "nodejs";
 
@@ -311,8 +312,9 @@ export async function POST(request: Request) {
 
   const profiles = await listGuardianProfiles(supabase, user.id);
   const active = await getActiveGuardianProfile(supabase, user);
+  const newlyGranted = await refreshUserAwards(user.id, supabase);
   return NextResponse.json(
-    { profile: created, profiles, active },
+    { profile: created, profiles, active, newlyGranted },
     { status: 201 }
   );
 }

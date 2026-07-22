@@ -12,11 +12,13 @@ import {
   Globe2,
 } from "lucide-react";
 import { useActiveProfile } from "@/components/ProfileProvider";
+import PlanLimitAlert from "@/components/PlanLimitAlert";
 import {
   parseResearchBrief,
   type ResearchSectionKind,
   type ResearchSubjectKind,
 } from "@/lib/research/prompt";
+import { dispatchAwardsFromResponse } from "@/lib/awards/client";
 type WebSource = {
   title: string;
   url: string;
@@ -51,7 +53,14 @@ export default function ResearchPanel() {
   const [includeVault, setIncludeVault] = useState(true);
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setErrorState] = useState<{
+    message: string;
+    code?: string;
+  } | null>(null);
+  const setError = (message: string | null, code?: string) => {
+    if (message === null) setErrorState(null);
+    else setErrorState(code ? { message, code } : { message });
+  };
   const [notice, setNotice] = useState<string | null>(null);
   const [result, setResult] = useState<ResearchResult | null>(null);
 
@@ -117,9 +126,10 @@ export default function ResearchPanel() {
         profileName?: string;
       };
       if (!res.ok) {
-        setError(body.error ?? "Research failed. Please try again.");
+        setError(body.error ?? "Research failed. Please try again.", body.code);
         return;
       }
+      dispatchAwardsFromResponse(body);
       setResult({
         query: body.query ?? query.trim(),
         subjectKind: body.subjectKind ?? subjectKind,
@@ -284,9 +294,11 @@ export default function ResearchPanel() {
       </form>
 
       {error ? (
-        <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
-          {error}
-        </p>
+        <PlanLimitAlert
+          message={error.message}
+          code={error.code}
+          className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+        />
       ) : null}
       {notice ? (
         <p className="rounded-xl border border-brand/30 bg-brand-light px-4 py-3 text-sm text-brand-dark" role="status">

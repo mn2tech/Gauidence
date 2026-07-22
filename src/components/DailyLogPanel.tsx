@@ -18,6 +18,7 @@ import {
 } from "@/lib/logs/types";
 import type { GuardianProfileType } from "@/lib/profiles/types";
 import SearchHighlight from "@/components/SearchHighlight";
+import { dispatchAwardsFromResponse } from "@/lib/awards/client";
 
 type Props = {
   profileId: string;
@@ -177,6 +178,7 @@ export default function DailyLogPanel({
         setError(body.error ?? "Couldn't save Quick Log.");
         return;
       }
+      dispatchAwardsFromResponse(body);
       setQuick("");
       await load();
     } finally {
@@ -211,6 +213,7 @@ export default function DailyLogPanel({
         setError(body.error ?? "Couldn't save Daily Log.");
         return;
       }
+      dispatchAwardsFromResponse(body);
       setContent("");
       setTitle("");
       setTags("");

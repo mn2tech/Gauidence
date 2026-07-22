@@ -20,6 +20,7 @@ import {
 import { loadResearchVaultContext } from "@/lib/research/vaultContext";
 import { withLlmUsage } from "@/lib/usage/record";
 import { assertBillingQuota, recordChatEvent } from "@/lib/billing/quota";
+import { refreshUserAwards } from "@/lib/awards/grant";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -183,6 +184,7 @@ ${vaultContext.trim() || "(none matching this query in the active vault)"}
         })
     );
 
+    const newlyGranted = await refreshUserAwards(user.id, supabase);
     return NextResponse.json({
       query,
       subjectKind,
@@ -192,6 +194,7 @@ ${vaultContext.trim() || "(none matching this query in the active vault)"}
       sources: web.results,
       vaultContextUsed: Boolean(vaultContext.trim()),
       provider: web.provider,
+      newlyGranted,
     });
   } catch (err) {
     const message =
