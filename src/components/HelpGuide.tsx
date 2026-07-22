@@ -7,6 +7,7 @@ import {
   Camera,
   Check,
   Circle,
+  GraduationCap,
   MessageCircle,
   NotebookPen,
   Search,
@@ -65,6 +66,13 @@ const HOW_TO = [
     body: "Ask questions about the active vault. Say “remind me…” to propose a reminder from a vault date — you confirm before it is saved. Always verify important decisions against the original file.",
     href: "/ask",
     linkLabel: "Ask Gideon",
+  },
+  {
+    icon: NotebookPen,
+    title: "Work Memory",
+    body: "Track semester projects: mission, next step, and blockers. End a session when you stop studying, then Continue with Gideon to pick up where you left off.",
+    href: "/work-memory",
+    linkLabel: "Open Work Memory",
   },
   {
     icon: BookOpen,
@@ -192,6 +200,122 @@ export default function HelpGuide({ signedIn }: { signedIn: boolean }) {
           </Link>
         </section>
       )}
+
+      <section className="rounded-2xl border border-violet-200 bg-violet-50/40 p-5 shadow-sm sm:p-7">
+        <div className="flex items-start gap-3">
+          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
+            <GraduationCap className="h-5 w-5" aria-hidden />
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-lg font-bold tracking-tight">
+              Guardian for students
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-ink-muted">
+              Think of Guardian as a smart binder for school. You scan syllabi and
+              assignments, jot quick Daily Logs when something changes, and ask
+              Gideon when you forget a due date or what you wrote last week. It
+              helps you stay organized — it does not do your homework for you.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          <div className="rounded-xl border border-violet-100 bg-white/80 p-4">
+            <h3 className="text-sm font-semibold">What to save</h3>
+            <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-ink-muted">
+              <li>Syllabi and assignment sheets</li>
+              <li>Rubrics and schedule printouts</li>
+              <li>Permission slips and forms</li>
+              <li>Notes you want to find later</li>
+            </ul>
+          </div>
+          <div className="rounded-xl border border-violet-100 bg-white/80 p-4">
+            <h3 className="text-sm font-semibold">Daily Log examples</h3>
+            <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-ink-muted">
+              <li>“Lab moved to Thursday”</li>
+              <li>“Midterm covers chapters 1–5”</li>
+              <li>“Group project: I’m doing slides”</li>
+            </ul>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-xl border border-violet-100 bg-white/80 p-4">
+          <h3 className="text-sm font-semibold">Ask Gideon things like</h3>
+          <ul className="mt-2 flex flex-wrap gap-2">
+            {[
+              "When is my paper due?",
+              "Summarize my latest Daily Log",
+              "Any homework updates?",
+              "What should I remember this week?",
+            ].map((q) => (
+              <li
+                key={q}
+                className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-xs text-foreground"
+              >
+                {q}
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <ol className="mt-5 space-y-2 text-sm text-ink-muted">
+          <li>
+            <span className="font-semibold text-foreground">1.</span> Create a{" "}
+            <strong>Student</strong> vault (add school name / grade if you like).
+          </li>
+          <li>
+            <span className="font-semibold text-foreground">2.</span> Scan or
+            upload your syllabus.
+          </li>
+          <li>
+            <span className="font-semibold text-foreground">3.</span> Write one
+            Daily Log for what&apos;s due this week.
+          </li>
+          <li>
+            <span className="font-semibold text-foreground">4.</span> Ask Gideon
+            about deadlines or your notes.
+          </li>
+          <li>
+            <span className="font-semibold text-foreground">5.</span> Turn on
+            email reminders in Settings for date alerts from your documents.
+          </li>
+        </ol>
+
+        <p className="mt-4 text-xs text-ink-muted">
+          Parents can also set up a Student vault under a family account. Free
+          tier has monthly limits — see{" "}
+          <Link href="/pricing" className="font-semibold text-brand hover:text-brand-dark">
+            Pricing
+          </Link>{" "}
+          for details.
+        </p>
+
+        {signedIn ? (
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link
+              href="/settings/profiles?add=1"
+              className="inline-flex items-center gap-1.5 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark"
+            >
+              Create student vault
+              <ArrowRight className="h-4 w-4" aria-hidden />
+            </Link>
+            <Link
+              href="/ask"
+              className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-semibold hover:bg-stone-50"
+            >
+              Ask Gideon
+            </Link>
+          </div>
+        ) : (
+          <Link
+            href="/signup"
+            className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark"
+          >
+            Get started free
+            <ArrowRight className="h-4 w-4" aria-hidden />
+          </Link>
+        )}
+      </section>
 
       <section>
         <h2 className="text-lg font-bold tracking-tight">How Guardian works</h2>
