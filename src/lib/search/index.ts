@@ -1,6 +1,4 @@
-/**
- * Universal vault search helpers (pure — safe for unit tests).
- */
+import { DOCUMENTS_PATH } from "@/lib/routes";
 
 export type SearchResultKind =
   | "profile"
@@ -113,13 +111,13 @@ export function hrefForResult(args: {
 }): string {
   const { kind, id, profileId } = args;
   if (kind === "profile") {
-    return `/dashboard?profileId=${encodeURIComponent(profileId)}`;
+    return `/dashboard?docs=1&profileId=${encodeURIComponent(profileId)}`;
   }
   if (kind === "daily_log") {
-    return `/dashboard?profileId=${encodeURIComponent(profileId)}&logId=${encodeURIComponent(id)}#daily-log-${profileId}`;
+    return `/dashboard?docs=1&profileId=${encodeURIComponent(profileId)}&logId=${encodeURIComponent(id)}#daily-log-${profileId}`;
   }
   if (kind === "document") {
-    return `/dashboard?profileId=${encodeURIComponent(profileId)}&documentId=${encodeURIComponent(id)}#documents-${profileId}`;
+    return `/dashboard?docs=1&profileId=${encodeURIComponent(profileId)}&documentId=${encodeURIComponent(id)}#documents-${profileId}`;
   }
   return `/ask?profileId=${encodeURIComponent(profileId)}&chatId=${encodeURIComponent(id)}`;
 }

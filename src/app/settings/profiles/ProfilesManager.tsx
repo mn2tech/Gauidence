@@ -95,6 +95,9 @@ export default function ProfilesManager() {
 
   const create = async () => {
     if (!option || !displayName.trim()) return;
+    const returnTo = searchParams.get("return");
+    const safeReturn =
+      returnTo?.startsWith("/") && !returnTo.startsWith("//") ? returnTo : "/ask";
     setBusy(true);
     setError(null);
     try {
@@ -127,7 +130,7 @@ export default function ProfilesManager() {
       dispatchAwardsFromResponse(body);
       await refresh();
       setAdding(false);
-      router.replace("/dashboard");
+      router.replace(safeReturn);
       window.dispatchEvent(new CustomEvent("guardian:profile-changed"));
     } finally {
       setBusy(false);

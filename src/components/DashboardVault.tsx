@@ -114,7 +114,7 @@ export default function DashboardVault({ userId }: { userId: string }) {
     );
   }
   if (!loading && profiles.length === 0) {
-    return <ProfileSetupHub />;
+    return <ProfileSetupHub returnTo="/ask" />;
   }
   if (!active) {
     return (

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Plus } from "lucide-react";
+import { DOCUMENTS_PATH } from "@/lib/routes";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
   isGroupStyleProfile,
@@ -116,7 +117,7 @@ export default function WelcomeProfileStrip({
     const params = new URLSearchParams(searchParams.toString());
     params.delete("passwordUpdated");
     const qs = params.toString();
-    router.replace(qs ? `/dashboard?${qs}` : "/dashboard", { scroll: false });
+    router.replace(qs ? `/dashboard?docs=1&${qs}` : DOCUMENTS_PATH, { scroll: false });
   }, [searchParams, router]);
 
   const topLevel = topLevelProfiles(profiles);

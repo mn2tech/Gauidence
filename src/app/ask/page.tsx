@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getActiveGuardianProfile } from "@/lib/profiles/server";
 import SiteHeader from "@/components/SiteHeader";
 import VaultChatPanel from "@/components/VaultChatPanel";
 
@@ -19,6 +20,8 @@ export default async function AskGideonPage() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  await getActiveGuardianProfile(supabase, user);
 
   return (
     <div className="flex h-[100dvh] flex-col overflow-hidden">

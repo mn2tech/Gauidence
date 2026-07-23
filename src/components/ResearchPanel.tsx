@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
+import { DOCUMENTS_PATH } from "@/lib/routes";
 import {
   Building2,
   ExternalLink,
@@ -88,7 +89,7 @@ export default function ResearchPanel() {
           with live web sources tied to your vault.
         </p>
         <Link
-          href="/dashboard"
+          href={DOCUMENTS_PATH}
           className="mt-4 inline-flex rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark"
         >
           Go to dashboard

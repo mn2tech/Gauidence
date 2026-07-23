@@ -20,7 +20,14 @@ const ICONS: Record<
 /**
  * First-run hub when the account has no people/spaces yet.
  */
-export default function ProfileSetupHub() {
+export default function ProfileSetupHub({
+  returnTo = "/ask",
+}: {
+  returnTo?: string;
+}) {
+  const safeReturn =
+    returnTo.startsWith("/") && !returnTo.startsWith("//") ? returnTo : "/ask";
+  const returnQuery = `&return=${encodeURIComponent(safeReturn)}`;
   return (
     <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm sm:p-8">
       <h2 className="text-xl font-bold tracking-tight">
@@ -49,7 +56,7 @@ export default function ProfileSetupHub() {
           return (
             <li key={g.id}>
               <Link
-                href={`/settings/profiles?add=1&group=${g.id}`}
+                href={`/settings/profiles?add=1&group=${g.id}${returnQuery}`}
                 className="flex h-full flex-col rounded-xl border border-stone-200 px-4 py-4 text-left transition hover:border-brand hover:bg-brand-light/40"
               >
                 <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-brand-light text-brand">

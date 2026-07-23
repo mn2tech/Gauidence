@@ -44,7 +44,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
   const safeNext =
     rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//")
       ? rawNext
-      : "/dashboard";
+      : "/ask";
 
   async function handleGoogle() {
     if (!supabase) {
@@ -107,6 +107,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
         if (error) {
           setError(error.message);
         } else if (data.session) {
+          await fetch("/api/profiles").catch(() => undefined);
           router.push(safeNext);
           router.refresh();
           return;
@@ -127,6 +128,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
               : error.message
           );
         } else {
+          await fetch("/api/profiles").catch(() => undefined);
           router.push(safeNext);
           router.refresh();
           return;

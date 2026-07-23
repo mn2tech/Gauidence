@@ -9,13 +9,22 @@ import SiteFooter from "@/components/SiteFooter";
 import SignOutButton from "@/components/SignOutButton";
 import DashboardVault from "@/components/DashboardVault";
 import WelcomeProfileStrip from "@/components/WelcomeProfileStrip";
-import { getActiveGuardianProfile } from "@/lib/profiles/server";
+import { hasDocumentsIntent } from "@/lib/routes";
+import {
+  getActiveGuardianProfile,
+  listGuardianProfiles,
+} from "@/lib/profiles/server";
 
 export const metadata: Metadata = {
-  title: "Dashboard — Guardian",
+  title: "Documents — Guardian",
 };
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
   const supabase = await createClient();
   if (!supabase) redirect("/login?error=not_configured");
 
@@ -25,6 +34,10 @@ export default async function DashboardPage() {
   if (!user) redirect("/login");
 
   await getActiveGuardianProfile(supabase, user);
+  const profiles = await listGuardianProfiles(supabase, user.id);
+  if (profiles.length === 0 || !hasDocumentsIntent(params)) {
+    redirect("/ask");
+  }
 
   const { data: account } = await supabase
     .from("profiles")

@@ -6,6 +6,7 @@ import {
   supabaseAnonKey,
   supabaseUrl,
 } from "@/lib/supabase/config";
+import { ensureDefaultGuardianProfile } from "@/lib/profiles/server";
 
 /**
  * OAuth / email-confirmation / password-recovery callback.
@@ -19,9 +20,9 @@ import {
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/dashboard";
+  const next = searchParams.get("next") ?? "/ask";
   const safeNext =
-    next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
+    next.startsWith("/") && !next.startsWith("//") ? next : "/ask";
 
   const providerError = searchParams.get("error");
   if (providerError) {
@@ -83,6 +84,7 @@ export async function GET(request: Request) {
       },
       { onConflict: "id", ignoreDuplicates: true }
     );
+    await ensureDefaultGuardianProfile(supabase, user);
     void import("@/lib/retention/run").then(({ trySendWelcomeEmail }) =>
       trySendWelcomeEmail(user.id).catch((err) => {
         console.error(

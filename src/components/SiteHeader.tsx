@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import ProfileSwitcher from "@/components/ProfileSwitcher";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import GlobalVaultSearch from "@/components/GlobalVaultSearch";
+import { DOCUMENTS_PATH } from "@/lib/routes";
 
 export default function SiteHeader() {
   const pathname = usePathname();
@@ -61,12 +62,12 @@ export default function SiteHeader() {
   }
 
   const cameraHref = needsSetup
-    ? "/dashboard"
+    ? "/ask"
     : active
       ? `/dashboard?camera=1#documents-${active.id}`
       : "/dashboard?camera=1";
-  const askHref = needsSetup ? "/dashboard" : "/ask";
-  const researchHref = needsSetup ? "/dashboard" : "/research";
+  const askHref = "/ask";
+  const researchHref = needsSetup ? "/ask" : "/research";
 
   const linkClass =
     "block rounded-lg px-3 py-2.5 text-sm font-medium text-foreground transition hover:bg-stone-100 sm:inline sm:rounded-none sm:px-0 sm:py-0 sm:font-normal sm:text-ink-muted sm:hover:bg-transparent sm:hover:text-foreground";
@@ -76,7 +77,7 @@ export default function SiteHeader() {
       <header className="sticky top-0 z-40 border-b border-stone-200 bg-white/80 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 sm:h-16 sm:px-6">
         <Link
-          href={signedIn ? "/dashboard" : "/"}
+          href={signedIn ? "/ask" : "/"}
           className="flex shrink-0 items-center gap-2 font-semibold tracking-tight"
         >
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand text-white">
@@ -134,7 +135,7 @@ export default function SiteHeader() {
               <Link href="/work-memory" className="hover:text-foreground">
                 Work Memory
               </Link>
-              <Link href="/dashboard" className="hover:text-foreground">
+              <Link href={DOCUMENTS_PATH} className="hover:text-foreground">
                 Documents
               </Link>
               <Link
@@ -248,7 +249,7 @@ export default function SiteHeader() {
                 <Link href="/work-memory" className={linkClass}>
                   Work Memory
                 </Link>
-                <Link href="/dashboard" className={linkClass}>
+                <Link href={DOCUMENTS_PATH} className={linkClass}>
                   Documents
                 </Link>
                 <Link href="/settings" className={linkClass}>

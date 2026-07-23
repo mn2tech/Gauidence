@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import { askGideonContextLabel } from "@/lib/profiles/types";
+import { dailyLogHref, documentsHref } from "@/lib/routes";
 
 type VaultSummary = {
   profileId: string;
@@ -99,9 +100,9 @@ export default function GideonNudge() {
 
   const empty = summary?.empty ?? true;
   const name = active.display_name;
-  const docsHref = `/dashboard#documents-${active.id}`;
-  const cameraHref = `/dashboard?camera=1#documents-${active.id}`;
-  const logHref = `/dashboard#daily-log-${active.id}`;
+  const docsHref = documentsHref(active.id);
+  const cameraHref = `/dashboard?docs=1&camera=1#documents-${active.id}`;
+  const logHref = dailyLogHref(active.id);
   const askHref = "/ask";
   const askLabel = askGideonContextLabel(active);
 

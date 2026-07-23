@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { SupabaseClient, User } from "@supabase/supabase-js";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   isGuardianProfileType,
   type GuardianProfile,
@@ -58,9 +59,84 @@ async function membershipRoleMap(
   return map;
 }
 
+function personalDisplayName(user: User): string {
+  const meta = user.user_metadata ?? {};
+  const fromMeta =
+    typeof meta.full_name === "string" && meta.full_name.trim()
+      ? meta.full_name.trim()
+      : typeof meta.name === "string" && meta.name.trim()
+        ? meta.name.trim()
+        : "";
+  if (fromMeta) return fromMeta;
+  return user.email?.split("@")[0]?.trim() || "Me";
+}
+
 /**
- * Returns the owner's default profile if one exists, otherwise null.
- * Does NOT auto-create a "Myself" profile — new users use the setup hub.
+ * Creates the default personal ("Myself") vault for a user who has none.
+ * New signups get one from the handle_new_user trigger (migration 0038);
+ * this covers accounts created before that migration.
+ */
+async function createPersonalGuardianProfile(
+  supabase: SupabaseClient,
+  user: User
+): Promise<GuardianProfile | null> {
+  const admin = createAdminClient();
+  const client = admin ?? supabase;
+
+  // Guard against concurrent requests racing to create the first profile.
+  const { data: existing } = await client
+    .from("guardian_profiles")
+    .select(PROFILE_SELECT)
+    .eq("owner_user_id", user.id)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (existing) return asProfile(existing, "owner");
+
+  const { data, error } = await client
+    .from("guardian_profiles")
+    .insert({
+      owner_user_id: user.id,
+      profile_type: "personal",
+      display_name: personalDisplayName(user),
+      relationship: "Myself",
+      is_default: true,
+    })
+    .select(PROFILE_SELECT)
+    .single();
+
+  if (error || !data) {
+    console.error(
+      "Auto-create personal profile failed:",
+      error?.code,
+      error?.message
+    );
+    return null;
+  }
+
+  if (admin) {
+    await admin.from("guardian_profile_members").upsert(
+      {
+        profile_id: data.id,
+        user_id: user.id,
+        role: "owner",
+        invited_by: user.id,
+      },
+      { onConflict: "profile_id,user_id" }
+    );
+  }
+
+  await supabase
+    .from("profiles")
+    .update({ active_guardian_profile_id: data.id })
+    .eq("id", user.id);
+
+  return asProfile(data, "owner");
+}
+
+/**
+ * Returns the owner's default profile, auto-creating a personal
+ * "Myself" vault when the user has none yet.
  */
 export async function ensureDefaultGuardianProfile(
   supabase: SupabaseClient,
@@ -102,7 +178,7 @@ export async function ensureDefaultGuardianProfile(
       );
       return asProfile(anyOwned, "owner");
     }
-    return null;
+    return createPersonalGuardianProfile(supabase, user);
   }
 
   const { data: existing } = await supabase
@@ -138,7 +214,7 @@ export async function ensureDefaultGuardianProfile(
     return asProfile(anyProfile, "owner");
   }
 
-  return null;
+  return createPersonalGuardianProfile(supabase, user);
 }
 
 async function ensureActivePointsSomewhere(
@@ -202,13 +278,18 @@ export async function listGuardianProfiles(
   });
 }
 
-/** Resolve active profile, or null when the user has not created/joined any yet. */
+/**
+ * Resolve the active profile. Users with no profiles get a personal
+ * "Myself" vault created automatically.
+ */
 export async function getActiveGuardianProfile(
   supabase: SupabaseClient,
   user: User
 ): Promise<GuardianProfile | null> {
   const profiles = await listGuardianProfiles(supabase, user.id);
-  if (profiles.length === 0) return null;
+  if (profiles.length === 0) {
+    return createPersonalGuardianProfile(supabase, user);
+  }
 
   const fallback =
     profiles.find((p) => p.access_role === "owner" && p.is_default) ??

@@ -2,6 +2,8 @@
  * Getting-started checklist helpers (pure — safe for unit tests).
  */
 
+import { DOCUMENTS_PATH, dailyLogHref } from "@/lib/routes";
+
 export const GETTING_STARTED_DISMISS_KEY = "guardian:getting-started-dismissed";
 
 export type OnboardingStepId =
@@ -44,8 +46,8 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
       "Scan or upload a PDF or photo so Guardian can find dates and key facts.",
     href: (profileId) =>
       profileId
-        ? `/dashboard?camera=1#documents-${profileId}`
-        : "/dashboard",
+        ? `/dashboard?docs=1&camera=1#documents-${profileId}`
+        : DOCUMENTS_PATH,
     cta: "Scan or upload",
     done: (p) => p.hasDocument,
   },
@@ -54,8 +56,7 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     title: "Write a Daily Log",
     description:
       "Capture a quick note, event, or observation in that vault’s timeline.",
-    href: (profileId) =>
-      profileId ? `/dashboard#daily-log-${profileId}` : "/dashboard",
+    href: (profileId) => dailyLogHref(profileId),
     cta: "Open Daily Log",
     done: (p) => p.hasDailyLog,
   },

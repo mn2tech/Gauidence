@@ -20,7 +20,7 @@ export default async function LoginPage({
   const safeNext =
     rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//")
       ? rawNext
-      : "/dashboard";
+      : "/ask";
 
   const supabase = await createClient();
   if (supabase) {

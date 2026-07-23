@@ -54,8 +54,9 @@ export async function GET() {
   const { supabase, user } = auth;
 
   try {
-    const [profiles, active, accountRow] = await Promise.all([
-      listGuardianProfiles(supabase, user.id),
+    // Resolve active first: it auto-creates the personal vault for new
+    // users, which must exist before the list is fetched.
+    const [active, accountRow] = await Promise.all([
       getActiveGuardianProfile(supabase, user),
       supabase
         .from("profiles")
@@ -63,6 +64,7 @@ export async function GET() {
         .eq("id", user.id)
         .maybeSingle(),
     ]);
+    const profiles = await listGuardianProfiles(supabase, user.id);
     const accountName =
       accountRow.data?.full_name?.trim() ||
       (typeof user.user_metadata?.full_name === "string"

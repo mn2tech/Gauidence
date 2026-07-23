@@ -12,10 +12,13 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import PlanLimitAlert from "@/components/PlanLimitAlert";
 import {
+  Building2,
   ExternalLink,
   FileUp,
   Camera,
   Bell,
+  GraduationCap,
+  Home,
   Info,
   Loader2,
   Menu,
@@ -25,6 +28,7 @@ import {
   Plus,
   Send,
   Trash2,
+  Users,
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -37,6 +41,11 @@ import {
 } from "@/components/ProfileSwitcher";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
+  PROFILE_CREATE_GROUPS,
+  topLevelProfiles,
+  type ProfileCreateGroupId,
+} from "@/lib/profiles/types";
+import {
   GIDEON_BRAND_LINE,
   GIDEON_LOADING_STATES,
   GIDEON_WHY,
@@ -46,6 +55,7 @@ import { isImageFileName } from "@/lib/vault/images";
 import { renderGideonText } from "@/components/gideonText";
 import { uploadAndAnalyzeToVault } from "@/lib/vault/clientUpload";
 import OrganizationSuggestionModal from "@/components/OrganizationSuggestionModal";
+import ProfileSetupHub from "@/components/ProfileSetupHub";
 import type { OrganizationSuggestionPayload } from "@/lib/organization/types";
 import { todayLogDate } from "@/lib/logs/types";
 import { calendarDateInZone } from "@/lib/reminders/time";
@@ -58,7 +68,7 @@ import {
 import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
 import { dispatchAwardsFromResponse } from "@/lib/awards/client";
 import { useGideonVoiceInput } from "@/hooks/useGideonVoiceInput";
-import type { WorkProject } from "@/lib/work-memory/types";
+import { documentsHref } from "@/lib/routes";
 
 function defaultReminderDateTime(): { date: string; time: string } {
   const now = new Date();
@@ -214,6 +224,13 @@ type Props = {
   variant?: "embedded" | "page";
 };
 
+const GROUP_ICONS: Record<ProfileCreateGroupId, typeof Users> = {
+  family: Users,
+  business: Building2,
+  student: GraduationCap,
+  other: Home,
+};
+
 const SECTION_STYLES: Record<string, string> = {
   from_documents: "border-brand/30 bg-brand-light/40",
   from_daily_log: "border-emerald-200 bg-emerald-50/80",
@@ -232,9 +249,10 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
   const requestedChatId = searchParams.get("chatId");
   const requestedProfileId = searchParams.get("profileId");
   const requestedWorkProjectId = searchParams.get("projectId");
-  const { active, profiles, loading: profilesLoading, switchProfile } =
+  const { active, profiles, loading: profilesLoading, switchProfile, refresh } =
     useActiveProfile();
   const needsSetup = !profilesLoading && profiles.length === 0;
+  const bootstrapTried = useRef(false);
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [messages, setMessages] = useState<VaultMessage[]>([]);
@@ -302,9 +320,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     onError: (msg) => setError(msg),
     disabled: sending || vaultBusy || !profileId,
   });
-  const documentsHref = profileId
-    ? `/dashboard#documents-${profileId}`
-    : "/dashboard";
+  const docsHref = documentsHref(profileId);
 
   const loadMetaAndChats = useCallback(async () => {
     const res = await fetch("/api/documents/vault-chat");
@@ -372,6 +388,12 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
       setLoadingHistory(false);
     }
   }, [loadMetaAndChats, loadThread, requestedChatId]);
+
+  useEffect(() => {
+    if (profilesLoading || profiles.length > 0 || bootstrapTried.current) return;
+    bootstrapTried.current = true;
+    void refresh();
+  }, [profilesLoading, profiles.length, refresh]);
 
   useEffect(() => {
     if (profilesLoading || needsSetup || profileSwitchRef.current) return;
@@ -1029,6 +1051,8 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
   };
 
   const welcome = !loadingHistory && messages.length === 0 && !sending;
+  const onlyDefaultVault =
+    !profilesLoading && topLevelProfiles(profiles).length <= 1;
   const docCount = meta?.documentCount ?? 0;
   const photoCount = meta?.photoCount ?? 0;
   const logCount = meta?.logCount ?? 0;
@@ -1099,7 +1123,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
               ) : null}
               <p className="text-[11px] text-ink-muted">
                 <Link
-                  href={documentsHref}
+                  href={docsHref}
                   className="font-medium text-brand hover:text-brand-dark"
                 >
                   Open Docs
@@ -1171,6 +1195,32 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
               )}
             </>
           )}
+          {onlyDefaultVault ? (
+            <div className="rounded-xl border border-stone-200 bg-stone-50/80 px-3 py-3">
+              <p className="text-xs font-semibold text-foreground">
+                Helping someone else too?
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-ink-muted">
+                Add a space for your family, business, or school and I&apos;ll
+                keep their documents separate.
+              </p>
+              <div className="mt-2.5 grid grid-cols-2 gap-2">
+                {PROFILE_CREATE_GROUPS.map((g) => {
+                  const Icon = GROUP_ICONS[g.id];
+                  return (
+                    <Link
+                      key={g.id}
+                      href={`/settings/profiles?add=1&group=${g.id}&return=${encodeURIComponent("/ask")}`}
+                      className="flex items-center gap-2 rounded-lg border border-stone-200 bg-white px-2.5 py-2 text-xs font-medium text-foreground transition hover:border-brand hover:bg-brand-light/40"
+                    >
+                      <Icon className="h-3.5 w-3.5 shrink-0 text-brand" />
+                      {g.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
@@ -1227,7 +1277,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
       </div>
       <div className="border-t border-stone-200 p-3">
         <Link
-          href={documentsHref}
+          href={docsHref}
           className="text-xs font-medium text-ink-muted hover:text-foreground"
         >
           ← Docs
@@ -1669,24 +1719,16 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
   );
 
   if (needsSetup) {
-    const setupBlock = (
+    const setupBlock = profilesLoading ? (
       <div className="mx-auto max-w-md space-y-4 px-1 py-8 text-center">
         <div className="flex justify-center">
-          <GideonAvatar size={44} />
+          <GideonAvatar size={44} pulse />
         </div>
-        <h2 className="text-lg font-semibold text-foreground">
-          Create a space first
-        </h2>
-        <p className="text-sm leading-relaxed text-ink-muted">
-          Gideon looks at your people and spaces. Choose who you&apos;re helping
-          on the dashboard, then come back to ask questions.
-        </p>
-        <Link
-          href="/dashboard"
-          className="inline-flex rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark"
-        >
-          Set up your first space
-        </Link>
+        <p className="text-sm text-ink-muted">Setting up your personal space…</p>
+      </div>
+    ) : (
+      <div className="mx-auto max-w-xl px-1 py-6">
+        <ProfileSetupHub />
       </div>
     );
     if (!isPage) {
@@ -1806,7 +1848,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
           </div>
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             <Link
-              href={documentsHref}
+              href={docsHref}
               aria-label="Documents"
               title="Documents"
               className="inline-flex items-center gap-1 rounded-full border border-stone-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50 sm:px-3"
