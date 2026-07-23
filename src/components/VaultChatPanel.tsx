@@ -12,13 +12,10 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import PlanLimitAlert from "@/components/PlanLimitAlert";
 import {
-  Building2,
   ExternalLink,
   FileUp,
   Camera,
   Bell,
-  GraduationCap,
-  Home,
   Info,
   Loader2,
   Menu,
@@ -27,7 +24,6 @@ import {
   NotebookPen,
   Plus,
   Send,
-  Users,
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -40,14 +36,17 @@ import {
 } from "@/components/ProfileSwitcher";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
-  PROFILE_CREATE_GROUPS,
+  VAULT_CREATE_CARDS,
   topLevelProfiles,
-  type ProfileCreateGroupId,
+  vaultCreateHref,
 } from "@/lib/profiles/types";
 import {
+  EMPTY_VAULT_BODY,
+  EMPTY_VAULT_HEADLINE,
   GIDEON_BRAND_LINE,
   GIDEON_LOADING_STATES,
   GIDEON_WHY,
+  VAULT_SCOPE_NOTE,
   parseGideonSections,
 } from "@/lib/vault/gideon";
 import { isImageFileName } from "@/lib/vault/images";
@@ -203,10 +202,17 @@ type Meta = {
   profileId?: string;
   profileName?: string;
   askContextLabel?: string;
+  chatContextLabel?: string;
+  vaultScopeNote?: string;
+  templateLabel?: string;
+  templateBadge?: string;
   guidance?: {
     headline: string;
     intro: string;
     tips: string[];
+    badge?: string;
+    label?: string;
+    suggestedUploads?: string[];
   } | null;
 };
 
@@ -228,13 +234,6 @@ function NameList({
 
 type Props = {
   variant?: "embedded" | "page";
-};
-
-const GROUP_ICONS: Record<ProfileCreateGroupId, typeof Users> = {
-  family: Users,
-  business: Building2,
-  student: GraduationCap,
-  other: Home,
 };
 
 const SECTION_STYLES: Record<string, string> = {
@@ -1078,17 +1077,40 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     countBits.push(`${logCount} Daily Log${logCount === 1 ? "" : "s"}`);
   }
 
+  const templateBadge =
+    meta?.guidance?.badge ?? meta?.templateBadge ?? null;
+  const suggestedUploads =
+    meta?.guidance?.suggestedUploads ?? meta?.guidance?.tips ?? [];
+
   const welcomeBlock = welcome && (
     <div className="mx-auto max-w-xl space-y-4 px-1 py-6">
       <div className="flex items-start gap-3">
         <GideonAvatar size={44} />
-        <div className="min-w-0 space-y-2">
+        <div className="min-w-0 space-y-3">
           <p className="text-base font-semibold text-foreground">
             Hi{greetName ? ` ${greetName}` : ""}, I&apos;m Gideon.
           </p>
           {meta?.profileName && (
             <AskWelcomeProfileSwitch fallbackName={meta.profileName} />
           )}
+
+          <div className="space-y-1.5">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm font-semibold text-foreground">
+                {meta?.guidance?.headline ?? "Welcome to your vault"}
+              </p>
+              {templateBadge ? (
+                <span className="inline-flex items-center rounded-full border border-stone-300 bg-white px-2.5 py-0.5 text-[11px] font-medium text-foreground">
+                  {templateBadge}
+                </span>
+              ) : null}
+            </div>
+            <p className="text-sm leading-relaxed text-ink-muted">
+              {meta?.guidance?.intro ??
+                "I remember your documents, daily logs, and important information so you can stop searching and simply ask."}
+            </p>
+          </div>
+
           {!emptyVault && countBits.length > 0 ? (
             <div className="space-y-2 rounded-xl border border-stone-200 bg-stone-50/80 px-3 py-2.5">
               <p className="text-xs font-semibold text-foreground">
@@ -1138,114 +1160,107 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
               </p>
             </div>
           ) : null}
+
           {emptyVault ? (
-            <>
+            <div className="space-y-1">
               <p className="text-sm font-medium text-foreground">
-                {meta?.guidance?.headline ??
-                  (meta?.profileName
-                    ? `${meta.profileName}'s vault is empty for now.`
-                    : "Your vault is empty for now.")}
+                {EMPTY_VAULT_HEADLINE}
               </p>
               <p className="text-sm leading-relaxed text-ink-muted">
-                {meta?.guidance?.intro ??
-                  "You can still ask general questions. Scan or upload a document here, or add a Daily Log, whenever you want me to remember your specific details."}
+                {EMPTY_VAULT_BODY}
               </p>
-              {meta?.guidance?.tips && meta.guidance.tips.length > 0 ? (
-                <ul className="list-inside list-disc space-y-1 text-sm leading-relaxed text-ink-muted">
-                  {meta.guidance.tips.map((tip) => (
-                    <li key={tip}>{tip}</li>
-                  ))}
-                </ul>
-              ) : null}
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={vaultBusy || sending || !profileId}
-                  onClick={openCamera}
-                  className="inline-flex rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark disabled:opacity-50"
-                >
-                  Scan with camera
-                </button>
-                <button
-                  type="button"
-                  disabled={vaultBusy || sending || !profileId}
-                  onClick={openFilePicker}
-                  className="inline-flex rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-stone-50 disabled:opacity-50"
-                >
-                  Upload a Document
-                </button>
-                <button
-                  type="button"
-                  disabled={vaultBusy || sending || !profileId}
-                  onClick={openLogForm}
-                  className="inline-flex rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-stone-50 disabled:opacity-50"
-                >
-                  Add a Daily Log
-                </button>
-              </div>
-              {meta && meta.suggestions.length > 0 ? (
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {meta.suggestions.map((q) => (
-                    <button
-                      key={q}
-                      type="button"
-                      disabled={sending}
-                      onClick={() => void sendQuestion(q)}
-                      className="rounded-full border border-stone-300 bg-white px-3 py-1.5 text-left text-xs font-medium text-foreground transition hover:border-brand hover:bg-brand-light/40 disabled:opacity-50"
-                    >
-                      {q}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </>
+            </div>
           ) : (
-            <>
-              <p className="text-sm leading-relaxed text-ink-muted">
-                {logsOnly
-                  ? "I'll check this profile's Daily Logs first. For other questions I can use general knowledge and clearly say when it's not from your vault."
-                  : "I'll search your vault first. If something isn't there, I can answer with general knowledge and label it clearly. What would you like to know?"}
-              </p>
-              {meta && meta.suggestions.length > 0 && (
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {meta.suggestions.map((q) => (
-                    <button
-                      key={q}
-                      type="button"
-                      disabled={sending}
-                      onClick={() => void sendQuestion(q)}
-                      className="rounded-full border border-stone-300 bg-white px-3 py-1.5 text-left text-xs font-medium text-foreground transition hover:border-brand hover:bg-brand-light/40 disabled:opacity-50"
-                    >
-                      {q}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </>
+            <p className="text-sm leading-relaxed text-ink-muted">
+              {logsOnly
+                ? "I'll check this profile's Daily Logs first. For other questions I can use general knowledge and clearly say when it's not from your vault."
+                : "I'll search your vault first. If something isn't there, I can answer with general knowledge and label it clearly. What would you like to know?"}
+            </p>
           )}
+
+          {emptyVault && suggestedUploads.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {suggestedUploads.map((item) => (
+                <span
+                  key={item}
+                  className="rounded-full border border-stone-200 bg-stone-50 px-2.5 py-1 text-[11px] font-medium text-ink-muted"
+                >
+                  {item}
+                </span>
+              ))}
+            </div>
+          ) : null}
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={vaultBusy || sending || !profileId}
+              onClick={openCamera}
+              className="inline-flex rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark disabled:opacity-50"
+            >
+              📷 Scan
+            </button>
+            <button
+              type="button"
+              disabled={vaultBusy || sending || !profileId}
+              onClick={openFilePicker}
+              className="inline-flex rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-stone-50 disabled:opacity-50"
+            >
+              📄 Upload Document
+            </button>
+            <button
+              type="button"
+              disabled={vaultBusy || sending || !profileId}
+              onClick={openLogForm}
+              className="inline-flex rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-stone-50 disabled:opacity-50"
+            >
+              📝 Add Daily Log
+            </button>
+          </div>
+
+          {meta && meta.suggestions.length > 0 ? (
+            <div className="space-y-2 pt-0.5">
+              <p className="text-xs font-semibold text-foreground">
+                Try asking Gideon
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {meta.suggestions.map((q) => (
+                  <button
+                    key={q}
+                    type="button"
+                    disabled={sending}
+                    onClick={() => void sendQuestion(q)}
+                    className="rounded-full border border-stone-300 bg-white px-3 py-1.5 text-left text-xs font-medium text-foreground transition hover:border-brand hover:bg-brand-light/40 disabled:opacity-50"
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
           {onlyDefaultVault ? (
             <div className="rounded-xl border border-stone-200 bg-stone-50/80 px-3 py-3">
               <p className="text-xs font-semibold text-foreground">
-                Helping someone else too?
+                Create another Vault
               </p>
               <p className="mt-1 text-xs leading-relaxed text-ink-muted">
-                Add a space for your family, business, or school and I&apos;ll
-                keep their documents separate.
+                Keep every part of your life completely separate while using one
+                Guardian account.
               </p>
-              <div className="mt-2.5 grid grid-cols-2 gap-2">
-                {PROFILE_CREATE_GROUPS.map((g) => {
-                  const Icon = GROUP_ICONS[g.id];
-                  return (
-                    <Link
-                      key={g.id}
-                      href={`/settings/profiles?add=1&group=${g.id}&return=${encodeURIComponent("/ask")}`}
-                      className="flex items-center gap-2 rounded-lg border border-stone-200 bg-white px-2.5 py-2 text-xs font-medium text-foreground transition hover:border-brand hover:bg-brand-light/40"
-                    >
-                      <Icon className="h-3.5 w-3.5 shrink-0 text-brand" />
-                      {g.label}
-                    </Link>
-                  );
-                })}
+              <div className="mt-2.5 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {VAULT_CREATE_CARDS.map((card) => (
+                  <Link
+                    key={card.id}
+                    href={vaultCreateHref(card, "/ask")}
+                    className="flex items-center gap-2 rounded-lg border border-stone-200 bg-white px-2.5 py-2 text-xs font-medium text-foreground transition hover:border-brand hover:bg-brand-light/40"
+                  >
+                    <span className="shrink-0" aria-hidden>
+                      {card.emoji}
+                    </span>
+                    {card.label}
+                  </Link>
+                ))}
               </div>
             </div>
           ) : null}
@@ -1338,6 +1353,27 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
       </Link>
     </div>
   ) : null;
+
+  const contextStrip =
+    meta?.chatContextLabel || meta?.templateLabel ? (
+      <div
+        className={
+          isPage
+            ? "shrink-0 border-t border-stone-100 px-4 pt-2 sm:px-8"
+            : "mt-2 px-0.5"
+        }
+      >
+        <div className={isPage ? "mx-auto max-w-3xl" : undefined}>
+          <p className="text-[11px] font-medium text-foreground">
+            {meta.chatContextLabel ??
+              `You are chatting with Gideon ${meta.templateLabel}`}
+          </p>
+          <p className="text-[11px] text-ink-muted">
+            {meta.vaultScopeNote ?? VAULT_SCOPE_NOTE}
+          </p>
+        </div>
+      </div>
+    ) : null;
 
   const composer = (
     <form
@@ -1758,6 +1794,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
         )}
         <ImminentReminderBanner profileId={profileId} />
         {workMemoryBanner}
+        {contextStrip}
         {composer}
         {vaultOverlays}
       </div>
@@ -1824,7 +1861,8 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
               </button>
             </div>
             <p className="truncate text-[11px] text-ink-muted">
-              {meta?.askContextLabel ??
+              {meta?.chatContextLabel ??
+                meta?.askContextLabel ??
                 "Your AI guide to everything in your vault."}
             </p>
           </div>
@@ -1871,6 +1909,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
 
         <ImminentReminderBanner profileId={profileId} />
         {workMemoryBanner}
+        {contextStrip}
         {composer}
       </div>
     </div>

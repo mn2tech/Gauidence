@@ -32,6 +32,10 @@ import {
   buildGideonLogSuggestions,
   buildGideonVaultGuidance,
   firstNameFrom,
+  getVaultTemplate,
+  gideonChatContextLabel,
+  VAULT_SCOPE_NOTE,
+  withVaultPersonality,
   type SuggestionProfileKind,
   type VaultDocHint,
 } from "@/lib/vault/gideon";
@@ -426,8 +430,24 @@ export async function GET(request: Request) {
         headline: guide.headline,
         intro: guide.intro,
         tips: guide.tips,
+        badge: guide.badge,
+        label: guide.label,
+        suggestedUploads: guide.suggestedUploads,
       };
       suggestions = guide.suggestions;
+    }
+
+    const template = getVaultTemplate(profileKind);
+    // Non-empty vaults still need template chrome (badge / context) on welcome.
+    if (!guidance) {
+      guidance = {
+        headline: template.welcomeTitle,
+        intro: template.description,
+        tips: template.suggestedUploads,
+        badge: template.badge,
+        label: template.label,
+        suggestedUploads: template.suggestedUploads,
+      };
     }
 
     const { data: account } = await supabase
@@ -461,6 +481,10 @@ export async function GET(request: Request) {
         profileName: active.display_name,
         profileType: active.profile_type,
         askContextLabel: askGideonContextLabel(active),
+        chatContextLabel: gideonChatContextLabel(profileKind),
+        vaultScopeNote: VAULT_SCOPE_NOTE,
+        templateLabel: template.label,
+        templateBadge: template.badge,
       },
     });
   }
@@ -490,6 +514,9 @@ export async function GET(request: Request) {
     );
   }
 
+  const profileKind = suggestionKindFrom(active.profile_type);
+  const template = getVaultTemplate(profileKind);
+
   return NextResponse.json({
     chats,
     chatId: chat.id,
@@ -498,7 +525,12 @@ export async function GET(request: Request) {
     meta: {
       profileId: active.id,
       profileName: active.display_name,
+      profileType: active.profile_type,
       askContextLabel: askGideonContextLabel(active),
+      chatContextLabel: gideonChatContextLabel(profileKind),
+      vaultScopeNote: VAULT_SCOPE_NOTE,
+      templateLabel: template.label,
+      templateBadge: template.badge,
       ...(await loadAskVaultInventory(supabase, user.id, active.id)).inventory,
     },
   });
@@ -857,7 +889,8 @@ export async function POST(request: Request) {
     const reminderAgent = wantsReminderAgent(question);
     const reminderNote = reminderAgent ? REMINDER_AGENT_SYSTEM_NOTE : "";
 
-    const system = `${VAULT_CHAT_SYSTEM}
+    const profileKind = suggestionKindFrom(active.profile_type);
+    const system = `${withVaultPersonality(VAULT_CHAT_SYSTEM, profileKind)}
 
 Active profile: ${active.display_name} (${active.profile_type}).
 ${rollupNote}

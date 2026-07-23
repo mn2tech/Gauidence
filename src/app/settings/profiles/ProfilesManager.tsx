@@ -52,7 +52,14 @@ export default function ProfilesManager() {
         raw === "other"
       ) {
         setGroupId(raw);
-        setStep(2);
+        const optionRaw = searchParams.get("option");
+        const groupOpts = optionsForCreateGroup(raw);
+        if (optionRaw && groupOpts.some((o) => o.id === optionRaw)) {
+          setOptionId(optionRaw);
+          setStep(3);
+        } else {
+          setStep(2);
+        }
       }
     }
   }, [searchParams]);

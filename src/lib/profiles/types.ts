@@ -163,6 +163,40 @@ export function optionsForCreateGroup(groupId: ProfileCreateGroupId) {
     .filter((o): o is (typeof PROFILE_CREATE_OPTIONS)[number] => Boolean(o));
 }
 
+/** Welcome-screen cards for creating another vault (config-driven). */
+export type VaultCreateCard = {
+  id: string;
+  label: string;
+  emoji: string;
+  /** PROFILE_CREATE_GROUPS id for the wizard. */
+  group: ProfileCreateGroupId;
+  /** Optional PROFILE_CREATE_OPTIONS id to skip straight to naming. */
+  optionId?: string;
+};
+
+export const VAULT_CREATE_CARDS: VaultCreateCard[] = [
+  { id: "personal", label: "Personal", emoji: "👤", group: "other", optionId: "myself" },
+  { id: "family", label: "Family", emoji: "👨‍👩‍👧", group: "family", optionId: "my_family" },
+  { id: "teacher", label: "Teacher", emoji: "🏫", group: "student", optionId: "teacher" },
+  { id: "student", label: "Student", emoji: "🎓", group: "student", optionId: "student" },
+  { id: "business", label: "Business", emoji: "💼", group: "business", optionId: "business" },
+  { id: "learning", label: "Learning", emoji: "📚", group: "other", optionId: "hobby" },
+  { id: "custom", label: "Custom", emoji: "⚙️", group: "other", optionId: "other" },
+];
+
+export function vaultCreateHref(
+  card: VaultCreateCard,
+  returnTo = "/ask"
+): string {
+  const params = new URLSearchParams({
+    add: "1",
+    group: card.group,
+    return: returnTo,
+  });
+  if (card.optionId) params.set("option", card.optionId);
+  return `/settings/profiles?${params.toString()}`;
+}
+
 export type GuardianProfileAccessRole = "owner" | "editor";
 
 export type GuardianProfile = {

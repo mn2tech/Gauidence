@@ -4,9 +4,14 @@ import {
   buildGideonSuggestions,
   buildGideonVaultGuidance,
   firstNameFrom,
+  getVaultTemplate,
+  gideonChatContextLabel,
   parseGideonSections,
+  withVaultPersonality,
   GIDEON_SYSTEM,
   GIDEON_BRAND_LINE,
+  EMPTY_VAULT_HEADLINE,
+  VAULT_SCOPE_NOTE,
 } from "../gideon.ts";
 
 describe("Gideon helpers", () => {
@@ -47,10 +52,32 @@ describe("Gideon helpers", () => {
 
   it("returns teacher onboarding guidance for an empty teacher vault", () => {
     const guide = buildGideonVaultGuidance("teacher", "Ms. Rivera");
-    assert.equal(guide.headline, "Ms. Rivera's vault is ready");
-    assert.match(guide.intro, /classroom/i);
-    assert.ok(guide.tips.length >= 2);
-    assert.ok(guide.suggestions.some((q) => /teacher role/i.test(q)));
+    assert.equal(guide.headline, "Welcome to your Teacher Vault");
+    assert.equal(guide.badge, "🏫 Teacher");
+    assert.equal(guide.label, "Teacher");
+    assert.match(guide.intro, /lesson plans|classroom/i);
+    assert.ok(guide.suggestedUploads.includes("Lesson Plans"));
+    assert.deepEqual(guide.tips, guide.suggestedUploads);
+    assert.ok(guide.suggestions.some((q) => /Summarize today's lesson/i.test(q)));
+  });
+
+  it("returns personal template fields for welcome chrome", () => {
+    const guide = buildGideonVaultGuidance("personal");
+    assert.equal(guide.headline, "Welcome to your Personal Vault");
+    assert.equal(guide.badge, "🛡 Personal");
+    assert.match(guide.intro, /stop searching and simply ask/i);
+    assert.ok(guide.suggestedUploads.includes("IDs"));
+    assert.ok(guide.suggestions.some((q) => /passport/i.test(q)));
+    assert.equal(gideonChatContextLabel("personal"), "You are chatting with Gideon Personal");
+    assert.equal(EMPTY_VAULT_HEADLINE, "Your vault is empty.");
+    assert.equal(VAULT_SCOPE_NOTE, "Searching only inside this vault.");
+  });
+
+  it("appends vault personality to the system prompt", () => {
+    const system = withVaultPersonality(GIDEON_SYSTEM, "business");
+    assert.match(system, /You are Gideon/);
+    assert.match(system, /Gideon Business/);
+    assert.equal(getVaultTemplate("business").label, "Business");
   });
 
   it("parses Gideon response sections", () => {

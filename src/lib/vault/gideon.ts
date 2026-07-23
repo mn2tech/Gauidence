@@ -141,225 +141,345 @@ export function buildGideonLogSuggestions(
   ];
 }
 
+/**
+ * Config-driven vault template: welcome copy, uploads, starter questions,
+ * and assistant personality. Add new vault types here — UI follows automatically.
+ */
+export type VaultTemplate = {
+  label: string;
+  badge: string;
+  welcomeTitle: string;
+  description: string;
+  suggestedUploads: string[];
+  starterQuestions: string[];
+  /** Short tone note appended to Gideon's system prompt for this vault. */
+  personality: string;
+};
+
 export type GideonVaultGuidance = {
   headline: string;
   intro: string;
+  /** @deprecated Prefer suggestedUploads — kept for API compatibility. */
   tips: string[];
   suggestions: string[];
+  badge: string;
+  label: string;
+  suggestedUploads: string[];
+  personality: string;
 };
 
-const GUIDANCE: Record<SuggestionProfileKind, Omit<GideonVaultGuidance, "headline">> = {
+export const VAULT_TEMPLATES: Record<SuggestionProfileKind, VaultTemplate> = {
+  personal: {
+    label: "Personal",
+    badge: "🛡 Personal",
+    welcomeTitle: "Welcome to your Personal Vault",
+    description:
+      "I remember your documents, daily logs, and important information so you can stop searching and simply ask.",
+    suggestedUploads: ["IDs", "Insurance", "Medical", "Bills", "Notes"],
+    starterQuestions: [
+      "When does my passport expire?",
+      "Find my insurance policy.",
+      "What bills are due this month?",
+    ],
+    personality:
+      "You are Gideon Personal — a calm private assistant for IDs, insurance, medical records, bills, and everyday life paperwork.",
+  },
   teacher: {
-    intro:
-      "This is your classroom hub — lesson plans, rosters, IEPs, parent notes, and conference paperwork all stay here.",
-    tips: [
-      "Scan or upload syllabi, assignments, and school forms",
-      "Log quick notes after class, meetings, or parent calls",
-      "Ask me to summarize materials or flag grading and conference dates",
+    label: "Teacher",
+    badge: "🏫 Teacher",
+    welcomeTitle: "Welcome to your Teacher Vault",
+    description:
+      "I remember your lesson plans, classroom notes, and school paperwork so you can ask instead of digging through folders.",
+    suggestedUploads: [
+      "Lesson Plans",
+      "Curriculum",
+      "Classroom Notes",
+      "Student Observations",
+      "Staff Meetings",
     ],
-    suggestions: [
-      "Help me with my teacher role — what can you do for me?",
-      "What should I store in a teacher vault?",
-      "How can Daily Logs help me track my classes?",
-      "What should I upload first for the school year?",
+    starterQuestions: [
+      "Summarize today's lesson.",
+      "Find my Grade 5 math lesson.",
+      "What students need follow-up?",
     ],
+    personality:
+      "You are Gideon Teacher — a practical classroom assistant for lesson plans, curriculum, observations, and parent or staff notes.",
   },
   student: {
-    intro:
-      "Keep report cards, schedules, permission slips, and school correspondence in one place.",
-    tips: [
-      "Upload report cards, transcripts, and enrollment forms",
-      "Track homework, projects, and school events in Daily Logs",
-      "Ask about deadlines, forms, or what’s in the vault",
+    label: "Student",
+    badge: "🎓 Student",
+    welcomeTitle: "Welcome to your Student Vault",
+    description:
+      "I remember homework, textbooks, notes, and exams so school stays organized and easy to ask about.",
+    suggestedUploads: [
+      "Homework",
+      "Textbooks",
+      "Notes",
+      "Assignments",
+      "Exams",
     ],
-    suggestions: [
-      "What school documents should I keep here?",
-      "How do I track homework and school events?",
-      "What can Gideon help me with for school?",
+    starterQuestions: [
+      "What homework is due soon?",
+      "Find my latest assignment.",
+      "Summarize my class notes.",
     ],
+    personality:
+      "You are Gideon Student — a focused study assistant for homework, notes, assignments, and exams.",
   },
   child: {
-    intro:
-      "Store medical forms, school records, activities, and anything you need for your child.",
-    tips: [
-      "Upload IDs, insurance cards, and school enrollment papers",
-      "Note appointments, activities, and milestones in Daily Logs",
-      "Ask about upcoming dates or summarize a document",
+    label: "Child",
+    badge: "🧒 Child",
+    welcomeTitle: "Welcome to your Child Vault",
+    description:
+      "I remember school forms, medical records, and activity notes for this child so you can ask instead of search.",
+    suggestedUploads: [
+      "IDs",
+      "School Forms",
+      "Medical",
+      "Activities",
+      "Notes",
     ],
-    suggestions: [
-      "What documents should I keep for my child?",
-      "How do Daily Logs help with school and activities?",
-      "What should I scan or upload first?",
+    starterQuestions: [
+      "What school forms are in this vault?",
+      "Any upcoming appointments?",
+      "Summarize the latest Daily Log.",
     ],
-  },
-  personal: {
-    intro:
-      "Your personal vault for IDs, insurance, leases, medical records, and everyday paperwork.",
-    tips: [
-      "Scan or upload important mail as soon as it arrives",
-      "Use Daily Logs for quick notes you want me to remember",
-      "Ask about deadlines, renewals, or what’s stored here",
-    ],
-    suggestions: [
-      "What kinds of documents belong in a personal vault?",
-      "How do I get started with my first upload?",
-      "What can you help me track?",
-    ],
+    personality:
+      "You are Gideon Child — a careful parent-facing assistant for school, medical, and activity records for one child.",
   },
   business: {
-    intro:
-      "Run your company paperwork here — contracts, invoices, licenses, and client or employee files.",
-    tips: [
-      "Upload contracts, invoices, and compliance documents",
-      "Link employee and client vaults under this business",
-      "Ask about due dates, renewals, or linked people",
+    label: "Business",
+    badge: "💼 Business",
+    welcomeTitle: "Welcome to your Business Vault",
+    description:
+      "I remember contracts, SOPs, invoices, and meeting notes so your company knowledge stays askable.",
+    suggestedUploads: [
+      "Contracts",
+      "SOPs",
+      "Invoices",
+      "Employees",
+      "Meeting Notes",
     ],
-    suggestions: [
-      "What should a business vault contain?",
-      "How do I add employees or clients?",
-      "Which invoices or contracts need attention?",
+    starterQuestions: [
+      "Find our EIN.",
+      "Summarize this contract.",
+      "What decisions were made last week?",
     ],
+    personality:
+      "You are Gideon Business — a precise operations assistant for contracts, invoices, SOPs, employees, and meeting decisions.",
   },
   employee: {
-    intro:
-      "Keep HR forms, pay stubs, benefits paperwork, and work notes for this role.",
-    tips: [
-      "Upload offer letters, reviews, and benefits documents",
-      "Log project updates and follow-ups in Daily Logs",
-      "Ask about dates, policies, or what’s on file",
+    label: "Employee",
+    badge: "👤 Employee",
+    welcomeTitle: "Welcome to your Employee Vault",
+    description:
+      "I remember HR forms, benefits, and work notes for this role so follow-ups stay easy to ask about.",
+    suggestedUploads: [
+      "Offer Letter",
+      "Reviews",
+      "Benefits",
+      "Policies",
+      "Notes",
     ],
-    suggestions: [
-      "What work documents should I keep here?",
-      "How do I track projects with Daily Logs?",
-      "Summarize what I should upload first.",
+    starterQuestions: [
+      "What work documents are on file?",
+      "Summarize recent project updates.",
+      "When is the next review date?",
     ],
+    personality:
+      "You are Gideon Employee — a discreet work assistant for HR paperwork, benefits, and role-specific notes.",
   },
   client: {
-    intro:
-      "Track contracts, proposals, invoices, and correspondence for this client.",
-    tips: [
-      "Upload agreements, SOWs, and billing documents",
-      "Log calls, deliverables, and follow-ups in Daily Logs",
-      "Ask about contract dates or open items",
+    label: "Client",
+    badge: "🤝 Client",
+    welcomeTitle: "Welcome to your Client Vault",
+    description:
+      "I remember contracts, proposals, invoices, and correspondence for this client so you can ask for the details.",
+    suggestedUploads: [
+      "Contracts",
+      "Proposals",
+      "Invoices",
+      "SOWs",
+      "Notes",
     ],
-    suggestions: [
-      "What client documents belong in this vault?",
-      "How do I track deliverables and follow-ups?",
-      "What should I upload for a new client?",
+    starterQuestions: [
+      "What is in this client's contract?",
+      "Which invoices are open?",
+      "Summarize recent client follow-ups.",
     ],
+    personality:
+      "You are Gideon Client — a relationship-aware assistant for one client's contracts, billing, and correspondence.",
   },
   family: {
-    intro:
-      "A shared family space for everyone’s documents, school forms, and household records.",
-    tips: [
-      "Add family members, students, or pets as linked vaults",
-      "Upload insurance, school, and medical paperwork",
-      "Ask what’s stored for each person or upcoming dates",
+    label: "Family",
+    badge: "👨‍👩‍👧 Family",
+    welcomeTitle: "Welcome to your Family Vault",
+    description:
+      "I remember household documents, school forms, and shared records so your family can ask instead of search.",
+    suggestedUploads: [
+      "Insurance",
+      "School Forms",
+      "Medical",
+      "Household",
+      "Notes",
     ],
-    suggestions: [
-      "How do I organize documents for my family?",
-      "What should each family member’s vault contain?",
-      "How do I add a child or student?",
+    starterQuestions: [
+      "What documents does our family have here?",
+      "Any upcoming family deadlines?",
+      "Summarize recent Daily Logs.",
     ],
+    personality:
+      "You are Gideon Family — a warm household assistant for shared family documents, school forms, and home records.",
   },
   vehicle: {
-    intro:
-      "Registration, insurance, service records, and loan paperwork for this vehicle.",
-    tips: [
-      "Upload title, insurance, and inspection documents",
-      "Log maintenance and repairs in Daily Logs",
-      "Ask about renewal or expiration dates",
+    label: "Vehicle",
+    badge: "🚗 Vehicle",
+    welcomeTitle: "Welcome to your Vehicle Vault",
+    description:
+      "I remember registration, insurance, and service records so vehicle details are one question away.",
+    suggestedUploads: [
+      "Title",
+      "Insurance",
+      "Registration",
+      "Service",
+      "Notes",
     ],
-    suggestions: [
-      "What vehicle documents should I keep?",
+    starterQuestions: [
       "When does insurance or registration renew?",
-      "How do I track maintenance?",
+      "What service history is on file?",
+      "Which vehicle documents expire soon?",
     ],
+    personality:
+      "You are Gideon Vehicle — a practical assistant for registration, insurance, loans, and maintenance records.",
   },
   home: {
-    intro:
-      "Mortgage, insurance, leases, warranties, and repair records for this home.",
-    tips: [
-      "Upload deeds, policies, and contractor invoices",
-      "Note repairs and inspections in Daily Logs",
-      "Ask about mortgage, insurance, or warranty dates",
+    label: "Home",
+    badge: "🏠 Home",
+    welcomeTitle: "Welcome to your Home Vault",
+    description:
+      "I remember mortgage, insurance, warranties, and repair notes so home paperwork is easy to ask about.",
+    suggestedUploads: [
+      "Mortgage",
+      "Insurance",
+      "Warranties",
+      "Repairs",
+      "Notes",
     ],
-    suggestions: [
-      "What home documents belong here?",
-      "How do I track repairs and contractors?",
-      "Which dates should I watch for?",
+    starterQuestions: [
+      "What home documents are here?",
+      "When is the next insurance or mortgage date?",
+      "Summarize recent repairs.",
     ],
+    personality:
+      "You are Gideon Home — a steady assistant for mortgage, insurance, warranties, and repair history.",
   },
   pet: {
-    intro:
-      "Vet records, vaccination history, insurance, and adoption paperwork.",
-    tips: [
-      "Upload vaccination and medical records",
-      "Log vet visits and medications in Daily Logs",
-      "Ask about upcoming appointments or renewals",
+    label: "Pet",
+    badge: "🐾 Pet",
+    welcomeTitle: "Welcome to your Pet Vault",
+    description:
+      "I remember vet records, vaccines, and care notes so pet details stay ready when you ask.",
+    suggestedUploads: [
+      "Vaccines",
+      "Vet Records",
+      "Insurance",
+      "Medications",
+      "Notes",
     ],
-    suggestions: [
-      "What pet records should I store?",
-      "How do I track vet visits?",
+    starterQuestions: [
       "When are vaccinations due?",
+      "Any recent vet notes?",
+      "What pet records are stored here?",
     ],
+    personality:
+      "You are Gideon Pet — a caring assistant for vet records, vaccinations, insurance, and daily care notes.",
   },
   hobby: {
-    intro:
-      "League forms, equipment receipts, schedules, and progress notes for this hobby or sport.",
-    tips: [
-      "Upload registration, waivers, and equipment docs",
-      "Log practices, games, and milestones in Daily Logs",
-      "Ask about schedules or what’s on file",
+    label: "Learning",
+    badge: "📚 Learning",
+    welcomeTitle: "Welcome to your Learning Vault",
+    description:
+      "I remember courses, practice notes, schedules, and progress so learning stays easy to ask about.",
+    suggestedUploads: [
+      "Courses",
+      "Notes",
+      "Schedules",
+      "Certificates",
+      "Progress",
     ],
-    suggestions: [
-      "What should I keep for my hobby or sport?",
-      "How do I track games and practices?",
-      "What can I upload first?",
+    starterQuestions: [
+      "What am I learning right now?",
+      "Summarize my recent practice notes.",
+      "Any upcoming lessons or deadlines?",
     ],
+    personality:
+      "You are Gideon Learning — an encouraging assistant for courses, practice notes, schedules, and progress.",
   },
   other: {
-    intro:
-      "A flexible vault for documents and notes that matter to you.",
-    tips: [
-      "Scan or upload PDFs and photos you want to remember",
-      "Use Daily Logs for quick notes between uploads",
-      "Ask me anything — I’ll say when it’s not in your vault",
-    ],
-    suggestions: [
-      "How do I get started with this vault?",
-      "What can Gideon help me with?",
+    label: "Custom",
+    badge: "⚙️ Custom",
+    welcomeTitle: "Welcome to your Custom Vault",
+    description:
+      "I remember the documents and notes you store here so you can stop searching and simply ask.",
+    suggestedUploads: ["Documents", "Photos", "Notes", "Forms", "Records"],
+    starterQuestions: [
+      "What is stored in this vault?",
+      "Summarize my most recent document.",
       "What should I upload first?",
     ],
+    personality:
+      "You are Gideon Custom — a flexible assistant for whatever documents and notes belong in this vault.",
   },
 };
 
-function guidanceHeadline(
-  profileKind: SuggestionProfileKind,
-  profileName?: string | null
-): string {
-  const name = profileName?.trim();
-  if (name) return `${name}'s vault is ready`;
-  const labels: Partial<Record<SuggestionProfileKind, string>> = {
-    teacher: "Your teacher vault is ready",
-    student: "Your student vault is ready",
-    personal: "Your personal vault is ready",
-    business: "Your business vault is ready",
-    family: "Your family vault is ready",
-  };
-  return labels[profileKind] ?? "Your vault is ready";
+export function getVaultTemplate(
+  profileKind: SuggestionProfileKind = "personal"
+): VaultTemplate {
+  return VAULT_TEMPLATES[profileKind] ?? VAULT_TEMPLATES.other;
 }
+
+/** Context line above chat: "You are chatting with Gideon Personal" */
+export function gideonChatContextLabel(
+  profileKind: SuggestionProfileKind = "personal"
+): string {
+  const template = getVaultTemplate(profileKind);
+  return `You are chatting with Gideon ${template.label}`;
+}
+
+export const VAULT_SCOPE_NOTE = "Searching only inside this vault.";
+
+export const EMPTY_VAULT_HEADLINE = "Your vault is empty.";
+export const EMPTY_VAULT_BODY =
+  "Upload your first document or add your first Daily Log and I'll start building your personal memory.";
 
 /** Onboarding copy and starter questions when a vault has no documents or logs yet. */
 export function buildGideonVaultGuidance(
   profileKind: SuggestionProfileKind = "personal",
-  profileName?: string | null
+  _profileName?: string | null
 ): GideonVaultGuidance {
-  const base = GUIDANCE[profileKind] ?? GUIDANCE.other;
+  const template = getVaultTemplate(profileKind);
   return {
-    headline: guidanceHeadline(profileKind, profileName),
-    ...base,
+    headline: template.welcomeTitle,
+    intro: template.description,
+    tips: template.suggestedUploads,
+    suggestions: template.starterQuestions,
+    badge: template.badge,
+    label: template.label,
+    suggestedUploads: template.suggestedUploads,
+    personality: template.personality,
   };
+}
+
+/** Append vault-template personality to the base Gideon system prompt. */
+export function withVaultPersonality(
+  baseSystem: string,
+  profileKind: SuggestionProfileKind = "personal"
+): string {
+  const { personality } = getVaultTemplate(profileKind);
+  return `${baseSystem}
+
+Vault personality:
+${personality}`;
 }
 
 /**
