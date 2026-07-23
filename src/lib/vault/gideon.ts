@@ -33,10 +33,13 @@ Optional sections (omit if unused):
 ## FROM YOUR DOCUMENTS
 ## FROM YOUR DAILY LOG
 ## FROM YOUR PROFILES
+## FROM YOUR WORK MEMORY
 ## CALCULATED
 ## GENERAL KNOWLEDGE
 ## GIDEON'S SUGGESTION
 ## NEEDS VERIFICATION
+
+Formatting: plain sentences and simple lists only. Do not use bold (**), italics, or extra markdown headings beyond the section headers above.
 
 Tone: calm, clear, cautious when uncertain. Guardian watches. Gideon explains. The user decides.`;
 
@@ -268,6 +271,7 @@ export type GideonSectionKind =
   | "from_profiles"
   | "calculated"
   | "general_knowledge"
+  | "from_work_memory"
   | "suggestion"
   | "needs_verification"
   | "body";
@@ -304,6 +308,11 @@ const SECTION_MAP: { match: RegExp; kind: GideonSectionKind; title: string }[] =
       match: /^#{1,3}\s*GENERAL KNOWLEDGE\s*$/i,
       kind: "general_knowledge",
       title: "General knowledge",
+    },
+    {
+      match: /^#{1,3}\s*FROM YOUR WORK MEMORY\s*$/i,
+      kind: "from_work_memory",
+      title: "From your Work Memory",
     },
     {
       match: /^#{1,3}\s*GIDEON'?S SUGGESTION\s*$/i,

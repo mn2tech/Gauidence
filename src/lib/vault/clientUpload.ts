@@ -18,11 +18,15 @@ export {
   buildPastedTextFile,
 } from "@/lib/vault/pastedText";
 
+import type { OrganizationSuggestionPayload } from "@/lib/organization/types";
+
 export type VaultUploadResult = {
   documentId: string;
   fileName: string;
   analyzed: boolean;
   analysisError?: string;
+  organizationSuggestion?: OrganizationSuggestionPayload | null;
+  organizationAutoApplied?: boolean;
 };
 
 /**
@@ -135,10 +139,17 @@ export async function uploadAndAnalyzeToVault(args: {
       };
     }
 
+    const body = (await res.json().catch(() => ({}))) as {
+      organizationSuggestion?: OrganizationSuggestionPayload | null;
+      organizationAutoApplied?: boolean;
+    };
+
     return {
       documentId: inserted.id,
       fileName: inserted.file_name,
       analyzed: true,
+      organizationSuggestion: body.organizationSuggestion ?? null,
+      organizationAutoApplied: Boolean(body.organizationAutoApplied),
     };
   } catch (err) {
     const timedOut = err instanceof DOMException && err.name === "AbortError";

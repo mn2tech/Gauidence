@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, MessageSquare, Send } from "lucide-react";
 import PlanLimitAlert from "@/components/PlanLimitAlert";
+import { renderGideonText } from "@/components/gideonText";
 
 export type DocumentChatMessage = {
   id: string;
@@ -149,7 +150,9 @@ export default function DocumentChatPanel({ documentId, enabled }: Props) {
               <span className="mr-1.5 text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
                 {m.role === "user" ? "You" : "Guardian"}
               </span>
-              <span className="whitespace-pre-wrap">{m.content}</span>
+              <span className="whitespace-pre-wrap">
+                {m.role === "user" ? m.content : renderGideonText(m.content)}
+              </span>
             </div>
           ))
         )}

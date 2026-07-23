@@ -43,7 +43,10 @@ import {
   parseGideonSections,
 } from "@/lib/vault/gideon";
 import { isImageFileName } from "@/lib/vault/images";
+import { renderGideonText } from "@/components/gideonText";
 import { uploadAndAnalyzeToVault } from "@/lib/vault/clientUpload";
+import OrganizationSuggestionModal from "@/components/OrganizationSuggestionModal";
+import type { OrganizationSuggestionPayload } from "@/lib/organization/types";
 import { todayLogDate } from "@/lib/logs/types";
 import { calendarDateInZone } from "@/lib/reminders/time";
 import {
@@ -215,6 +218,7 @@ const SECTION_STYLES: Record<string, string> = {
   from_documents: "border-brand/30 bg-brand-light/40",
   from_daily_log: "border-emerald-200 bg-emerald-50/80",
   from_profiles: "border-teal-200 bg-teal-50/80",
+  from_work_memory: "border-indigo-200 bg-indigo-50/70",
   calculated: "border-sky-200 bg-sky-50/80",
   general_knowledge: "border-stone-200 bg-stone-50/90",
   suggestion: "border-violet-200 bg-violet-50/70",
@@ -270,6 +274,8 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
   );
   const [vaultBusy, setVaultBusy] = useState(false);
   const [vaultStatus, setVaultStatus] = useState<string | null>(null);
+  const [orgSuggestion, setOrgSuggestion] =
+    useState<OrganizationSuggestionPayload | null>(null);
   const [workProject, setWorkProject] = useState<WorkProject | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const plusRef = useRef<HTMLDivElement>(null);
@@ -637,6 +643,17 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
         return;
       }
 
+      if (
+        result.organizationSuggestion &&
+        (result.organizationSuggestion.status === "pending" ||
+          result.organizationAutoApplied)
+      ) {
+        setOrgSuggestion({
+          ...result.organizationSuggestion,
+          autoApplied: Boolean(result.organizationAutoApplied),
+        });
+      }
+
       await sendQuestion(
         `I just uploaded ${result.fileName}. What should I know from it?`
       );
@@ -912,7 +929,9 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
                 {sec.title}
               </p>
             )}
-            <p className="whitespace-pre-wrap text-foreground/90">{sec.content}</p>
+            <p className="whitespace-pre-wrap text-foreground/90">
+              {renderGideonText(sec.content)}
+            </p>
           </div>
         ))}
         {proposed ? (
@@ -1443,6 +1462,27 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
         onClose={() => setCameraOpen(false)}
         onCapture={(file) => void handleVaultFile(file)}
       />
+      {orgSuggestion ? (
+        <OrganizationSuggestionModal
+          suggestion={orgSuggestion}
+          onDismiss={() => setOrgSuggestion(null)}
+          onChooseLocation={() => setOrgSuggestion(null)}
+          onResolved={({ action, movedToProfileId, undoAvailable }) => {
+            if (action === "undo" || !undoAvailable) {
+              setOrgSuggestion(null);
+            }
+            if (movedToProfileId && movedToProfileId !== profileId) {
+              pushLocalNote(
+                "I filed that document in the location you approved. You can find it under Documents in that vault."
+              );
+            } else if (action === "keep_current") {
+              pushLocalNote("Kept the document in this vault.");
+            } else if (action === "undo") {
+              pushLocalNote("Returned the document to its previous location.");
+            }
+          }}
+        />
+      ) : null}
       {logOpen ? (
         <div
           className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
