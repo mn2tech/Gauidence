@@ -69,6 +69,7 @@ import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
 import { dispatchAwardsFromResponse } from "@/lib/awards/client";
 import { useGideonVoiceInput } from "@/hooks/useGideonVoiceInput";
 import { documentsHref } from "@/lib/routes";
+import type { WorkProject } from "@/lib/work-memory/types";
 
 function defaultReminderDateTime(): { date: string; time: string } {
   const now = new Date();
