@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test src/lib/analysis/__tests__/*.test.ts src/lib/vault/__tests__/*.test.ts src/lib/profiles/__tests__/*.test.ts src/lib/logs/__tests__/*.test.ts src/lib/reminders/__tests__/*.test.ts src/lib/research/__tests__/*.test.ts src/lib/search/__tests__/*.test.ts src/lib/help/__tests__/*.test.ts src/lib/billing/__tests__/*.test.ts src/lib/voice/__tests__/*.test.ts src/lib/awards/__tests__/*.test.ts src/lib/retention/__tests__/*.test.ts src/lib/sms/__tests__/*.test.ts src/lib/work-memory/__tests__/*.test.ts src/lib/organization/__tests__/*.test.ts",
+    "test": "tsx --test src/lib/analysis/__tests__/*.test.ts src/lib/vault/__tests__/*.test.ts src/lib/profiles/__tests__/*.test.ts src/lib/logs/__tests__/*.test.ts src/lib/reminders/__tests__/*.test.ts src/lib/research/__tests__/*.test.ts src/lib/search/__tests__/*.test.ts src/lib/help/__tests__/*.test.ts src/lib/billing/__tests__/*.test.ts src/lib/voice/__tests__/*.test.ts src/lib/awards/__tests__/*.test.ts src/lib/retention/__tests__/*.test.ts src/lib/sms/__tests__/*.test.ts src/lib/work-memory/__tests__/*.test.ts src/lib/organization/__tests__/*.test.ts src/lib/experts/__tests__/*.test.ts",
+    "validate:experts": "tsx scripts/validate-experts.ts",
     "compare:analyzers": "tsx --require ./scripts/stub-server-only.cjs scripts/compare-analyzers.ts"
   },
   "dependencies": {
@@ -25,7 +26,8 @@
     "server-only": "^0.0.1",
     "stripe": "^22.3.2",
     "unpdf": "^1.6.2",
-    "web-push": "^3.6.7"
+    "web-push": "^3.6.7",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

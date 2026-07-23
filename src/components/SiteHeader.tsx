@@ -135,6 +135,9 @@ export default function SiteHeader() {
               <Link href="/work-memory" className="hover:text-foreground">
                 Work Memory
               </Link>
+              <Link href="/experts" className="hover:text-foreground">
+                Experts
+              </Link>
               <Link href={DOCUMENTS_PATH} className="hover:text-foreground">
                 Documents
               </Link>
@@ -248,6 +251,9 @@ export default function SiteHeader() {
                 </Link>
                 <Link href="/work-memory" className={linkClass}>
                   Work Memory
+                </Link>
+                <Link href="/experts" className={linkClass}>
+                  Experts
                 </Link>
                 <Link href={DOCUMENTS_PATH} className={linkClass}>
                   Documents

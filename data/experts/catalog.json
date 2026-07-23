@@ -1,0 +1,15 @@
+{
+  "experts": [
+    {
+      "id": "example-expert",
+      "name": "Example Expert",
+      "shortName": "Example",
+      "category": "Professional",
+      "description": "Demonstrates the reusable Guardian Expert framework.",
+      "icon": "sparkles",
+      "status": "development",
+      "version": "1.0.0",
+      "file": "example-expert.json"
+    }
+  ]
+}

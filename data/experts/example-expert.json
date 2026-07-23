@@ -1,0 +1,340 @@
+{
+  "id": "example-expert",
+  "version": "1.0.0",
+  "name": "Example Expert",
+  "shortName": "Example",
+  "category": "Professional",
+  "icon": "sparkles",
+  "status": "development",
+  "description": "A minimal expert that validates the Guardian Experts framework.",
+  "longDescription": "Use this expert to explore structured learning, quizzes, scenarios, and interview practice without domain-specific content.",
+  "primaryGoal": "Learn how Guardian Experts work and practice core framework capabilities.",
+  "disclaimer": "This is a demonstration expert for framework validation. Responses are for learning purposes only.",
+
+  "theme": {
+    "accent": "purple",
+    "style": "professional"
+  },
+
+  "capabilities": [
+    {
+      "id": "learn",
+      "title": "Learn",
+      "description": "Follow a structured learning path with modules and lessons.",
+      "icon": "book-open",
+      "route": "learn",
+      "enabled": true
+    },
+    {
+      "id": "ask",
+      "title": "Ask",
+      "description": "Ask questions grounded in expert knowledge topics.",
+      "icon": "message-circle",
+      "route": "ask",
+      "enabled": true
+    }
+  ],
+
+  "systemPrompt": "You are the Example Expert inside Guardian. Help users learn framework concepts clearly and practically. Stay within the expert's scope. Use concise explanations and actionable guidance.",
+
+  "responseRules": [
+    "Keep answers focused on the user's question.",
+    "Reference relevant learning topics when helpful.",
+    "Do not invent capabilities that are not part of this expert.",
+    "Encourage the user to complete modules and practice quizzes."
+  ],
+
+  "starterQuestions": [
+    "What is the Guardian Experts framework?",
+    "How does expert progress tracking work?",
+    "What should I learn first in this expert?"
+  ],
+
+  "roadmap": [
+    {
+      "id": "module-one",
+      "order": 1,
+      "title": "Getting Started",
+      "description": "Understand the core concepts of Guardian Experts.",
+      "estimatedMinutes": 10,
+      "learningObjectives": [
+        "Explain what an expert installation is",
+        "Identify the main capability areas",
+        "Navigate the expert dashboard"
+      ],
+      "lessonTopicIds": ["topic-one", "topic-two"],
+      "quizIds": ["quiz-one"],
+      "status": "published"
+    },
+    {
+      "id": "module-two",
+      "order": 2,
+      "title": "Practice and Assessment",
+      "description": "Apply what you learned through quizzes and scenarios.",
+      "estimatedMinutes": 15,
+      "learningObjectives": [
+        "Complete a quiz attempt",
+        "Work through a practice scenario",
+        "Use interview mode for open-ended practice"
+      ],
+      "lessonTopicIds": ["topic-three"],
+      "quizIds": [],
+      "status": "published"
+    }
+  ],
+
+  "knowledgeTopics": [
+    {
+      "id": "topic-one",
+      "title": "Expert Installations",
+      "category": "fundamentals",
+      "summary": "An installation links an expert definition to a Guardian profile without copying JSON into user records.",
+      "details": [
+        "Each installation stores expert_id and expert_version.",
+        "Progress, quiz attempts, and activity are stored separately in Supabase.",
+        "The same expert can be installed on multiple authorized profiles."
+      ],
+      "examples": [
+        {
+          "title": "Profile-scoped install",
+          "description": "A user installs Example Expert on their personal profile and tracks progress independently."
+        }
+      ],
+      "keyPoints": [
+        "Installations reference expert_id and expert_version",
+        "User data never mutates shared expert JSON",
+        "RLS enforces profile-scoped access"
+      ],
+      "commonMistakes": [
+        "Assuming progress is stored inside the expert JSON file",
+        "Trying to install a coming-soon expert"
+      ],
+      "starterQuestions": [
+        "How do I install an expert?",
+        "Can I install the same expert on two profiles?"
+      ],
+      "relatedTopicIds": ["topic-two"],
+      "sourceType": "guardian-curated"
+    },
+    {
+      "id": "topic-two",
+      "title": "Capabilities and Routes",
+      "category": "fundamentals",
+      "summary": "Capabilities are defined in JSON and rendered dynamically by the dashboard.",
+      "details": [
+        "Each capability includes id, title, description, icon, route, and enabled flag.",
+        "The dashboard does not hardcode capability names.",
+        "Routes map to reusable framework screens."
+      ],
+      "examples": [
+        {
+          "title": "Learn capability",
+          "description": "Opens the roadmap view with modules, lessons, and progress tracking."
+        }
+      ],
+      "keyPoints": [
+        "Capabilities drive navigation",
+        "Disabled capabilities are hidden",
+        "New experts add capabilities via JSON only"
+      ],
+      "commonMistakes": [
+        "Hardcoding expert-specific UI in shared components"
+      ],
+      "starterQuestions": [
+        "What capabilities does this expert support?"
+      ],
+      "relatedTopicIds": ["topic-one", "topic-three"],
+      "sourceType": "guardian-curated"
+    },
+    {
+      "id": "topic-three",
+      "title": "Assessment Engines",
+      "category": "practice",
+      "summary": "Quizzes, scenarios, and interview mode reuse generic engines powered by JSON content.",
+      "details": [
+        "Quiz engine supports multiple-choice and true-false questions.",
+        "Scenario engine renders flexible context and optional records.",
+        "Interview mode evaluates responses server-side using answer guides."
+      ],
+      "examples": [
+        {
+          "title": "Quiz retry",
+          "description": "Users can retry quizzes; best score and passing status are tracked per installation."
+        }
+      ],
+      "keyPoints": [
+        "Content lives in JSON; attempts live in Supabase",
+        "Interview answer guides are never exposed before a response",
+        "Activity events record learning milestones"
+      ],
+      "commonMistakes": [
+        "Expecting client-side scoring for interview feedback"
+      ],
+      "starterQuestions": [
+        "How are quiz attempts saved?",
+        "What is the difference between a scenario and an interview question?"
+      ],
+      "relatedTopicIds": ["topic-two"],
+      "sourceType": "guardian-curated"
+    }
+  ],
+
+  "glossary": [
+    {
+      "term": "Expert",
+      "definition": "A reusable learning and guidance package defined by a versioned JSON file.",
+      "category": "fundamentals",
+      "relatedTopicIds": ["topic-one"]
+    },
+    {
+      "term": "Installation",
+      "definition": "A user-specific link between a Guardian profile and an expert definition.",
+      "category": "fundamentals",
+      "relatedTopicIds": ["topic-one"]
+    },
+    {
+      "term": "Capability",
+      "definition": "A navigable feature area such as Learn or Ask, defined in expert JSON.",
+      "category": "fundamentals",
+      "relatedTopicIds": ["topic-two"]
+    },
+    {
+      "term": "Roadmap Module",
+      "definition": "A ordered learning unit containing objectives, lesson topics, and optional quizzes.",
+      "category": "fundamentals",
+      "relatedTopicIds": ["topic-two"]
+    },
+    {
+      "term": "Knowledge Topic",
+      "definition": "Structured reference content used for lessons and Ask Expert retrieval.",
+      "category": "practice",
+      "relatedTopicIds": ["topic-three"]
+    }
+  ],
+
+  "quizzes": [
+    {
+      "id": "quiz-one",
+      "title": "Framework Basics Quiz",
+      "moduleId": "module-one",
+      "description": "Check your understanding of Guardian Experts fundamentals.",
+      "passingScore": 70,
+      "questions": [
+        {
+          "id": "question-one",
+          "type": "multiple-choice",
+          "question": "What does a user_experts record store?",
+          "options": [
+            "A full copy of the expert JSON",
+            "expert_id and expert_version references",
+            "Only quiz answers",
+            "Vault document embeddings"
+          ],
+          "correctOptionIndex": 1,
+          "explanation": "Installations reference expert_id and expert_version; content stays in shared JSON files."
+        },
+        {
+          "id": "question-two",
+          "type": "true-false",
+          "question": "User module progress is stored inside the expert JSON file.",
+          "options": ["True", "False"],
+          "correctOptionIndex": 1,
+          "explanation": "Progress is stored in Supabase tables such as expert_module_progress."
+        },
+        {
+          "id": "question-three",
+          "type": "multiple-choice",
+          "question": "Who builds the expert system prompt for Ask Expert?",
+          "options": [
+            "The browser client",
+            "The user in settings",
+            "The server using expert definition and context",
+            "The catalog.json file only"
+          ],
+          "correctOptionIndex": 2,
+          "explanation": "The server builds prompts from expert definition, safety rules, and retrieved knowledge."
+        }
+      ]
+    }
+  ],
+
+  "scenarios": [
+    {
+      "id": "scenario-one",
+      "title": "Choosing the Right Profile",
+      "difficulty": "beginner",
+      "category": "practice",
+      "fictional": true,
+      "notice": "This is a fictional learning scenario for framework practice.",
+      "context": "You want to install Example Expert and track progress separately for your personal and work contexts.",
+      "records": {
+        "personal_profile": "Myself",
+        "work_profile": "Acme Consulting",
+        "experts_installed": 0
+      },
+      "question": "What is the best next step?",
+      "choices": [
+        "Install once and share progress across all profiles automatically",
+        "Install the expert separately on each profile where you want independent progress",
+        "Copy example-expert.json into your vault documents",
+        "Edit the shared JSON to add your user id"
+      ],
+      "correctChoiceIndex": 1,
+      "explanation": "Each profile can have its own installation with separate progress while referencing the same expert definition.",
+      "learningPoints": [
+        "Installations are profile-scoped",
+        "Shared JSON remains read-only for users",
+        "Progress is tracked per user_expert_id"
+      ]
+    }
+  ],
+
+  "interviewQuestions": [
+    {
+      "id": "interview-one",
+      "category": "fundamentals",
+      "difficulty": "beginner",
+      "question": "Explain how Guardian Experts separate content from user state.",
+      "answerGuide": [
+        "Expert content lives in versioned JSON files",
+        "User installations reference expert_id and expert_version",
+        "Progress, attempts, and activity are stored in Supabase",
+        "RLS protects user data per profile"
+      ],
+      "followUpQuestions": [
+        "What happens when an expert version is updated?",
+        "Why should the client never send a system prompt?"
+      ]
+    },
+    {
+      "id": "interview-two",
+      "category": "practice",
+      "difficulty": "intermediate",
+      "question": "How would you add a new capability to an expert without changing reusable components?",
+      "answerGuide": [
+        "Add a capability entry to the expert JSON",
+        "Ensure route maps to an existing framework screen or add a generic handler",
+        "Validate with npm run validate:experts",
+        "Deploy updated JSON and catalog entry"
+      ],
+      "followUpQuestions": [
+        "What fields are required on a capability object?"
+      ]
+    },
+    {
+      "id": "interview-three",
+      "category": "fundamentals",
+      "difficulty": "beginner",
+      "question": "Describe the Ask Expert request flow from the user's perspective.",
+      "answerGuide": [
+        "User sends user_expert_id and question only",
+        "Server verifies ownership and loads expert definition",
+        "Server retrieves relevant knowledge and builds the prompt",
+        "Response may include citations to knowledge topics"
+      ],
+      "followUpQuestions": [
+        "Why is expert_id not accepted from the client?"
+      ]
+    }
+  ]
+}
