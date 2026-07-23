@@ -11,7 +11,13 @@ import {
   GIDEON_SYSTEM,
   GIDEON_BRAND_LINE,
   EMPTY_VAULT_HEADLINE,
+  EMPTY_VAULT_BODY,
   VAULT_SCOPE_NOTE,
+  WELCOME_AI_MEMORY_TITLE,
+  TRY_GUARDIAN_EXAMPLES,
+  ORGANIZE_EXAMPLES,
+  PRIVACY_CARD_POINTS,
+  ONBOARDING_STARTER_QUESTIONS,
 } from "../gideon.ts";
 
 describe("Gideon helpers", () => {
@@ -50,26 +56,32 @@ describe("Gideon helpers", () => {
     assert.deepEqual(buildGideonSuggestions([]), []);
   });
 
-  it("returns teacher onboarding guidance for an empty teacher vault", () => {
+  it("returns trust-first onboarding guidance for empty vaults", () => {
     const guide = buildGideonVaultGuidance("teacher", "Ms. Rivera");
-    assert.equal(guide.headline, "Welcome to your Teacher Vault");
+    assert.equal(guide.headline, WELCOME_AI_MEMORY_TITLE);
+    assert.match(guide.intro, /AI memory|ask Gideon/i);
     assert.equal(guide.badge, "🏫 Teacher");
     assert.equal(guide.label, "Teacher");
-    assert.match(guide.intro, /lesson plans|classroom/i);
-    assert.ok(guide.suggestedUploads.includes("Lesson Plans"));
-    assert.deepEqual(guide.tips, guide.suggestedUploads);
-    assert.ok(guide.suggestions.some((q) => /Summarize today's lesson/i.test(q)));
+    assert.ok(guide.suggestedUploads.some((t) => /Receipts|School|Meeting/i.test(t)));
+    assert.ok(!guide.suggestedUploads.some((t) => /\bIDs?\b|passport|SSN/i.test(t)));
+    assert.deepEqual(guide.suggestions, [...ONBOARDING_STARTER_QUESTIONS]);
   });
 
-  it("returns personal template fields for welcome chrome", () => {
+  it("keeps personal onboarding free of identity-document pressure", () => {
     const guide = buildGideonVaultGuidance("personal");
-    assert.equal(guide.headline, "Welcome to your Personal Vault");
-    assert.equal(guide.badge, "🛡 Personal");
-    assert.match(guide.intro, /stop searching and simply ask/i);
-    assert.ok(guide.suggestedUploads.includes("IDs"));
-    assert.ok(guide.suggestions.some((q) => /passport/i.test(q)));
-    assert.equal(gideonChatContextLabel("personal"), "You are chatting with Gideon Personal");
+    assert.equal(guide.headline, WELCOME_AI_MEMORY_TITLE);
+    assert.match(guide.intro, /stop searching and simply ask Gideon/i);
+    assert.ok(!guide.suggestions.some((q) => /passport|driver'?s license|SSN/i.test(q)));
+    assert.ok(
+      !TRY_GUARDIAN_EXAMPLES.some((e) =>
+        /passport|driver|license|SSN|social security|tax return/i.test(e)
+      )
+    );
+    assert.ok(ORGANIZE_EXAMPLES.some((e) => /if you choose/i.test(e)));
+    assert.ok(PRIVACY_CARD_POINTS.length >= 4);
     assert.equal(EMPTY_VAULT_HEADLINE, "Your vault is empty.");
+    assert.match(EMPTY_VAULT_BODY, /something simple/i);
+    assert.equal(gideonChatContextLabel("personal"), "You are chatting with Gideon Personal");
     assert.equal(VAULT_SCOPE_NOTE, "Searching only inside this vault.");
   });
 

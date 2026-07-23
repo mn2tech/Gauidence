@@ -174,15 +174,21 @@ export const VAULT_TEMPLATES: Record<SuggestionProfileKind, VaultTemplate> = {
     badge: "🛡 Personal",
     welcomeTitle: "Welcome to your Personal Vault",
     description:
-      "I remember your documents, daily logs, and important information so you can stop searching and simply ask.",
-    suggestedUploads: ["IDs", "Insurance", "Medical", "Bills", "Notes"],
+      "I remember everyday documents, notes, photos, and plans so you can stop searching and simply ask.",
+    suggestedUploads: [
+      "Receipts",
+      "Flyers",
+      "Warranties",
+      "Travel plans",
+      "Notes",
+    ],
     starterQuestions: [
-      "When does my passport expire?",
-      "Find my insurance policy.",
-      "What bills are due this month?",
+      "Summarize this receipt.",
+      "What's on my shopping list?",
+      "When is my next appointment?",
     ],
     personality:
-      "You are Gideon Personal — a calm private assistant for IDs, insurance, medical records, bills, and everyday life paperwork.",
+      "You are Gideon Personal — a calm private assistant for everyday documents, notes, photos, and plans. Never pressure the user to upload identity documents; celebrate small, comfortable starts.",
   },
   teacher: {
     label: "Teacher",
@@ -231,42 +237,42 @@ export const VAULT_TEMPLATES: Record<SuggestionProfileKind, VaultTemplate> = {
     badge: "🧒 Child",
     welcomeTitle: "Welcome to your Child Vault",
     description:
-      "I remember school forms, medical records, and activity notes for this child so you can ask instead of search.",
+      "I remember school flyers, activity notes, and everyday updates for this child so you can ask instead of search.",
     suggestedUploads: [
-      "IDs",
-      "School Forms",
-      "Medical",
-      "Activities",
+      "School flyers",
+      "Activity schedules",
+      "Newsletters",
       "Notes",
+      "Photos",
     ],
     starterQuestions: [
-      "What school forms are in this vault?",
-      "Any upcoming appointments?",
+      "What's on the school newsletter?",
+      "Any upcoming activities?",
       "Summarize the latest Daily Log.",
     ],
     personality:
-      "You are Gideon Child — a careful parent-facing assistant for school, medical, and activity records for one child.",
+      "You are Gideon Child — a careful parent-facing assistant for school updates, activities, and everyday notes. Prefer low-pressure starts over sensitive identity documents.",
   },
   business: {
     label: "Business",
     badge: "💼 Business",
     welcomeTitle: "Welcome to your Business Vault",
     description:
-      "I remember contracts, SOPs, invoices, and meeting notes so your company knowledge stays askable.",
+      "I remember meeting notes, receipts, SOPs, and everyday work files so your company knowledge stays askable.",
     suggestedUploads: [
-      "Contracts",
+      "Meeting Notes",
+      "Receipts",
       "SOPs",
       "Invoices",
-      "Employees",
-      "Meeting Notes",
+      "Schedules",
     ],
     starterQuestions: [
-      "Find our EIN.",
-      "Summarize this contract.",
+      "Summarize these meeting notes.",
       "What decisions were made last week?",
+      "Find my latest receipt.",
     ],
     personality:
-      "You are Gideon Business — a precise operations assistant for contracts, invoices, SOPs, employees, and meeting decisions.",
+      "You are Gideon Business — a precise operations assistant for meeting notes, invoices, SOPs, and work files. Encourage comfortable starts before sensitive records.",
   },
   employee: {
     label: "Employee",
@@ -448,9 +454,84 @@ export function gideonChatContextLabel(
 
 export const VAULT_SCOPE_NOTE = "Searching only inside this vault.";
 
+/** First-time welcome — trust-first, not identity-document-first. */
+export const WELCOME_AI_MEMORY_TITLE = "Welcome to your AI memory.";
+export const WELCOME_AI_MEMORY_BODY =
+  "Guardian helps you remember documents, daily events, notes, photos, and important information—so you can stop searching and simply ask Gideon.";
+
 export const EMPTY_VAULT_HEADLINE = "Your vault is empty.";
 export const EMPTY_VAULT_BODY =
-  "Upload your first document or add your first Daily Log and I'll start building your personal memory.";
+  "Start with something simple—a receipt, flyer, note, or Daily Log—and discover how easy it is to ask Gideon instead of searching.";
+
+export const FIRST_MEMORY_PROMPT =
+  "What would you like Gideon to remember first?";
+
+export type FirstMemoryActionId =
+  | "document"
+  | "daily_log"
+  | "photo"
+  | "schedule"
+  | "meeting_notes";
+
+export const FIRST_MEMORY_ACTIONS: {
+  id: FirstMemoryActionId;
+  label: string;
+  emoji: string;
+}[] = [
+  { id: "document", label: "Document", emoji: "📄" },
+  { id: "daily_log", label: "Daily Log", emoji: "📝" },
+  { id: "photo", label: "Photo", emoji: "📸" },
+  { id: "schedule", label: "Schedule", emoji: "📅" },
+  { id: "meeting_notes", label: "Meeting Notes", emoji: "💬" },
+];
+
+export const TRY_GUARDIAN_TITLE = "Try Guardian in 60 seconds";
+export const TRY_GUARDIAN_SUBTITLE =
+  "Upload something simple and ask Gideon a question.";
+
+/** Everyday, low-risk examples — never lead with IDs or government documents. */
+export const TRY_GUARDIAN_EXAMPLES = [
+  "Summer camp flyer",
+  "School newsletter",
+  "Car maintenance receipt",
+  "Home appliance manual",
+  "Meeting notes",
+  "Travel itinerary",
+  "Restaurant receipt",
+  "Warranty",
+  "Shopping list",
+] as const;
+
+export const PRIVACY_CARD_TITLE = "🔒 Your Privacy Comes First";
+export const PRIVACY_CARD_POINTS = [
+  "Your vault is private by default.",
+  "You choose what to upload.",
+  "Delete anything at any time.",
+  "Nothing is shared without your permission.",
+  "Start with documents you're comfortable storing.",
+] as const;
+
+export const ORGANIZE_INTRO = "Guardian can organize things like:";
+export const ORGANIZE_EXAMPLES = [
+  "Family documents",
+  "School information",
+  "Business files",
+  "Home records",
+  "Vehicle maintenance",
+  "Travel plans",
+  "Warranties",
+  "Receipts",
+  "Daily logs",
+  "Meeting notes",
+  "Insurance policies (if you choose)",
+] as const;
+
+/** Low-pressure starter questions for an empty vault. */
+export const ONBOARDING_STARTER_QUESTIONS = [
+  "What can you remember for me?",
+  "How do I get started with something simple?",
+  "What should I upload first?",
+] as const;
 
 /** Onboarding copy and starter questions when a vault has no documents or logs yet. */
 export function buildGideonVaultGuidance(
@@ -459,13 +540,13 @@ export function buildGideonVaultGuidance(
 ): GideonVaultGuidance {
   const template = getVaultTemplate(profileKind);
   return {
-    headline: template.welcomeTitle,
-    intro: template.description,
-    tips: template.suggestedUploads,
-    suggestions: template.starterQuestions,
+    headline: WELCOME_AI_MEMORY_TITLE,
+    intro: WELCOME_AI_MEMORY_BODY,
+    tips: [...ORGANIZE_EXAMPLES],
+    suggestions: [...ONBOARDING_STARTER_QUESTIONS],
     badge: template.badge,
     label: template.label,
-    suggestedUploads: template.suggestedUploads,
+    suggestedUploads: [...ORGANIZE_EXAMPLES],
     personality: template.personality,
   };
 }

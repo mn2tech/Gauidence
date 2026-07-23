@@ -43,11 +43,23 @@ import {
 import {
   EMPTY_VAULT_BODY,
   EMPTY_VAULT_HEADLINE,
+  FIRST_MEMORY_ACTIONS,
+  FIRST_MEMORY_PROMPT,
   GIDEON_BRAND_LINE,
   GIDEON_LOADING_STATES,
   GIDEON_WHY,
+  ORGANIZE_EXAMPLES,
+  ORGANIZE_INTRO,
+  PRIVACY_CARD_POINTS,
+  PRIVACY_CARD_TITLE,
+  TRY_GUARDIAN_EXAMPLES,
+  TRY_GUARDIAN_SUBTITLE,
+  TRY_GUARDIAN_TITLE,
   VAULT_SCOPE_NOTE,
+  WELCOME_AI_MEMORY_BODY,
+  WELCOME_AI_MEMORY_TITLE,
   parseGideonSections,
+  type FirstMemoryActionId,
 } from "@/lib/vault/gideon";
 import { isImageFileName } from "@/lib/vault/images";
 import { renderGideonText } from "@/components/gideonText";
@@ -1079,8 +1091,13 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
 
   const templateBadge =
     meta?.guidance?.badge ?? meta?.templateBadge ?? null;
-  const suggestedUploads =
-    meta?.guidance?.suggestedUploads ?? meta?.guidance?.tips ?? [];
+
+  const runFirstMemoryAction = (id: FirstMemoryActionId) => {
+    if (id === "document") openFilePicker();
+    else if (id === "daily_log" || id === "meeting_notes") openLogForm();
+    else if (id === "photo") openCamera();
+    else if (id === "schedule") openReminderForm();
+  };
 
   const welcomeBlock = welcome && (
     <div className="mx-auto max-w-xl space-y-4 px-1 py-6">
@@ -1097,7 +1114,9 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
           <div className="space-y-1.5">
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-sm font-semibold text-foreground">
-                {meta?.guidance?.headline ?? "Welcome to your vault"}
+                {emptyVault
+                  ? (meta?.guidance?.headline ?? WELCOME_AI_MEMORY_TITLE)
+                  : (meta?.guidance?.headline ?? "Welcome to your vault")}
               </p>
               {templateBadge ? (
                 <span className="inline-flex items-center rounded-full border border-stone-300 bg-white px-2.5 py-0.5 text-[11px] font-medium text-foreground">
@@ -1106,8 +1125,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
               ) : null}
             </div>
             <p className="text-sm leading-relaxed text-ink-muted">
-              {meta?.guidance?.intro ??
-                "I remember your documents, daily logs, and important information so you can stop searching and simply ask."}
+              {meta?.guidance?.intro ?? WELCOME_AI_MEMORY_BODY}
             </p>
           </div>
 
@@ -1162,61 +1180,126 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
           ) : null}
 
           {emptyVault ? (
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-foreground">
-                {EMPTY_VAULT_HEADLINE}
-              </p>
-              <p className="text-sm leading-relaxed text-ink-muted">
-                {EMPTY_VAULT_BODY}
-              </p>
-            </div>
+            <>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-foreground">
+                  {EMPTY_VAULT_HEADLINE}
+                </p>
+                <p className="text-sm leading-relaxed text-ink-muted">
+                  {EMPTY_VAULT_BODY}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-foreground">
+                  {FIRST_MEMORY_PROMPT}
+                </p>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {FIRST_MEMORY_ACTIONS.map((action) => (
+                    <button
+                      key={action.id}
+                      type="button"
+                      disabled={vaultBusy || sending || !profileId}
+                      onClick={() => runFirstMemoryAction(action.id)}
+                      className="flex flex-col items-center gap-1.5 rounded-xl border border-stone-200 bg-white px-3 py-3 text-center transition hover:border-brand hover:bg-brand-light/40 disabled:opacity-50"
+                    >
+                      <span className="text-xl" aria-hidden>
+                        {action.emoji}
+                      </span>
+                      <span className="text-xs font-semibold text-foreground">
+                        {action.label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-stone-200 bg-stone-50/80 px-3 py-3">
+                <p className="text-xs font-semibold text-foreground">
+                  {TRY_GUARDIAN_TITLE}
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-ink-muted">
+                  {TRY_GUARDIAN_SUBTITLE}
+                </p>
+                <ul className="mt-2 grid grid-cols-1 gap-1 sm:grid-cols-2">
+                  {TRY_GUARDIAN_EXAMPLES.map((example) => (
+                    <li
+                      key={example}
+                      className="text-xs leading-relaxed text-ink-muted"
+                    >
+                      • {example}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="rounded-xl border border-brand/20 bg-brand-light/40 px-3 py-3">
+                <p className="text-xs font-semibold text-foreground">
+                  {PRIVACY_CARD_TITLE}
+                </p>
+                <ul className="mt-2 space-y-1">
+                  {PRIVACY_CARD_POINTS.map((point) => (
+                    <li
+                      key={point}
+                      className="text-xs leading-relaxed text-ink-muted"
+                    >
+                      • {point}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="space-y-1.5">
+                <p className="text-xs font-semibold text-foreground">
+                  {ORGANIZE_INTRO}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {ORGANIZE_EXAMPLES.map((item) => (
+                    <span
+                      key={item}
+                      className="rounded-full border border-stone-200 bg-stone-50 px-2.5 py-1 text-[11px] font-medium text-ink-muted"
+                    >
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </>
           ) : (
-            <p className="text-sm leading-relaxed text-ink-muted">
-              {logsOnly
-                ? "I'll check this profile's Daily Logs first. For other questions I can use general knowledge and clearly say when it's not from your vault."
-                : "I'll search your vault first. If something isn't there, I can answer with general knowledge and label it clearly. What would you like to know?"}
-            </p>
-          )}
-
-          {emptyVault && suggestedUploads.length > 0 ? (
-            <div className="flex flex-wrap gap-1.5">
-              {suggestedUploads.map((item) => (
-                <span
-                  key={item}
-                  className="rounded-full border border-stone-200 bg-stone-50 px-2.5 py-1 text-[11px] font-medium text-ink-muted"
+            <>
+              <p className="text-sm leading-relaxed text-ink-muted">
+                {logsOnly
+                  ? "I'll check this profile's Daily Logs first. For other questions I can use general knowledge and clearly say when it's not from your vault."
+                  : "I'll search your vault first. If something isn't there, I can answer with general knowledge and label it clearly. What would you like to know?"}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={vaultBusy || sending || !profileId}
+                  onClick={openCamera}
+                  className="inline-flex rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark disabled:opacity-50"
                 >
-                  {item}
-                </span>
-              ))}
-            </div>
-          ) : null}
-
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={vaultBusy || sending || !profileId}
-              onClick={openCamera}
-              className="inline-flex rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark disabled:opacity-50"
-            >
-              📷 Scan
-            </button>
-            <button
-              type="button"
-              disabled={vaultBusy || sending || !profileId}
-              onClick={openFilePicker}
-              className="inline-flex rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-stone-50 disabled:opacity-50"
-            >
-              📄 Upload Document
-            </button>
-            <button
-              type="button"
-              disabled={vaultBusy || sending || !profileId}
-              onClick={openLogForm}
-              className="inline-flex rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-stone-50 disabled:opacity-50"
-            >
-              📝 Add Daily Log
-            </button>
-          </div>
+                  📷 Scan
+                </button>
+                <button
+                  type="button"
+                  disabled={vaultBusy || sending || !profileId}
+                  onClick={openFilePicker}
+                  className="inline-flex rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-stone-50 disabled:opacity-50"
+                >
+                  📄 Upload Document
+                </button>
+                <button
+                  type="button"
+                  disabled={vaultBusy || sending || !profileId}
+                  onClick={openLogForm}
+                  className="inline-flex rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-stone-50 disabled:opacity-50"
+                >
+                  📝 Add Daily Log
+                </button>
+              </div>
+            </>
+          )}
 
           {meta && meta.suggestions.length > 0 ? (
             <div className="space-y-2 pt-0.5">
