@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
 import { ChevronDown, MessageSquarePlus, Plus, Trash2 } from "lucide-react";
 import ProfileAvatar from "@/components/ProfileAvatar";
 import { useActiveProfile } from "@/components/ProfileProvider";
@@ -59,11 +59,13 @@ function VaultRow({
   selected,
   indented,
   onSelect,
+  className = "",
 }: {
   profile: GuardianProfile;
   selected: boolean;
   indented?: boolean;
   onSelect: () => void;
+  className?: string;
 }) {
   return (
     <button
@@ -77,7 +79,7 @@ function VaultRow({
         selected
           ? "bg-white font-medium text-foreground ring-1 ring-brand/30"
           : "text-foreground/90 hover:bg-white/80"
-      }`}
+      } ${className}`}
     >
       <ProfileAvatar profile={profile} size="sm" />
       <span className="min-w-0 flex-1">
@@ -92,9 +94,94 @@ function VaultRow({
   );
 }
 
+function VaultGroup({
+  profile,
+  subVaults,
+  selected,
+  expanded,
+  onToggleExpand,
+  onSelect,
+  onSelectChild,
+  activeChildId,
+}: {
+  profile: GuardianProfile;
+  subVaults: GuardianProfile[];
+  selected: boolean;
+  expanded: boolean;
+  onToggleExpand: () => void;
+  onSelect: () => void;
+  onSelectChild: (id: string) => void;
+  activeChildId?: string;
+}) {
+  const hasSubVaults = subVaults.length > 0;
+
+  return (
+    <li>
+      <div
+        className={`flex items-stretch rounded-lg ${
+          hasSubVaults
+            ? selected && !activeChildId
+              ? "bg-white ring-1 ring-brand/30"
+              : "hover:bg-white/80"
+            : ""
+        }`}
+      >
+        {hasSubVaults ? (
+          <button
+            type="button"
+            onClick={onToggleExpand}
+            aria-expanded={expanded}
+            aria-label={`${expanded ? "Collapse" : "Expand"} ${profile.display_name}`}
+            className="flex shrink-0 items-center self-stretch rounded-l-lg px-1.5 text-ink-muted transition hover:bg-white/60"
+          >
+            <ChevronDown
+              className={`h-3.5 w-3.5 transition-transform ${
+                expanded ? "" : "-rotate-90"
+              }`}
+              aria-hidden
+            />
+          </button>
+        ) : null}
+        <div className="min-w-0 flex-1">
+          <VaultRow
+            profile={profile}
+            selected={!hasSubVaults && selected}
+            onSelect={onSelect}
+            className={hasSubVaults ? "rounded-l-none pl-0 hover:bg-transparent" : undefined}
+          />
+        </div>
+      </div>
+      {hasSubVaults && expanded
+        ? subVaults.map((child) => (
+            <VaultRow
+              key={child.id}
+              profile={child}
+              selected={activeChildId === child.id}
+              indented
+              onSelect={() => onSelectChild(child.id)}
+            />
+          ))
+        : null}
+    </li>
+  );
+}
+
 function VaultList({ onPicked }: { onPicked?: () => void }) {
   const { profiles, active, loading, switchProfile } = useActiveProfile();
   const topLevel = topLevelProfiles(profiles);
+  const [expandedParents, setExpandedParents] = useState<Set<string>>(
+    () => new Set()
+  );
+
+  useEffect(() => {
+    if (!active?.parent_profile_id) return;
+    setExpandedParents((prev) => {
+      if (prev.has(active.parent_profile_id!)) return prev;
+      const next = new Set(prev);
+      next.add(active.parent_profile_id!);
+      return next;
+    });
+  }, [active?.parent_profile_id]);
 
   const pick = (id: string) => {
     if (active?.id === id) {
@@ -102,6 +189,15 @@ function VaultList({ onPicked }: { onPicked?: () => void }) {
       return;
     }
     void switchProfile(id).then(() => onPicked?.());
+  };
+
+  const toggleParent = (parentId: string) => {
+    setExpandedParents((prev) => {
+      const next = new Set(prev);
+      if (next.has(parentId)) next.delete(parentId);
+      else next.add(parentId);
+      return next;
+    });
   };
 
   if (loading && !active) {
@@ -125,24 +221,21 @@ function VaultList({ onPicked }: { onPicked?: () => void }) {
   return (
     <ul className="space-y-0.5" role="listbox" aria-label="Vaults">
       {topLevel.map((p) => {
-        const children = nestedUnder(profiles, p);
+        const subVaults = nestedUnder(profiles, p);
         return (
-          <li key={p.id}>
-            <VaultRow
-              profile={p}
-              selected={active?.id === p.id}
-              onSelect={() => pick(p.id)}
-            />
-            {children.map((child) => (
-              <VaultRow
-                key={child.id}
-                profile={child}
-                selected={active?.id === child.id}
-                indented
-                onSelect={() => pick(child.id)}
-              />
-            ))}
-          </li>
+          <VaultGroup
+            key={p.id}
+            profile={p}
+            subVaults={subVaults}
+            selected={active?.id === p.id}
+            activeChildId={
+              active?.parent_profile_id === p.id ? active.id : undefined
+            }
+            expanded={subVaults.length === 0 || expandedParents.has(p.id)}
+            onToggleExpand={() => toggleParent(p.id)}
+            onSelect={() => pick(p.id)}
+            onSelectChild={pick}
+          />
         );
       })}
       <li className="pt-1">
