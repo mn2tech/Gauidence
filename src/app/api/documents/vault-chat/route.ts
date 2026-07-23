@@ -30,6 +30,7 @@ import {
 import {
   buildGideonSuggestions,
   buildGideonLogSuggestions,
+  buildGideonVaultGuidance,
   firstNameFrom,
   type SuggestionProfileKind,
   type VaultDocHint,
@@ -392,6 +393,9 @@ export async function GET(request: Request) {
     const logCount = inventory.logCount;
 
     let suggestions: string[] = [];
+    let guidance = null;
+    const profileKind = suggestionKindFrom(active.profile_type);
+
     if (docCount > 0) {
       const { data: extracted } = await supabase
         .from("extracted_data")
@@ -412,12 +416,18 @@ export async function GET(request: Request) {
       }
       suggestions = buildGideonSuggestions(
         hints,
-        suggestionKindFrom(active.profile_type)
+        profileKind
       );
     } else if (logCount > 0) {
-      suggestions = buildGideonLogSuggestions(
-        suggestionKindFrom(active.profile_type)
-      );
+      suggestions = buildGideonLogSuggestions(profileKind);
+    } else {
+      const guide = buildGideonVaultGuidance(profileKind, active.display_name);
+      guidance = {
+        headline: guide.headline,
+        intro: guide.intro,
+        tips: guide.tips,
+      };
+      suggestions = guide.suggestions;
     }
 
     const { data: account } = await supabase
@@ -446,6 +456,7 @@ export async function GET(request: Request) {
         photoNamesMore: inventory.photoNamesMore,
         logNamesMore: inventory.logNamesMore,
         suggestions,
+        guidance,
         profileId: active.id,
         profileName: active.display_name,
         profileType: active.profile_type,

@@ -27,7 +27,6 @@ import {
   NotebookPen,
   Plus,
   Send,
-  Trash2,
   Users,
   X,
 } from "lucide-react";
@@ -56,6 +55,7 @@ import { renderGideonText } from "@/components/gideonText";
 import { uploadAndAnalyzeToVault } from "@/lib/vault/clientUpload";
 import OrganizationSuggestionModal from "@/components/OrganizationSuggestionModal";
 import ProfileSetupHub from "@/components/ProfileSetupHub";
+import AskGideonSidebar from "@/components/AskGideonSidebar";
 import type { OrganizationSuggestionPayload } from "@/lib/organization/types";
 import { todayLogDate } from "@/lib/logs/types";
 import { calendarDateInZone } from "@/lib/reminders/time";
@@ -203,6 +203,11 @@ type Meta = {
   profileId?: string;
   profileName?: string;
   askContextLabel?: string;
+  guidance?: {
+    headline: string;
+    intro: string;
+    tips: string[];
+  } | null;
 };
 
 function NameList({
@@ -1135,16 +1140,23 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
           ) : null}
           {emptyVault ? (
             <>
-              <p className="text-sm text-ink-muted">
-                {meta?.profileName
-                  ? `${meta.profileName}'s vault is empty for now.`
-                  : "Your vault is empty for now."}
+              <p className="text-sm font-medium text-foreground">
+                {meta?.guidance?.headline ??
+                  (meta?.profileName
+                    ? `${meta.profileName}'s vault is empty for now.`
+                    : "Your vault is empty for now.")}
               </p>
               <p className="text-sm leading-relaxed text-ink-muted">
-                You can still ask general questions. Scan or upload a document
-                here, or add a Daily Log, whenever you want me to remember your
-                specific details.
+                {meta?.guidance?.intro ??
+                  "You can still ask general questions. Scan or upload a document here, or add a Daily Log, whenever you want me to remember your specific details."}
               </p>
+              {meta?.guidance?.tips && meta.guidance.tips.length > 0 ? (
+                <ul className="list-inside list-disc space-y-1 text-sm leading-relaxed text-ink-muted">
+                  {meta.guidance.tips.map((tip) => (
+                    <li key={tip}>{tip}</li>
+                  ))}
+                </ul>
+              ) : null}
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
@@ -1171,6 +1183,21 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
                   Add a Daily Log
                 </button>
               </div>
+              {meta && meta.suggestions.length > 0 ? (
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {meta.suggestions.map((q) => (
+                    <button
+                      key={q}
+                      type="button"
+                      disabled={sending}
+                      onClick={() => void sendQuestion(q)}
+                      className="rounded-full border border-stone-300 bg-white px-3 py-1.5 text-left text-xs font-medium text-foreground transition hover:border-brand hover:bg-brand-light/40 disabled:opacity-50"
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
             </>
           ) : (
             <>
@@ -1227,64 +1254,18 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     </div>
   );
 
-  const chatList = (
-    <>
-      <div className="flex items-center gap-2 border-b border-stone-200 p-3">
-        <button
-          type="button"
-          onClick={() => void startNewChat()}
-          disabled={sending}
-          className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-brand px-3 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark disabled:opacity-50"
-        >
-          <MessageSquarePlus className="h-4 w-4" />
-          New chat
-        </button>
-      </div>
-      <div className="min-h-0 flex-1 overflow-y-auto p-2">
-        <p className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
-          Chat history
-        </p>
-        {chats.length === 0 ? (
-          <p className="px-2 py-2 text-xs text-ink-muted">No chats yet.</p>
-        ) : (
-          <ul className="space-y-0.5">
-            {chats.map((c) => (
-              <li key={c.id}>
-                <div
-                  className={`group flex items-center gap-1 rounded-lg ${
-                    c.id === activeChatId ? "bg-white ring-1 ring-stone-200" : ""
-                  }`}
-                >
-                  <button
-                    type="button"
-                    onClick={() => void selectChat(c.id)}
-                    className="min-w-0 flex-1 truncate px-2.5 py-2 text-left text-sm hover:text-foreground"
-                  >
-                    {c.title || "New chat"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => void deleteChat(c.id, e)}
-                    aria-label={`Delete ${c.title}`}
-                    className="mr-1 rounded-md p-1.5 text-ink-muted opacity-0 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 focus:opacity-100"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-      <div className="border-t border-stone-200 p-3">
-        <Link
-          href={docsHref}
-          className="text-xs font-medium text-ink-muted hover:text-foreground"
-        >
-          ← Docs
-        </Link>
-      </div>
-    </>
+  const askSidebar = (
+    <AskGideonSidebar
+      chats={chats}
+      activeChatId={activeChatId}
+      sending={sending}
+      docsHref={docsHref}
+      activeVaultName={active?.display_name ?? meta?.profileName}
+      onNewChat={() => void startNewChat()}
+      onSelectChat={(id) => void selectChat(id)}
+      onDeleteChat={(id, e) => void deleteChat(id, e)}
+      onSidebarAction={() => setSidebarOpen(false)}
+    />
   );
 
   const messageList = (
@@ -1787,7 +1768,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     <>
     <div className="flex h-full w-full overflow-hidden bg-white">
       <aside className="hidden h-full w-64 shrink-0 flex-col border-r border-stone-200 bg-stone-50 md:flex">
-        {chatList}
+        {askSidebar}
       </aside>
 
       {sidebarOpen && (
@@ -1800,7 +1781,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
           />
           <div className="relative z-10 flex h-full w-72 max-w-[85vw] flex-col bg-stone-50 shadow-xl">
             <div className="flex items-center justify-between border-b border-stone-200 px-3 py-2">
-              <span className="text-sm font-semibold">Chats</span>
+              <span className="text-sm font-semibold">Vaults &amp; chats</span>
               <button
                 type="button"
                 onClick={() => setSidebarOpen(false)}
@@ -1810,7 +1791,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="flex min-h-0 flex-1 flex-col">{chatList}</div>
+            <div className="flex min-h-0 flex-1 flex-col">{askSidebar}</div>
           </div>
         </div>
       )}
@@ -1820,7 +1801,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
           <button
             type="button"
             className="rounded-full p-2 text-ink-muted hover:bg-stone-100 md:hidden"
-            aria-label="Open chat history"
+            aria-label="Open vaults and chats"
             onClick={() => setSidebarOpen(true)}
           >
             <Menu className="h-5 w-5" />

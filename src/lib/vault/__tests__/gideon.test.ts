@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   buildGideonSuggestions,
+  buildGideonVaultGuidance,
   firstNameFrom,
   parseGideonSections,
   GIDEON_SYSTEM,
@@ -42,6 +43,14 @@ describe("Gideon helpers", () => {
 
   it("returns no suggestions for an empty vault", () => {
     assert.deepEqual(buildGideonSuggestions([]), []);
+  });
+
+  it("returns teacher onboarding guidance for an empty teacher vault", () => {
+    const guide = buildGideonVaultGuidance("teacher", "Ms. Rivera");
+    assert.equal(guide.headline, "Ms. Rivera's vault is ready");
+    assert.match(guide.intro, /classroom/i);
+    assert.ok(guide.tips.length >= 2);
+    assert.ok(guide.suggestions.some((q) => /teacher role/i.test(q)));
   });
 
   it("parses Gideon response sections", () => {

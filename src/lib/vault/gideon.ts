@@ -141,6 +141,227 @@ export function buildGideonLogSuggestions(
   ];
 }
 
+export type GideonVaultGuidance = {
+  headline: string;
+  intro: string;
+  tips: string[];
+  suggestions: string[];
+};
+
+const GUIDANCE: Record<SuggestionProfileKind, Omit<GideonVaultGuidance, "headline">> = {
+  teacher: {
+    intro:
+      "This is your classroom hub — lesson plans, rosters, IEPs, parent notes, and conference paperwork all stay here.",
+    tips: [
+      "Scan or upload syllabi, assignments, and school forms",
+      "Log quick notes after class, meetings, or parent calls",
+      "Ask me to summarize materials or flag grading and conference dates",
+    ],
+    suggestions: [
+      "Help me with my teacher role — what can you do for me?",
+      "What should I store in a teacher vault?",
+      "How can Daily Logs help me track my classes?",
+      "What should I upload first for the school year?",
+    ],
+  },
+  student: {
+    intro:
+      "Keep report cards, schedules, permission slips, and school correspondence in one place.",
+    tips: [
+      "Upload report cards, transcripts, and enrollment forms",
+      "Track homework, projects, and school events in Daily Logs",
+      "Ask about deadlines, forms, or what’s in the vault",
+    ],
+    suggestions: [
+      "What school documents should I keep here?",
+      "How do I track homework and school events?",
+      "What can Gideon help me with for school?",
+    ],
+  },
+  child: {
+    intro:
+      "Store medical forms, school records, activities, and anything you need for your child.",
+    tips: [
+      "Upload IDs, insurance cards, and school enrollment papers",
+      "Note appointments, activities, and milestones in Daily Logs",
+      "Ask about upcoming dates or summarize a document",
+    ],
+    suggestions: [
+      "What documents should I keep for my child?",
+      "How do Daily Logs help with school and activities?",
+      "What should I scan or upload first?",
+    ],
+  },
+  personal: {
+    intro:
+      "Your personal vault for IDs, insurance, leases, medical records, and everyday paperwork.",
+    tips: [
+      "Scan or upload important mail as soon as it arrives",
+      "Use Daily Logs for quick notes you want me to remember",
+      "Ask about deadlines, renewals, or what’s stored here",
+    ],
+    suggestions: [
+      "What kinds of documents belong in a personal vault?",
+      "How do I get started with my first upload?",
+      "What can you help me track?",
+    ],
+  },
+  business: {
+    intro:
+      "Run your company paperwork here — contracts, invoices, licenses, and client or employee files.",
+    tips: [
+      "Upload contracts, invoices, and compliance documents",
+      "Link employee and client vaults under this business",
+      "Ask about due dates, renewals, or linked people",
+    ],
+    suggestions: [
+      "What should a business vault contain?",
+      "How do I add employees or clients?",
+      "Which invoices or contracts need attention?",
+    ],
+  },
+  employee: {
+    intro:
+      "Keep HR forms, pay stubs, benefits paperwork, and work notes for this role.",
+    tips: [
+      "Upload offer letters, reviews, and benefits documents",
+      "Log project updates and follow-ups in Daily Logs",
+      "Ask about dates, policies, or what’s on file",
+    ],
+    suggestions: [
+      "What work documents should I keep here?",
+      "How do I track projects with Daily Logs?",
+      "Summarize what I should upload first.",
+    ],
+  },
+  client: {
+    intro:
+      "Track contracts, proposals, invoices, and correspondence for this client.",
+    tips: [
+      "Upload agreements, SOWs, and billing documents",
+      "Log calls, deliverables, and follow-ups in Daily Logs",
+      "Ask about contract dates or open items",
+    ],
+    suggestions: [
+      "What client documents belong in this vault?",
+      "How do I track deliverables and follow-ups?",
+      "What should I upload for a new client?",
+    ],
+  },
+  family: {
+    intro:
+      "A shared family space for everyone’s documents, school forms, and household records.",
+    tips: [
+      "Add family members, students, or pets as linked vaults",
+      "Upload insurance, school, and medical paperwork",
+      "Ask what’s stored for each person or upcoming dates",
+    ],
+    suggestions: [
+      "How do I organize documents for my family?",
+      "What should each family member’s vault contain?",
+      "How do I add a child or student?",
+    ],
+  },
+  vehicle: {
+    intro:
+      "Registration, insurance, service records, and loan paperwork for this vehicle.",
+    tips: [
+      "Upload title, insurance, and inspection documents",
+      "Log maintenance and repairs in Daily Logs",
+      "Ask about renewal or expiration dates",
+    ],
+    suggestions: [
+      "What vehicle documents should I keep?",
+      "When does insurance or registration renew?",
+      "How do I track maintenance?",
+    ],
+  },
+  home: {
+    intro:
+      "Mortgage, insurance, leases, warranties, and repair records for this home.",
+    tips: [
+      "Upload deeds, policies, and contractor invoices",
+      "Note repairs and inspections in Daily Logs",
+      "Ask about mortgage, insurance, or warranty dates",
+    ],
+    suggestions: [
+      "What home documents belong here?",
+      "How do I track repairs and contractors?",
+      "Which dates should I watch for?",
+    ],
+  },
+  pet: {
+    intro:
+      "Vet records, vaccination history, insurance, and adoption paperwork.",
+    tips: [
+      "Upload vaccination and medical records",
+      "Log vet visits and medications in Daily Logs",
+      "Ask about upcoming appointments or renewals",
+    ],
+    suggestions: [
+      "What pet records should I store?",
+      "How do I track vet visits?",
+      "When are vaccinations due?",
+    ],
+  },
+  hobby: {
+    intro:
+      "League forms, equipment receipts, schedules, and progress notes for this hobby or sport.",
+    tips: [
+      "Upload registration, waivers, and equipment docs",
+      "Log practices, games, and milestones in Daily Logs",
+      "Ask about schedules or what’s on file",
+    ],
+    suggestions: [
+      "What should I keep for my hobby or sport?",
+      "How do I track games and practices?",
+      "What can I upload first?",
+    ],
+  },
+  other: {
+    intro:
+      "A flexible vault for documents and notes that matter to you.",
+    tips: [
+      "Scan or upload PDFs and photos you want to remember",
+      "Use Daily Logs for quick notes between uploads",
+      "Ask me anything — I’ll say when it’s not in your vault",
+    ],
+    suggestions: [
+      "How do I get started with this vault?",
+      "What can Gideon help me with?",
+      "What should I upload first?",
+    ],
+  },
+};
+
+function guidanceHeadline(
+  profileKind: SuggestionProfileKind,
+  profileName?: string | null
+): string {
+  const name = profileName?.trim();
+  if (name) return `${name}'s vault is ready`;
+  const labels: Partial<Record<SuggestionProfileKind, string>> = {
+    teacher: "Your teacher vault is ready",
+    student: "Your student vault is ready",
+    personal: "Your personal vault is ready",
+    business: "Your business vault is ready",
+    family: "Your family vault is ready",
+  };
+  return labels[profileKind] ?? "Your vault is ready";
+}
+
+/** Onboarding copy and starter questions when a vault has no documents or logs yet. */
+export function buildGideonVaultGuidance(
+  profileKind: SuggestionProfileKind = "personal",
+  profileName?: string | null
+): GideonVaultGuidance {
+  const base = GUIDANCE[profileKind] ?? GUIDANCE.other;
+  return {
+    headline: guidanceHeadline(profileKind, profileName),
+    ...base,
+  };
+}
+
 /**
  * Suggested questions based on vault contents and profile type.
  */
