@@ -38,8 +38,10 @@ import DocumentChatPanel from "@/components/DocumentChatPanel";
 import CameraCaptureModal from "@/components/CameraCaptureModal";
 import ShareDocumentButton from "@/components/ShareDocumentButton";
 import MoveDocumentButton from "@/components/MoveDocumentButton";
+import OrganizationSuggestionModal from "@/components/OrganizationSuggestionModal";
 import SearchHighlight from "@/components/SearchHighlight";
 import { syncDocumentAwards } from "@/lib/awards/client";
+import type { OrganizationSuggestionPayload } from "@/lib/organization/types";
 
 type DocumentRow = {
   id: string;
@@ -178,6 +180,9 @@ export default function DocumentManager({
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [savingRename, setSavingRename] = useState(false);
+  const [organizationSuggestion, setOrganizationSuggestion] =
+    useState<OrganizationSuggestionPayload | null>(null);
+  const [orgNotice, setOrgNotice] = useState<string | null>(null);
 
   const loadDocuments = useCallback(async () => {
     if (!supabase || !profileId) return;
@@ -609,6 +614,8 @@ export default function DocumentManager({
         classificationConfidence?: number;
         category?: string | null;
         analysisStatus?: AnalysisStatus;
+        organizationSuggestion?: OrganizationSuggestionPayload | null;
+        organizationAutoApplied?: boolean;
       } = {};
       try {
         body = await res.json();
@@ -672,6 +679,21 @@ export default function DocumentManager({
         }
         setExpandedId(doc.id);
         notifyAlertsUpdated();
+        if (
+          body.organizationSuggestion &&
+          (body.organizationSuggestion.status === "pending" ||
+            body.organizationAutoApplied)
+        ) {
+          setOrganizationSuggestion({
+            ...body.organizationSuggestion,
+            autoApplied: Boolean(body.organizationAutoApplied),
+          });
+        }
+        if (body.organizationAutoApplied && body.organizationSuggestion) {
+          setOrgNotice(
+            `Guardian filed this in ${body.organizationSuggestion.profilePath ?? "the suggested vault"}. You can undo from the card.`
+          );
+        }
       }
     } catch (err) {
       const timedOut =
@@ -739,6 +761,12 @@ export default function DocumentManager({
           {documents.length} {documents.length === 1 ? "document" : "documents"}
         </span>
       </div>
+
+      {orgNotice ? (
+        <p className="mt-3 rounded-xl bg-brand-light px-3 py-2 text-sm text-brand-dark">
+          {orgNotice}
+        </p>
+      ) : null}
 
       {/* Upload zone */}
       <div
@@ -1055,20 +1083,39 @@ export default function DocumentManager({
                         </button>
                       </div>
                     ) : (
-                      <p className="truncate text-sm font-medium">
-                        <SearchHighlight
-                          text={doc.file_name}
-                          term={
-                            highlightDocumentId === doc.id ? searchTerm : null
-                          }
-                        />
-                      </p>
+                      <>
+                        <p className="truncate text-sm font-medium">
+                          <SearchHighlight
+                            text={
+                              analysis?.title?.trim() || doc.file_name
+                            }
+                            term={
+                              highlightDocumentId === doc.id ? searchTerm : null
+                            }
+                          />
+                        </p>
+                        {analysis?.title &&
+                        analysis.title.trim() !== doc.file_name ? (
+                          <p className="truncate text-xs text-ink-muted">
+                            {doc.file_name}
+                          </p>
+                        ) : null}
+                      </>
                     )}
                     <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-muted">
                       <span>
                         {ACCEPTED_TYPES[doc.mime_type] ?? doc.mime_type} ·{" "}
                         {formatSize(doc.size_bytes)} · {formatDate(doc.created_at)}
                       </span>
+                      <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-ink-muted">
+                        {ANALYSIS_STATUS_LABELS[doc.analysis_status] ??
+                          doc.analysis_status}
+                      </span>
+                      {analysis?.facts?.length ? (
+                        <span className="text-[11px] text-ink-muted">
+                          {analysis.facts.length} details
+                        </span>
+                      ) : null}
                       <select
                         value={doc.category ?? ""}
                         onChange={(e) => handleSetCategory(doc, e.target.value)}
@@ -1360,6 +1407,34 @@ export default function DocumentManager({
           </div>
         </div>
       )}
+
+      {organizationSuggestion ? (
+        <OrganizationSuggestionModal
+          suggestion={organizationSuggestion}
+          onDismiss={() => setOrganizationSuggestion(null)}
+          onChooseLocation={() => setOrganizationSuggestion(null)}
+          onResolved={({ action, movedToProfileId, undoAvailable }) => {
+            if (action === "undo" || !undoAvailable) {
+              setOrganizationSuggestion(null);
+            }
+            if (
+              movedToProfileId &&
+              movedToProfileId !== profileId &&
+              (action === "accept" ||
+                action === "create_suggested" ||
+                action === "keep_unorganized")
+            ) {
+              void loadDocuments();
+              setOrgNotice("Document moved to another vault.");
+            } else if (action === "undo") {
+              void loadDocuments();
+              setOrgNotice("Document returned to its previous location.");
+            } else if (action === "keep_current") {
+              setOrgNotice("Kept in the current vault.");
+            }
+          }}
+        />
+      ) : null}
     </div>
   );
 }

@@ -14,6 +14,8 @@ type Props = {
   avatarUrl: string | null;
   initialRemindersEnabled: boolean;
   initialTipsEnabled: boolean;
+  initialAutoOrganizeMode?: "off" | "suggest" | "auto";
+  initialAutoOrganizeThreshold?: number;
 };
 
 export default function SettingsForm({
@@ -24,6 +26,8 @@ export default function SettingsForm({
   avatarUrl,
   initialRemindersEnabled,
   initialTipsEnabled,
+  initialAutoOrganizeMode = "suggest",
+  initialAutoOrganizeThreshold = 0.85,
 }: Props) {
   const supabase = createClient();
   const router = useRouter();
@@ -47,6 +51,16 @@ export default function SettingsForm({
   const [tipsEnabled, setTipsEnabled] = useState(initialTipsEnabled);
   const [savingTips, setSavingTips] = useState(false);
   const [tipsError, setTipsError] = useState<string | null>(null);
+
+  const [autoOrganizeMode, setAutoOrganizeMode] = useState<
+    "off" | "suggest" | "auto"
+  >(initialAutoOrganizeMode);
+  const [autoOrganizeThreshold, setAutoOrganizeThreshold] = useState(
+    initialAutoOrganizeThreshold
+  );
+  const [savingAutoOrganize, setSavingAutoOrganize] = useState(false);
+  const [autoOrganizeSaved, setAutoOrganizeSaved] = useState(false);
+  const [autoOrganizeError, setAutoOrganizeError] = useState<string | null>(null);
 
   const [confirmText, setConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
@@ -143,6 +157,29 @@ export default function SettingsForm({
       setTipsError("We couldn't save that change. Please try again.");
     }
     setSavingTips(false);
+  }
+
+  async function handleSaveAutoOrganize(e: React.FormEvent) {
+    e.preventDefault();
+    if (!supabase) return;
+    setAutoOrganizeError(null);
+    setAutoOrganizeSaved(false);
+    setSavingAutoOrganize(true);
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        auto_organize_mode: autoOrganizeMode,
+        auto_organize_threshold: autoOrganizeThreshold,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", userId);
+    if (error) {
+      setAutoOrganizeError("We couldn't save AI Auto-Organize settings.");
+    } else {
+      setAutoOrganizeSaved(true);
+      router.refresh();
+    }
+    setSavingAutoOrganize(false);
   }
 
   const deleteConfirmed = confirmText.trim().toUpperCase() === "DELETE";
@@ -268,6 +305,79 @@ export default function SettingsForm({
               <Check className="h-4 w-4" />
             ) : null}
             {nameSaved ? "Saved" : "Save profile"}
+          </button>
+        </form>
+      </section>
+
+      {/* AI Auto-Organization */}
+      <section className="rounded-2xl border border-stone-200 bg-white p-6">
+        <h2 className="text-base font-semibold">AI Auto-Organize</h2>
+        <p className="mt-1 text-sm text-ink-muted">
+          After upload, Guardian can suggest where a document belongs. Nothing moves
+          until you approve — unless you enable automatic filing for trusted matches.
+        </p>
+        <form onSubmit={handleSaveAutoOrganize} className="mt-4 space-y-4">
+          <div>
+            <label htmlFor="autoOrganizeMode" className="block text-sm font-medium">
+              Mode
+            </label>
+            <select
+              id="autoOrganizeMode"
+              value={autoOrganizeMode}
+              onChange={(e) => {
+                setAutoOrganizeMode(
+                  e.target.value as "off" | "suggest" | "auto"
+                );
+                setAutoOrganizeSaved(false);
+              }}
+              className={inputClass}
+            >
+              <option value="off">Off — current upload workflow</option>
+              <option value="suggest">Suggest — recommend and wait for approval</option>
+              <option value="auto">
+                Automatic for trusted matches — file when confidence is high
+              </option>
+            </select>
+          </div>
+          {autoOrganizeMode === "auto" ? (
+            <div>
+              <label
+                htmlFor="autoOrganizeThreshold"
+                className="block text-sm font-medium"
+              >
+                Confidence threshold ({Math.round(autoOrganizeThreshold * 100)}%)
+              </label>
+              <input
+                id="autoOrganizeThreshold"
+                type="range"
+                min={0.7}
+                max={0.98}
+                step={0.01}
+                value={autoOrganizeThreshold}
+                onChange={(e) => {
+                  setAutoOrganizeThreshold(Number(e.target.value));
+                  setAutoOrganizeSaved(false);
+                }}
+                className="mt-2 w-full"
+              />
+            </div>
+          ) : null}
+          {autoOrganizeError ? (
+            <p role="alert" className="text-sm text-red-700">
+              {autoOrganizeError}
+            </p>
+          ) : null}
+          <button
+            type="submit"
+            disabled={savingAutoOrganize}
+            className="inline-flex items-center gap-2 rounded-full bg-brand px-5 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
+          >
+            {savingAutoOrganize ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : autoOrganizeSaved ? (
+              <Check className="h-4 w-4" />
+            ) : null}
+            {autoOrganizeSaved ? "Saved" : "Save AI Auto-Organize"}
           </button>
         </form>
       </section>

@@ -249,6 +249,29 @@ export async function POST(request: Request) {
 
     await setStatus(finalStatus);
 
+    let organizationSuggestion = null;
+    let organizationAutoApplied = false;
+    try {
+      const { runOrganizationAfterAnalysis } = await import(
+        "@/lib/organization/run"
+      );
+      const orgResult = await runOrganizationAfterAnalysis(supabase, {
+        userId: user.id,
+        documentId: doc.id,
+        currentProfileId: profileId,
+        currentProfileName: guardianProfile?.display_name ?? null,
+        analysis,
+        classification,
+      });
+      organizationSuggestion = orgResult.suggestion;
+      organizationAutoApplied = orgResult.autoApplied;
+    } catch (orgErr) {
+      console.error(
+        "Organization suggestion failed:",
+        orgErr instanceof Error ? orgErr.message : "error"
+      );
+    }
+
     return NextResponse.json({
       summary: analysis.summary,
       facts,
@@ -265,6 +288,8 @@ export async function POST(request: Request) {
       title: analysis.title,
       warnings: analysis.warnings,
       analysisStatus: finalStatus,
+      organizationSuggestion,
+      organizationAutoApplied,
       ...(result.diagnostic ? { diagnostic: result.diagnostic } : {}),
     });
   } catch (err) {
