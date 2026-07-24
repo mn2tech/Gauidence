@@ -82,4 +82,16 @@ describe("retention eligibility", () => {
     const age = accountAgeHours(created);
     assert.ok(age >= 47.9 && age <= 48.1);
   });
+
+  it("never auto-sends product announcement via retention cron", () => {
+    assert.equal(
+      isEligibleForRetentionEmail(
+        "product_gideon_attachments",
+        0,
+        empty,
+        sent
+      ),
+      false
+    );
+  });
 });

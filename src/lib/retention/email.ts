@@ -150,6 +150,50 @@ export function renderRetentionEmail(
           `Quick Start: ${help}`,
         ].join("\n"),
       };
+    case "product_gideon_attachments":
+      return {
+        subject: "New in Ask Gideon: attach photos and PDFs in chat",
+        html: emailShell(`
+          <p style="margin:16px 0 8px;font-size:15px;color:#1c1917;line-height:1.5;">
+            Hi ${escapeHtml(name)}, we improved Ask Gideon.
+          </p>
+          <p style="margin:0 0 12px;font-size:14px;color:#57534e;line-height:1.6;">
+            You can now attach photos and PDFs right in the chat — see your file
+            first, then Gideon reads it and replies below.
+          </p>
+          <ol style="margin:0 0 4px;padding-left:20px;font-size:14px;color:#57534e;line-height:1.7;">
+            <li>Open <strong style="color:#1c1917;">Ask Gideon</strong></li>
+            <li>Tap <strong style="color:#1c1917;">+</strong> → <strong style="color:#1c1917;">Add files or photos</strong> (or press Ctrl+U)</li>
+            <li>Your photo or PDF preview appears in the message box — add a question if you like</li>
+            <li>Send — your file shows in chat right away while Gideon analyzes</li>
+            <li>Use <strong style="color:#1c1917;">Scan with camera</strong> for quick photos of notes or documents</li>
+          </ol>
+          <p style="margin:12px 0 0;font-size:13px;color:#78716c;line-height:1.5;">
+            Files are saved to your vault automatically. Great for lists, receipts,
+            contracts, and handwritten notes.
+          </p>
+          ${cta(ask, "Try it in Ask Gideon")}
+          ${footerNote()}
+        `),
+        text: [
+          `Hi ${name}, we improved Ask Gideon.`,
+          "",
+          "You can now attach photos and PDFs right in the chat — see your file first, then Gideon reads it and replies below.",
+          "",
+          "Quick steps:",
+          "1. Open Ask Gideon",
+          "2. Tap + → Add files or photos (or press Ctrl+U)",
+          "3. Preview appears in the message box — add a question if you like",
+          "4. Send — your file shows right away while Gideon analyzes",
+          "5. Use Scan with camera for quick photos",
+          "",
+          "Files are saved to your vault automatically.",
+          "",
+          `Try it: ${ask}`,
+          "",
+          "You can turn off getting-started emails in Guardian Settings.",
+        ].join("\n"),
+      };
     default:
       throw new Error(`Unknown retention email: ${key}`);
   }

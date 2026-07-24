@@ -36,6 +36,8 @@ export function isEligibleForRetentionEmail(
         !activity.hasAskedGideon &&
         !activity.hasResearch
       );
+    case "product_gideon_attachments":
+      return false;
     default:
       return false;
   }

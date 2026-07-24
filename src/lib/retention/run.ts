@@ -138,6 +138,114 @@ export async function processRetentionForUser(
   return { sent: recorded ? [key] : [], skipped: false };
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export type ProductEmailCampaignResult = {
+  candidates: number;
+  sent: number;
+  skippedAlreadySent: number;
+  skippedOptOut: number;
+  failed: number;
+  dryRun: boolean;
+};
+
+/**
+ * One-time product announcement to all users with tips emails enabled.
+ * Idempotent per user via user_retention_emails.
+ */
+export async function runProductEmailCampaign(
+  key: RetentionEmailKey,
+  options?: { dryRun?: boolean; limit?: number; delayMs?: number }
+): Promise<ProductEmailCampaignResult> {
+  const dryRun = options?.dryRun ?? false;
+  const limit = options?.limit;
+  const delayMs = options?.delayMs ?? 120;
+
+  const admin = createAdminClient();
+  if (!admin) {
+    return {
+      candidates: 0,
+      sent: 0,
+      skippedAlreadySent: 0,
+      skippedOptOut: 0,
+      failed: 0,
+      dryRun,
+    };
+  }
+
+  const { data: profiles, error } = await admin
+    .from("profiles")
+    .select("id, email, full_name, created_at, email_tips_enabled")
+    .not("email", "is", null);
+
+  if (error) {
+    console.error("product email profiles load failed:", error.message);
+    return {
+      candidates: 0,
+      sent: 0,
+      skippedAlreadySent: 0,
+      skippedOptOut: 0,
+      failed: 0,
+      dryRun,
+    };
+  }
+
+  let sent = 0;
+  let skippedAlreadySent = 0;
+  let skippedOptOut = 0;
+  let failed = 0;
+  let candidates = 0;
+
+  for (const row of (profiles ?? []) as RetentionProfileRow[]) {
+    if (limit != null && sent >= limit) break;
+
+    if (!row.email?.trim()) continue;
+    if (row.email_tips_enabled === false) {
+      skippedOptOut += 1;
+      continue;
+    }
+
+    const sentKeys = await loadSentKeys(row.id);
+    if (sentKeys.has(key)) {
+      skippedAlreadySent += 1;
+      continue;
+    }
+
+    candidates += 1;
+    if (dryRun) {
+      if (limit != null && candidates >= limit) break;
+      continue;
+    }
+
+    const ok = await sendRetentionEmail(row.email, key, {
+      fullName: row.full_name,
+    });
+    if (!ok) {
+      failed += 1;
+      continue;
+    }
+
+    const recorded = await recordSent(row.id, key);
+    if (recorded) {
+      sent += 1;
+      if (limit != null && sent >= limit) break;
+    }
+
+    if (delayMs > 0) await sleep(delayMs);
+  }
+
+  return {
+    candidates,
+    sent,
+    skippedAlreadySent,
+    skippedOptOut,
+    failed,
+    dryRun,
+  };
+}
+
 /** Welcome email only — used from auth callback after signup. */
 export async function trySendWelcomeEmail(userId: string): Promise<boolean> {
   const admin = createAdminClient();
@@ -176,6 +284,7 @@ export async function runRetentionCampaign(): Promise<{
         nudge_no_vault: 0,
         nudge_no_document: 0,
         nudge_try_gideon: 0,
+        product_gideon_attachments: 0,
       },
     };
   }
@@ -198,6 +307,7 @@ export async function runRetentionCampaign(): Promise<{
         nudge_no_vault: 0,
         nudge_no_document: 0,
         nudge_try_gideon: 0,
+        product_gideon_attachments: 0,
       },
     };
   }
@@ -207,6 +317,7 @@ export async function runRetentionCampaign(): Promise<{
     nudge_no_vault: 0,
     nudge_no_document: 0,
     nudge_try_gideon: 0,
+    product_gideon_attachments: 0,
   };
 
   let emailsSent = 0;

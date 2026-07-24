@@ -5,6 +5,7 @@ export const RETENTION_EMAIL_KEYS = [
   "nudge_no_vault",
   "nudge_no_document",
   "nudge_try_gideon",
+  "product_gideon_attachments",
 ] as const;
 
 export type RetentionEmailKey = (typeof RETENTION_EMAIL_KEYS)[number];
@@ -22,4 +23,5 @@ export const RETENTION_MIN_AGE_HOURS: Record<RetentionEmailKey, number> = {
   nudge_no_vault: 24,
   nudge_no_document: 72,
   nudge_try_gideon: 168,
+  product_gideon_attachments: 0,
 };
