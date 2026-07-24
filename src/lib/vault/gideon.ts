@@ -55,6 +55,11 @@ export const GIDEON_ATTACHED_DOCUMENT_NOTE = `Attached document:
 - Answer using that attachment. Do not say the image or file is missing.
 - For photos: describe what you see when asked; transcribe visible text or lists when asked.`;
 
+export const GIDEON_CROSS_VAULT_NOTE = `Cross-vault mode:
+- The user is in one active vault but excerpts from another named vault are included below.
+- When the answer relies on that other vault, start with a short lead-in such as "From Nolan's vault:" before the facts.
+- Attribute each fact to the vault owner labeled in the source. Do not imply the document is in the active vault unless it is.`;
+
 export const GIDEON_TRANSCRIPTION_NOTE = `Transcription mode:
 - The user wants a readable transcription or list from their vault (often a photo or scan).
 - Lead with a short friendly title if helpful (e.g. "Book names"), then a clean numbered list.

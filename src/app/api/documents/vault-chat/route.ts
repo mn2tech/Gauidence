@@ -30,6 +30,7 @@ import {
   listLinkedProfilesForVaultRollup,
   retrieveVaultChunksAcrossProfiles,
 } from "@/lib/vault/rollup";
+import { detectCrossVaultScope } from "@/lib/vault/detectVaultScope";
 import {
   buildGideonSuggestions,
   buildGideonLogSuggestions,
@@ -38,6 +39,7 @@ import {
   getVaultTemplate,
   gideonChatContextLabel,
   GIDEON_ATTACHED_DOCUMENT_NOTE,
+  GIDEON_CROSS_VAULT_NOTE,
   GIDEON_TRANSCRIPTION_NOTE,
   VAULT_SCOPE_NOTE,
   wantsTranscription,
@@ -49,7 +51,7 @@ import {
   loadAttachedVaultDocument,
 } from "@/lib/vault/attachedDocument";
 import { mergePinnedChunks } from "@/lib/vault/retrieve";
-import { getActiveGuardianProfile } from "@/lib/profiles/server";
+import { listGuardianProfiles, getActiveGuardianProfile } from "@/lib/profiles/server";
 import {
   askGideonContextLabel,
   canHaveLinkedEmployees,
@@ -293,6 +295,11 @@ type ChatMessageRow = {
     profileName?: string;
     isImage?: boolean;
   }[];
+  vaultScope?: {
+    profileId: string;
+    profileName: string;
+    activeProfileName: string;
+  } | null;
   created_at: string;
 };
 
@@ -499,9 +506,11 @@ export async function GET(request: Request) {
     });
   }
 
+  const accessibleProfiles = await listGuardianProfiles(supabase, user.id);
+
   const { data: chat } = await supabase
     .from("vault_chats")
-    .select("id, title, profile_id")
+    .select("id, title, profile_id, scoped_profile_id")
     .eq("id", chatId)
     .eq("user_id", user.id)
     .eq("profile_id", active.id)
@@ -510,6 +519,11 @@ export async function GET(request: Request) {
   if (!chat) {
     return NextResponse.json({ error: "Chat not found." }, { status: 404 });
   }
+
+  const scopedProfile =
+    typeof chat.scoped_profile_id === "string"
+      ? accessibleProfiles.find((p) => p.id === chat.scoped_profile_id) ?? null
+      : null;
 
   const { data: messages, error } = await supabase
     .from("vault_chat_messages")
@@ -541,9 +555,65 @@ export async function GET(request: Request) {
       vaultScopeNote: VAULT_SCOPE_NOTE,
       templateLabel: template.label,
       templateBadge: template.badge,
+      chatScopedProfile: scopedProfile
+        ? {
+            profileId: scopedProfile.id,
+            profileName: scopedProfile.display_name,
+          }
+        : null,
       ...(await loadAskVaultInventory(supabase, user.id, active.id)).inventory,
     },
   });
+}
+
+/** Clear temporary cross-vault scope on a chat thread. */
+export async function PATCH(request: Request) {
+  const auth = await requireUser();
+  if (!isAuthed(auth)) return auth;
+  const { supabase, user } = auth;
+
+  const active = await getActiveGuardianProfile(supabase, user);
+  if (!active) {
+    return NextResponse.json(
+      {
+        error:
+          "Create a person or space first — open the dashboard and choose who you're helping.",
+      },
+      { status: 400 }
+    );
+  }
+
+  let chatIdRaw: unknown;
+  let clearScopedProfile = false;
+  try {
+    const body = await request.json();
+    chatIdRaw = body.chatId;
+    clearScopedProfile = body.clearScopedProfile === true;
+  } catch {
+    return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+  }
+
+  const chatId =
+    typeof chatIdRaw === "string" && chatIdRaw.trim() ? chatIdRaw.trim() : null;
+  if (!chatId || !clearScopedProfile) {
+    return NextResponse.json({ error: "Missing chatId or action." }, { status: 400 });
+  }
+
+  const { error } = await supabase
+    .from("vault_chats")
+    .update({ scoped_profile_id: null })
+    .eq("id", chatId)
+    .eq("user_id", user.id)
+    .eq("profile_id", active.id);
+
+  if (error) {
+    return NextResponse.json(
+      { error: "Couldn't update chat scope." },
+      { status: 502 }
+    );
+  }
+
+  return NextResponse.json({ ok: true, chatScopedProfile: null });
 }
 
 /** Create a blank thread (New chat). */
@@ -642,12 +712,14 @@ export async function POST(request: Request) {
   let chatIdRaw: unknown;
   let workProjectIdRaw: unknown;
   let attachmentDocumentIdRaw: unknown;
+  let clearScopedProfile = false;
   try {
     const body = await request.json();
     questionRaw = body.question;
     chatIdRaw = body.chatId;
     workProjectIdRaw = body.workProjectId;
     attachmentDocumentIdRaw = body.attachmentDocumentId;
+    clearScopedProfile = body.clearScopedProfile === true;
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
@@ -697,55 +769,19 @@ export async function POST(request: Request) {
   const profileNames = Object.fromEntries(
     searchScopes.map((s) => [s.id, s.display_name])
   );
-
-  try {
-    await Promise.all(
-      searchScopes.slice(0, 8).map((scope) =>
-        ensureUserVaultIndexed(supabase, user.id, scope.id).catch((err) => {
-          console.error(
-            "Vault ensure index failed:",
-            err instanceof Error ? err.message : "error"
-          );
-        })
-      )
-    );
-  } catch {
-    /* already logged per profile */
-  }
-
-  const { count: chunkCount } = await supabase
-    .from("document_chunks")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", user.id)
-    .in("profile_id", searchIds);
-
-  const { count: logCount } = await supabase
-    .from("daily_logs")
-    .select("id", { count: "exact", head: true })
-    .eq("owner_user_id", user.id)
-    .in("profile_id", searchIds);
-
-  // Document RAG needs embeddings; empty vault / Daily Log-only / general
-  // knowledge questions do not.
-  if ((chunkCount ?? 0) > 0 && !isVaultEmbeddingConfigured()) {
-    return NextResponse.json(
-      {
-        error:
-          "I couldn't complete that request right now. Please try again.",
-      },
-      { status: 503 }
-    );
-  }
+  const accessibleProfiles = await listGuardianProfiles(supabase, user.id);
+  const accessibleProfileIds = accessibleProfiles.map((p) => p.id);
 
   let chatId: string;
   let isNewChat = false;
+  let threadScopedProfileId: string | null = null;
   const requestedId =
     typeof chatIdRaw === "string" && chatIdRaw.trim() ? chatIdRaw.trim() : null;
 
   if (requestedId) {
     const { data: existingChat } = await supabase
       .from("vault_chats")
-      .select("id, title")
+      .select("id, title, scoped_profile_id")
       .eq("id", requestedId)
       .eq("user_id", user.id)
       .eq("profile_id", active.id)
@@ -754,6 +790,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Chat not found." }, { status: 404 });
     }
     chatId = existingChat.id;
+    threadScopedProfileId =
+      typeof existingChat.scoped_profile_id === "string"
+        ? existingChat.scoped_profile_id
+        : null;
   } else {
     const { data: created, error: chatError } = await supabase
       .from("vault_chats")
@@ -772,6 +812,94 @@ export async function POST(request: Request) {
     }
     chatId = created.id;
     isNewChat = true;
+  }
+
+  if (clearScopedProfile) {
+    threadScopedProfileId = null;
+    await supabase
+      .from("vault_chats")
+      .update({ scoped_profile_id: null })
+      .eq("id", chatId)
+      .eq("user_id", user.id)
+      .eq("profile_id", active.id);
+  }
+
+  let crossVaultScopeId: string | null = null;
+  if (
+    !clearScopedProfile &&
+    threadScopedProfileId &&
+    !searchIds.includes(threadScopedProfileId) &&
+    accessibleProfileIds.includes(threadScopedProfileId)
+  ) {
+    crossVaultScopeId = threadScopedProfileId;
+  } else if (!clearScopedProfile) {
+    const detected = detectCrossVaultScope({
+      question,
+      activeProfileId: active.id,
+      inScopeProfileIds: searchIds,
+      accessibleProfiles: accessibleProfiles.map((p) => ({
+        id: p.id,
+        display_name: p.display_name,
+      })),
+    });
+    crossVaultScopeId = detected?.id ?? null;
+  }
+
+  const crossVaultProfile = crossVaultScopeId
+    ? (accessibleProfiles.find((p) => p.id === crossVaultScopeId) ?? null)
+    : null;
+  const usedCrossVault = Boolean(
+    crossVaultProfile && !searchIds.includes(crossVaultProfile.id)
+  );
+
+  const retrievalScopes = [...searchScopes];
+  if (usedCrossVault && crossVaultProfile) {
+    retrievalScopes.push({
+      id: crossVaultProfile.id,
+      display_name: crossVaultProfile.display_name,
+      profile_type: crossVaultProfile.profile_type,
+    });
+    profileNames[crossVaultProfile.id] = crossVaultProfile.display_name;
+  }
+  const allSearchIds = [...new Set(retrievalScopes.map((s) => s.id))];
+
+  try {
+    await Promise.all(
+      retrievalScopes.slice(0, 8).map((scope) =>
+        ensureUserVaultIndexed(supabase, user.id, scope.id).catch((err) => {
+          console.error(
+            "Vault ensure index failed:",
+            err instanceof Error ? err.message : "error"
+          );
+        })
+      )
+    );
+  } catch {
+    /* already logged per profile */
+  }
+
+  const { count: chunkCount } = await supabase
+    .from("document_chunks")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id)
+    .in("profile_id", allSearchIds);
+
+  const { count: logCount } = await supabase
+    .from("daily_logs")
+    .select("id", { count: "exact", head: true })
+    .eq("owner_user_id", user.id)
+    .in("profile_id", allSearchIds);
+
+  // Document RAG needs embeddings; empty vault / Daily Log-only / general
+  // knowledge questions do not.
+  if ((chunkCount ?? 0) > 0 && !isVaultEmbeddingConfigured()) {
+    return NextResponse.json(
+      {
+        error:
+          "I couldn't complete that request right now. Please try again.",
+      },
+      { status: 503 }
+    );
   }
 
   const { data: priorMessages } = await supabase
@@ -837,7 +965,7 @@ export async function POST(request: Request) {
       ? await loadAttachedVaultDocument(supabase, {
           userId: user.id,
           documentId: attachmentDocumentId,
-          allowedProfileIds: searchIds,
+          allowedProfileIds: accessibleProfileIds,
           profileNames,
         })
       : null;
@@ -846,11 +974,11 @@ export async function POST(request: Request) {
     const queryEmbedding =
       (chunkCount ?? 0) > 0 ? await embedQuery(question) : null;
     const retrievedChunks = queryEmbedding
-      ? linkedProfiles.length > 0
+      ? retrievalScopes.length > 1
         ? await retrieveVaultChunksAcrossProfiles(
             supabase,
             queryEmbedding,
-            searchScopes,
+            retrievalScopes,
             showPictures ? 8 : 5
           )
         : (
@@ -874,10 +1002,10 @@ export async function POST(request: Request) {
     const dailyLogs = await retrieveRelevantDailyLogs(supabase, {
       userId: user.id,
       profileId: active.id,
-      profileIds: searchIds,
+      profileIds: allSearchIds,
       profileNames,
       question,
-      limit: linkedProfiles.length > 0 ? 4 : 3,
+      limit: retrievalScopes.length > 1 ? 4 : 3,
     });
     const logContext = formatDailyLogsForGideon(dailyLogs, profileNames);
     const linkedContext = await loadLinkedOrgContext(
@@ -932,6 +1060,12 @@ export async function POST(request: Request) {
     const transcriptionMode = wantsTranscription(question);
     const transcriptionNote = transcriptionMode ? GIDEON_TRANSCRIPTION_NOTE : "";
     const attachedNote = attachedDoc ? GIDEON_ATTACHED_DOCUMENT_NOTE : "";
+    const crossVaultNote =
+      usedCrossVault && crossVaultProfile
+        ? `${GIDEON_CROSS_VAULT_NOTE}
+
+Active vault: ${active.display_name}. Cross-vault search: ${crossVaultProfile.display_name}.`
+        : "";
 
     const profileKind = suggestionKindFrom(active.profile_type);
     const system = `${withVaultPersonality(VAULT_CHAT_SYSTEM, profileKind)}
@@ -943,6 +1077,7 @@ ${vaultEmptyNote}
 ${reminderNote}
 ${transcriptionNote}
 ${attachedNote}
+${crossVaultNote}
 
 --- RETRIEVED EXCERPTS ---
 ${formatted.context.trim() || "(none)"}
@@ -1052,9 +1187,16 @@ ${workMemoryContext.trim() || "(none — user has no active work projects)"}
     );
   }
 
-  const chatUpdates: { updated_at: string; title?: string } = {
+  const chatUpdates: {
+    updated_at: string;
+    title?: string;
+    scoped_profile_id?: string | null;
+  } = {
     updated_at: new Date().toISOString(),
   };
+  if (usedCrossVault && crossVaultProfile) {
+    chatUpdates.scoped_profile_id = crossVaultProfile.id;
+  }
   if (
     shouldGenerateVaultChatTitle({ isFirstExchange, question })
   ) {
@@ -1084,12 +1226,30 @@ ${workMemoryContext.trim() || "(none — user has no active work projects)"}
   const chats = await listChats(supabase, user.id, active.id);
   const proposedReminder = parseProposedReminder(answer);
   const newlyGranted = await refreshUserAwards(user.id, supabase);
+  const vaultScope =
+    usedCrossVault && crossVaultProfile
+      ? {
+          profileId: crossVaultProfile.id,
+          profileName: crossVaultProfile.display_name,
+          activeProfileName: active.display_name,
+        }
+      : null;
 
   return NextResponse.json({
     chatId,
     chats,
-    messages: [userMsg, assistantMsg] as ChatMessageRow[],
+    messages: [
+      userMsg,
+      { ...assistantMsg, vaultScope },
+    ] as ChatMessageRow[],
     proposedReminder,
     newlyGranted,
+    vaultScope,
+    chatScopedProfile: usedCrossVault
+      ? {
+          profileId: crossVaultProfile!.id,
+          profileName: crossVaultProfile!.display_name,
+        }
+      : null,
   });
 }

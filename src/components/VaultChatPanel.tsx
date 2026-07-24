@@ -27,6 +27,7 @@ import {
   Plus,
   Send,
   X,
+  ArrowRightLeft,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import GideonAvatar from "@/components/GideonAvatar";
@@ -271,6 +272,11 @@ type VaultMessage = {
   content: string;
   citations?: Citation[] | null;
   attachment?: VaultMessageAttachment | null;
+  vaultScope?: {
+    profileId: string;
+    profileName: string;
+    activeProfileName: string;
+  } | null;
   created_at: string;
 };
 
@@ -320,6 +326,10 @@ type Meta = {
   vaultScopeNote?: string;
   templateLabel?: string;
   templateBadge?: string;
+  chatScopedProfile?: {
+    profileId: string;
+    profileName: string;
+  } | null;
   guidance?: {
     headline: string;
     intro: string;
@@ -409,6 +419,12 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
   const [confirmedReminderIds, setConfirmedReminderIds] = useState<Set<string>>(
     () => new Set()
   );
+  const [dismissedVaultScopeIds, setDismissedVaultScopeIds] = useState<
+    Set<string>
+  >(() => new Set());
+  const [switchingVaultScopeId, setSwitchingVaultScopeId] = useState<
+    string | null
+  >(null);
   const [vaultBusy, setVaultBusy] = useState(false);
   const [vaultStatus, setVaultStatus] = useState<string | null>(null);
   const [pendingAttachment, setPendingAttachment] =
@@ -737,6 +753,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     setError(null);
     setActiveChatId(null);
     setMessages([]);
+    setDismissedVaultScopeIds(new Set());
     setSidebarOpen(false);
     try {
       await loadMetaAndChats();
@@ -885,6 +902,42 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     setReminderDate(defaults.date);
     setReminderTime(defaults.time);
     setReminderOpen(true);
+  };
+
+  const dismissVaultScope = async (messageId: string) => {
+    setDismissedVaultScopeIds((prev) => new Set(prev).add(messageId));
+    if (!activeChatId) return;
+    try {
+      await fetch("/api/documents/vault-chat", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chatId: activeChatId,
+          clearScopedProfile: true,
+        }),
+      });
+      setMeta((prev) =>
+        prev ? { ...prev, chatScopedProfile: null } : prev
+      );
+    } catch {
+      /* non-blocking */
+    }
+  };
+
+  const continueInScopedVault = async (profileId: string, messageId: string) => {
+    setSwitchingVaultScopeId(messageId);
+    try {
+      const ok = await switchProfile(profileId);
+      if (ok) {
+        await refresh();
+        setDismissedVaultScopeIds((prev) => new Set(prev).add(messageId));
+        setMeta((prev) =>
+          prev ? { ...prev, chatScopedProfile: null } : prev
+        );
+      }
+    } finally {
+      setSwitchingVaultScopeId(null);
+    }
   };
 
   const saveInlineReminder = async (e: FormEvent) => {
@@ -1071,6 +1124,8 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
         messages?: VaultMessage[];
         chatId?: string;
         chats?: ChatSummary[];
+        vaultScope?: VaultMessage["vaultScope"];
+        chatScopedProfile?: Meta["chatScopedProfile"];
       };
       if (!res.ok) {
         if (options?.replaceUserMessageId) {
@@ -1089,6 +1144,13 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
       }
       if (body.chats) setChats(body.chats);
       if (body.chatId) setActiveChatId(body.chatId);
+      if (body.chatScopedProfile !== undefined) {
+        setMeta((prev) =>
+          prev
+            ? { ...prev, chatScopedProfile: body.chatScopedProfile ?? null }
+            : prev
+        );
+      }
       const turn = body.messages ?? [];
       const optimisticAttachment = options?.attachment;
       const mergedTurn = turn.map((m, index) => {
@@ -1253,6 +1315,12 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     const linkOnlyCitations = options?.hideCitationPreviews ? [] : sourceCitations;
     const alreadySet = confirmedReminderIds.has(m.id);
     const confirming = confirmingReminderId === m.id;
+    const vaultScope = m.vaultScope;
+    const showVaultScopeCard =
+      vaultScope &&
+      !dismissedVaultScopeIds.has(m.id) &&
+      vaultScope.profileId !== active?.id;
+    const switchingVault = switchingVaultScopeId === m.id;
 
     return (
       <div className="min-w-0 flex-1 space-y-2">
@@ -1330,6 +1398,43 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
                 </button>
               </div>
             )}
+          </div>
+        ) : null}
+        {showVaultScopeCard ? (
+          <div className="rounded-xl border border-sky-200 bg-sky-50/90 px-3 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-sky-900/70">
+              Answered from another vault
+            </p>
+            <p className="mt-1 text-sm text-foreground">
+              This came from <span className="font-medium">{vaultScope.profileName}</span>
+              &apos;s vault. You&apos;re still in{" "}
+              <span className="font-medium">{vaultScope.activeProfileName}</span>.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={switchingVault || sending || vaultBusy}
+                onClick={() =>
+                  void continueInScopedVault(vaultScope.profileId, m.id)
+                }
+                className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand/90 disabled:opacity-60"
+              >
+                {switchingVault ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <ArrowRightLeft className="h-3.5 w-3.5" />
+                )}
+                Continue in {vaultScope.profileName}&apos;s vault
+              </button>
+              <button
+                type="button"
+                disabled={switchingVault}
+                onClick={() => void dismissVaultScope(m.id)}
+                className="inline-flex items-center rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50"
+              >
+                Stay in {vaultScope.activeProfileName}
+              </button>
+            </div>
           </div>
         ) : null}
         {linkOnlyCitations.length > 0 ? (
@@ -1770,6 +1875,17 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
           </p>
           <p className="text-[11px] text-ink-muted">
             {meta.vaultScopeNote ?? VAULT_SCOPE_NOTE}
+            {meta.chatScopedProfile &&
+            meta.chatScopedProfile.profileId !== active?.id ? (
+              <>
+                {" "}
+                This chat is also using{" "}
+                <span className="font-medium text-foreground">
+                  {meta.chatScopedProfile.profileName}
+                </span>
+                &apos;s vault for follow-ups.
+              </>
+            ) : null}
           </p>
         </div>
       </div>
