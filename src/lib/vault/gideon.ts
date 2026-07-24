@@ -50,6 +50,11 @@ export function wantsTranscription(question: string): boolean {
   );
 }
 
+export const GIDEON_ATTACHED_DOCUMENT_NOTE = `Attached document:
+- The user attached a specific file to this message (see ATTACHED DOCUMENT below and/or the image in their message).
+- Answer using that attachment. Do not say the image or file is missing.
+- For photos: describe what you see when asked; transcribe visible text or lists when asked.`;
+
 export const GIDEON_TRANSCRIPTION_NOTE = `Transcription mode:
 - The user wants a readable transcription or list from their vault (often a photo or scan).
 - Lead with a short friendly title if helpful (e.g. "Book names"), then a clean numbered list.

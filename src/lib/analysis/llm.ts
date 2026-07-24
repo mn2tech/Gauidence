@@ -390,6 +390,32 @@ export async function runPlainText(
   }
 }
 
+function imageBlockFromBase64(
+  mimeType: string,
+  base64: string
+): Anthropic.Messages.ImageBlockParam | null {
+  const media =
+    mimeType === "image/jpg"
+      ? "image/jpeg"
+      : mimeType.toLowerCase();
+  if (
+    media !== "image/jpeg" &&
+    media !== "image/png" &&
+    media !== "image/gif" &&
+    media !== "image/webp"
+  ) {
+    return null;
+  }
+  return {
+    type: "image",
+    source: {
+      type: "base64",
+      media_type: media,
+      data: base64,
+    },
+  };
+}
+
 /** Multi-turn chat for Ask-your-document (text-only messages). */
 export async function runChatCompletion(
   client: LlmClient,
@@ -398,19 +424,43 @@ export async function runChatCompletion(
     messages: { role: "user" | "assistant"; content: string }[];
     model?: string;
     maxTokens?: number;
+    /** When set, the image is included on the final user turn (Ask Gideon attachment). */
+    attachedImage?: { mimeType: string; base64: string; fileName: string };
   }
 ): Promise<string> {
   try {
     const model = args.model ?? ANALYSIS_MODEL;
+    const messages: Anthropic.Messages.MessageParam[] = args.messages.map(
+      (m, index) => {
+        const isLastUser =
+          m.role === "user" && index === args.messages.length - 1;
+        if (
+          isLastUser &&
+          args.attachedImage &&
+          args.attachedImage.base64.trim()
+        ) {
+          const parts: ContentPart[] = [
+            {
+              type: "text",
+              text: `Attached file: ${args.attachedImage.fileName}\n\n${m.content}`,
+            },
+          ];
+          const imageBlock = imageBlockFromBase64(
+            args.attachedImage.mimeType,
+            args.attachedImage.base64
+          );
+          if (imageBlock) parts.push(imageBlock);
+          return { role: "user", content: parts };
+        }
+        return { role: m.role, content: m.content };
+      }
+    );
     const response = await client.messages.create({
       model,
       max_tokens: args.maxTokens ?? 2048,
       temperature: 0,
       system: args.system,
-      messages: args.messages.map((m) => ({
-        role: m.role,
-        content: m.content,
-      })),
+      messages,
     });
     captureAnthropicUsage(model, response.usage);
     const textBlock = response.content.find((b) => b.type === "text");

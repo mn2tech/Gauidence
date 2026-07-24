@@ -35,6 +35,7 @@ import {
   firstNameFrom,
   getVaultTemplate,
   gideonChatContextLabel,
+  GIDEON_ATTACHED_DOCUMENT_NOTE,
   GIDEON_TRANSCRIPTION_NOTE,
   VAULT_SCOPE_NOTE,
   wantsTranscription,
@@ -42,6 +43,10 @@ import {
   type SuggestionProfileKind,
   type VaultDocHint,
 } from "@/lib/vault/gideon";
+import {
+  loadAttachedVaultDocument,
+} from "@/lib/vault/attachedDocument";
+import { mergePinnedChunks } from "@/lib/vault/retrieve";
 import { getActiveGuardianProfile } from "@/lib/profiles/server";
 import {
   askGideonContextLabel,
@@ -634,11 +639,13 @@ export async function POST(request: Request) {
   let questionRaw: unknown;
   let chatIdRaw: unknown;
   let workProjectIdRaw: unknown;
+  let attachmentDocumentIdRaw: unknown;
   try {
     const body = await request.json();
     questionRaw = body.question;
     chatIdRaw = body.chatId;
     workProjectIdRaw = body.workProjectId;
+    attachmentDocumentIdRaw = body.attachmentDocumentId;
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
@@ -818,9 +825,22 @@ export async function POST(request: Request) {
 
   try {
     const showPictures = wantsShowPictures(question);
+    const attachmentDocumentId =
+      typeof attachmentDocumentIdRaw === "string"
+        ? attachmentDocumentIdRaw.trim()
+        : "";
+    const attachedDoc = attachmentDocumentId
+      ? await loadAttachedVaultDocument(supabase, {
+          userId: user.id,
+          documentId: attachmentDocumentId,
+          allowedProfileIds: searchIds,
+          profileNames,
+        })
+      : null;
+
     const queryEmbedding =
       (chunkCount ?? 0) > 0 ? await embedQuery(question) : null;
-    const chunks = queryEmbedding
+    const retrievedChunks = queryEmbedding
       ? linkedProfiles.length > 0
         ? await retrieveVaultChunksAcrossProfiles(
             supabase,
@@ -841,6 +861,10 @@ export async function POST(request: Request) {
             profile_name: active.display_name,
           }))
       : [];
+    const chunks = mergePinnedChunks(
+      attachedDoc?.chunks ?? [],
+      retrievedChunks
+    );
     const formatted = formatRetrievalContext(chunks);
     const dailyLogs = await retrieveRelevantDailyLogs(supabase, {
       userId: user.id,
@@ -882,8 +906,17 @@ export async function POST(request: Request) {
     const pictureNote = showPictures
       ? `The user wants to see pictures. Prefer naming image file names from the retrieved excerpts (jpg/png/webp/etc.) so the UI can display them. If no image files were retrieved, say so clearly.`
       : "";
+    const attachedContext = attachedDoc
+      ? [
+          `File: ${attachedDoc.fileName}`,
+          attachedDoc.sourceText
+            ? `Document text (OCR/native):\n${attachedDoc.sourceText.slice(0, 12000)}`
+            : "(no extracted text — use the attached image if present)",
+        ].join("\n\n")
+      : "";
     const vaultEmptyNote =
       !formatted.context.trim() &&
+      !attachedContext.trim() &&
       !logContext.trim() &&
       !linkedContext.trim()
         ? "No vault excerpts, Daily Logs, or linked profile structure matched this question (or the vault is empty). Do not invent vault facts. Use ## GENERAL KNOWLEDGE for general questions, and ## GIDEON'S SUGGESTION to upload documents when that would help."
@@ -893,6 +926,7 @@ export async function POST(request: Request) {
     const reminderNote = reminderAgent ? REMINDER_AGENT_SYSTEM_NOTE : "";
     const transcriptionMode = wantsTranscription(question);
     const transcriptionNote = transcriptionMode ? GIDEON_TRANSCRIPTION_NOTE : "";
+    const attachedNote = attachedDoc ? GIDEON_ATTACHED_DOCUMENT_NOTE : "";
 
     const profileKind = suggestionKindFrom(active.profile_type);
     const system = `${withVaultPersonality(VAULT_CHAT_SYSTEM, profileKind)}
@@ -903,10 +937,15 @@ ${pictureNote}
 ${vaultEmptyNote}
 ${reminderNote}
 ${transcriptionNote}
+${attachedNote}
 
 --- RETRIEVED EXCERPTS ---
 ${formatted.context.trim() || "(none)"}
 --- END EXCERPTS ---
+
+--- ATTACHED DOCUMENT (user sent with this message) ---
+${attachedContext.trim() || "(none)"}
+--- END ATTACHED DOCUMENT ---
 
 --- RETRIEVED DAILY LOGS (user-entered notes; vault owner labeled when linked) ---
 ${logContext.trim() || "(none)"}
@@ -928,6 +967,15 @@ ${workMemoryContext.trim() || "(none — user has no active work projects)"}
           model: CHAT_MODEL,
           maxTokens: reminderAgent ? 1100 : transcriptionMode ? 1200 : 900,
           messages: [...history, { role: "user", content: question }],
+          ...(attachedDoc?.isImage && attachedDoc.imageBase64
+            ? {
+                attachedImage: {
+                  mimeType: attachedDoc.mimeType,
+                  base64: attachedDoc.imageBase64,
+                  fileName: attachedDoc.fileName,
+                },
+              }
+            : {}),
         })
     );
     if (!answer) {
@@ -935,6 +983,20 @@ ${workMemoryContext.trim() || "(none — user has no active work projects)"}
         "I found potentially relevant information, but it needs verification before I can give you a reliable answer.";
     }
     let selected = selectCitationsForAnswer(answer, chunks);
+    if (attachedDoc) {
+      const attachedCitation = {
+        documentId: attachedDoc.documentId,
+        fileName: attachedDoc.fileName,
+        ...(attachedDoc.profileName
+          ? { profileName: attachedDoc.profileName }
+          : {}),
+        ...(attachedDoc.isImage ? { isImage: true } : {}),
+      };
+      const seen = new Set(selected.map((c) => c.documentId));
+      if (!seen.has(attachedDoc.documentId)) {
+        selected = [attachedCitation, ...selected];
+      }
+    }
     if (showPictures) {
       const imageLimit = wantsSingleImageFocus(question) ? 1 : 4;
       const imageOnes = selectImageCitationsFromChunks(chunks, imageLimit);

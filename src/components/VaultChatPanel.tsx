@@ -1056,6 +1056,10 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
         body: JSON.stringify({
           question,
           chatId: activeChatId,
+          ...(options?.attachment?.documentId &&
+          !isPendingAttachmentId(options.attachment.documentId)
+            ? { attachmentDocumentId: options.attachment.documentId }
+            : {}),
           ...(requestedWorkProjectId
             ? { workProjectId: requestedWorkProjectId }
             : {}),

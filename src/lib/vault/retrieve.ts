@@ -64,6 +64,17 @@ export function formatRetrievalContext(chunks: RetrievedChunk[]): {
   };
 }
 
+/** Prepend pinned chunks and drop duplicates from semantic retrieval. */
+export function mergePinnedChunks(
+  pinned: RetrievedChunk[],
+  retrieved: RetrievedChunk[]
+): RetrievedChunk[] {
+  if (pinned.length === 0) return retrieved;
+  const pinnedIds = new Set(pinned.map((c) => c.id));
+  const rest = retrieved.filter((c) => !pinnedIds.has(c.id));
+  return [...pinned, ...rest];
+}
+
 export type VaultCitation = {
   documentId: string;
   fileName: string;
