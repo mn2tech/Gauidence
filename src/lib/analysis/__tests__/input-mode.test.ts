@@ -53,7 +53,22 @@ describe("analysis input mode", () => {
         text: "A".repeat(100),
       },
     });
-    assert.equal(resolveAnalysisInputMode(c), "hybrid");
+    assert.equal(resolveAnalysisInputMode(c), "text");
+  });
+
+  it("routes multi-page contracts with good text to text mode (not full PDF visual)", () => {
+    const c = detectDocumentCharacteristics({
+      mimeType: "application/pdf",
+      extraction: {
+        quality: 0.82,
+        pageCount: 4,
+        charCount: 12_000,
+        text: "A".repeat(500),
+      },
+    });
+    assert.equal(c.likelyVisuallyStructured, false);
+    assert.equal(c.likelyTextHeavy, true);
+    assert.equal(resolveAnalysisInputMode(c), "text");
   });
 
   it("routes pasted plain text to text mode", () => {

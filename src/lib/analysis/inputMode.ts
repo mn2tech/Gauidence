@@ -37,19 +37,20 @@ export function detectDocumentCharacteristics(args: {
   const nativeTextQuality = args.extraction.quality;
   const hasNativeText = (args.extraction.text ?? "").trim().length >= 40;
 
+  const charCount = args.extraction.charCount;
+
   const likelyVisuallyStructured =
     !isPlainText &&
     (isImage ||
-      (isPdf && (pageCount == null || pageCount <= 4)) ||
-      (isPdf && nativeTextQuality < 0.45));
+      (isPdf && nativeTextQuality < 0.45) ||
+      (isPdf && !hasNativeText && (pageCount == null || pageCount <= 4)));
 
   const likelyTextHeavy =
     isPlainText ||
     (isPdf &&
-      pageCount != null &&
-      pageCount >= 8 &&
+      hasNativeText &&
       nativeTextQuality >= 0.5 &&
-      hasNativeText);
+      (charCount >= 4_000 || (pageCount != null && pageCount >= 5)));
 
   return {
     mimeType: args.mimeType,

@@ -38,6 +38,7 @@ import {
   type AnalysisInputMode,
 } from "./inputMode";
 import { capSourceText } from "@/lib/vault/sourceText";
+import { classificationFromFileName } from "./filenameHints";
 
 /** Max chars stored/indexed from extraction (large PDFs are truncated). */
 export { SOURCE_TEXT_MAX_CHARS, capSourceText } from "@/lib/vault/sourceText";
@@ -177,7 +178,9 @@ export async function runAnalysisPipeline(
   };
 
   await onProgress?.("classifying");
-  const classification = await classifyDocument(client, enriched);
+  const fileNameHint = classificationFromFileName(file.fileName);
+  const classification =
+    fileNameHint ?? (await classifyDocument(client, enriched));
   const routedTo = resolveAnalyzerType(classification, IMPLEMENTED_SPECIALISTS);
 
   await onProgress?.("analyzing");
