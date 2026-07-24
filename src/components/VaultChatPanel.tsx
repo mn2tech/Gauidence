@@ -114,6 +114,10 @@ function fileTypeBadge(fileName: string): string {
   return ext;
 }
 
+function isPendingAttachmentId(documentId: string): boolean {
+  return documentId.startsWith("local-");
+}
+
 function VaultAttachmentCard({
   documentId,
   fileName,
@@ -127,20 +131,26 @@ function VaultAttachmentCard({
   previewUrl?: string | null;
   compact?: boolean;
 }) {
-  const [url, setUrl] = useState<string | null>(previewUrl ?? null);
-  const [failed, setFailed] = useState(false);
+  const [openUrl, setOpenUrl] = useState<string | null>(previewUrl ?? null);
+  const [imageFailed, setImageFailed] = useState(false);
   const isImage = kind === "image" || isImageFileName(fileName);
+  const pending = isPendingAttachmentId(documentId);
 
   useEffect(() => {
+    setImageFailed(false);
     if (previewUrl) {
-      setUrl(previewUrl);
+      setOpenUrl(previewUrl);
+      return;
+    }
+    if (pending) {
+      setOpenUrl(null);
       return;
     }
     let cancelled = false;
     void (async () => {
       const supabase = createClient();
       if (!supabase) {
-        if (!cancelled) setFailed(true);
+        if (!cancelled && isImage) setImageFailed(true);
         return;
       }
       const { data: doc } = await supabase
@@ -149,7 +159,7 @@ function VaultAttachmentCard({
         .eq("id", documentId)
         .maybeSingle();
       if (!doc?.file_path) {
-        if (!cancelled) setFailed(true);
+        if (!cancelled && isImage) setImageFailed(true);
         return;
       }
       const { data, error } = await supabase.storage
@@ -157,25 +167,25 @@ function VaultAttachmentCard({
         .createSignedUrl(doc.file_path, 300);
       if (cancelled) return;
       if (error || !data?.signedUrl) {
-        setFailed(true);
+        if (isImage) setImageFailed(true);
         return;
       }
-      setUrl(data.signedUrl);
+      setOpenUrl(data.signedUrl);
     })();
     return () => {
       cancelled = true;
     };
-  }, [documentId, previewUrl]);
+  }, [documentId, previewUrl, pending, isImage]);
 
   const badge = fileTypeBadge(fileName);
   const shell = compact
     ? "inline-flex w-[7.5rem] flex-col overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm"
     : "block overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm";
 
-  if (failed) {
+  if (imageFailed && isImage) {
     return (
-      <div className={`${shell} p-2 text-[10px] text-ink-muted`}>
-        Couldn&apos;t load {fileName}
+      <div className={`${shell} p-2 text-[10px] text-ink-muted`} title={fileName}>
+        Couldn&apos;t load preview
       </div>
     );
   }
@@ -188,11 +198,9 @@ function VaultAttachmentCard({
           : "flex min-h-[8rem] items-center justify-center bg-stone-50"
       }
     >
-      {!url ? (
-        <Loader2 className="h-4 w-4 animate-spin text-ink-muted" />
-      ) : isImage ? (
+      {isImage && openUrl ? (
         <img
-          src={url}
+          src={openUrl}
           alt={fileName}
           className={
             compact
@@ -200,6 +208,8 @@ function VaultAttachmentCard({
               : "max-h-72 w-full object-contain"
           }
         />
+      ) : isImage && (pending || !openUrl) ? (
+        <Loader2 className="h-4 w-4 animate-spin text-ink-muted" />
       ) : (
         <FileText className="h-8 w-8 text-brand" />
       )}
@@ -212,34 +222,30 @@ function VaultAttachmentCard({
     </div>
   );
 
-  if (!url && !isImage) {
-    return (
-      <div className={shell}>
-        {thumb}
-        {footer}
-      </div>
-    );
-  }
+  const body = (
+    <>
+      {thumb}
+      {footer}
+    </>
+  );
 
-  if (url) {
+  if (openUrl) {
     return (
       <a
-        href={url}
+        href={openUrl}
         target="_blank"
         rel="noopener noreferrer"
         className={shell}
         title={fileName}
       >
-        {thumb}
-        {footer}
+        {body}
       </a>
     );
   }
 
   return (
     <div className={shell} title={fileName}>
-      {thumb}
-      {footer}
+      {body}
     </div>
   );
 }
