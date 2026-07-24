@@ -8,24 +8,32 @@ export const runtime = "nodejs";
 /**
  * One-time product email: Gideon chat attachments.
  * POST with optional JSON body: { "dryRun": true, "limit": 5 }
+ * Auth: platform admin session, or Bearer CRON_SECRET for scripted sends.
  */
 export async function POST(request: Request) {
-  const supabase = await createClient();
-  if (!supabase) {
-    return NextResponse.json(
-      { error: "Sign-in isn't configured on this deployment." },
-      { status: 503 }
-    );
-  }
+  const secret = process.env.CRON_SECRET;
+  const bearer = request.headers.get("authorization");
+  const cronOk =
+    Boolean(secret) && bearer === `Bearer ${secret}`;
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "You need to be signed in." }, { status: 401 });
-  }
-  if (!isPlatformAdmin(user.email)) {
-    return NextResponse.json({ error: "Not found." }, { status: 404 });
+  if (!cronOk) {
+    const supabase = await createClient();
+    if (!supabase) {
+      return NextResponse.json(
+        { error: "Sign-in isn't configured on this deployment." },
+        { status: 503 }
+      );
+    }
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "You need to be signed in." }, { status: 401 });
+    }
+    if (!isPlatformAdmin(user.email)) {
+      return NextResponse.json({ error: "Not found." }, { status: 404 });
+    }
   }
 
   let dryRun = false;
