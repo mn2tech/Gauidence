@@ -12,10 +12,13 @@ type ExtractedRow = {
   document_type: string | null;
   warnings: unknown;
   specialist: unknown;
+  source_text: string | null;
+  source_text_indexed_at: string | null;
 };
 
 /**
- * Index analyzed documents for one profile that have no chunks yet.
+ * Index analyzed documents for one profile that have no chunks yet,
+ * or have stored source_text that has not been embedded yet.
  */
 export async function ensureUserVaultIndexed(
   supabase: SupabaseClient,
@@ -29,7 +32,7 @@ export async function ensureUserVaultIndexed(
   const { data: extracted, error } = await supabase
     .from("extracted_data")
     .select(
-      "document_id, summary, facts, title, document_type, warnings, specialist"
+      "document_id, summary, facts, title, document_type, warnings, specialist, source_text, source_text_indexed_at"
     )
     .eq("profile_id", profileId);
 
@@ -57,7 +60,12 @@ export async function ensureUserVaultIndexed(
 
   let indexedDocs = 0;
   for (const row of extracted as ExtractedRow[]) {
-    if (already.has(row.document_id)) continue;
+    const hasSourceText = Boolean(row.source_text?.trim());
+    const sourceNotIndexed =
+      hasSourceText && row.source_text_indexed_at == null;
+    const needsIndex = !already.has(row.document_id) || sourceNotIndexed;
+    if (!needsIndex) continue;
+
     const fileName = nameById.get(row.document_id);
     if (!fileName) continue;
 
@@ -82,6 +90,7 @@ export async function ensureUserVaultIndexed(
             row.specialist && typeof row.specialist === "object"
               ? (row.specialist as Record<string, unknown>)
               : null,
+          sourceText: row.source_text,
         },
       });
       if (result.indexed > 0) indexedDocs += 1;

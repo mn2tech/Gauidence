@@ -13,6 +13,8 @@ export type VaultIndexSource = {
   facts?: { label?: string; value?: string; source?: string }[] | null;
   warnings?: string[] | null;
   specialist?: Record<string, unknown> | null;
+  /** Full native/OCR text from analysis extraction. */
+  sourceText?: string | null;
 };
 
 /**
@@ -53,6 +55,19 @@ export function buildVaultIndexText(source: VaultIndexSource): string {
   return lines.join("\n").trim();
 }
 
+function hasAnalysisBody(source: VaultIndexSource): boolean {
+  return (
+    Boolean(source.summary?.trim()) ||
+    (Array.isArray(source.facts) &&
+      source.facts.some((f) => String(f.value ?? "").trim())) ||
+    Boolean(source.title?.trim())
+  );
+}
+
+function hasIndexableContent(source: VaultIndexSource): boolean {
+  return hasAnalysisBody(source) || Boolean(source.sourceText?.trim());
+}
+
 /**
  * Split text into overlapping chunks for embedding.
  */
@@ -89,14 +104,31 @@ export function chunkText(
   return chunks;
 }
 
+/**
+ * Build embedding chunks from structured analysis + full document text.
+ */
 export function prepareVaultChunks(source: VaultIndexSource): string[] {
-  const text = buildVaultIndexText(source);
-  // Filename-only stubs are not worth indexing.
-  const hasBody =
-    Boolean(source.summary?.trim()) ||
-    (Array.isArray(source.facts) &&
-      source.facts.some((f) => String(f.value ?? "").trim())) ||
-    Boolean(source.title?.trim());
-  if (!hasBody) return [];
-  return chunkText(text);
+  if (!hasIndexableContent(source)) return [];
+
+  const chunks: string[] = [];
+  const fileName = source.fileName;
+
+  if (hasAnalysisBody(source)) {
+    chunks.push(...chunkText(buildVaultIndexText(source)));
+  }
+
+  const sourceText = source.sourceText?.replace(/\r\n/g, "\n").trim();
+  if (sourceText) {
+    const bodyChunks = chunkText(sourceText);
+    for (let i = 0; i < bodyChunks.length; i++) {
+      const piece = bodyChunks[i]!;
+      const header =
+        i === 0 && !hasAnalysisBody(source)
+          ? `Document: ${fileName}\n\nDocument text:\n`
+          : `Document text (${fileName}):\n`;
+      chunks.push(`${header}${piece}`);
+    }
+  }
+
+  return chunks;
 }

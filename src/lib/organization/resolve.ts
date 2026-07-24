@@ -545,7 +545,9 @@ export async function resolveOrganizationSuggestion(
     const { indexDocumentForVault } = await import("@/lib/vault/indexDocument");
     const { data: extracted } = await supabase
       .from("extracted_data")
-      .select("title, summary, document_type, facts, warnings, specialist")
+      .select(
+        "title, summary, document_type, facts, warnings, specialist, source_text"
+      )
       .eq("document_id", row.document_id)
       .maybeSingle();
     const { data: docRow } = await supabase
@@ -567,6 +569,7 @@ export async function resolveOrganizationSuggestion(
           facts: extracted.facts,
           warnings: extracted.warnings,
           specialist: extracted.specialist,
+          sourceText: extracted.source_text,
         },
       });
     }

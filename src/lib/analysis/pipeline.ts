@@ -37,6 +37,10 @@ import {
   resolveAnalysisInputMode,
   type AnalysisInputMode,
 } from "./inputMode";
+import { capSourceText } from "@/lib/vault/sourceText";
+
+/** Max chars stored/indexed from extraction (large PDFs are truncated). */
+export { SOURCE_TEXT_MAX_CHARS, capSourceText } from "@/lib/vault/sourceText";
 
 export type PipelineProgress = (status: AnalysisStatus) => Promise<void> | void;
 
@@ -46,6 +50,8 @@ export type PipelineResult = {
   analysis: GuardianAnalysis;
   model: string;
   inputMode?: AnalysisInputMode;
+  /** Full extracted/OCR text (capped) for persistence and vault indexing. */
+  sourceText: string | null;
   diagnostic?: AnalysisDiagnostic;
 };
 
@@ -240,6 +246,7 @@ export async function runAnalysisPipeline(
     analysis,
     model: usedModel,
     inputMode,
+    sourceText: capSourceText(extraction.text),
   };
 
   if (isAnalysisDebugEnabled()) {

@@ -146,7 +146,7 @@ export async function POST(request: Request) {
         )
     );
 
-    const { analysis, classification, routedTo, model } = result;
+    const { analysis, classification, routedTo, model, sourceText } = result;
     const facts = toDisplayFacts(analysis, timeZone);
     const finalStatus: AnalysisStatus =
       analysis.guardian_status === "needs_verification"
@@ -181,6 +181,8 @@ export async function POST(request: Request) {
           amounts: analysis.amounts,
         },
         title: analysis.title,
+        source_text: sourceText,
+        source_text_indexed_at: null,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "document_id" }
@@ -238,6 +240,7 @@ export async function POST(request: Request) {
           facts,
           warnings: analysis.warnings,
           specialist: analysis.specialist,
+          sourceText,
         },
       });
     } catch (indexErr) {

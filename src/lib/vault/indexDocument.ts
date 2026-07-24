@@ -65,6 +65,13 @@ export async function indexDocumentForVault(
     throw new Error(`Failed to index document chunks: ${error.message}`);
   }
 
+  if (args.source.sourceText?.trim()) {
+    await args.supabase
+      .from("extracted_data")
+      .update({ source_text_indexed_at: new Date().toISOString() })
+      .eq("document_id", args.documentId);
+  }
+
   return { indexed: rows.length };
 }
 

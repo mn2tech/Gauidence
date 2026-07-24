@@ -41,6 +41,29 @@ describe("vault RAG chunking", () => {
       []
     );
   });
+
+  it("indexes full source text in addition to analysis", () => {
+    const chunks = prepareVaultChunks({
+      fileName: "flyer.pdf",
+      summary: "Summer camp registration.",
+      facts: [{ label: "Camp", value: "Lakeview", source: "document" }],
+      sourceText:
+        "Summer camp starts June 12. Bring sunscreen and a water bottle.",
+    });
+    assert.ok(chunks.length >= 2);
+    assert.ok(chunks.some((c) => /Summer camp registration/i.test(c)));
+    assert.ok(chunks.some((c) => /Document text/i.test(c) && /sunscreen/i.test(c)));
+  });
+
+  it("indexes source-only documents without analysis body", () => {
+    const chunks = prepareVaultChunks({
+      fileName: "notes.txt",
+      sourceText: "Meeting notes from Tuesday. Action item: send follow-up email.",
+    });
+    assert.equal(chunks.length, 1);
+    assert.match(chunks[0]!, /Document text:/);
+    assert.match(chunks[0]!, /follow-up email/);
+  });
 });
 
 describe("vault retrieval formatting", () => {
