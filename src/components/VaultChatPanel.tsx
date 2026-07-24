@@ -23,6 +23,7 @@ import {
   MessageSquarePlus,
   Mic,
   NotebookPen,
+  Paperclip,
   Plus,
   Send,
   X,
@@ -281,6 +282,16 @@ type PendingVaultAttachment = {
 
 function isImageUpload(file: File): boolean {
   return file.type.startsWith("image/");
+}
+
+function attachShortcutLabel(): string {
+  if (
+    typeof navigator !== "undefined" &&
+    /Mac|iPhone|iPad|iPod/.test(navigator.platform)
+  ) {
+    return "⌘U";
+  }
+  return "Ctrl+U";
 }
 
 type ChatSummary = {
@@ -698,6 +709,29 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
       document.removeEventListener("keydown", onKey);
     };
   }, [plusOpen]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "u") return;
+      if (vaultBusy || sending || !profileId) return;
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.isContentEditable ||
+          (target.tagName === "INPUT" &&
+            target.id !== inputId &&
+            (target as HTMLInputElement).type !== "file") ||
+          (target.tagName === "TEXTAREA" && target.id !== inputId))
+      ) {
+        return;
+      }
+      e.preventDefault();
+      setPlusOpen(false);
+      fileInputRef.current?.click();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [vaultBusy, sending, profileId, inputId]);
 
   const startNewChat = async () => {
     setError(null);
@@ -1545,7 +1579,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
                   onClick={openFilePicker}
                   className="inline-flex rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-stone-50 disabled:opacity-50"
                 >
-                  📄 Upload Document
+                  📄 Add files or photos
                 </button>
                 <button
                   type="button"
@@ -1816,8 +1850,21 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
               {plusOpen && (
                 <div
                   role="menu"
-                  className="absolute bottom-full left-0 z-50 mb-2 w-52 rounded-xl border border-stone-200 bg-white py-1 shadow-lg"
+                  className="absolute bottom-full left-0 z-50 mb-2 w-60 overflow-hidden rounded-xl border border-stone-200 bg-white py-1 shadow-lg"
                 >
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={vaultBusy || sending || !profileId}
+                    onClick={openFilePicker}
+                    className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm font-medium text-foreground hover:bg-stone-50 disabled:opacity-50"
+                  >
+                    <Paperclip className="h-4 w-4 shrink-0 text-ink-muted" />
+                    <span className="min-w-0 flex-1">Add files or photos</span>
+                    <span className="shrink-0 text-xs text-ink-muted">
+                      {attachShortcutLabel()}
+                    </span>
+                  </button>
                   <button
                     type="button"
                     role="menuitem"
@@ -1827,16 +1874,6 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
                   >
                     <Camera className="h-4 w-4 text-brand" />
                     Scan with camera
-                  </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    disabled={vaultBusy || sending || !profileId}
-                    onClick={openFilePicker}
-                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-medium text-foreground hover:bg-stone-50 disabled:opacity-50"
-                  >
-                    <FileUp className="h-4 w-4 text-brand" />
-                    Upload document
                   </button>
                   <button
                     type="button"
