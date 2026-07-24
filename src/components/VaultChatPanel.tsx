@@ -192,6 +192,16 @@ type VaultMessage = {
   created_at: string;
 };
 
+type PendingVaultAttachment = {
+  file: File;
+  previewUrl: string | null;
+  kind: "image" | "document";
+};
+
+function isImageUpload(file: File): boolean {
+  return file.type.startsWith("image/");
+}
+
 type ChatSummary = {
   id: string;
   title: string;
@@ -309,12 +319,15 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
   );
   const [vaultBusy, setVaultBusy] = useState(false);
   const [vaultStatus, setVaultStatus] = useState<string | null>(null);
+  const [pendingAttachment, setPendingAttachment] =
+    useState<PendingVaultAttachment | null>(null);
   const [orgSuggestion, setOrgSuggestion] =
     useState<OrganizationSuggestionPayload | null>(null);
   const [workProject, setWorkProject] = useState<WorkProject | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const plusRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pendingAttachmentRef = useRef<PendingVaultAttachment | null>(null);
   const profileSwitchRef = useRef(false);
   const deepLinkChatConsumed = useRef<string | null>(null);
   const workProjectPrefillDone = useRef(false);
@@ -338,6 +351,45 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     disabled: sending || vaultBusy || !profileId,
   });
   const docsHref = documentsHref(profileId);
+
+  pendingAttachmentRef.current = pendingAttachment;
+
+  useEffect(() => {
+    return () => {
+      const previewUrl = pendingAttachmentRef.current?.previewUrl;
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, []);
+
+  const revokePendingPreview = useCallback((previewUrl: string | null) => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+  }, []);
+
+  const clearPendingAttachment = useCallback(() => {
+    setPendingAttachment((prev) => {
+      if (prev?.previewUrl) revokePendingPreview(prev.previewUrl);
+      return null;
+    });
+  }, [revokePendingPreview]);
+
+  const stageVaultFile = useCallback(
+    (file: File) => {
+      if (!profileId || vaultBusy || sending) return;
+      setPlusOpen(false);
+      setCameraOpen(false);
+      setError(null);
+      setPendingAttachment((prev) => {
+        if (prev?.previewUrl) revokePendingPreview(prev.previewUrl);
+        const kind = isImageUpload(file) ? "image" : "document";
+        return {
+          file,
+          previewUrl: kind === "image" ? URL.createObjectURL(file) : null,
+          kind,
+        };
+      });
+    },
+    [profileId, vaultBusy, sending, revokePendingPreview]
+  );
 
   const loadMetaAndChats = useCallback(async () => {
     const res = await fetch("/api/documents/vault-chat");
@@ -645,17 +697,19 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     ]);
   };
 
-  const handleVaultFile = async (file: File) => {
-    if (!profileId || vaultBusy || sending) return;
-    setPlusOpen(false);
-    setCameraOpen(false);
+  const uploadVaultFile = async (file: File) => {
+    if (!profileId) {
+      throw new Error("Choose a vault before uploading.");
+    }
     setError(null);
     setVaultBusy(true);
     setVaultStatus("Uploading to your vault…");
 
     try {
       const supabase = createClient();
-      if (!supabase) throw new Error("Sign-in isn't available. Refresh and try again.");
+      if (!supabase) {
+        throw new Error("Sign-in isn't available. Refresh and try again.");
+      }
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -670,34 +724,8 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
       });
 
       await loadMetaAndChats().catch(() => undefined);
-      setVaultBusy(false);
-      setVaultStatus(null);
-
-      if (!result.analyzed) {
-        pushLocalNote(
-          `I added "${result.fileName}" to your vault, but analysis didn't finish${
-            result.analysisError ? `: ${result.analysisError}` : "."
-          }`
-        );
-        return;
-      }
-
-      if (
-        result.organizationSuggestion &&
-        (result.organizationSuggestion.status === "pending" ||
-          result.organizationAutoApplied)
-      ) {
-        setOrgSuggestion({
-          ...result.organizationSuggestion,
-          autoApplied: Boolean(result.organizationAutoApplied),
-        });
-      }
-
-      await sendQuestion(
-        `I just uploaded ${result.fileName}. What should I know from it?`
-      );
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed. Please try again.");
+      return result;
+    } finally {
       setVaultBusy(false);
       setVaultStatus(null);
     }
@@ -940,7 +968,53 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
 
   const send = async (e: React.FormEvent) => {
     e.preventDefault();
-    await sendQuestion(input);
+    const question = input.trim();
+    const attachment = pendingAttachment;
+    if ((!question && !attachment) || sending || vaultBusy) return;
+
+    if (attachment) {
+      const { file } = attachment;
+      clearPendingAttachment();
+      setInput("");
+
+      try {
+        const result = await uploadVaultFile(file);
+
+        if (!result.analyzed) {
+          pushLocalNote(
+            `I added "${result.fileName}" to your vault, but analysis didn't finish${
+              result.analysisError ? `: ${result.analysisError}` : "."
+            }`
+          );
+          return;
+        }
+
+        if (
+          result.organizationSuggestion &&
+          (result.organizationSuggestion.status === "pending" ||
+            result.organizationAutoApplied)
+        ) {
+          setOrgSuggestion({
+            ...result.organizationSuggestion,
+            autoApplied: Boolean(result.organizationAutoApplied),
+          });
+        }
+
+        const finalQuestion =
+          question ||
+          `I just uploaded ${result.fileName}. What should I know from it?`;
+        await sendQuestion(finalQuestion);
+      } catch (err) {
+        stageVaultFile(file);
+        if (question) setInput(question);
+        setError(
+          err instanceof Error ? err.message : "Upload failed. Please try again."
+        );
+      }
+      return;
+    }
+
+    await sendQuestion(question);
   };
 
   const renderAssistantContent = (m: VaultMessage) => {
@@ -1464,80 +1538,170 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
       className={
         isPage
           ? "shrink-0 border-t border-stone-200 bg-white px-4 py-3 sm:px-8"
-          : "mt-3 flex gap-2"
+          : "mt-3"
       }
     >
-      <div
-        className={
-          isPage
-            ? "mx-auto flex w-full max-w-3xl gap-2"
-            : "flex w-full gap-2"
-        }
-      >
-        <div className="relative shrink-0" ref={plusRef}>
-          <button
-            type="button"
-            onClick={() => setPlusOpen((o) => !o)}
-            aria-expanded={plusOpen}
-            aria-haspopup="menu"
-            aria-label="Add to vault"
-            disabled={vaultBusy || sending || !profileId}
-            className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50 ${
-              emptyVault
-                ? "border-brand/40 bg-brand-light text-brand hover:bg-brand/15"
-                : "border-stone-300 bg-white text-ink-muted hover:border-stone-400 hover:text-foreground"
-            }`}
-          >
-            <Plus className="h-4 w-4" />
-          </button>
-          {plusOpen && (
-            <div
-              role="menu"
-              className="absolute bottom-full left-0 z-20 mb-2 w-52 overflow-hidden rounded-xl border border-stone-200 bg-white py-1 shadow-lg"
-            >
+      <div className={isPage ? "mx-auto w-full max-w-3xl" : "w-full"}>
+        <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm focus-within:border-brand/40 focus-within:ring-2 focus-within:ring-brand/20">
+          {pendingAttachment ? (
+            <div className="px-3 pt-3">
+              <div className="group relative inline-flex">
+                {pendingAttachment.kind === "image" && pendingAttachment.previewUrl ? (
+                  <img
+                    src={pendingAttachment.previewUrl}
+                    alt={pendingAttachment.file.name}
+                    className="h-20 w-20 rounded-xl border border-stone-200 object-cover shadow-sm"
+                  />
+                ) : (
+                  <div className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-xl border border-stone-200 bg-stone-50 px-1 shadow-sm">
+                    <FileUp className="h-5 w-5 shrink-0 text-brand" />
+                    <span className="line-clamp-2 w-full px-1 text-center text-[10px] leading-tight text-ink-muted">
+                      {pendingAttachment.file.name}
+                    </span>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={clearPendingAttachment}
+                  disabled={sending || vaultBusy}
+                  aria-label={`Remove ${pendingAttachment.file.name}`}
+                  className="absolute -right-2 -top-2 inline-flex h-6 w-6 items-center justify-center rounded-full border border-stone-200 bg-white text-ink-muted shadow-sm transition hover:bg-stone-50 hover:text-foreground disabled:opacity-50"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          <div className="px-3 pt-2">
+            <label className="sr-only" htmlFor={inputId}>
+              Ask Gideon
+            </label>
+            <input
+              id={inputId}
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              disabled={sending || vaultBusy || voiceListening}
+              maxLength={2000}
+              placeholder={
+                voiceListening
+                  ? "Listening…"
+                  : pendingAttachment
+                    ? "Write a message…"
+                    : emptyVault
+                      ? "Ask anything — or use + to scan / upload…"
+                      : logsOnly
+                        ? "Ask about Daily Logs or anything else…"
+                        : "Ask about your documents or anything else…"
+              }
+              className="w-full border-0 bg-transparent py-1.5 text-sm outline-none placeholder:text-ink-muted disabled:opacity-50"
+            />
+          </div>
+
+          <div className="flex items-center justify-between gap-2 px-2 pb-2 pt-1">
+            <div className="relative shrink-0" ref={plusRef}>
               <button
                 type="button"
-                role="menuitem"
+                onClick={() => setPlusOpen((o) => !o)}
+                aria-expanded={plusOpen}
+                aria-haspopup="menu"
+                aria-label="Add to vault"
                 disabled={vaultBusy || sending || !profileId}
-                onClick={openCamera}
-                className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-medium text-foreground hover:bg-stone-50 disabled:opacity-50"
+                className={`inline-flex h-9 w-9 items-center justify-center rounded-full border transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50 ${
+                  emptyVault
+                    ? "border-brand/40 bg-brand-light text-brand hover:bg-brand/15"
+                    : "border-stone-300 bg-white text-ink-muted hover:border-stone-400 hover:text-foreground"
+                }`}
               >
-                <Camera className="h-4 w-4 text-brand" />
-                Scan with camera
+                <Plus className="h-4 w-4" />
               </button>
+              {plusOpen && (
+                <div
+                  role="menu"
+                  className="absolute bottom-full left-0 z-20 mb-2 w-52 overflow-hidden rounded-xl border border-stone-200 bg-white py-1 shadow-lg"
+                >
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={vaultBusy || sending || !profileId}
+                    onClick={openCamera}
+                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-medium text-foreground hover:bg-stone-50 disabled:opacity-50"
+                  >
+                    <Camera className="h-4 w-4 text-brand" />
+                    Scan with camera
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={vaultBusy || sending || !profileId}
+                    onClick={openFilePicker}
+                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-medium text-foreground hover:bg-stone-50 disabled:opacity-50"
+                  >
+                    <FileUp className="h-4 w-4 text-brand" />
+                    Upload document
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={vaultBusy || sending || !profileId}
+                    onClick={openLogForm}
+                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-medium text-foreground hover:bg-stone-50 disabled:opacity-50"
+                  >
+                    <NotebookPen className="h-4 w-4 text-brand" />
+                    Add daily log
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={vaultBusy || sending || !profileId}
+                    onClick={openReminderForm}
+                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-medium text-foreground hover:bg-stone-50 disabled:opacity-50"
+                  >
+                    <Bell className="h-4 w-4 text-brand" />
+                    Add reminder
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1">
+              {voiceSupported ? (
+                <button
+                  type="button"
+                  onClick={toggleVoice}
+                  aria-label={voiceListening ? "Stop listening" : "Talk to Gideon"}
+                  aria-pressed={voiceListening}
+                  disabled={sending || vaultBusy || !profileId}
+                  className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50 ${
+                    voiceListening
+                      ? "border-red-300 bg-red-50 text-red-600 hover:bg-red-100"
+                      : "border-stone-300 bg-white text-ink-muted hover:border-stone-400 hover:text-foreground"
+                  }`}
+                >
+                  <Mic className="h-4 w-4" />
+                </button>
+              ) : null}
               <button
-                type="button"
-                role="menuitem"
-                disabled={vaultBusy || sending || !profileId}
-                onClick={openFilePicker}
-                className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-medium text-foreground hover:bg-stone-50 disabled:opacity-50"
+                type="submit"
+                disabled={
+                  sending ||
+                  vaultBusy ||
+                  (!input.trim() && !pendingAttachment)
+                }
+                aria-label="Send question to Gideon"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-brand text-white transition hover:bg-brand-dark focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
               >
-                <FileUp className="h-4 w-4 text-brand" />
-                Upload document
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                disabled={vaultBusy || sending || !profileId}
-                onClick={openLogForm}
-                className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-medium text-foreground hover:bg-stone-50 disabled:opacity-50"
-              >
-                <NotebookPen className="h-4 w-4 text-brand" />
-                Add daily log
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                disabled={vaultBusy || sending || !profileId}
-                onClick={openReminderForm}
-                className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-medium text-foreground hover:bg-stone-50 disabled:opacity-50"
-              >
-                <Bell className="h-4 w-4 text-brand" />
-                Add reminder
+                {sending || vaultBusy ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
               </button>
             </div>
-          )}
+          </div>
         </div>
+
         <input
           ref={fileInputRef}
           type="file"
@@ -1546,62 +1710,9 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
           onChange={(e) => {
             const file = e.target.files?.[0];
             e.target.value = "";
-            if (file) void handleVaultFile(file);
+            if (file) stageVaultFile(file);
           }}
         />
-        <label className="sr-only" htmlFor={inputId}>
-          Ask Gideon
-        </label>
-        <input
-          id={inputId}
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          disabled={sending || vaultBusy || voiceListening}
-          maxLength={2000}
-          placeholder={
-            voiceListening
-              ? "Listening…"
-              : emptyVault
-                ? "Ask anything — or use + to scan / upload…"
-                : logsOnly
-                  ? "Ask about Daily Logs or anything else…"
-                  : "Ask about your documents or anything else…"
-          }
-          className={`min-w-0 flex-1 rounded-full border bg-white px-3 py-2.5 text-sm outline-none ring-brand focus:ring-2 disabled:opacity-50 ${
-            voiceListening
-              ? "border-brand/50 ring-1 ring-brand/30"
-              : "border-stone-200"
-          }`}
-        />
-        {voiceSupported ? (
-          <button
-            type="button"
-            onClick={toggleVoice}
-            aria-label={voiceListening ? "Stop listening" : "Talk to Gideon"}
-            aria-pressed={voiceListening}
-            disabled={sending || vaultBusy || !profileId}
-            className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50 ${
-              voiceListening
-                ? "border-red-300 bg-red-50 text-red-600 hover:bg-red-100"
-                : "border-stone-300 bg-white text-ink-muted hover:border-stone-400 hover:text-foreground"
-            }`}
-          >
-            <Mic className="h-4 w-4" />
-          </button>
-        ) : null}
-        <button
-          type="submit"
-          disabled={sending || vaultBusy || !input.trim()}
-          aria-label="Send question to Gideon"
-          className="inline-flex items-center justify-center rounded-full bg-brand px-3 py-2 text-white transition hover:bg-brand-dark focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
-        >
-          {sending || vaultBusy ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Send className="h-4 w-4" />
-          )}
-        </button>
       </div>
     </form>
   );
@@ -1611,7 +1722,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
       <CameraCaptureModal
         open={cameraOpen}
         onClose={() => setCameraOpen(false)}
-        onCapture={(file) => void handleVaultFile(file)}
+        onCapture={(file) => stageVaultFile(file)}
       />
       {orgSuggestion ? (
         <OrganizationSuggestionModal
