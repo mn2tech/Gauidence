@@ -1542,7 +1542,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
       }
     >
       <div className={isPage ? "mx-auto w-full max-w-3xl" : "w-full"}>
-        <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm focus-within:border-brand/40 focus-within:ring-2 focus-within:ring-brand/20">
+        <div className="relative rounded-2xl border border-stone-200 bg-white shadow-sm focus-within:border-brand/40 focus-within:ring-2 focus-within:ring-brand/20">
           {pendingAttachment ? (
             <div className="px-3 pt-3">
               <div className="group relative inline-flex">
@@ -1619,7 +1619,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
               {plusOpen && (
                 <div
                   role="menu"
-                  className="absolute bottom-full left-0 z-20 mb-2 w-52 overflow-hidden rounded-xl border border-stone-200 bg-white py-1 shadow-lg"
+                  className="absolute bottom-full left-0 z-50 mb-2 w-52 rounded-xl border border-stone-200 bg-white py-1 shadow-lg"
                 >
                   <button
                     type="button"
