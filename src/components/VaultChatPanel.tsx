@@ -1014,6 +1014,16 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     const uniqueCitations = [
       ...new Map(citations.map((c) => [c.documentId, c])).values(),
     ];
+    const imageCitations = [
+      ...new Map(
+        uniqueCitations
+          .filter((c) => c.isImage || isImageFileName(c.fileName))
+          .map((c) => [c.fileName.trim().toLowerCase(), c])
+      ).values(),
+    ];
+    const sourceCitations = uniqueCitations.filter(
+      (c) => !(c.isImage || isImageFileName(c.fileName))
+    );
     const alreadySet = confirmedReminderIds.has(m.id);
     const confirming = confirmingReminderId === m.id;
 
@@ -1081,25 +1091,27 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
             )}
           </div>
         ) : null}
-        {uniqueCitations.length > 0 && (
+        {imageCitations.length > 0 || sourceCitations.length > 0 ? (
           <div className="space-y-2 pt-1">
-            {uniqueCitations.some(
-              (c) => c.isImage || isImageFileName(c.fileName)
-            ) ? (
-              <div className="grid gap-2 sm:grid-cols-2">
-                {uniqueCitations
-                  .filter((c) => c.isImage || isImageFileName(c.fileName))
-                  .map((c) => (
-                    <CitationImagePreview
-                      key={`img-${c.documentId}`}
-                      documentId={c.documentId}
-                      fileName={c.fileName}
-                      profileName={c.profileName}
-                    />
-                  ))}
+            {imageCitations.length > 0 ? (
+              <div
+                className={
+                  imageCitations.length > 1
+                    ? "grid gap-2 sm:grid-cols-2"
+                    : "grid gap-2"
+                }
+              >
+                {imageCitations.map((c) => (
+                  <CitationImagePreview
+                    key={`img-${c.documentId}`}
+                    documentId={c.documentId}
+                    fileName={c.fileName}
+                    profileName={c.profileName}
+                  />
+                ))}
               </div>
             ) : null}
-            {uniqueCitations.map((c) => (
+            {sourceCitations.map((c) => (
               <div
                 key={c.documentId}
                 className="flex flex-wrap items-center gap-2 text-[11px] text-ink-muted"

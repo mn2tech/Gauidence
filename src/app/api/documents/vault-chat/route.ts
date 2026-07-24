@@ -17,9 +17,10 @@ import {
   selectCitationsForAnswer,
   selectImageCitationsFromChunks,
   markImageCitations,
+  dedupeVaultCitations,
   VAULT_CHAT_SYSTEM,
 } from "@/lib/vault/indexDocument";
-import { wantsShowPictures } from "@/lib/vault/images";
+import { wantsShowPictures, wantsSingleImageFocus } from "@/lib/vault/images";
 import { buildAskVaultInventory } from "@/lib/vault/askInventory";
 import { ensureUserVaultIndexed } from "@/lib/vault/ensureIndexed";
 import {
@@ -935,7 +936,8 @@ ${workMemoryContext.trim() || "(none — user has no active work projects)"}
     }
     let selected = selectCitationsForAnswer(answer, chunks);
     if (showPictures) {
-      const imageOnes = selectImageCitationsFromChunks(chunks, 4);
+      const imageLimit = wantsSingleImageFocus(question) ? 1 : 4;
+      const imageOnes = selectImageCitationsFromChunks(chunks, imageLimit);
       const seen = new Set(selected.map((c) => c.documentId));
       for (const img of imageOnes) {
         if (seen.has(img.documentId)) continue;
@@ -946,7 +948,7 @@ ${workMemoryContext.trim() || "(none — user has no active work projects)"}
         selected = imageOnes;
       }
     }
-    citations = markImageCitations(selected);
+    citations = markImageCitations(dedupeVaultCitations(selected));
   } catch (err) {
     if (err && typeof err === "object" && "status" in err && "message" in err) {
       return NextResponse.json(

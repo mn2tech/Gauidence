@@ -176,5 +176,22 @@ export function markImageCitations(
   }));
 }
 
+/** One citation per document and file name (avoids duplicate previews). */
+export function dedupeVaultCitations(
+  citations: VaultCitation[]
+): VaultCitation[] {
+  const byDocumentId = new Map<string, VaultCitation>();
+  for (const citation of citations) {
+    if (!citation.documentId) continue;
+    byDocumentId.set(citation.documentId, citation);
+  }
+  const byFileName = new Map<string, VaultCitation>();
+  for (const citation of byDocumentId.values()) {
+    const key = citation.fileName.trim().toLowerCase();
+    if (!byFileName.has(key)) byFileName.set(key, citation);
+  }
+  return [...byFileName.values()];
+}
+
 /** @deprecated Use GIDEON_SYSTEM — kept as alias for vault modules. */
 export const VAULT_CHAT_SYSTEM = GIDEON_SYSTEM;

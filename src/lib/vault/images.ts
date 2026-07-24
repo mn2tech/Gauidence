@@ -18,3 +18,8 @@ export function wantsShowPictures(question: string): boolean {
     question
   );
 }
+
+/** User is asking about one specific image (not a gallery). */
+export function wantsSingleImageFocus(question: string): boolean {
+  return /\b(this|the)\s+(photo|image|picture|pic|scan)\b/i.test(question);
+}

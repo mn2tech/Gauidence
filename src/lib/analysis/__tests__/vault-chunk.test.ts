@@ -8,6 +8,7 @@ import {
 import {
   formatRetrievalContext,
   selectCitationsForAnswer,
+  dedupeVaultCitations,
 } from "../../vault/retrieve.ts";
 
 describe("vault RAG chunking", () => {
@@ -155,5 +156,29 @@ describe("vault retrieval formatting", () => {
       chunks
     );
     assert.equal(noneNamed.length, 0);
+  });
+
+  it("dedupeVaultCitations keeps one entry per file name", () => {
+    const deduped = dedupeVaultCitations([
+      {
+        documentId: "a",
+        fileName: "holiday.jpg",
+        profileName: "Personal",
+      },
+      {
+        documentId: "b",
+        fileName: "holiday.jpg",
+        profileName: "Personal",
+      },
+      {
+        documentId: "c",
+        fileName: "invoice.pdf",
+      },
+    ]);
+    assert.equal(deduped.length, 2);
+    assert.equal(
+      deduped.filter((c) => c.fileName === "holiday.jpg").length,
+      1
+    );
   });
 });
