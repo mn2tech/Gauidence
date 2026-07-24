@@ -960,6 +960,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     options?: {
       attachment?: VaultMessageAttachment;
       userDisplayContent?: string;
+      replaceUserMessageId?: string;
     }
   ) => {
     const question = questionRaw.trim();
@@ -971,16 +972,18 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
 
     const optimisticId = `local-${Date.now()}`;
     const userContent = options?.userDisplayContent?.trim() ?? question;
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: optimisticId,
-        role: "user",
-        content: userContent,
-        attachment: options?.attachment ?? null,
-        created_at: new Date().toISOString(),
-      },
-    ]);
+    if (!options?.replaceUserMessageId) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: optimisticId,
+          role: "user",
+          content: userContent,
+          attachment: options?.attachment ?? null,
+          created_at: new Date().toISOString(),
+        },
+      ]);
+    }
 
     try {
       const res = await fetch("/api/documents/vault-chat", {
@@ -1002,7 +1005,13 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
         chats?: ChatSummary[];
       };
       if (!res.ok) {
-        setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+        if (options?.replaceUserMessageId) {
+          setMessages((prev) =>
+            prev.filter((m) => m.id !== options.replaceUserMessageId)
+          );
+        } else {
+          setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+        }
         setInput(question);
         setError(
           body.error ?? "I couldn't complete that request right now. Please try again.",
@@ -1030,13 +1039,22 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
         return m;
       });
       setMessages((prev) => [
-        ...prev.filter((m) => m.id !== optimisticId),
+        ...prev.filter(
+          (m) =>
+            m.id !== optimisticId && m.id !== options?.replaceUserMessageId
+        ),
         ...mergedTurn,
       ]);
       dispatchAwardsFromResponse(body);
       void loadMetaAndChats();
     } catch {
-      setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+      if (options?.replaceUserMessageId) {
+        setMessages((prev) =>
+          prev.filter((m) => m.id !== options.replaceUserMessageId)
+        );
+      } else {
+        setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+      }
       setInput(question);
       setError("I couldn't complete that request right now. Please try again.");
     } finally {
@@ -1063,8 +1081,42 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
       clearPendingAttachment();
       setInput("");
 
+      const userMsgId = `local-upload-${Date.now()}`;
+      const userContent = question;
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: userMsgId,
+          role: "user",
+          content: userContent,
+          attachment: {
+            documentId: userMsgId,
+            fileName: file.name,
+            kind: isImageUpload(file) ? "image" : "document",
+            previewUrl: attachmentPreview,
+          },
+          created_at: new Date().toISOString(),
+        },
+      ]);
+
       try {
         const result = await uploadVaultFile(file);
+
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === userMsgId && m.attachment
+              ? {
+                  ...m,
+                  attachment: {
+                    ...m.attachment,
+                    documentId: result.documentId,
+                    fileName: result.fileName,
+                  },
+                }
+              : m
+          )
+        );
 
         if (!result.analyzed) {
           pushLocalNote(
@@ -1088,8 +1140,10 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
             previewUrl: attachmentPreview,
           },
           userDisplayContent: question,
+          replaceUserMessageId: userMsgId,
         });
       } catch (err) {
+        setMessages((prev) => prev.filter((m) => m.id !== userMsgId));
         stageVaultFile(file);
         if (question) setInput(question);
         setError(
