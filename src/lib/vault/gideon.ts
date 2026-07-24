@@ -83,6 +83,7 @@ export type SuggestionProfileKind =
   | "student"
   | "teacher"
   | "business"
+  | "non_profit"
   | "employee"
   | "client"
   | "family"
@@ -143,6 +144,7 @@ export function buildGideonLogSuggestions(
   }
   if (
     profileKind === "business" ||
+    profileKind === "non_profit" ||
     profileKind === "employee" ||
     profileKind === "client"
   ) {
@@ -293,6 +295,27 @@ export const VAULT_TEMPLATES: Record<SuggestionProfileKind, VaultTemplate> = {
     ],
     personality:
       "You are Gideon Business — a precise operations assistant for meeting notes, invoices, SOPs, and work files. Encourage comfortable starts before sensitive records.",
+  },
+  non_profit: {
+    label: "Nonprofit",
+    badge: "💚 Nonprofit",
+    welcomeTitle: "Welcome to your Nonprofit Vault",
+    description:
+      "I remember grant letters, donor notes, board materials, and program files so your mission knowledge stays askable.",
+    suggestedUploads: [
+      "Grant letters",
+      "Donor correspondence",
+      "Board minutes",
+      "Receipts",
+      "Program notes",
+    ],
+    starterQuestions: [
+      "Summarize recent board minutes.",
+      "What grant deadlines are coming up?",
+      "Find my latest donation receipt.",
+    ],
+    personality:
+      "You are Gideon Nonprofit — a mission-focused assistant for grants, donors, board materials, and program records. Encourage comfortable starts before sensitive records.",
   },
   employee: {
     label: "Employee",
@@ -609,6 +632,7 @@ export function buildGideonSuggestions(
   const isTeacher = profileKind === "teacher";
   const isBiz =
     profileKind === "business" ||
+    profileKind === "non_profit" ||
     profileKind === "employee" ||
     profileKind === "client";
   const isAsset =
@@ -645,7 +669,7 @@ export function buildGideonSuggestions(
     suggestions.push("What hobby or sport documents are in this vault?");
     suggestions.push("Any upcoming games, lessons, or renewals?");
     suggestions.push("Summarize the latest hobby document.");
-  } else if (profileKind === "business") {
+  } else if (profileKind === "business" || profileKind === "non_profit") {
     suggestions.push("How many employees are linked to this profile?");
     suggestions.push("How many clients are linked to this profile?");
     if (types.has("invoice") || docs.length > 0) {

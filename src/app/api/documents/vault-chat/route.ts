@@ -259,7 +259,7 @@ function suggestionKindFrom(
     type === "employee" ||
     type === "client"
   ) {
-    return type === "non_profit" ? "business" : type;
+    return type === "non_profit" ? "non_profit" : type;
   }
   if (type === "vehicle" || type === "home" || type === "pet" || type === "hobby") {
     return type;

@@ -82,6 +82,10 @@ describe("Gideon helpers", () => {
     assert.equal(EMPTY_VAULT_HEADLINE, "Your vault is empty.");
     assert.match(EMPTY_VAULT_BODY, /something simple/i);
     assert.equal(gideonChatContextLabel("personal"), "You are chatting with Gideon Personal");
+    assert.equal(
+      gideonChatContextLabel("non_profit"),
+      "You are chatting with Gideon Nonprofit"
+    );
     assert.equal(VAULT_SCOPE_NOTE, "Searching only inside this vault.");
   });
 
