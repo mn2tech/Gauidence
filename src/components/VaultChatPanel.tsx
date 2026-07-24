@@ -1135,7 +1135,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
               </div>
             ))}
           </div>
-        )}
+        ) : null}
       </div>
     );
   };
