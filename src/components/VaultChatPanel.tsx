@@ -64,10 +64,8 @@ import {
 import { isImageFileName } from "@/lib/vault/images";
 import { renderGideonText } from "@/components/gideonText";
 import { uploadAndAnalyzeToVault } from "@/lib/vault/clientUpload";
-import OrganizationSuggestionModal from "@/components/OrganizationSuggestionModal";
 import ProfileSetupHub from "@/components/ProfileSetupHub";
 import AskGideonSidebar from "@/components/AskGideonSidebar";
-import type { OrganizationSuggestionPayload } from "@/lib/organization/types";
 import { todayLogDate } from "@/lib/logs/types";
 import { calendarDateInZone } from "@/lib/reminders/time";
 import {
@@ -321,8 +319,6 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
   const [vaultStatus, setVaultStatus] = useState<string | null>(null);
   const [pendingAttachment, setPendingAttachment] =
     useState<PendingVaultAttachment | null>(null);
-  const [orgSuggestion, setOrgSuggestion] =
-    useState<OrganizationSuggestionPayload | null>(null);
   const [workProject, setWorkProject] = useState<WorkProject | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const plusRef = useRef<HTMLDivElement>(null);
@@ -989,20 +985,11 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
           return;
         }
 
-        if (
-          result.organizationSuggestion &&
-          (result.organizationSuggestion.status === "pending" ||
-            result.organizationAutoApplied)
-        ) {
-          setOrgSuggestion({
-            ...result.organizationSuggestion,
-            autoApplied: Boolean(result.organizationAutoApplied),
-          });
-        }
-
         const finalQuestion =
           question ||
-          `I just uploaded ${result.fileName}. What should I know from it?`;
+          (isImageUpload(file)
+            ? "What do you see in this image? Transcribe any lists or notes clearly."
+            : `Summarize what matters in ${result.fileName}.`);
         await sendQuestion(finalQuestion);
       } catch (err) {
         stageVaultFile(file);
@@ -1724,27 +1711,6 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
         onClose={() => setCameraOpen(false)}
         onCapture={(file) => stageVaultFile(file)}
       />
-      {orgSuggestion ? (
-        <OrganizationSuggestionModal
-          suggestion={orgSuggestion}
-          onDismiss={() => setOrgSuggestion(null)}
-          onChooseLocation={() => setOrgSuggestion(null)}
-          onResolved={({ action, movedToProfileId, undoAvailable }) => {
-            if (action === "undo" || !undoAvailable) {
-              setOrgSuggestion(null);
-            }
-            if (movedToProfileId && movedToProfileId !== profileId) {
-              pushLocalNote(
-                "I filed that document in the location you approved. You can find it under Documents in that vault."
-              );
-            } else if (action === "keep_current") {
-              pushLocalNote("Kept the document in this vault.");
-            } else if (action === "undo") {
-              pushLocalNote("Returned the document to its previous location.");
-            }
-          }}
-        />
-      ) : null}
       {logOpen ? (
         <div
           className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
