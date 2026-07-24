@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, BellRing, Check, Loader2, Mail, UserRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { VAULT_ORGANIZATION_SUGGESTIONS_ENABLED } from "@/lib/features/organization";
 
 type Props = {
   userId: string;
@@ -310,6 +311,7 @@ export default function SettingsForm({
       </section>
 
       {/* AI Auto-Organization */}
+      {VAULT_ORGANIZATION_SUGGESTIONS_ENABLED ? (
       <section className="rounded-2xl border border-stone-200 bg-white p-6">
         <h2 className="text-base font-semibold">AI Auto-Organize</h2>
         <p className="mt-1 text-sm text-ink-muted">
@@ -381,6 +383,7 @@ export default function SettingsForm({
           </button>
         </form>
       </section>
+      ) : null}
 
       {/* Password */}
       <section className="rounded-2xl border border-stone-200 bg-white p-6">

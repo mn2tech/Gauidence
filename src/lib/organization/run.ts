@@ -2,6 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Classification, GuardianAnalysis } from "@/lib/analysis/types";
+import { VAULT_ORGANIZATION_SUGGESTIONS_ENABLED } from "@/lib/features/organization";
 import { listGuardianProfiles } from "@/lib/profiles/server";
 import { buildOrganizationAiOutput } from "./buildFromAnalysis";
 import { logOrganizationEvent } from "./audit";
@@ -71,6 +72,15 @@ export async function runOrganizationAfterAnalysis(
     autoApply?: boolean;
   }
 ): Promise<RunOrganizationResult> {
+  if (!VAULT_ORGANIZATION_SUGGESTIONS_ENABLED) {
+    return {
+      skipped: true,
+      reason: "disabled",
+      suggestion: null,
+      autoApplied: false,
+    };
+  }
+
   const settings = await loadAutoOrganizeSettings(supabase, params.userId);
   if (settings.mode === "off") {
     return { skipped: true, reason: "off", suggestion: null, autoApplied: false };
