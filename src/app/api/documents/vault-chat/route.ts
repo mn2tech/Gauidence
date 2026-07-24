@@ -10,6 +10,8 @@ import {
   sanitizeChatQuestion,
   CHAT_HISTORY_MAX_TURNS,
 } from "@/lib/chat/context";
+import { generateVaultChatTitle } from "@/lib/chat/generateVaultChatTitle";
+import { shouldGenerateVaultChatTitle } from "@/lib/chat/vaultChatTitle";
 import { embedQuery, isVaultEmbeddingConfigured } from "@/lib/vault/embeddings";
 import {
   formatRetrievalContext,
@@ -786,6 +788,7 @@ export async function POST(request: Request) {
       role: m.role as "user" | "assistant",
       content: String(m.content).slice(0, 1200),
     }));
+  const isFirstExchange = (priorMessages ?? []).length === 0;
 
   if (!isNewChat && history.length === 0) {
     await supabase
@@ -822,6 +825,7 @@ export async function POST(request: Request) {
     isImage?: boolean;
   }[] = [];
   let answer: string;
+  let attachedFileName: string | undefined;
 
   try {
     const showPictures = wantsShowPictures(question);
@@ -837,6 +841,7 @@ export async function POST(request: Request) {
           profileNames,
         })
       : null;
+    attachedFileName = attachedDoc?.fileName;
 
     const queryEmbedding =
       (chunkCount ?? 0) > 0 ? await embedQuery(question) : null;
@@ -1047,10 +1052,34 @@ ${workMemoryContext.trim() || "(none — user has no active work projects)"}
     );
   }
 
-  await supabase
-    .from("vault_chats")
-    .update({ updated_at: new Date().toISOString() })
-    .eq("id", chatId);
+  const chatUpdates: { updated_at: string; title?: string } = {
+    updated_at: new Date().toISOString(),
+  };
+  if (
+    shouldGenerateVaultChatTitle({ isFirstExchange, question })
+  ) {
+    try {
+      const generatedTitle = await withLlmUsage(
+        { userId: user.id, feature: "vault_chat" },
+        () =>
+          generateVaultChatTitle({
+            question,
+            answer,
+            attachmentFileName: attachedFileName,
+          })
+      );
+      if (generatedTitle) {
+        chatUpdates.title = generatedTitle;
+      }
+    } catch (err) {
+      console.error(
+        "Vault chat title generation failed:",
+        err instanceof Error ? err.message : "error"
+      );
+    }
+  }
+
+  await supabase.from("vault_chats").update(chatUpdates).eq("id", chatId);
 
   const chats = await listChats(supabase, user.id, active.id);
   const proposedReminder = parseProposedReminder(answer);
