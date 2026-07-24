@@ -63,6 +63,7 @@ import {
   type FirstMemoryActionId,
 } from "@/lib/vault/gideon";
 import { isImageFileName } from "@/lib/vault/images";
+import { renderPdfThumbnailFromFile, renderPdfThumbnailFromUrl } from "@/lib/vault/pdfThumbnail";
 import { renderGideonText } from "@/components/gideonText";
 import { uploadAndAnalyzeToVault } from "@/lib/vault/clientUpload";
 import ProfileSetupHub from "@/components/ProfileSetupHub";
@@ -131,19 +132,19 @@ function VaultAttachmentCard({
   previewUrl?: string | null;
   compact?: boolean;
 }) {
-  const [openUrl, setOpenUrl] = useState<string | null>(previewUrl ?? null);
+  const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [imageFailed, setImageFailed] = useState(false);
   const isImage = kind === "image" || isImageFileName(fileName);
+  const isPdf = /\.pdf$/i.test(fileName);
   const pending = isPendingAttachmentId(documentId);
+  const [pdfThumb, setPdfThumb] = useState<string | null>(
+    isPdf && previewUrl ? previewUrl : null
+  );
 
   useEffect(() => {
     setImageFailed(false);
-    if (previewUrl) {
-      setOpenUrl(previewUrl);
-      return;
-    }
     if (pending) {
-      setOpenUrl(null);
+      setSignedUrl(null);
       return;
     }
     let cancelled = false;
@@ -170,17 +171,34 @@ function VaultAttachmentCard({
         if (isImage) setImageFailed(true);
         return;
       }
-      setOpenUrl(data.signedUrl);
+      setSignedUrl(data.signedUrl);
     })();
     return () => {
       cancelled = true;
     };
-  }, [documentId, previewUrl, pending, isImage]);
+  }, [documentId, pending, isImage]);
+
+  useEffect(() => {
+    if (!isPdf || pdfThumb || !signedUrl) return;
+    let cancelled = false;
+    void renderPdfThumbnailFromUrl(signedUrl, 120).then((url) => {
+      if (!cancelled && url) setPdfThumb(url);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isPdf, pdfThumb, signedUrl]);
+
+  useEffect(() => {
+    if (isPdf && previewUrl) setPdfThumb(previewUrl);
+  }, [isPdf, previewUrl]);
 
   const badge = fileTypeBadge(fileName);
   const shell = compact
     ? "inline-flex w-[7.5rem] flex-col overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm"
     : "block overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm";
+  const href = signedUrl ?? (isImage ? previewUrl : null);
+  const visualSrc = isImage ? previewUrl ?? signedUrl : pdfThumb;
 
   if (imageFailed && isImage) {
     return (
@@ -192,60 +210,56 @@ function VaultAttachmentCard({
 
   const thumb = (
     <div
-      className={
-        compact
-          ? "flex h-24 items-center justify-center bg-stone-50"
-          : "flex min-h-[8rem] items-center justify-center bg-stone-50"
-      }
+      className={`relative bg-stone-50 ${
+        compact ? "h-24 w-full" : "min-h-[8rem] w-full"
+      }`}
     >
-      {isImage && openUrl ? (
+      {visualSrc ? (
         <img
-          src={openUrl}
+          src={visualSrc}
           alt={fileName}
           className={
             compact
-              ? "h-full w-full object-cover"
+              ? "h-full w-full object-cover object-top"
               : "max-h-72 w-full object-contain"
           }
         />
-      ) : isImage && (pending || !openUrl) ? (
-        <Loader2 className="h-4 w-4 animate-spin text-ink-muted" />
+      ) : isImage && (pending || !signedUrl) ? (
+        <div className="flex h-full items-center justify-center">
+          <Loader2 className="h-4 w-4 animate-spin text-ink-muted" />
+        </div>
+      ) : isPdf && !pdfThumb ? (
+        <div className="flex h-full items-center justify-center">
+          <Loader2 className="h-4 w-4 animate-spin text-ink-muted" />
+        </div>
       ) : (
-        <FileText className="h-8 w-8 text-brand" />
+        <div className="flex h-full items-center justify-center">
+          <FileText className="h-8 w-8 text-brand" />
+        </div>
       )}
+      <span className="absolute bottom-1.5 left-1.5 rounded-md bg-white/95 px-1.5 py-0.5 text-[9px] font-semibold text-foreground shadow-sm">
+        {badge}
+      </span>
     </div>
   );
 
-  const footer = (
-    <div className="truncate border-t border-stone-100 px-2 py-1 text-center text-[10px] font-medium text-ink-muted">
-      {badge}
-    </div>
-  );
-
-  const body = (
-    <>
-      {thumb}
-      {footer}
-    </>
-  );
-
-  if (openUrl) {
+  if (href) {
     return (
       <a
-        href={openUrl}
+        href={href}
         target="_blank"
         rel="noopener noreferrer"
         className={shell}
         title={fileName}
       >
-        {body}
+        {thumb}
       </a>
     );
   }
 
   return (
     <div className={shell} title={fileName}>
-      {body}
+      {thumb}
     </div>
   );
 }
@@ -427,7 +441,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
   }, []);
 
   const revokePendingPreview = useCallback((previewUrl: string | null) => {
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    if (previewUrl?.startsWith("blob:")) URL.revokeObjectURL(previewUrl);
   }, []);
 
   const clearPendingAttachment = useCallback(() => {
@@ -446,11 +460,21 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
       setPendingAttachment((prev) => {
         if (prev?.previewUrl) revokePendingPreview(prev.previewUrl);
         const kind = isImageUpload(file) ? "image" : "document";
-        return {
+        const staged: PendingVaultAttachment = {
           file,
           previewUrl: kind === "image" ? URL.createObjectURL(file) : null,
           kind,
         };
+        if (file.type === "application/pdf") {
+          void renderPdfThumbnailFromFile(file, 120).then((dataUrl) => {
+            setPendingAttachment((current) =>
+              current?.file === file && dataUrl
+                ? { ...current, previewUrl: dataUrl }
+                : current
+            );
+          });
+        }
+        return staged;
       });
     },
     [profileId, vaultBusy, sending, revokePendingPreview]
@@ -1080,10 +1104,10 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     if ((!question && !attachment) || sending || vaultBusy) return;
 
     if (attachment) {
-      const { file } = attachment;
+      const { file, previewUrl: stagedPreviewUrl } = attachment;
       const attachmentPreview = isImageUpload(file)
         ? URL.createObjectURL(file)
-        : null;
+        : stagedPreviewUrl;
       clearPendingAttachment();
       setInput("");
 
@@ -1727,20 +1751,12 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
           {pendingAttachment ? (
             <div className="px-3 pt-3">
               <div className="group relative inline-flex">
-                {pendingAttachment.kind === "image" && pendingAttachment.previewUrl ? (
-                  <img
-                    src={pendingAttachment.previewUrl}
-                    alt={pendingAttachment.file.name}
-                    className="h-20 w-20 rounded-xl border border-stone-200 object-cover shadow-sm"
-                  />
-                ) : (
-                  <div className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-xl border border-stone-200 bg-stone-50 px-1 shadow-sm">
-                    <FileUp className="h-5 w-5 shrink-0 text-brand" />
-                    <span className="line-clamp-2 w-full px-1 text-center text-[10px] leading-tight text-ink-muted">
-                      {pendingAttachment.file.name}
-                    </span>
-                  </div>
-                )}
+                <VaultAttachmentCard
+                  documentId="local-pending"
+                  fileName={pendingAttachment.file.name}
+                  kind={pendingAttachment.kind}
+                  previewUrl={pendingAttachment.previewUrl}
+                />
                 <button
                   type="button"
                   onClick={clearPendingAttachment}
