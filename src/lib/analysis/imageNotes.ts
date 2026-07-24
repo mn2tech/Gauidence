@@ -3,6 +3,7 @@
  */
 
 import type { GuardianAnalysis } from "./types";
+import { normalizeFact } from "./normalize";
 
 /** True when OCR text looks like a multi-line list or note. */
 export function looksLikeListTranscription(text: string): boolean {
@@ -43,13 +44,17 @@ export function enrichAnalysisFromImageTranscription(
   );
   const listFacts = lines
     .filter((line) => !existing.has(line.toLowerCase()))
-    .map((line, i) => ({
-      label: `Item ${i + 1}`,
-      value: line,
-      source: "transcription" as const,
-      source_excerpt: line,
-      confidence: 0.85,
-    }));
+    .map((line, i) =>
+      normalizeFact({
+        label: `Item ${i + 1}`,
+        value: line,
+        source_type: "document",
+        source_excerpt: line,
+        confidence: 0.85,
+        needs_verification: false,
+      })
+    )
+    .filter((f): f is NonNullable<typeof f> => Boolean(f));
 
   next.facts = [...listFacts, ...(next.facts ?? [])].slice(0, 40);
   return next;
