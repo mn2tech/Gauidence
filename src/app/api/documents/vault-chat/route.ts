@@ -51,7 +51,12 @@ import {
   loadAttachedVaultDocument,
 } from "@/lib/vault/attachedDocument";
 import { mergePinnedChunks } from "@/lib/vault/retrieve";
-import { listGuardianProfiles, getActiveGuardianProfile } from "@/lib/profiles/server";
+import {
+  listGuardianProfiles,
+  getActiveGuardianProfile,
+  requireAccessibleGuardianProfile,
+} from "@/lib/profiles/server";
+import type { GuardianProfile } from "@/lib/profiles/types";
 import {
   askGideonContextLabel,
   canHaveLinkedEmployees,
@@ -336,6 +341,37 @@ function isAuthed(v: Authed | NextResponse): v is Authed {
   return !(v instanceof NextResponse);
 }
 
+async function resolveVaultChatProfile(
+  supabase: SupabaseClient,
+  user: User,
+  profileIdOverride?: string | null
+): Promise<GuardianProfile | null> {
+  const override =
+    typeof profileIdOverride === "string" && profileIdOverride.trim()
+      ? profileIdOverride.trim()
+      : null;
+  if (override) {
+    return requireAccessibleGuardianProfile(supabase, user.id, override);
+  }
+  return getActiveGuardianProfile(supabase, user);
+}
+
+function vaultProfileNotFoundResponse(profileIdOverride?: string | null) {
+  if (profileIdOverride) {
+    return NextResponse.json(
+      { error: "Vault not found or not accessible." },
+      { status: 403 }
+    );
+  }
+  return NextResponse.json(
+    {
+      error:
+        "Create a person or space first — open the dashboard and choose who you're helping.",
+    },
+    { status: 400 }
+  );
+}
+
 async function askGideonScopeMeta(
   supabase: SupabaseClient,
   userId: string,
@@ -412,17 +448,13 @@ export async function GET(request: Request) {
   if (!isAuthed(auth)) return auth;
   const { supabase, user } = auth;
 
-  const active = await getActiveGuardianProfile(supabase, user);
+  const url = new URL(request.url);
+  const profileIdParam = url.searchParams.get("profileId");
+  const active = await resolveVaultChatProfile(supabase, user, profileIdParam);
   if (!active) {
-    return NextResponse.json(
-      {
-        error:
-          "Create a person or space first — open the dashboard and choose who you're helping.",
-      },
-      { status: 400 }
-    );
+    return vaultProfileNotFoundResponse(profileIdParam);
   }
-  const chatId = new URL(request.url).searchParams.get("chatId");
+  const chatId = url.searchParams.get("chatId");
   const chats = await listChats(supabase, user.id, active.id);
 
   if (!chatId) {
@@ -602,25 +634,29 @@ export async function PATCH(request: Request) {
   if (!isAuthed(auth)) return auth;
   const { supabase, user } = auth;
 
-  const active = await getActiveGuardianProfile(supabase, user);
-  if (!active) {
-    return NextResponse.json(
-      {
-        error:
-          "Create a person or space first — open the dashboard and choose who you're helping.",
-      },
-      { status: 400 }
-    );
-  }
-
   let chatIdRaw: unknown;
   let clearScopedProfile = false;
+  let profileIdRaw: unknown;
   try {
     const body = await request.json();
     chatIdRaw = body.chatId;
     clearScopedProfile = body.clearScopedProfile === true;
+    profileIdRaw = body.profileId;
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+  }
+
+  const profileIdOverride =
+    typeof profileIdRaw === "string" && profileIdRaw.trim()
+      ? profileIdRaw.trim()
+      : null;
+  const active = await resolveVaultChatProfile(
+    supabase,
+    user,
+    profileIdOverride
+  );
+  if (!active) {
+    return vaultProfileNotFoundResponse(profileIdOverride);
   }
 
   const chatId =
@@ -647,19 +683,14 @@ export async function PATCH(request: Request) {
 }
 
 /** Create a blank thread (New chat). */
-export async function PUT() {
+export async function PUT(request: Request) {
   const auth = await requireUser();
   if (!isAuthed(auth)) return auth;
   const { supabase, user } = auth;
-  const active = await getActiveGuardianProfile(supabase, user);
+  const profileIdParam = new URL(request.url).searchParams.get("profileId");
+  const active = await resolveVaultChatProfile(supabase, user, profileIdParam);
   if (!active) {
-    return NextResponse.json(
-      {
-        error:
-          "Create a person or space first — open the dashboard and choose who you're helping.",
-      },
-      { status: 400 }
-    );
+    return vaultProfileNotFoundResponse(profileIdParam);
   }
 
   const { data: created, error } = await supabase
@@ -688,18 +719,14 @@ export async function DELETE(request: Request) {
   const auth = await requireUser();
   if (!isAuthed(auth)) return auth;
   const { supabase, user } = auth;
-  const active = await getActiveGuardianProfile(supabase, user);
+  const url = new URL(request.url);
+  const profileIdParam = url.searchParams.get("profileId");
+  const active = await resolveVaultChatProfile(supabase, user, profileIdParam);
   if (!active) {
-    return NextResponse.json(
-      {
-        error:
-          "Create a person or space first — open the dashboard and choose who you're helping.",
-      },
-      { status: 400 }
-    );
+    return vaultProfileNotFoundResponse(profileIdParam);
   }
 
-  const chatId = new URL(request.url).searchParams.get("chatId");
+  const chatId = url.searchParams.get("chatId");
   if (!chatId) {
     return NextResponse.json({ error: "Missing chatId." }, { status: 400 });
   }
@@ -743,6 +770,7 @@ export async function POST(request: Request) {
   let workProjectIdRaw: unknown;
   let attachmentDocumentIdRaw: unknown;
   let clearScopedProfile = false;
+  let profileIdRaw: unknown;
   try {
     const body = await request.json();
     questionRaw = body.question;
@@ -750,6 +778,7 @@ export async function POST(request: Request) {
     workProjectIdRaw = body.workProjectId;
     attachmentDocumentIdRaw = body.attachmentDocumentId;
     clearScopedProfile = body.clearScopedProfile === true;
+    profileIdRaw = body.profileId;
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
@@ -773,15 +802,17 @@ export async function POST(request: Request) {
     );
   }
 
-  const active = await getActiveGuardianProfile(supabase, user);
+  const profileIdOverride =
+    typeof profileIdRaw === "string" && profileIdRaw.trim()
+      ? profileIdRaw.trim()
+      : null;
+  const active = await resolveVaultChatProfile(
+    supabase,
+    user,
+    profileIdOverride
+  );
   if (!active) {
-    return NextResponse.json(
-      {
-        error:
-          "Create a person or space first — open the dashboard and choose who you're helping.",
-      },
-      { status: 400 }
-    );
+    return vaultProfileNotFoundResponse(profileIdOverride);
   }
 
   const linkedProfiles = canRollupLinkedVaultSearch(active.profile_type)

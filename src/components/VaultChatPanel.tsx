@@ -28,10 +28,12 @@ import {
   Send,
   X,
   ArrowRightLeft,
+  PanelRightOpen,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import GideonAvatar from "@/components/GideonAvatar";
 import CameraCaptureModal from "@/components/CameraCaptureModal";
+import VaultChatDrawer from "@/components/VaultChatDrawer";
 import ImminentReminderBanner from "@/components/ImminentReminderBanner";
 import {
   AskTitleProfileSwitch,
@@ -357,7 +359,9 @@ function NameList({
 }
 
 type Props = {
-  variant?: "embedded" | "page";
+  variant?: "embedded" | "page" | "drawer";
+  /** Chat as this vault without switching the app-wide active profile. */
+  scopedProfileId?: string;
 };
 
 const SECTION_STYLES: Record<string, string> = {
@@ -372,8 +376,35 @@ const SECTION_STYLES: Record<string, string> = {
   body: "border-transparent bg-transparent",
 };
 
-export default function VaultChatPanel({ variant = "embedded" }: Props) {
+function vaultChatApiUrl(
+  params?: Record<string, string | undefined>,
+  scopedProfileId?: string | null
+): string {
+  const sp = new URLSearchParams();
+  if (params) {
+    for (const [key, value] of Object.entries(params)) {
+      if (value) sp.set(key, value);
+    }
+  }
+  if (scopedProfileId) sp.set("profileId", scopedProfileId);
+  const query = sp.toString();
+  return `/api/documents/vault-chat${query ? `?${query}` : ""}`;
+}
+
+function withVaultChatProfileId<T extends Record<string, unknown>>(
+  body: T,
+  scopedProfileId?: string | null
+): T & { profileId?: string } {
+  if (!scopedProfileId) return body;
+  return { ...body, profileId: scopedProfileId };
+}
+
+export default function VaultChatPanel({
+  variant = "embedded",
+  scopedProfileId,
+}: Props) {
   const isPage = variant === "page";
+  const isDrawer = variant === "drawer";
   const searchParams = useSearchParams();
   const requestedChatId = searchParams.get("chatId");
   const requestedProfileId = searchParams.get("profileId");
@@ -425,6 +456,10 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
   const [switchingVaultScopeId, setSwitchingVaultScopeId] = useState<
     string | null
   >(null);
+  const [sideVault, setSideVault] = useState<{
+    profileId: string;
+    profileName: string;
+  } | null>(null);
   const [vaultBusy, setVaultBusy] = useState(false);
   const [vaultStatus, setVaultStatus] = useState<string | null>(null);
   const [pendingAttachment, setPendingAttachment] =
@@ -440,8 +475,16 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
   const sendQuestionRef = useRef<(questionRaw: string) => Promise<void>>(
     async () => {}
   );
-  const inputId = isPage ? "ask-gideon-page-input" : "ask-gideon-input";
-  const profileId = active?.id ?? meta?.profileId ?? null;
+  const inputId = isPage
+    ? "ask-gideon-page-input"
+    : isDrawer
+      ? "ask-gideon-drawer-input"
+      : "ask-gideon-input";
+  const scopedProfile = scopedProfileId
+    ? profiles.find((p) => p.id === scopedProfileId) ?? null
+    : null;
+  const effectiveProfile = scopedProfile ?? active;
+  const profileId = effectiveProfile?.id ?? meta?.profileId ?? null;
 
   const {
     listening: voiceListening,
@@ -508,7 +551,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
   );
 
   const loadMetaAndChats = useCallback(async () => {
-    const res = await fetch("/api/documents/vault-chat");
+    const res = await fetch(vaultChatApiUrl(undefined, scopedProfileId));
     const body = (await res.json().catch(() => ({}))) as {
       error?: string;
       chats?: ChatSummary[];
@@ -518,33 +561,36 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     setChats(body.chats ?? []);
     if (body.meta) setMeta(body.meta);
     return body.chats ?? [];
-  }, []);
+  }, [scopedProfileId]);
 
-  const loadThread = useCallback(async (chatId: string) => {
-    const res = await fetch(
-      `/api/documents/vault-chat?chatId=${encodeURIComponent(chatId)}`
-    );
-    const body = (await res.json().catch(() => ({}))) as {
-      error?: string;
-      chats?: ChatSummary[];
-      messages?: VaultMessage[];
-      chatId?: string;
-      meta?: Partial<Meta>;
-    };
-    if (!res.ok) throw new Error(body.error ?? "Couldn't load chat.");
-    if (body.chats) setChats(body.chats);
-    setActiveChatId(body.chatId ?? chatId);
-    setMessages(body.messages ?? []);
-    if (body.meta) {
-      setMeta((prev) => ({
-        firstName: prev?.firstName ?? null,
-        documentCount: 0,
-        suggestions: prev?.suggestions ?? [],
-        ...prev,
-        ...body.meta,
-      }));
-    }
-  }, []);
+  const loadThread = useCallback(
+    async (chatId: string) => {
+      const res = await fetch(
+        vaultChatApiUrl({ chatId }, scopedProfileId)
+      );
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        chats?: ChatSummary[];
+        messages?: VaultMessage[];
+        chatId?: string;
+        meta?: Partial<Meta>;
+      };
+      if (!res.ok) throw new Error(body.error ?? "Couldn't load chat.");
+      if (body.chats) setChats(body.chats);
+      setActiveChatId(body.chatId ?? chatId);
+      setMessages(body.messages ?? []);
+      if (body.meta) {
+        setMeta((prev) => ({
+          firstName: prev?.firstName ?? null,
+          documentCount: 0,
+          suggestions: prev?.suggestions ?? [],
+          ...prev,
+          ...body.meta,
+        }));
+      }
+    },
+    [scopedProfileId]
+  );
 
   const bootstrap = useCallback(async () => {
     setLoadingHistory(true);
@@ -582,6 +628,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
 
   useEffect(() => {
     if (profilesLoading || needsSetup || profileSwitchRef.current) return;
+    if (scopedProfileId) return;
     if (!requestedProfileId) return;
     if (active?.id === requestedProfileId) return;
     if (!profiles.some((p) => p.id === requestedProfileId)) return;
@@ -662,6 +709,11 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
       setLoadingHistory(false);
       return;
     }
+    if (scopedProfileId) {
+      if (!profiles.some((p) => p.id === scopedProfileId)) return;
+      void bootstrap();
+      return;
+    }
     if (requestedProfileId && active?.id !== requestedProfileId) {
       // Wait until profile switch lands before loading chats.
       return;
@@ -673,10 +725,12 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     profilesLoading,
     requestedProfileId,
     active?.id,
+    scopedProfileId,
+    profiles,
   ]);
 
   useEffect(() => {
-    if (needsSetup) return;
+    if (needsSetup || scopedProfileId) return;
     const onProfile = () => {
       setActiveChatId(null);
       setMessages([]);
@@ -685,7 +739,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     window.addEventListener("guardian:profile-changed", onProfile);
     return () =>
       window.removeEventListener("guardian:profile-changed", onProfile);
-  }, [bootstrap, needsSetup]);
+  }, [bootstrap, needsSetup, scopedProfileId]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -779,10 +833,9 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     e.stopPropagation();
     setError(null);
     try {
-      const res = await fetch(
-        `/api/documents/vault-chat?chatId=${encodeURIComponent(chatId)}`,
-        { method: "DELETE" }
-      );
+      const res = await fetch(vaultChatApiUrl({ chatId }, scopedProfileId), {
+        method: "DELETE",
+      });
       const body = (await res.json().catch(() => ({}))) as {
         error?: string;
         chats?: ChatSummary[];
@@ -911,10 +964,15 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
       await fetch("/api/documents/vault-chat", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chatId: activeChatId,
-          clearScopedProfile: true,
-        }),
+        body: JSON.stringify(
+          withVaultChatProfileId(
+            {
+              chatId: activeChatId,
+              clearScopedProfile: true,
+            },
+            scopedProfileId
+          )
+        ),
       });
       setMeta((prev) =>
         prev ? { ...prev, chatScopedProfile: null } : prev
@@ -922,6 +980,11 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     } catch {
       /* non-blocking */
     }
+  };
+
+  const openSideVault = (profileId: string, profileName: string, messageId: string) => {
+    setSideVault({ profileId, profileName });
+    setDismissedVaultScopeIds((prev) => new Set(prev).add(messageId));
   };
 
   const continueInScopedVault = async (profileId: string, messageId: string) => {
@@ -1106,17 +1169,22 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
       const res = await fetch("/api/documents/vault-chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          question,
-          chatId: activeChatId,
-          ...(options?.attachment?.documentId &&
-          !isPendingAttachmentId(options.attachment.documentId)
-            ? { attachmentDocumentId: options.attachment.documentId }
-            : {}),
-          ...(requestedWorkProjectId
-            ? { workProjectId: requestedWorkProjectId }
-            : {}),
-        }),
+        body: JSON.stringify(
+          withVaultChatProfileId(
+            {
+              question,
+              chatId: activeChatId,
+              ...(options?.attachment?.documentId &&
+              !isPendingAttachmentId(options.attachment.documentId)
+                ? { attachmentDocumentId: options.attachment.documentId }
+                : {}),
+              ...(requestedWorkProjectId
+                ? { workProjectId: requestedWorkProjectId }
+                : {}),
+            },
+            scopedProfileId
+          )
+        ),
       });
       const body = (await res.json().catch(() => ({}))) as {
         error?: string;
@@ -1319,7 +1387,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     const showVaultScopeCard =
       vaultScope &&
       !dismissedVaultScopeIds.has(m.id) &&
-      vaultScope.profileId !== active?.id;
+      vaultScope.profileId !== effectiveProfile?.id;
     const switchingVault = switchingVaultScopeId === m.id;
 
     return (
@@ -1411,6 +1479,23 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
               <span className="font-medium">{vaultScope.activeProfileName}</span>.
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
+              {!scopedProfileId && !isDrawer ? (
+                <button
+                  type="button"
+                  disabled={switchingVault || sending || vaultBusy}
+                  onClick={() =>
+                    openSideVault(
+                      vaultScope.profileId,
+                      vaultScope.profileName,
+                      m.id
+                    )
+                  }
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-sky-300 bg-white px-3 py-1.5 text-xs font-semibold text-sky-900 transition hover:bg-sky-50 disabled:opacity-60"
+                >
+                  <PanelRightOpen className="h-3.5 w-3.5" />
+                  Open {vaultScope.profileName}&apos;s vault here
+                </button>
+              ) : null}
               <button
                 type="button"
                 disabled={switchingVault || sending || vaultBusy}
@@ -1770,7 +1855,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
   const messageList = (
     <div
       className={
-        isPage
+        isPage || isDrawer
           ? "min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-8"
           : "max-h-64 space-y-3 overflow-y-auto rounded-xl bg-stone-50 p-3 ring-1 ring-stone-200"
       }
@@ -1863,7 +1948,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     meta?.chatContextLabel || meta?.templateLabel ? (
       <div
         className={
-          isPage
+          isPage || isDrawer
             ? "shrink-0 border-t border-stone-100 px-4 pt-2 sm:px-8"
             : "mt-2 px-0.5"
         }
@@ -1876,7 +1961,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
           <p className="text-[11px] text-ink-muted">
             {meta.vaultScopeNote ?? VAULT_SCOPE_NOTE}
             {meta.chatScopedProfile &&
-            meta.chatScopedProfile.profileId !== active?.id ? (
+            meta.chatScopedProfile.profileId !== effectiveProfile?.id ? (
               <>
                 {" "}
                 This chat is also using{" "}
@@ -1895,7 +1980,7 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     <form
       onSubmit={send}
       className={
-        isPage
+        isPage || isDrawer
           ? "shrink-0 border-t border-stone-200 bg-white px-4 py-3 sm:px-8"
           : "mt-3"
       }
@@ -2290,6 +2375,25 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     );
   }
 
+  if (isDrawer) {
+    return (
+      <div className="flex h-full min-h-0 flex-col">
+        {messageList}
+        {error && (
+          <PlanLimitAlert
+            message={error.message}
+            code={error.code}
+            className="shrink-0 px-3 text-xs text-red-700"
+          />
+        )}
+        <ImminentReminderBanner profileId={profileId} />
+        {contextStrip}
+        {composer}
+        {vaultOverlays}
+      </div>
+    );
+  }
+
   if (!isPage) {
     return (
       <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
@@ -2441,6 +2545,13 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
       </div>
     </div>
     {vaultOverlays}
+    {sideVault ? (
+      <VaultChatDrawer
+        profileId={sideVault.profileId}
+        profileName={sideVault.profileName}
+        onClose={() => setSideVault(null)}
+      />
+    ) : null}
     </>
   );
 }
