@@ -34,7 +34,9 @@ import {
   firstNameFrom,
   getVaultTemplate,
   gideonChatContextLabel,
+  GIDEON_TRANSCRIPTION_NOTE,
   VAULT_SCOPE_NOTE,
+  wantsTranscription,
   withVaultPersonality,
   type SuggestionProfileKind,
   type VaultDocHint,
@@ -888,6 +890,8 @@ export async function POST(request: Request) {
 
     const reminderAgent = wantsReminderAgent(question);
     const reminderNote = reminderAgent ? REMINDER_AGENT_SYSTEM_NOTE : "";
+    const transcriptionMode = wantsTranscription(question);
+    const transcriptionNote = transcriptionMode ? GIDEON_TRANSCRIPTION_NOTE : "";
 
     const profileKind = suggestionKindFrom(active.profile_type);
     const system = `${withVaultPersonality(VAULT_CHAT_SYSTEM, profileKind)}
@@ -897,6 +901,7 @@ ${rollupNote}
 ${pictureNote}
 ${vaultEmptyNote}
 ${reminderNote}
+${transcriptionNote}
 
 --- RETRIEVED EXCERPTS ---
 ${formatted.context.trim() || "(none)"}
@@ -920,7 +925,7 @@ ${workMemoryContext.trim() || "(none — user has no active work projects)"}
         runChatCompletion(client, {
           system,
           model: CHAT_MODEL,
-          maxTokens: reminderAgent ? 1100 : 900,
+          maxTokens: reminderAgent ? 1100 : transcriptionMode ? 1200 : 900,
           messages: [...history, { role: "user", content: question }],
         })
     );

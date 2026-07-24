@@ -10,6 +10,8 @@ Transcribe the document EXACTLY as shown. Rules:
 - Copy every digit exactly. Never drop or invent digits (16128 must not become 1628; 71628 must not become 712.62 or 1628).
 - Preserve leading zeros (0000016 stays 0000016).
 - Preserve line breaks and reading order.
+- For handwritten notes, shopping lists, book lists, or bullet notes: put one item per line.
+- For book or media titles, fix obvious capitalization (e.g. "creepy pair of underwear" → "Creepy Pair of Underwear") but do not invent items.
 - For invoice tables, output rows as: CONTRACTOR | DESCRIPTION | HOURS | RATE | AMOUNT
 - Include every line-item row. Do not omit contractors.
 - Prefer explicitly labeled dates exactly as written (Date / Due).
@@ -47,7 +49,7 @@ export async function transcribeDocument(args: {
   const content: ContentPart[] = [
     {
       type: "text",
-      text: `Transcribe this document (${args.fileName}) verbatim. Preserve invoice table columns and all digits.`,
+      text: `Transcribe this document (${args.fileName}) verbatim. Preserve lists one item per line. Preserve invoice table columns and all digits.`,
     },
   ];
 

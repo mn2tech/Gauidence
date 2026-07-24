@@ -66,6 +66,7 @@ Use for unknown types, low-confidence classifications, and unsupported specialis
 (passport, driver's license, warranty, tax documents until dedicated analyzers ship).
 Rules:
 - Extract title, purpose, summary, people, organizations, important dates, amounts, obligations, warnings, likely next steps.
+- For photographed notes, lists, or handwriting: list every line item in summary and facts.
 - Do not force specialized invoice/insurance/contract fields.
 - Be cautious: if a date's purpose is unclear, say so and mark needs_verification.
 - Example cautious wording: "I found this date, but I could not confidently determine its purpose."

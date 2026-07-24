@@ -39,6 +39,7 @@ import {
 } from "./inputMode";
 import { capSourceText } from "@/lib/vault/sourceText";
 import { classificationFromFileName } from "./filenameHints";
+import { enrichAnalysisFromImageTranscription } from "./imageNotes";
 
 /** Max chars stored/indexed from extraction (large PDFs are truncated). */
 export { SOURCE_TEXT_MAX_CHARS, capSourceText } from "@/lib/vault/sourceText";
@@ -148,16 +149,48 @@ export async function runAnalysisPipeline(
     fileName: file.fileName,
   });
 
-  const characteristics = detectDocumentCharacteristics({
+  const isImageUpload = file.mimeType.startsWith("image/");
+
+  let characteristics = detectDocumentCharacteristics({
     mimeType: file.mimeType,
     extraction,
   });
-  const inputMode = resolveAnalysisInputMode(characteristics);
+  let inputMode = resolveAnalysisInputMode(characteristics);
 
   let ocrText: string | undefined;
-  // Visual mode already sends the PDF/image to Claude — a separate OCR pass
-  // doubles latency and commonly pushes past the serverless timeout.
-  if (inputMode !== "visual" && extraction.quality < 0.45) {
+  // Photos have no native text layer — always OCR once so source_text and RAG work.
+  if (isImageUpload && extraction.quality < 0.45) {
+    const ocr = await transcribeDocument({
+      client,
+      fileName: file.fileName,
+      mimeType: file.mimeType,
+      base64: file.base64,
+      pageImages: extraction.pageImages,
+    });
+    ocrText = ocr.text;
+    if (ocr.text.trim()) {
+      const report = assessExtractionQuality(ocr.text);
+      extraction = {
+        ...extraction,
+        text: ocr.text,
+        method: "vision_ocr",
+        quality: Math.max(ocr.quality, report.score),
+        charCount: ocr.text.length,
+        issues: [...new Set([...extraction.issues, ...ocr.issues, ...report.issues])],
+        estimatedLineRows: report.estimatedLineRows,
+        reason:
+          "Image transcribed with vision OCR for vault memory, search, and analysis.",
+      };
+      characteristics = detectDocumentCharacteristics({
+        mimeType: file.mimeType,
+        extraction,
+      });
+      inputMode =
+        extraction.quality >= 0.45
+          ? "text"
+          : resolveAnalysisInputMode(characteristics);
+    }
+  } else if (inputMode !== "visual" && extraction.quality < 0.45) {
     const fallback = await maybeOcrFallback(client, file, extraction);
     extraction = fallback.extraction;
     ocrText = fallback.ocrText;
@@ -192,6 +225,10 @@ export async function runAnalysisPipeline(
     classification.document_type
   );
   let analysis = rawAnalysis;
+
+  if (isImageUpload && extraction.method === "vision_ocr" && extraction.text.trim()) {
+    analysis = enrichAnalysisFromImageTranscription(analysis, extraction.text);
+  }
 
   if (classification.classification_confidence < 0.8) {
     analysis.warnings.push(

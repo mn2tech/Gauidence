@@ -43,6 +43,21 @@ Formatting: plain sentences and simple lists only. Do not use bold (**), italics
 
 Tone: calm, clear, cautious when uncertain. Guardian watches. Gideon explains. The user decides.`;
 
+/** User wants a clean transcription or list from a photo/scan in the vault. */
+export function wantsTranscription(question: string): boolean {
+  return /\b(transcri(?:be|ption)|what(?:'s| is) (?:written|on (?:this|the)(?: photo| image| picture| note)?)|what (?:does|do) (?:this|it|the)[^.?]{0,24}(?:say|show|list)|read (?:this|the) (?:note|list|photo|image|picture)|list (?:the |all )?(?:items?|books?|names?)|book names?|items (?:on|in) (?:this|the)|turn this into a list)\b/i.test(
+    question
+  );
+}
+
+export const GIDEON_TRANSCRIPTION_NOTE = `Transcription mode:
+- The user wants a readable transcription or list from their vault (often a photo or scan).
+- Lead with a short friendly title if helpful (e.g. "Book names"), then a clean numbered list.
+- Prefer "Document text" excerpts — they are verbatim OCR from photos and scans.
+- Fix obvious spelling and title capitalization when confident; do not invent items.
+- Use simple numbered lines (1. 2. 3.). You may exceed the usual brevity limit for lists.
+- If no transcription is in the excerpts, say so and suggest uploading a clearer photo.`;
+
 export const GIDEON_LOADING_STATES = [
   "Gideon is checking your vault…",
   "Finding the relevant documents…",
