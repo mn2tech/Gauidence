@@ -494,13 +494,63 @@ export function getVaultTemplate(
 
 /** Context line above chat: "You are chatting with Gideon Personal" */
 export function gideonChatContextLabel(
-  profileKind: SuggestionProfileKind = "personal"
+  profileKind: SuggestionProfileKind = "personal",
+  displayName?: string | null
 ): string {
   const template = getVaultTemplate(profileKind);
-  return `You are chatting with Gideon ${template.label}`;
+  const name = displayName?.trim();
+  if (!name || profileKind === "personal") {
+    return `You are chatting with Gideon ${template.label}`;
+  }
+  if (
+    profileKind === "family" ||
+    profileKind === "business" ||
+    profileKind === "non_profit" ||
+    profileKind === "vehicle" ||
+    profileKind === "home" ||
+    profileKind === "pet" ||
+    profileKind === "hobby" ||
+    profileKind === "other"
+  ) {
+    return `You are chatting with Gideon · ${name}`;
+  }
+  const possessive = name.toLowerCase().endsWith("s") ? `${name}'` : `${name}'s`;
+  return `You are chatting with Gideon in ${possessive} vault`;
 }
 
 export const VAULT_SCOPE_NOTE = "Searching only inside this vault.";
+
+export function buildVaultScopeNote(args: {
+  displayName?: string | null;
+  profileKind?: SuggestionProfileKind;
+  linkedMemberNames?: string[];
+  chatScopedProfileName?: string | null;
+}): string {
+  const scoped = args.chatScopedProfileName?.trim();
+  const activeName = args.displayName?.trim();
+  if (scoped) {
+    const activeLabel = activeName ? `${activeName}'s vault` : "this vault";
+    const scopedPossessive = scoped.toLowerCase().endsWith("s")
+      ? `${scoped}'`
+      : `${scoped}'s`;
+    return `Searching ${activeLabel}; also using ${scopedPossessive} vault for this chat.`;
+  }
+  const linked = (args.linkedMemberNames ?? []).map((n) => n.trim()).filter(Boolean);
+  if (linked.length > 0) {
+    const list =
+      linked.length <= 4
+        ? linked.join(", ")
+        : `${linked.slice(0, 3).join(", ")}, and ${linked.length - 3} more`;
+    return `Searching this vault and linked members: ${list}.`;
+  }
+  if (activeName && args.profileKind && args.profileKind !== "personal") {
+    const possessive = activeName.toLowerCase().endsWith("s")
+      ? `${activeName}'`
+      : `${activeName}'s`;
+    return `Searching only ${possessive} vault.`;
+  }
+  return VAULT_SCOPE_NOTE;
+}
 
 /** First-time welcome — trust-first, not identity-document-first. */
 export const WELCOME_AI_MEMORY_TITLE = "Welcome to your AI memory.";

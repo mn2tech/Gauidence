@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   buildGideonSuggestions,
   buildGideonVaultGuidance,
+  buildVaultScopeNote,
   firstNameFrom,
   getVaultTemplate,
   gideonChatContextLabel,
@@ -86,7 +87,31 @@ describe("Gideon helpers", () => {
       gideonChatContextLabel("non_profit"),
       "You are chatting with Gideon Nonprofit"
     );
+    assert.equal(
+      gideonChatContextLabel("child", "Nolan"),
+      "You are chatting with Gideon in Nolan's vault"
+    );
+    assert.equal(
+      gideonChatContextLabel("child", "James"),
+      "You are chatting with Gideon in James' vault"
+    );
+    assert.equal(
+      gideonChatContextLabel("family", "Smith Family"),
+      "You are chatting with Gideon · Smith Family"
+    );
     assert.equal(VAULT_SCOPE_NOTE, "Searching only inside this vault.");
+    assert.equal(
+      buildVaultScopeNote({ displayName: "Nolan", profileKind: "child" }),
+      "Searching only Nolan's vault."
+    );
+    assert.equal(
+      buildVaultScopeNote({
+        displayName: "Family",
+        profileKind: "family",
+        linkedMemberNames: ["Nolan", "Ava"],
+      }),
+      "Searching this vault and linked members: Nolan, Ava."
+    );
   });
 
   it("appends vault personality to the system prompt", () => {

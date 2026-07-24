@@ -41,7 +41,7 @@ import {
   GIDEON_ATTACHED_DOCUMENT_NOTE,
   GIDEON_CROSS_VAULT_NOTE,
   GIDEON_TRANSCRIPTION_NOTE,
-  VAULT_SCOPE_NOTE,
+  buildVaultScopeNote,
   wantsTranscription,
   withVaultPersonality,
   type SuggestionProfileKind,
@@ -336,6 +336,28 @@ function isAuthed(v: Authed | NextResponse): v is Authed {
   return !(v instanceof NextResponse);
 }
 
+async function askGideonScopeMeta(
+  supabase: SupabaseClient,
+  userId: string,
+  active: { id: string; display_name: string; profile_type: GuardianProfileType },
+  chatScopedProfileName?: string | null
+) {
+  const profileKind = suggestionKindFrom(active.profile_type);
+  const linkedProfiles = canRollupLinkedVaultSearch(active.profile_type)
+    ? await listLinkedProfilesForVaultRollup(supabase, userId, active)
+    : [];
+  return {
+    profileKind,
+    chatContextLabel: gideonChatContextLabel(profileKind, active.display_name),
+    vaultScopeNote: buildVaultScopeNote({
+      displayName: active.display_name,
+      profileKind,
+      linkedMemberNames: linkedProfiles.map((p) => p.display_name),
+      chatScopedProfileName,
+    }),
+  };
+}
+
 function titleFromQuestion(question: string): string {
   const t = question.trim().replace(/\s+/g, " ");
   if (t.length <= 48) return t || "New chat";
@@ -467,6 +489,8 @@ export async function GET(request: Request) {
       };
     }
 
+    const scopeMeta = await askGideonScopeMeta(supabase, user.id, active);
+
     const { data: account } = await supabase
       .from("profiles")
       .select("full_name")
@@ -498,8 +522,8 @@ export async function GET(request: Request) {
         profileName: active.display_name,
         profileType: active.profile_type,
         askContextLabel: askGideonContextLabel(active),
-        chatContextLabel: gideonChatContextLabel(profileKind),
-        vaultScopeNote: VAULT_SCOPE_NOTE,
+        chatContextLabel: scopeMeta.chatContextLabel,
+        vaultScopeNote: scopeMeta.vaultScopeNote,
         templateLabel: template.label,
         templateBadge: template.badge,
       },
@@ -540,6 +564,12 @@ export async function GET(request: Request) {
 
   const profileKind = suggestionKindFrom(active.profile_type);
   const template = getVaultTemplate(profileKind);
+  const scopeMeta = await askGideonScopeMeta(
+    supabase,
+    user.id,
+    active,
+    scopedProfile?.display_name
+  );
 
   return NextResponse.json({
     chats,
@@ -551,8 +581,8 @@ export async function GET(request: Request) {
       profileName: active.display_name,
       profileType: active.profile_type,
       askContextLabel: askGideonContextLabel(active),
-      chatContextLabel: gideonChatContextLabel(profileKind),
-      vaultScopeNote: VAULT_SCOPE_NOTE,
+      chatContextLabel: scopeMeta.chatContextLabel,
+      vaultScopeNote: scopeMeta.vaultScopeNote,
       templateLabel: template.label,
       templateBadge: template.badge,
       chatScopedProfile: scopedProfile
