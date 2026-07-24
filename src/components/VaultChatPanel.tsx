@@ -16,6 +16,7 @@ import {
   FileUp,
   Camera,
   Bell,
+  FileText,
   Info,
   Loader2,
   Menu,
@@ -100,19 +101,41 @@ type Citation = {
   isImage?: boolean;
 };
 
-function CitationImagePreview({
+type VaultMessageAttachment = {
+  documentId: string;
+  fileName: string;
+  kind: "image" | "document";
+  previewUrl?: string | null;
+};
+
+function fileTypeBadge(fileName: string): string {
+  const ext = fileName.split(".").pop()?.toUpperCase() ?? "FILE";
+  if (ext === "JPEG") return "JPG";
+  return ext;
+}
+
+function VaultAttachmentCard({
   documentId,
   fileName,
-  profileName,
+  kind,
+  previewUrl,
+  compact = true,
 }: {
   documentId: string;
   fileName: string;
-  profileName?: string;
+  kind: "image" | "document";
+  previewUrl?: string | null;
+  compact?: boolean;
 }) {
-  const [url, setUrl] = useState<string | null>(null);
+  const [url, setUrl] = useState<string | null>(previewUrl ?? null);
   const [failed, setFailed] = useState(false);
+  const isImage = kind === "image" || isImageFileName(fileName);
 
   useEffect(() => {
+    if (previewUrl) {
+      setUrl(previewUrl);
+      return;
+    }
     let cancelled = false;
     void (async () => {
       const supabase = createClient();
@@ -142,43 +165,82 @@ function CitationImagePreview({
     return () => {
       cancelled = true;
     };
-  }, [documentId]);
+  }, [documentId, previewUrl]);
+
+  const badge = fileTypeBadge(fileName);
+  const shell = compact
+    ? "inline-flex w-[7.5rem] flex-col overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm"
+    : "block overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm";
 
   if (failed) {
     return (
-      <p className="text-[11px] text-ink-muted">
-        Couldn&apos;t load preview for {fileName}.
-      </p>
-    );
-  }
-  if (!url) {
-    return (
-      <div className="flex h-32 items-center justify-center rounded-xl border border-stone-200 bg-stone-50 text-xs text-ink-muted">
-        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-        Loading image…
+      <div className={`${shell} p-2 text-[10px] text-ink-muted`}>
+        Couldn&apos;t load {fileName}
       </div>
     );
   }
 
-  const label = profileName ? `${profileName} · ${fileName}` : fileName;
+  const thumb = (
+    <div
+      className={
+        compact
+          ? "flex h-24 items-center justify-center bg-stone-50"
+          : "flex min-h-[8rem] items-center justify-center bg-stone-50"
+      }
+    >
+      {!url ? (
+        <Loader2 className="h-4 w-4 animate-spin text-ink-muted" />
+      ) : isImage ? (
+        <img
+          src={url}
+          alt={fileName}
+          className={
+            compact
+              ? "h-full w-full object-cover"
+              : "max-h-72 w-full object-contain"
+          }
+        />
+      ) : (
+        <FileText className="h-8 w-8 text-brand" />
+      )}
+    </div>
+  );
+
+  const footer = (
+    <div className="truncate border-t border-stone-100 px-2 py-1 text-center text-[10px] font-medium text-ink-muted">
+      {badge}
+    </div>
+  );
+
+  if (!url && !isImage) {
+    return (
+      <div className={shell}>
+        {thumb}
+        {footer}
+      </div>
+    );
+  }
+
+  if (url) {
+    return (
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={shell}
+        title={fileName}
+      >
+        {thumb}
+        {footer}
+      </a>
+    );
+  }
 
   return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="block overflow-hidden rounded-xl border border-stone-200 bg-stone-50"
-    >
-      {/* Signed storage URLs are dynamic; use native img. */}
-      <img
-        src={url}
-        alt={label}
-        className="max-h-72 w-full object-contain"
-      />
-      <p className="truncate border-t border-stone-100 px-2 py-1.5 text-[11px] text-ink-muted">
-        {label}
-      </p>
-    </a>
+    <div className={shell} title={fileName}>
+      {thumb}
+      {footer}
+    </div>
   );
 }
 
@@ -187,6 +249,7 @@ type VaultMessage = {
   role: "user" | "assistant";
   content: string;
   citations?: Citation[] | null;
+  attachment?: VaultMessageAttachment | null;
   created_at: string;
 };
 
@@ -892,7 +955,13 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     }
   };
 
-  const sendQuestion = async (questionRaw: string) => {
+  const sendQuestion = async (
+    questionRaw: string,
+    options?: {
+      attachment?: VaultMessageAttachment;
+      userDisplayContent?: string;
+    }
+  ) => {
     const question = questionRaw.trim();
     if (!question || sending || vaultBusy) return;
 
@@ -901,12 +970,14 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     setInput("");
 
     const optimisticId = `local-${Date.now()}`;
+    const userContent = options?.userDisplayContent?.trim() ?? question;
     setMessages((prev) => [
       ...prev,
       {
         id: optimisticId,
         role: "user",
-        content: question,
+        content: userContent,
+        attachment: options?.attachment ?? null,
         created_at: new Date().toISOString(),
       },
     ]);
@@ -942,9 +1013,25 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
       if (body.chats) setChats(body.chats);
       if (body.chatId) setActiveChatId(body.chatId);
       const turn = body.messages ?? [];
+      const optimisticAttachment = options?.attachment;
+      const mergedTurn = turn.map((m, index) => {
+        if (
+          index === 0 &&
+          m.role === "user" &&
+          optimisticAttachment &&
+          !m.attachment
+        ) {
+          return {
+            ...m,
+            attachment: optimisticAttachment,
+            content: userContent || m.content,
+          };
+        }
+        return m;
+      });
       setMessages((prev) => [
         ...prev.filter((m) => m.id !== optimisticId),
-        ...turn,
+        ...mergedTurn,
       ]);
       dispatchAwardsFromResponse(body);
       void loadMetaAndChats();
@@ -970,6 +1057,9 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
 
     if (attachment) {
       const { file } = attachment;
+      const attachmentPreview = isImageUpload(file)
+        ? URL.createObjectURL(file)
+        : null;
       clearPendingAttachment();
       setInput("");
 
@@ -990,7 +1080,15 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
           (isImageUpload(file)
             ? "What do you see in this image? Transcribe any lists or notes clearly."
             : `Summarize what matters in ${result.fileName}.`);
-        await sendQuestion(finalQuestion);
+        await sendQuestion(finalQuestion, {
+          attachment: {
+            documentId: result.documentId,
+            fileName: result.fileName,
+            kind: isImageUpload(file) ? "image" : "document",
+            previewUrl: attachmentPreview,
+          },
+          userDisplayContent: question,
+        });
       } catch (err) {
         stageVaultFile(file);
         if (question) setInput(question);
@@ -1004,7 +1102,10 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     await sendQuestion(question);
   };
 
-  const renderAssistantContent = (m: VaultMessage) => {
+  const renderAssistantContent = (
+    m: VaultMessage,
+    options?: { hideCitationPreviews?: boolean }
+  ) => {
     const proposed = parseProposedReminder(m.content);
     const displayContent = stripProposedReminderSection(m.content);
     const sections = parseGideonSections(
@@ -1024,11 +1125,29 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
     const sourceCitations = uniqueCitations.filter(
       (c) => !(c.isImage || isImageFileName(c.fileName))
     );
+    const previewCitations = options?.hideCitationPreviews
+      ? []
+      : [...imageCitations, ...sourceCitations];
+    const linkOnlyCitations = options?.hideCitationPreviews ? [] : sourceCitations;
     const alreadySet = confirmedReminderIds.has(m.id);
     const confirming = confirmingReminderId === m.id;
 
     return (
       <div className="min-w-0 flex-1 space-y-2">
+        {previewCitations.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {previewCitations.map((c) => (
+              <VaultAttachmentCard
+                key={`att-${c.documentId}`}
+                documentId={c.documentId}
+                fileName={c.fileName}
+                kind={
+                  c.isImage || isImageFileName(c.fileName) ? "image" : "document"
+                }
+              />
+            ))}
+          </div>
+        ) : null}
         {sections.map((sec, i) => (
           <div
             key={`${m.id}-${i}`}
@@ -1091,27 +1210,9 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
             )}
           </div>
         ) : null}
-        {imageCitations.length > 0 || sourceCitations.length > 0 ? (
+        {linkOnlyCitations.length > 0 ? (
           <div className="space-y-2 pt-1">
-            {imageCitations.length > 0 ? (
-              <div
-                className={
-                  imageCitations.length > 1
-                    ? "grid gap-2 sm:grid-cols-2"
-                    : "grid gap-2"
-                }
-              >
-                {imageCitations.map((c) => (
-                  <CitationImagePreview
-                    key={`img-${c.documentId}`}
-                    documentId={c.documentId}
-                    fileName={c.fileName}
-                    profileName={c.profileName}
-                  />
-                ))}
-              </div>
-            ) : null}
-            {sourceCitations.map((c) => (
+            {linkOnlyCitations.map((c) => (
               <div
                 key={c.documentId}
                 className="flex flex-wrap items-center gap-2 text-[11px] text-ink-muted"
@@ -1455,17 +1556,38 @@ export default function VaultChatPanel({ variant = "embedded" }: Props) {
       ) : (
         <>
           {welcomeBlock}
-          {messages.map((m) =>
+          {messages.map((m, index) =>
             m.role === "user" ? (
               <div key={m.id} className="flex justify-end">
-                <div className="max-w-[85%] rounded-2xl bg-stone-100 px-3.5 py-2 text-sm text-foreground">
-                  <span className="whitespace-pre-wrap">{m.content}</span>
+                <div className="flex max-w-[85%] flex-col items-end gap-2">
+                  {m.attachment ? (
+                    <VaultAttachmentCard
+                      documentId={m.attachment.documentId}
+                      fileName={m.attachment.fileName}
+                      kind={m.attachment.kind}
+                      previewUrl={m.attachment.previewUrl}
+                    />
+                  ) : null}
+                  {m.content.trim() ? (
+                    <div className="rounded-2xl bg-stone-100 px-3.5 py-2 text-sm text-foreground">
+                      <span className="whitespace-pre-wrap">{m.content}</span>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             ) : (
               <div key={m.id} className="flex items-start gap-2.5">
                 <GideonAvatar size={40} variant="portrait" />
-                {renderAssistantContent(m)}
+                {renderAssistantContent(m, {
+                  hideCitationPreviews:
+                    index > 0 &&
+                    messages[index - 1]?.role === "user" &&
+                    Boolean(messages[index - 1]?.attachment) &&
+                    (m.citations ?? []).some(
+                      (c) =>
+                        c.documentId === messages[index - 1]?.attachment?.documentId
+                    ),
+                })}
               </div>
             )
           )}
