@@ -75,7 +75,12 @@ export default function VaultChatDrawer({
           </button>
         </header>
         <div className="min-h-0 flex-1">
-          <VaultChatPanel variant="drawer" scopedProfileId={profileId} />
+          <VaultChatPanel
+            key={profileId}
+            variant="drawer"
+            scopedProfileId={profileId}
+            startFreshChat
+          />
         </div>
       </aside>
     </div>

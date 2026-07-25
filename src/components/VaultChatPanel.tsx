@@ -362,6 +362,8 @@ type Props = {
   variant?: "embedded" | "page" | "drawer";
   /** Chat as this vault without switching the app-wide active profile. */
   scopedProfileId?: string;
+  /** Side panel: do not resume URL or prior threads; start a new chat. */
+  startFreshChat?: boolean;
 };
 
 const SECTION_STYLES: Record<string, string> = {
@@ -402,13 +404,17 @@ function withVaultChatProfileId<T extends Record<string, unknown>>(
 export default function VaultChatPanel({
   variant = "embedded",
   scopedProfileId,
+  startFreshChat = false,
 }: Props) {
   const isPage = variant === "page";
   const isDrawer = variant === "drawer";
+  const isScopedPanel = Boolean(scopedProfileId) || isDrawer;
   const searchParams = useSearchParams();
-  const requestedChatId = searchParams.get("chatId");
-  const requestedProfileId = searchParams.get("profileId");
-  const requestedWorkProjectId = searchParams.get("projectId");
+  const requestedChatId = isScopedPanel ? null : searchParams.get("chatId");
+  const requestedProfileId = isScopedPanel ? null : searchParams.get("profileId");
+  const requestedWorkProjectId = isScopedPanel
+    ? null
+    : searchParams.get("projectId");
   const { active, profiles, loading: profilesLoading, switchProfile, refresh } =
     useActiveProfile();
   const needsSetup = !profilesLoading && profiles.length === 0;
@@ -597,6 +603,11 @@ export default function VaultChatPanel({
     setError(null);
     try {
       const list = await loadMetaAndChats();
+      if (startFreshChat || isDrawer) {
+        setActiveChatId(null);
+        setMessages([]);
+        return;
+      }
       const deepChat =
         requestedChatId &&
         deepLinkChatConsumed.current !== requestedChatId
@@ -615,10 +626,11 @@ export default function VaultChatPanel({
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't load Ask Gideon.");
       setMessages([]);
+      setActiveChatId(null);
     } finally {
       setLoadingHistory(false);
     }
-  }, [loadMetaAndChats, loadThread, requestedChatId]);
+  }, [loadMetaAndChats, loadThread, requestedChatId, startFreshChat, isDrawer]);
 
   useEffect(() => {
     if (profilesLoading || profiles.length > 0 || bootstrapTried.current) return;
@@ -1166,27 +1178,39 @@ export default function VaultChatPanel({
     }
 
     try {
-      const res = await fetch("/api/documents/vault-chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          withVaultChatProfileId(
-            {
-              question,
-              chatId: activeChatId,
-              ...(options?.attachment?.documentId &&
-              !isPendingAttachmentId(options.attachment.documentId)
-                ? { attachmentDocumentId: options.attachment.documentId }
-                : {}),
-              ...(requestedWorkProjectId
-                ? { workProjectId: requestedWorkProjectId }
-                : {}),
-            },
-            scopedProfileId
-          )
-        ),
-      });
-      const body = (await res.json().catch(() => ({}))) as {
+      let chatIdForSend = activeChatId;
+      if (
+        scopedProfileId &&
+        chatIdForSend &&
+        !chats.some((c) => c.id === chatIdForSend)
+      ) {
+        chatIdForSend = null;
+      }
+
+      const postBody = withVaultChatProfileId(
+        {
+          question,
+          chatId: chatIdForSend,
+          ...(options?.attachment?.documentId &&
+          !isPendingAttachmentId(options.attachment.documentId)
+            ? { attachmentDocumentId: options.attachment.documentId }
+            : {}),
+          ...(requestedWorkProjectId
+            ? { workProjectId: requestedWorkProjectId }
+            : {}),
+        },
+        scopedProfileId
+      );
+
+      const postOnce = () =>
+        fetch("/api/documents/vault-chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(postBody),
+        });
+
+      let res = await postOnce();
+      let body = (await res.json().catch(() => ({}))) as {
         error?: string;
         code?: string;
         messages?: VaultMessage[];
@@ -1195,6 +1219,22 @@ export default function VaultChatPanel({
         vaultScope?: VaultMessage["vaultScope"];
         chatScopedProfile?: Meta["chatScopedProfile"];
       };
+
+      if (
+        !res.ok &&
+        res.status === 404 &&
+        body.error === "Chat not found." &&
+        postBody.chatId
+      ) {
+        setActiveChatId(null);
+        const retryBody = { ...postBody, chatId: null };
+        res = await fetch("/api/documents/vault-chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(retryBody),
+        });
+        body = (await res.json().catch(() => ({}))) as typeof body;
+      }
       if (!res.ok) {
         if (options?.replaceUserMessageId) {
           setMessages((prev) =>
