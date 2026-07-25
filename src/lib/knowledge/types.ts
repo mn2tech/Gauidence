@@ -1,4 +1,8 @@
+import type { DocumentAnalysisContext } from "./document-analysis-context";
+
 export type KnowledgeSourceType = "document" | "daily_log" | "conversation";
+
+export type { DocumentAnalysisContext };
 
 export interface KnowledgeInput {
   sourceType: KnowledgeSourceType;
@@ -7,6 +11,8 @@ export interface KnowledgeInput {
   vaultId?: string;
   content: string;
   metadata?: Record<string, unknown>;
+  /** Structured fields from document analysis — avoids re-processing or duplicating source text. */
+  analysisContext?: DocumentAnalysisContext;
 }
 
 export interface KnowledgeEntityPreview {

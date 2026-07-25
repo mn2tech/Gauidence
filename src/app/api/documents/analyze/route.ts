@@ -275,20 +275,23 @@ export async function POST(request: Request) {
       );
     }
 
-    void import("@/lib/knowledge/trigger-knowledge-engine").then(
-      ({ triggerKnowledgeEngine }) =>
-        triggerKnowledgeEngine({
-          sourceType: "document",
-          sourceId: doc.id,
-          profileId,
-          vaultId: profileId,
-          content: sourceText?.trim() || analysis.summary?.trim() || "",
-          metadata: {
-            fileName: doc.file_name,
-            documentType: analysis.document_type,
-            title: analysis.title,
-          },
-        })
+    void Promise.all([
+      import("@/lib/knowledge/trigger-knowledge-engine"),
+      import("@/lib/knowledge/document-analysis-context"),
+    ]).then(([{ triggerKnowledgeEngine }, { buildDocumentAnalysisContext }]) =>
+      triggerKnowledgeEngine({
+        sourceType: "document",
+        sourceId: doc.id,
+        profileId,
+        vaultId: profileId,
+        content: sourceText?.trim() || analysis.summary?.trim() || "",
+        metadata: {
+          fileName: doc.file_name,
+          documentType: analysis.document_type,
+          title: analysis.title,
+        },
+        analysisContext: buildDocumentAnalysisContext(analysis),
+      })
     );
 
     return NextResponse.json({

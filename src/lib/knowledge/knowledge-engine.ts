@@ -1,4 +1,6 @@
+import { enrichFromDocumentAnalysis } from "./enrich-from-analysis";
 import { extractEntities } from "./entity-extractor";
+import { mergeKnowledgePreviews } from "./merge-preview";
 import { suggestMemories } from "./memory-generator";
 import { suggestRelationships } from "./relationship-builder";
 import { suggestTimelineEvents } from "./timeline-generator";
@@ -11,6 +13,18 @@ function logEvent(
   console.info(`[knowledge-engine] ${event}`, payload);
 }
 
+function buildHeuristicPreview(
+  input: KnowledgeInput
+): KnowledgePreview {
+  const entities = extractEntities(input.content);
+  return {
+    entities,
+    suggestedMemories: suggestMemories(input, entities),
+    suggestedTimelineEvents: suggestTimelineEvents(input, entities),
+    suggestedRelationships: suggestRelationships(input, entities),
+  };
+}
+
 export class KnowledgeEngine {
   /** Shadow-mode processing: analyze content and return a preview only. */
   static async process(input: KnowledgeInput): Promise<KnowledgePreview> {
@@ -20,53 +34,74 @@ export class KnowledgeEngine {
       profileId: input.profileId,
       vaultId: input.vaultId ?? null,
       contentLength: input.content.length,
+      hasAnalysisContext: Boolean(input.analysisContext),
     });
 
     try {
-      const entities = extractEntities(input.content);
+      const heuristic = buildHeuristicPreview(input);
+      if (input.analysisContext) {
+        heuristic.suggestedMemories = heuristic.suggestedMemories.filter(
+          (memory) =>
+            !(memory.category === "summary" && memory.key === "opening_context")
+        );
+      }
       logEvent("knowledge_entities_extracted", {
         sourceType: input.sourceType,
         sourceId: input.sourceId,
-        count: entities.length,
+        count: heuristic.entities.length,
+        source: "heuristic",
       });
 
-      const suggestedMemories = suggestMemories(input, entities);
+      let preview = heuristic;
+
+      if (input.analysisContext) {
+        const fromAnalysis = enrichFromDocumentAnalysis(
+          input,
+          input.analysisContext
+        );
+        preview = mergeKnowledgePreviews(fromAnalysis, heuristic);
+        logEvent("knowledge_analysis_enriched", {
+          sourceType: input.sourceType,
+          sourceId: input.sourceId,
+          analysisEntityCount: fromAnalysis.entities.length,
+          analysisMemoryCount: fromAnalysis.suggestedMemories.length,
+          analysisTimelineCount: fromAnalysis.suggestedTimelineEvents.length,
+          analysisRelationshipCount: fromAnalysis.suggestedRelationships.length,
+          mergedEntityCount: preview.entities.length,
+          mergedMemoryCount: preview.suggestedMemories.length,
+          mergedTimelineCount: preview.suggestedTimelineEvents.length,
+          mergedRelationshipCount: preview.suggestedRelationships.length,
+        });
+      }
+
       logEvent("knowledge_memories_suggested", {
         sourceType: input.sourceType,
         sourceId: input.sourceId,
-        count: suggestedMemories.length,
+        count: preview.suggestedMemories.length,
       });
 
-      const suggestedTimelineEvents = suggestTimelineEvents(input, entities);
       logEvent("knowledge_timeline_suggested", {
         sourceType: input.sourceType,
         sourceId: input.sourceId,
-        count: suggestedTimelineEvents.length,
+        count: preview.suggestedTimelineEvents.length,
       });
 
-      const suggestedRelationships = suggestRelationships(input, entities);
       logEvent("knowledge_relationships_suggested", {
         sourceType: input.sourceType,
         sourceId: input.sourceId,
-        count: suggestedRelationships.length,
+        count: preview.suggestedRelationships.length,
       });
-
-      const preview: KnowledgePreview = {
-        entities,
-        suggestedMemories,
-        suggestedTimelineEvents,
-        suggestedRelationships,
-      };
 
       logEvent("knowledge_engine_completed", {
         sourceType: input.sourceType,
         sourceId: input.sourceId,
         profileId: input.profileId,
         vaultId: input.vaultId ?? null,
-        entityCount: entities.length,
-        memoryCount: suggestedMemories.length,
-        timelineCount: suggestedTimelineEvents.length,
-        relationshipCount: suggestedRelationships.length,
+        entityCount: preview.entities.length,
+        memoryCount: preview.suggestedMemories.length,
+        timelineCount: preview.suggestedTimelineEvents.length,
+        relationshipCount: preview.suggestedRelationships.length,
+        enrichedFromAnalysis: Boolean(input.analysisContext),
       });
 
       return preview;

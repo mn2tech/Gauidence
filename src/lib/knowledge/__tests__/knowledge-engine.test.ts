@@ -1,11 +1,55 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, it } from "node:test";
 import { isKnowledgeEngineEnabled } from "@/lib/features/knowledge-engine";
+import { buildDocumentAnalysisContext } from "@/lib/knowledge/document-analysis-context";
+import { enrichFromDocumentAnalysis } from "@/lib/knowledge/enrich-from-analysis";
 import { KnowledgeEngine } from "@/lib/knowledge/knowledge-engine";
 import { triggerKnowledgeEngine } from "@/lib/knowledge/trigger-knowledge-engine";
 import type { KnowledgeInput } from "@/lib/knowledge/types";
+import type { GuardianAnalysis } from "@/lib/analysis/types";
 
 const ENV_KEY = "GUARDIAN_KNOWLEDGE_ENGINE_ENABLED";
+
+function sampleAnalysis(): GuardianAnalysis {
+  return {
+    document_type: "invoice",
+    title: "Acme Corp March Invoice",
+    summary: "Invoice from Acme Corp to John Smith for $1,250 due 2026-03-15.",
+    facts: [],
+    important_dates: [
+      {
+        label: "Payment due",
+        value: "March 15, 2026",
+        date: "2026-03-15",
+        source_type: "document",
+        confidence: 0.95,
+        source_excerpt: "Due March 15, 2026",
+        page_number: 1,
+        needs_verification: false,
+        is_deadline: true,
+      },
+    ],
+    people: ["John Smith"],
+    organizations: ["Acme Corp"],
+    amounts: [
+      {
+        label: "Total due",
+        value: "$1,250.00",
+        source_type: "document",
+        confidence: 0.98,
+        source_excerpt: "Total $1,250.00",
+        page_number: 1,
+        needs_verification: false,
+      },
+    ],
+    obligations: ["Pay invoice by March 15, 2026"],
+    warnings: [],
+    guardian_status: "action_needed",
+    suggested_actions: ["Schedule payment before due date"],
+    overall_confidence: 0.93,
+    specialist: {},
+  };
+}
 
 function sampleDocumentInput(
   overrides: Partial<KnowledgeInput> = {}
@@ -94,6 +138,54 @@ describe("KnowledgeEngine.process (shadow mode)", () => {
       assert.equal(item.sourceType, "daily_log");
       assert.equal(item.sourceId, "log-456");
     }
+  });
+
+  it("enriches document previews from analysis context without duplicating source text", async () => {
+    const analysisContext = buildDocumentAnalysisContext(sampleAnalysis());
+    const preview = await KnowledgeEngine.process({
+      ...sampleDocumentInput({ content: "" }),
+      analysisContext,
+    });
+
+    assert.ok(
+      preview.entities.some(
+        (entity) => entity.type === "person" && entity.name === "John Smith"
+      )
+    );
+    assert.ok(
+      preview.entities.some(
+        (entity) =>
+          entity.type === "organization" && entity.name === "Acme Corp"
+      )
+    );
+    assert.ok(
+      preview.suggestedMemories.some(
+        (memory) =>
+          memory.category === "summary" && memory.key === "document_summary"
+      )
+    );
+    assert.ok(
+      preview.suggestedMemories.some((memory) => memory.category === "obligation")
+    );
+    assert.ok(
+      preview.suggestedTimelineEvents.some(
+        (event) => event.eventDate === "2026-03-15"
+      )
+    );
+    assert.ok(
+      preview.suggestedRelationships.some(
+        (rel) =>
+          rel.subject === "John Smith" &&
+          rel.object === "Acme Corp" &&
+          rel.relationship === "associated_with"
+      )
+    );
+    assert.equal(
+      preview.suggestedMemories.some(
+        (memory) => memory.key === "opening_context"
+      ),
+      false
+    );
   });
 });
 
@@ -195,6 +287,20 @@ describe("triggerKnowledgeEngine", () => {
   });
 });
 
+describe("enrichFromDocumentAnalysis", () => {
+  it("maps analysis fields into traceable preview items", () => {
+    const input = sampleDocumentInput();
+    const preview = enrichFromDocumentAnalysis(
+      input,
+      buildDocumentAnalysisContext(sampleAnalysis())
+    );
+
+    assert.equal(preview.entities.length, 3);
+    assert.ok(preview.suggestedMemories.some((m) => m.category === "action"));
+    assert.ok(preview.suggestedTimelineEvents[0]?.category, "deadline");
+  });
+});
+
 describe("shadow mode has no Supabase dependency", () => {
   it("knowledge engine modules do not import supabase", async () => {
     const modules = [
@@ -203,6 +309,8 @@ describe("shadow mode has no Supabase dependency", () => {
       "@/lib/knowledge/memory-generator",
       "@/lib/knowledge/timeline-generator",
       "@/lib/knowledge/relationship-builder",
+      "@/lib/knowledge/enrich-from-analysis",
+      "@/lib/knowledge/document-analysis-context",
     ];
 
     for (const specifier of modules) {

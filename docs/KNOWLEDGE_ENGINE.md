@@ -15,6 +15,14 @@ The Knowledge Engine derives structured knowledge from existing Guardian sources
 - **Does not** include a Supabase client inside the engine.
 - Failures are caught by `triggerKnowledgeEngine()` and never affect the parent HTTP response.
 
+### Document analysis enrichment (Phase 1)
+
+For documents, the analyze route passes structured fields from the existing
+`GuardianAnalysis` result (`people`, `organizations`, `important_dates`,
+`obligations`, `suggested_actions`, `amounts`, `summary`) via
+`analysisContext`. This reuses the AI analysis already performed — no extra
+LLM calls and no duplication of raw `source_text`.
+
 ## Integration points
 
 | Trigger | Route | When |
@@ -37,6 +45,9 @@ Every derived preview item carries:
 
 | File | Role |
 |------|------|
+| `src/lib/knowledge/document-analysis-context.ts` | Maps `GuardianAnalysis` → engine input |
+| `src/lib/knowledge/enrich-from-analysis.ts` | Builds preview from analysis fields |
+| `src/lib/knowledge/merge-preview.ts` | Merges analysis + heuristic previews |
 | `src/lib/knowledge/types.ts` | Input/preview types |
 | `src/lib/knowledge/knowledge-engine.ts` | `KnowledgeEngine.process()` orchestrator |
 | `src/lib/knowledge/entity-extractor.ts` | Deterministic entity extraction |
