@@ -477,6 +477,7 @@ export default function VaultChatPanel({
   const pendingAttachmentRef = useRef<PendingVaultAttachment | null>(null);
   const profileSwitchRef = useRef(false);
   const deepLinkChatConsumed = useRef<string | null>(null);
+  const bootstrapGeneration = useRef(0);
   const workProjectPrefillDone = useRef(false);
   const sendQuestionRef = useRef<(questionRaw: string) => Promise<void>>(
     async () => {}
@@ -599,36 +600,56 @@ export default function VaultChatPanel({
   );
 
   const bootstrap = useCallback(async () => {
+    const generation = ++bootstrapGeneration.current;
     setLoadingHistory(true);
     setError(null);
     try {
       const list = await loadMetaAndChats();
+      if (generation !== bootstrapGeneration.current) return;
+
       if (startFreshChat || isDrawer) {
         setActiveChatId(null);
         setMessages([]);
         return;
       }
+
       const deepChat =
         requestedChatId &&
-        deepLinkChatConsumed.current !== requestedChatId
+        deepLinkChatConsumed.current !== requestedChatId &&
+        list.some((c) => c.id === requestedChatId)
           ? requestedChatId
           : null;
-      if (deepChat) {
-        deepLinkChatConsumed.current = deepChat;
-        await loadThread(deepChat);
-      } else if (list[0]) {
-        // Resume the most recent chat for this profile (Docs ↔ Ask continuity).
-        await loadThread(list[0].id);
-      } else {
+
+      const initialChatId = deepChat ?? list[0]?.id ?? null;
+      if (!initialChatId) {
         setActiveChatId(null);
         setMessages([]);
+        return;
+      }
+
+      if (deepChat) deepLinkChatConsumed.current = deepChat;
+      try {
+        await loadThread(initialChatId);
+      } catch (err) {
+        if (generation !== bootstrapGeneration.current) return;
+        const message =
+          err instanceof Error ? err.message : "Couldn't load Ask Gideon.";
+        if (message === "Chat not found.") {
+          setActiveChatId(null);
+          setMessages([]);
+          return;
+        }
+        throw err;
       }
     } catch (err) {
+      if (generation !== bootstrapGeneration.current) return;
       setError(err instanceof Error ? err.message : "Couldn't load Ask Gideon.");
       setMessages([]);
       setActiveChatId(null);
     } finally {
-      setLoadingHistory(false);
+      if (generation === bootstrapGeneration.current) {
+        setLoadingHistory(false);
+      }
     }
   }, [loadMetaAndChats, loadThread, requestedChatId, startFreshChat, isDrawer]);
 
@@ -744,8 +765,11 @@ export default function VaultChatPanel({
   useEffect(() => {
     if (needsSetup || scopedProfileId) return;
     const onProfile = () => {
+      bootstrapGeneration.current += 1;
+      deepLinkChatConsumed.current = null;
       setActiveChatId(null);
       setMessages([]);
+      setError(null);
       void bootstrap();
     };
     window.addEventListener("guardian:profile-changed", onProfile);
@@ -1179,11 +1203,7 @@ export default function VaultChatPanel({
 
     try {
       let chatIdForSend = activeChatId;
-      if (
-        scopedProfileId &&
-        chatIdForSend &&
-        !chats.some((c) => c.id === chatIdForSend)
-      ) {
+      if (chatIdForSend && !chats.some((c) => c.id === chatIdForSend)) {
         chatIdForSend = null;
       }
 
