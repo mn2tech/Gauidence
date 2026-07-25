@@ -603,6 +603,9 @@ export default function VaultChatPanel({
     const generation = ++bootstrapGeneration.current;
     setLoadingHistory(true);
     setError(null);
+    setChats([]);
+    setActiveChatId(null);
+    setMessages([]);
     try {
       const list = await loadMetaAndChats();
       if (generation !== bootstrapGeneration.current) return;
@@ -767,9 +770,11 @@ export default function VaultChatPanel({
     const onProfile = () => {
       bootstrapGeneration.current += 1;
       deepLinkChatConsumed.current = null;
+      setChats([]);
       setActiveChatId(null);
       setMessages([]);
       setError(null);
+      setLoadingHistory(true);
       void bootstrap();
     };
     window.addEventListener("guardian:profile-changed", onProfile);
@@ -859,7 +864,19 @@ export default function VaultChatPanel({
       await loadThread(chatId);
       setSidebarOpen(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't load chat.");
+      const message =
+        err instanceof Error ? err.message : "Couldn't load chat.";
+      if (message === "Chat not found.") {
+        setActiveChatId(null);
+        setMessages([]);
+        try {
+          await loadMetaAndChats();
+        } catch {
+          /* sidebar refresh is best-effort */
+        }
+        return;
+      }
+      setError(message);
     } finally {
       setLoadingHistory(false);
     }
