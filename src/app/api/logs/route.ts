@@ -216,6 +216,22 @@ export async function POST(request: Request) {
     );
   }
 
+  void import("@/lib/knowledge/trigger-knowledge-engine").then(
+    ({ triggerKnowledgeEngine }) =>
+      triggerKnowledgeEngine({
+        sourceType: "daily_log",
+        sourceId: data.id,
+        profileId: data.profile_id,
+        vaultId: data.profile_id,
+        content: data.content,
+        metadata: {
+          title: data.title,
+          logDate: data.log_date,
+          category: data.category,
+        },
+      })
+  );
+
   const newlyGranted = await refreshUserAwards(user.id, supabase);
   return NextResponse.json({ log: data, newlyGranted }, { status: 201 });
 }

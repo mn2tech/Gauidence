@@ -275,6 +275,22 @@ export async function POST(request: Request) {
       );
     }
 
+    void import("@/lib/knowledge/trigger-knowledge-engine").then(
+      ({ triggerKnowledgeEngine }) =>
+        triggerKnowledgeEngine({
+          sourceType: "document",
+          sourceId: doc.id,
+          profileId,
+          vaultId: profileId,
+          content: sourceText?.trim() || analysis.summary?.trim() || "",
+          metadata: {
+            fileName: doc.file_name,
+            documentType: analysis.document_type,
+            title: analysis.title,
+          },
+        })
+    );
+
     return NextResponse.json({
       summary: analysis.summary,
       facts,
