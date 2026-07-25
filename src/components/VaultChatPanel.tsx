@@ -481,6 +481,12 @@ export default function VaultChatPanel({
   requestedChatIdRef.current = requestedChatId;
   const bootstrapGeneration = useRef(0);
   const bootstrappedVaultRef = useRef<string | null>(null);
+  const messagesRef = useRef(messages);
+  const sendingRef = useRef(sending);
+  const activeChatIdRef = useRef(activeChatId);
+  messagesRef.current = messages;
+  sendingRef.current = sending;
+  activeChatIdRef.current = activeChatId;
   const workProjectPrefillDone = useRef(false);
   const sendQuestionRef = useRef<(questionRaw: string) => Promise<void>>(
     async () => {}
@@ -531,7 +537,7 @@ export default function VaultChatPanel({
     },
     onInterimTranscript: setInput,
     onError: (msg) => setError(msg),
-    disabled: sending || vaultBusy || !profileId,
+    disabled: sending || vaultBusy || loadingHistory || !profileId,
   });
   const docsHref = documentsHref(profileId);
 
@@ -637,18 +643,38 @@ export default function VaultChatPanel({
 
   const bootstrap = useCallback(async () => {
     const generation = ++bootstrapGeneration.current;
+    const hadConversation =
+      sendingRef.current ||
+      messagesRef.current.length > 0 ||
+      Boolean(activeChatIdRef.current);
+
     setLoadingHistory(true);
     setError(null);
-    setChats([]);
-    setActiveChatId(null);
-    setMessages([]);
+
+    if (!hadConversation) {
+      setChats([]);
+      setActiveChatId(null);
+      setMessages([]);
+    }
+
     try {
       const list = await loadMetaAndChats();
       if (generation !== bootstrapGeneration.current) return;
 
       if (startFreshChat || isDrawer) {
-        setActiveChatId(null);
-        setMessages([]);
+        if (!hadConversation) {
+          setActiveChatId(null);
+          setMessages([]);
+        }
+        return;
+      }
+
+      // User may have sent a message while bootstrap was in flight — keep it.
+      if (
+        sendingRef.current ||
+        messagesRef.current.length > 0 ||
+        activeChatIdRef.current
+      ) {
         return;
       }
 
@@ -659,7 +685,7 @@ export default function VaultChatPanel({
           ? requestedChatIdRef.current
           : null;
 
-      const initialChatId = deepChat;
+      const initialChatId = deepChat ?? list[0]?.id ?? null;
       if (!initialChatId) {
         setActiveChatId(null);
         setMessages([]);
@@ -682,9 +708,15 @@ export default function VaultChatPanel({
       }
     } catch (err) {
       if (generation !== bootstrapGeneration.current) return;
-      setError(err instanceof Error ? err.message : "Couldn't load Ask Gideon.");
-      setMessages([]);
-      setActiveChatId(null);
+      if (
+        !sendingRef.current &&
+        messagesRef.current.length === 0 &&
+        !activeChatIdRef.current
+      ) {
+        setError(err instanceof Error ? err.message : "Couldn't load Ask Gideon.");
+        setMessages([]);
+        setActiveChatId(null);
+      }
     } finally {
       if (generation === bootstrapGeneration.current) {
         setLoadingHistory(false);
@@ -2151,7 +2183,7 @@ export default function VaultChatPanel({
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              disabled={sending || vaultBusy || voiceListening}
+              disabled={sending || vaultBusy || loadingHistory || voiceListening}
               maxLength={2000}
               placeholder={
                 voiceListening
@@ -2259,6 +2291,7 @@ export default function VaultChatPanel({
                 disabled={
                   sending ||
                   vaultBusy ||
+                  loadingHistory ||
                   (!input.trim() && !pendingAttachment)
                 }
                 aria-label="Send question to Gideon"
