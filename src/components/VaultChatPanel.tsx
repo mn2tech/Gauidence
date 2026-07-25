@@ -9,7 +9,7 @@ import {
   type MouseEvent,
 } from "react";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import PlanLimitAlert from "@/components/PlanLimitAlert";
 import {
   ExternalLink,
@@ -409,8 +409,6 @@ export default function VaultChatPanel({
   const isPage = variant === "page";
   const isDrawer = variant === "drawer";
   const isScopedPanel = Boolean(scopedProfileId) || isDrawer;
-  const router = useRouter();
-  const pathname = usePathname();
   const searchParams = useSearchParams();
   const requestedChatId = isScopedPanel ? null : searchParams.get("chatId");
   const requestedProfileId = isScopedPanel ? null : searchParams.get("profileId");
@@ -482,6 +480,7 @@ export default function VaultChatPanel({
   const requestedChatIdRef = useRef<string | null>(requestedChatId);
   requestedChatIdRef.current = requestedChatId;
   const bootstrapGeneration = useRef(0);
+  const bootstrappedVaultRef = useRef<string | null>(null);
   const workProjectPrefillDone = useRef(false);
   const sendQuestionRef = useRef<(questionRaw: string) => Promise<void>>(
     async () => {}
@@ -501,28 +500,22 @@ export default function VaultChatPanel({
   const syncAskUrl = useCallback(
     (chatId: string | null) => {
       if (isScopedPanel || isDrawer) return;
-      const params = new URLSearchParams(searchParams.toString());
+      if (typeof window === "undefined") return;
+      const params = new URLSearchParams(window.location.search);
       if (chatId) params.set("chatId", chatId);
       else params.delete("chatId");
       if (vaultProfileId) params.set("profileId", vaultProfileId);
       else params.delete("profileId");
       const qs = params.toString();
-      const next = `${pathname}${qs ? `?${qs}` : ""}`;
-      const current = `${pathname}${
-        searchParams.toString() ? `?${searchParams.toString()}` : ""
-      }`;
+      const next = `${window.location.pathname}${qs ? `?${qs}` : ""}`;
+      const current = `${window.location.pathname}${window.location.search}`;
       if (next !== current) {
-        router.replace(next, { scroll: false });
+        window.history.replaceState(window.history.state, "", next);
       }
+      requestedChatIdRef.current = chatId;
+      if (chatId) deepLinkChatConsumed.current = chatId;
     },
-    [
-      isScopedPanel,
-      isDrawer,
-      pathname,
-      router,
-      searchParams,
-      vaultProfileId,
-    ]
+    [isScopedPanel, isDrawer, vaultProfileId]
   );
   const syncAskUrlRef = useRef(syncAskUrl);
   syncAskUrlRef.current = syncAskUrl;
@@ -666,7 +659,7 @@ export default function VaultChatPanel({
           ? requestedChatIdRef.current
           : null;
 
-      const initialChatId = deepChat ?? list[0]?.id ?? null;
+      const initialChatId = deepChat;
       if (!initialChatId) {
         setActiveChatId(null);
         setMessages([]);
@@ -710,6 +703,8 @@ export default function VaultChatPanel({
     }
     if (scopedProfileId) {
       if (!profiles.some((p) => p.id === scopedProfileId)) return;
+      if (bootstrappedVaultRef.current === scopedProfileId) return;
+      bootstrappedVaultRef.current = scopedProfileId;
       void bootstrapRef.current();
       return;
     }
@@ -718,6 +713,8 @@ export default function VaultChatPanel({
       // Wait until profile switch lands before loading chats.
       return;
     }
+    if (bootstrappedVaultRef.current === active.id) return;
+    bootstrappedVaultRef.current = active.id;
     void bootstrapRef.current();
   }, [
     needsSetup,
@@ -725,6 +722,7 @@ export default function VaultChatPanel({
     active?.id,
     scopedProfileId,
     profiles.length,
+    requestedProfileId,
   ]);
 
   useEffect(() => {
@@ -816,8 +814,11 @@ export default function VaultChatPanel({
 
   useEffect(() => {
     if (needsSetup || scopedProfileId) return;
-    const onProfile = () => {
+    const onProfile = (e: Event) => {
+      const profileId = (e as CustomEvent<{ profileId?: string }>).detail
+        ?.profileId;
       bootstrapGeneration.current += 1;
+      bootstrappedVaultRef.current = profileId ?? null;
       deepLinkChatConsumed.current = null;
       setChats([]);
       setActiveChatId(null);
