@@ -407,17 +407,28 @@ function vaultChatStorageKey(profileId: string): string {
 
 function readRememberedVaultChat(profileId: string | null): string | null {
   if (!profileId || typeof window === "undefined") return null;
-  return sessionStorage.getItem(vaultChatStorageKey(profileId));
+  return (
+    localStorage.getItem(vaultChatStorageKey(profileId)) ??
+    sessionStorage.getItem(vaultChatStorageKey(profileId))
+  );
 }
 
 function rememberVaultChat(profileId: string | null, chatId: string | null) {
   if (!profileId || !chatId || typeof window === "undefined") return;
+  localStorage.setItem(vaultChatStorageKey(profileId), chatId);
   sessionStorage.setItem(vaultChatStorageKey(profileId), chatId);
 }
 
 function forgetVaultChat(profileId: string | null) {
   if (!profileId || typeof window === "undefined") return;
+  localStorage.removeItem(vaultChatStorageKey(profileId));
   sessionStorage.removeItem(vaultChatStorageKey(profileId));
+}
+
+function readUrlChatId(): string | null {
+  if (typeof window === "undefined") return null;
+  const chatId = new URLSearchParams(window.location.search).get("chatId");
+  return chatId?.trim() ? chatId.trim() : null;
 }
 
 export default function VaultChatPanel({
@@ -497,7 +508,9 @@ export default function VaultChatPanel({
   const profileSwitchRef = useRef(false);
   const deepLinkChatConsumed = useRef<string | null>(null);
   const requestedChatIdRef = useRef<string | null>(requestedChatId);
-  requestedChatIdRef.current = requestedChatId;
+  useEffect(() => {
+    if (requestedChatId) requestedChatIdRef.current = requestedChatId;
+  }, [requestedChatId]);
   const bootstrapGeneration = useRef(0);
   const bootstrappedVaultRef = useRef<string | null>(null);
   const messagesRef = useRef(messages);
@@ -625,7 +638,11 @@ export default function VaultChatPanel({
   const loadThread = useCallback(
     async (
       chatId: string,
-      options?: { bootstrapGeneration?: number; allowEmpty?: boolean }
+      options?: {
+        bootstrapGeneration?: number;
+        allowEmpty?: boolean;
+        refresh?: boolean;
+      }
     ) => {
       const generation = options?.bootstrapGeneration;
       const res = await fetch(
@@ -648,7 +665,30 @@ export default function VaultChatPanel({
       if (body.chats) setChats(body.chats);
       const resolvedChatId = body.chatId ?? chatId;
       const serverMessages = body.messages ?? [];
-      if (serverMessages.length > 0 || options?.allowEmpty) {
+
+      if (options?.refresh) {
+        if (serverMessages.length > 0) {
+          setActiveChatId(resolvedChatId);
+          setMessages(serverMessages);
+          syncAskUrlRef.current(resolvedChatId);
+          rememberVaultChat(vaultProfileId, resolvedChatId);
+        }
+      } else if (options?.bootstrapGeneration !== undefined) {
+        const hasLocalConversation =
+          messagesRef.current.length > 0 ||
+          sendingRef.current ||
+          Boolean(activeChatIdRef.current);
+        if (hasLocalConversation) {
+          if (body.chats) setChats(body.chats);
+          return;
+        }
+        if (serverMessages.length > 0 || options?.allowEmpty) {
+          setActiveChatId(resolvedChatId);
+          setMessages(serverMessages);
+          syncAskUrlRef.current(resolvedChatId);
+          rememberVaultChat(vaultProfileId, resolvedChatId);
+        }
+      } else if (serverMessages.length > 0 || options?.allowEmpty) {
         setActiveChatId(resolvedChatId);
         setMessages(serverMessages);
         syncAskUrlRef.current(resolvedChatId);
@@ -678,10 +718,10 @@ export default function VaultChatPanel({
 
       if (startFreshChat || isDrawer) return;
 
+      const urlChatIdParam = readUrlChatId();
       const urlChatId =
-        requestedChatIdRef.current &&
-        list.some((c) => c.id === requestedChatIdRef.current)
-          ? requestedChatIdRef.current
+        urlChatIdParam && list.some((c) => c.id === urlChatIdParam)
+          ? urlChatIdParam
           : null;
 
       const rememberedChatId = (() => {
@@ -1320,10 +1360,7 @@ export default function VaultChatPanel({
     }
 
     try {
-      let chatIdForSend = activeChatId;
-      if (chatIdForSend && !chats.some((c) => c.id === chatIdForSend)) {
-        chatIdForSend = null;
-      }
+      let chatIdForSend = activeChatIdRef.current ?? activeChatId;
 
       const postBody = withVaultChatProfileId(
         {
@@ -1427,7 +1464,11 @@ export default function VaultChatPanel({
         ...mergedTurn,
       ]);
       dispatchAwardsFromResponse(body);
-      void loadMetaAndChats();
+      if (resolvedChatId) {
+        void loadThread(resolvedChatId, { refresh: true });
+      } else {
+        void loadMetaAndChats();
+      }
     } catch {
       if (options?.replaceUserMessageId) {
         setMessages((prev) =>

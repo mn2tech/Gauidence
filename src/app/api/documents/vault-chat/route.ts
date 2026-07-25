@@ -853,12 +853,19 @@ export async function POST(request: Request) {
   if (requestedId) {
     const { data: existingChat } = await supabase
       .from("vault_chats")
-      .select("id, title, scoped_profile_id")
+      .select("id, title, profile_id, scoped_profile_id")
       .eq("id", requestedId)
       .eq("user_id", user.id)
-      .eq("profile_id", active.id)
       .maybeSingle();
     if (!existingChat) {
+      return NextResponse.json({ error: "Chat not found." }, { status: 404 });
+    }
+    const chatOwnerProfile = await requireAccessibleGuardianProfile(
+      supabase,
+      user.id,
+      String(existingChat.profile_id)
+    );
+    if (!chatOwnerProfile) {
       return NextResponse.json({ error: "Chat not found." }, { status: 404 });
     }
     chatId = existingChat.id;
