@@ -5,7 +5,9 @@ import {
   buildGideonVaultGuidance,
   buildVaultScopeNote,
   buildGideonTodayNote,
+  buildCurrentTimeAnswer,
   buildTodayDateAnswer,
+  isSimpleCurrentTimeQuestion,
   isSimpleTodayDateQuestion,
   firstNameFrom,
   getVaultTemplate,
@@ -30,7 +32,7 @@ describe("Gideon helpers", () => {
     assert.match(GIDEON_SYSTEM, /Payment status is unknown/);
     assert.match(GIDEON_SYSTEM, /GENERAL KNOWLEDGE/);
     assert.match(GIDEON_SYSTEM, /general knowledge rather than the user's vault/i);
-    assert.match(GIDEON_SYSTEM, /CURRENT DATE is provided/i);
+    assert.match(GIDEON_SYSTEM, /CURRENT DATE AND TIME is provided/i);
     assert.equal(
       GIDEON_BRAND_LINE,
       "Guardian watches. Gideon explains. You decide."
@@ -41,10 +43,11 @@ describe("Gideon helpers", () => {
     const note = buildGideonTodayNote(
       new Date("2026-07-25T15:00:00-04:00")
     );
-    assert.match(note, /CURRENT DATE \(authoritative\)/);
+    assert.match(note, /CURRENT DATE AND TIME \(authoritative\)/);
     assert.match(note, /Saturday, July 25, 2026/);
+    assert.match(note, /3:00 PM/);
     assert.match(note, /Eastern Time/);
-    assert.match(note, /do not say you lack real-time date access/i);
+    assert.match(note, /do not say you lack real-time date or time access/i);
   });
 
   it("detects simple today-date questions", () => {
@@ -68,6 +71,23 @@ describe("Gideon helpers", () => {
     );
     assert.match(answer, /Today is Saturday, July 25, 2026/);
     assert.match(answer, /India Standard Time/);
+  });
+
+  it("detects simple current-time questions", () => {
+    assert.equal(isSimpleCurrentTimeQuestion("time?"), true);
+    assert.equal(isSimpleCurrentTimeQuestion("what time is it"), true);
+    assert.equal(isSimpleCurrentTimeQuestion("what's the time"), true);
+    assert.equal(isSimpleCurrentTimeQuestion("what time is my reminder"), false);
+    assert.equal(isSimpleCurrentTimeQuestion("what timezone am I in"), false);
+  });
+
+  it("builds a direct current-time answer", () => {
+    const answer = buildCurrentTimeAnswer(
+      "America/New_York",
+      new Date("2026-07-25T15:00:00-04:00")
+    );
+    assert.match(answer, /The current time is 3:00 PM/);
+    assert.match(answer, /Eastern Time/);
   });
 
   it("parses first name from full name", () => {

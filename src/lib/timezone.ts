@@ -74,6 +74,18 @@ export function formatGuardianTodayLabel(
   return `${weekday}, ${date}`;
 }
 
+/** e.g. "4:50 PM" in the given IANA timezone. */
+export function formatGuardianTimeLabel(
+  instant: Date = new Date(),
+  timeZone: string = GUARDIAN_TIME_ZONE
+): string {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(instant);
+}
+
 /** Calendar YYYY-MM-DD in an IANA timezone. */
 export function calendarDateInUserZone(
   instant: Date = new Date(),

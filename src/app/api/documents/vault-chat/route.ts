@@ -37,7 +37,9 @@ import {
   buildGideonLogSuggestions,
   buildGideonVaultGuidance,
   buildGideonTodayNote,
+  buildCurrentTimeAnswer,
   buildTodayDateAnswer,
+  isSimpleCurrentTimeQuestion,
   isSimpleTodayDateQuestion,
   firstNameFrom,
   getVaultTemplate,
@@ -1167,6 +1169,8 @@ export async function POST(request: Request) {
 
   if (isSimpleTodayDateQuestion(question) && !attachmentDocumentId) {
     answer = buildTodayDateAnswer(userTz);
+  } else if (isSimpleCurrentTimeQuestion(question) && !attachmentDocumentId) {
+    answer = buildCurrentTimeAnswer(userTz);
   } else {
   try {
     const showPictures = wantsShowPictures(question);

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   calendarDateInUserZone,
   detectBrowserTimeZone,
+  formatGuardianTimeLabel,
   formatGuardianTodayLabel,
   guardianTimeZoneLabel,
   isValidIanaTimeZone,
@@ -21,6 +22,14 @@ describe("timezone helpers", () => {
     );
     assert.match(label, /Saturday, July 25, 2026/);
     assert.match(guardianTimeZoneLabel("Asia/Kolkata"), /India/i);
+  });
+
+  it("formats clock time in a zone", () => {
+    const time = formatGuardianTimeLabel(
+      new Date("2026-07-25T15:00:00-04:00"),
+      "America/New_York"
+    );
+    assert.equal(time, "3:00 PM");
   });
 
   it("calendar date respects zone boundaries", () => {
