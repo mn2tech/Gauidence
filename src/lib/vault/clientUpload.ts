@@ -19,6 +19,7 @@ export {
 } from "@/lib/vault/pastedText";
 
 import type { OrganizationSuggestionPayload } from "@/lib/organization/types";
+import { ANALYZE_CLIENT_TIMEOUT_MS } from "@/lib/analysis/timeout";
 
 export type VaultUploadResult = {
   documentId: string;
@@ -109,7 +110,7 @@ export async function uploadAndAnalyzeToVault(args: {
   args.onStatus?.("Reading the document…");
   try {
     const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), 110_000);
+    const timeoutId = window.setTimeout(() => controller.abort(), ANALYZE_CLIENT_TIMEOUT_MS);
     let res: Response;
     try {
       res = await fetch("/api/documents/analyze", {

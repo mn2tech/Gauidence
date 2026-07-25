@@ -63,8 +63,7 @@ const IN_PROGRESS_ANALYSIS: AnalysisStatus[] = [
   "validating",
 ];
 
-/** Abort before Vercel's 120s hard kill so the UI can show a clear timeout message. */
-const ANALYZE_CLIENT_TIMEOUT_MS = 110_000;
+import { ANALYZE_CLIENT_TIMEOUT_MS } from "@/lib/analysis/timeout";
 
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "newest", label: "Newest first" },

@@ -74,7 +74,7 @@ export function createLlmClient(): LlmClient {
   // The SDK defaults to two retries. Visual analysis makes two sequential
   // Claude calls (classification + specialist), so brief 5xx/529 incidents
   // otherwise surface too often as a failed document. The analyze route has a
-  // 120s budget; four retries remain within it when overloads fail quickly.
+  // 300s budget; four retries remain within it when overloads fail quickly.
   return new Anthropic({ apiKey, maxRetries: 4, timeout: 45_000 });
 }
 

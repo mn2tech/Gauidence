@@ -5,8 +5,10 @@ import { requireEditableGuardianProfile } from "@/lib/profiles/server";
 import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
 import { VAULT_PASTE_MAX_CHARS } from "@/lib/vault/pastedText";
 
+import { ANALYZE_MAX_DURATION_SEC } from "@/lib/analysis/timeout";
+
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = ANALYZE_MAX_DURATION_SEC;
 
 type Authed = { supabase: SupabaseClient; user: User };
 
