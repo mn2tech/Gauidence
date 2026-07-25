@@ -528,10 +528,9 @@ export default function VaultChatPanel({
       if (isScopedPanel || isDrawer) return;
       if (typeof window === "undefined") return;
       const params = new URLSearchParams(window.location.search);
+      params.delete("chatId");
+      params.delete("profileId");
       if (chatId) params.set("chatId", chatId);
-      else params.delete("chatId");
-      if (vaultProfileId) params.set("profileId", vaultProfileId);
-      else params.delete("profileId");
       const qs = params.toString();
       const next = `${window.location.pathname}${qs ? `?${qs}` : ""}`;
       const current = `${window.location.pathname}${window.location.search}`;
@@ -541,7 +540,7 @@ export default function VaultChatPanel({
       requestedChatIdRef.current = chatId;
       if (chatId) deepLinkChatConsumed.current = chatId;
     },
-    [isScopedPanel, isDrawer, vaultProfileId]
+    [isScopedPanel, isDrawer]
   );
   const syncAskUrlRef = useRef(syncAskUrl);
   syncAskUrlRef.current = syncAskUrl;
@@ -639,13 +638,13 @@ export default function VaultChatPanel({
         chatId?: string;
         meta?: Partial<Meta>;
       };
-      if (!res.ok) throw new Error(body.error ?? "Couldn't load chat.");
       if (
         generation !== undefined &&
         generation !== bootstrapGeneration.current
       ) {
         return;
       }
+      if (!res.ok) throw new Error(body.error ?? "Couldn't load chat.");
       if (body.chats) setChats(body.chats);
       const resolvedChatId = body.chatId ?? chatId;
       const serverMessages = body.messages ?? [];
@@ -699,10 +698,34 @@ export default function VaultChatPanel({
         !activeChatIdRef.current
       ) {
         if (urlChatId) deepLinkChatConsumed.current = urlChatId;
-        await loadThread(resumeChatId, {
-          bootstrapGeneration: generation,
-          allowEmpty: true,
-        });
+        try {
+          await loadThread(resumeChatId, {
+            bootstrapGeneration: generation,
+            allowEmpty: true,
+          });
+        } catch (err) {
+          if (generation !== bootstrapGeneration.current) return;
+          const message =
+            err instanceof Error ? err.message : "Couldn't load Ask Gideon.";
+          if (message === "Chat not found.") {
+            forgetVaultChat(vaultProfileId);
+            setError(null);
+            const fallbackId =
+              resumeChatId === list[0]?.id ? null : (list[0]?.id ?? null);
+            if (
+              fallbackId &&
+              fallbackId !== resumeChatId &&
+              messagesRef.current.length === 0
+            ) {
+              await loadThread(fallbackId, {
+                bootstrapGeneration: generation,
+                allowEmpty: true,
+              });
+            }
+            return;
+          }
+          throw err;
+        }
       }
     } catch (err) {
       if (generation !== bootstrapGeneration.current) return;
@@ -732,8 +755,16 @@ export default function VaultChatPanel({
     }
     if (!active?.id) return;
     if (requestedProfileId && active.id !== requestedProfileId) {
-      // Wait until profile switch lands before loading chats.
-      return;
+      // Stale profileId in URL (e.g. from an old vault before switch) — drop it.
+      if (typeof window !== "undefined") {
+        const params = new URLSearchParams(window.location.search);
+        if (params.has("profileId")) {
+          params.delete("profileId");
+          const qs = params.toString();
+          const next = `${window.location.pathname}${qs ? `?${qs}` : ""}`;
+          window.history.replaceState(window.history.state, "", next);
+        }
+      }
     }
     if (bootstrappedVaultRef.current === active.id) return;
     bootstrappedVaultRef.current = active.id;
@@ -935,6 +966,7 @@ export default function VaultChatPanel({
       const message =
         err instanceof Error ? err.message : "Couldn't load chat.";
       if (message === "Chat not found.") {
+        forgetVaultChat(vaultProfileId);
         setActiveChatId(null);
         setMessages([]);
         try {

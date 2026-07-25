@@ -569,12 +569,22 @@ export async function GET(request: Request) {
     .select("id, title, profile_id, scoped_profile_id")
     .eq("id", chatId)
     .eq("user_id", user.id)
-    .eq("profile_id", active.id)
     .maybeSingle();
 
   if (!chat) {
     return NextResponse.json({ error: "Chat not found." }, { status: 404 });
   }
+
+  const chatProfile = await requireAccessibleGuardianProfile(
+    supabase,
+    user.id,
+    String(chat.profile_id)
+  );
+  if (!chatProfile) {
+    return NextResponse.json({ error: "Chat not found." }, { status: 404 });
+  }
+
+  const threadChats = await listChats(supabase, user.id, chatProfile.id);
 
   const scopedProfile =
     typeof chat.scoped_profile_id === "string"
@@ -594,25 +604,25 @@ export async function GET(request: Request) {
     );
   }
 
-  const profileKind = suggestionKindFrom(active.profile_type);
+  const profileKind = suggestionKindFrom(chatProfile.profile_type);
   const template = getVaultTemplate(profileKind);
   const scopeMeta = await askGideonScopeMeta(
     supabase,
     user.id,
-    active,
+    chatProfile,
     scopedProfile?.display_name
   );
 
   return NextResponse.json({
-    chats,
+    chats: threadChats,
     chatId: chat.id,
     title: chat.title,
     messages: (messages ?? []) as ChatMessageRow[],
     meta: {
-      profileId: active.id,
-      profileName: active.display_name,
-      profileType: active.profile_type,
-      askContextLabel: askGideonContextLabel(active),
+      profileId: chatProfile.id,
+      profileName: chatProfile.display_name,
+      profileType: chatProfile.profile_type,
+      askContextLabel: askGideonContextLabel(chatProfile),
       chatContextLabel: scopeMeta.chatContextLabel,
       vaultScopeNote: scopeMeta.vaultScopeNote,
       templateLabel: template.label,
@@ -623,7 +633,8 @@ export async function GET(request: Request) {
             profileName: scopedProfile.display_name,
           }
         : null,
-      ...(await loadAskVaultInventory(supabase, user.id, active.id)).inventory,
+      ...(await loadAskVaultInventory(supabase, user.id, chatProfile.id))
+        .inventory,
     },
   });
 }
