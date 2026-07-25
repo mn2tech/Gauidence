@@ -8,10 +8,9 @@ import type { AnalysisStatus } from "@/lib/analysis/types";
 import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
 import { withLlmUsage } from "@/lib/usage/record";
 import { assertBillingQuota } from "@/lib/billing/quota";
-import { ANALYZE_MAX_DURATION_SEC } from "@/lib/analysis/timeout";
 
 export const runtime = "nodejs";
-export const maxDuration = ANALYZE_MAX_DURATION_SEC;
+export const maxDuration = 300;
 
 const MAX_ANALYZE_BYTES = 15 * 1024 * 1024;
 
