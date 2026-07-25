@@ -71,11 +71,8 @@ export function createLlmClient(): LlmClient {
       "missing_api_key"
     );
   }
-  // The SDK defaults to two retries. Visual analysis makes two sequential
-  // Claude calls (classification + specialist), so brief 5xx/529 incidents
-  // otherwise surface too often as a failed document. The analyze route has a
-  // 300s budget; four retries remain within it when overloads fail quickly.
-  return new Anthropic({ apiKey, maxRetries: 4, timeout: 45_000 });
+  // 300s route budget; classification + specialist are sequential Claude calls.
+  return new Anthropic({ apiKey, maxRetries: 4, timeout: 120_000 });
 }
 
 function dataUrlToImageBlock(
@@ -248,6 +245,13 @@ function mapAnthropicError(err: unknown): never {
         "Claude is temporarily busy. Please try this document again in a moment.",
         503,
         "overloaded"
+      );
+    }
+    if (err.status === 413) {
+      throw new AnalysisLlmError(
+        "This file is too large for Claude to process. Try a smaller PDF or a clearer scan.",
+        413,
+        "payload_too_large"
       );
     }
     if (err.status === 400) {

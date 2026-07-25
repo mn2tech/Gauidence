@@ -17,6 +17,7 @@ import { analyzeGeneral } from "./analyzers/general";
 import {
   ANALYSIS_MODEL,
   VISUAL_ANALYSIS_MODEL,
+  AnalysisLlmError,
   createLlmClient,
   type FilePayload,
   type LlmClient,
@@ -77,6 +78,42 @@ async function runSpecialist(
       return { analysis: await analyzeReceipt(client, file) };
     default:
       return { analysis: await analyzeGeneral(client, file, classifiedType) };
+  }
+}
+
+function asTextOnlyPdf(file: FilePayload): FilePayload {
+  return {
+    ...file,
+    inputMode: "text",
+    pageImages: [],
+    extraction: file.extraction
+      ? { ...file.extraction, pageImages: [] }
+      : file.extraction,
+  };
+}
+
+/** Retry PDF analysis with extracted text when the native PDF block fails. */
+async function withPdfTextFallback<T>(
+  file: FilePayload,
+  run: (payload: FilePayload) => Promise<T>
+): Promise<T> {
+  try {
+    return await run(file);
+  } catch (err) {
+    const text = file.extractedText?.trim() ?? "";
+    if (
+      !(err instanceof AnalysisLlmError) ||
+      file.mimeType !== "application/pdf" ||
+      file.inputMode === "text" ||
+      text.length < 200
+    ) {
+      throw err;
+    }
+    console.warn("PDF Claude request failed; retrying with extracted text only", {
+      code: err.code,
+      fileName: file.fileName,
+    });
+    return run(asTextOnlyPdf(file));
   }
 }
 
@@ -196,6 +233,14 @@ export async function runAnalysisPipeline(
     ocrText = fallback.ocrText;
   }
 
+  if (
+    inputMode === "visual" &&
+    file.mimeType === "application/pdf" &&
+    extraction.text.trim().length >= 500
+  ) {
+    inputMode = "text";
+  }
+
   const invoiceAnchors =
     extraction.method !== "vision_ocr" && extraction.quality >= 0.45
       ? parseInvoiceFromText(extraction.text)
@@ -213,16 +258,16 @@ export async function runAnalysisPipeline(
   await onProgress?.("classifying");
   const fileNameHint = classificationFromFileName(file.fileName);
   const classification =
-    fileNameHint ?? (await classifyDocument(client, enriched));
+    fileNameHint ??
+    (await withPdfTextFallback(enriched, (payload) =>
+      classifyDocument(client, payload)
+    ));
   const routedTo = resolveAnalyzerType(classification, IMPLEMENTED_SPECIALISTS);
 
   await onProgress?.("analyzing");
-  const { analysis: rawAnalysis, rawModelJson } = await runSpecialist(
-    client,
-    routedTo,
+  const { analysis: rawAnalysis, rawModelJson } = await withPdfTextFallback(
     enriched,
-    user,
-    classification.document_type
+    (payload) => runSpecialist(client, routedTo, payload, user, classification.document_type)
   );
   let analysis = rawAnalysis;
 
