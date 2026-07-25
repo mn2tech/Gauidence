@@ -643,7 +643,7 @@ export default function VaultChatPanel({
         allowEmpty?: boolean;
         refresh?: boolean;
       }
-    ) => {
+    ): Promise<number> => {
       const generation = options?.bootstrapGeneration;
       const res = await fetch(
         vaultChatApiUrl({ chatId }, vaultProfileId)
@@ -659,40 +659,36 @@ export default function VaultChatPanel({
         generation !== undefined &&
         generation !== bootstrapGeneration.current
       ) {
-        return;
+        return 0;
       }
       if (!res.ok) throw new Error(body.error ?? "Couldn't load chat.");
       if (body.chats) setChats(body.chats);
       const resolvedChatId = body.chatId ?? chatId;
       const serverMessages = body.messages ?? [];
+      let appliedCount = 0;
 
-      if (options?.refresh) {
-        if (serverMessages.length > 0) {
-          setActiveChatId(resolvedChatId);
-          setMessages(serverMessages);
-          syncAskUrlRef.current(resolvedChatId);
-          rememberVaultChat(vaultProfileId, resolvedChatId);
-        }
-      } else if (options?.bootstrapGeneration !== undefined) {
-        const hasLocalConversation =
-          messagesRef.current.length > 0 ||
-          sendingRef.current ||
-          Boolean(activeChatIdRef.current);
-        if (hasLocalConversation) {
-          if (body.chats) setChats(body.chats);
-          return;
-        }
-        if (serverMessages.length > 0 || options?.allowEmpty) {
-          setActiveChatId(resolvedChatId);
-          setMessages(serverMessages);
-          syncAskUrlRef.current(resolvedChatId);
-          rememberVaultChat(vaultProfileId, resolvedChatId);
-        }
-      } else if (serverMessages.length > 0 || options?.allowEmpty) {
+      const applyThread = () => {
         setActiveChatId(resolvedChatId);
         setMessages(serverMessages);
         syncAskUrlRef.current(resolvedChatId);
         rememberVaultChat(vaultProfileId, resolvedChatId);
+        appliedCount = serverMessages.length;
+      };
+
+      if (options?.refresh) {
+        if (serverMessages.length > 0) applyThread();
+      } else if (options?.bootstrapGeneration !== undefined) {
+        const hasLocalMessages =
+          messagesRef.current.length > 0 || sendingRef.current;
+        if (hasLocalMessages) {
+          if (body.chats) setChats(body.chats);
+          return 0;
+        }
+        if (serverMessages.length > 0 || options?.allowEmpty) {
+          applyThread();
+        }
+      } else if (serverMessages.length > 0 || options?.allowEmpty) {
+        applyThread();
       }
       if (body.meta) {
         setMeta((prev) => ({
@@ -703,8 +699,53 @@ export default function VaultChatPanel({
           ...body.meta,
         }));
       }
+      return appliedCount;
     },
     [vaultProfileId]
+  );
+
+  const resumeVaultChat = useCallback(
+    async (
+      list: ChatSummary[],
+      generation: number,
+      preferredIds: Array<string | null | undefined>
+    ) => {
+      const tried = new Set<string>();
+      const candidates: string[] = [];
+      for (const id of preferredIds) {
+        if (!id || tried.has(id)) continue;
+        tried.add(id);
+        candidates.push(id);
+      }
+      for (const chat of list) {
+        if (tried.has(chat.id)) continue;
+        tried.add(chat.id);
+        candidates.push(chat.id);
+      }
+
+      for (const chatId of candidates) {
+        if (generation !== bootstrapGeneration.current) return;
+        if (messagesRef.current.length > 0 || sendingRef.current) return;
+        try {
+          const count = await loadThread(chatId, {
+            bootstrapGeneration: generation,
+          });
+          if (count > 0) return;
+        } catch (err) {
+          if (generation !== bootstrapGeneration.current) return;
+          const message =
+            err instanceof Error ? err.message : "Couldn't load Ask Gideon.";
+          if (message === "Chat not found.") {
+            if (readRememberedVaultChat(vaultProfileId) === chatId) {
+              forgetVaultChat(vaultProfileId);
+            }
+            continue;
+          }
+          throw err;
+        }
+      }
+    },
+    [loadThread, vaultProfileId]
   );
 
   const bootstrap = useCallback(async () => {
@@ -718,54 +759,19 @@ export default function VaultChatPanel({
 
       if (startFreshChat || isDrawer) return;
 
-      const urlChatIdParam = readUrlChatId();
-      const urlChatId =
-        urlChatIdParam && list.some((c) => c.id === urlChatIdParam)
-          ? urlChatIdParam
-          : null;
-
-      const rememberedChatId = (() => {
-        const stored = readRememberedVaultChat(vaultProfileId);
-        return stored && list.some((c) => c.id === stored) ? stored : null;
-      })();
-
-      const resumeChatId = urlChatId ?? rememberedChatId ?? list[0]?.id ?? null;
+      const urlChatId = readUrlChatId();
+      const rememberedChatId = readRememberedVaultChat(vaultProfileId);
 
       if (
-        resumeChatId &&
         messagesRef.current.length === 0 &&
-        !sendingRef.current &&
-        !activeChatIdRef.current
+        !sendingRef.current
       ) {
         if (urlChatId) deepLinkChatConsumed.current = urlChatId;
-        try {
-          await loadThread(resumeChatId, {
-            bootstrapGeneration: generation,
-            allowEmpty: true,
-          });
-        } catch (err) {
-          if (generation !== bootstrapGeneration.current) return;
-          const message =
-            err instanceof Error ? err.message : "Couldn't load Ask Gideon.";
-          if (message === "Chat not found.") {
-            forgetVaultChat(vaultProfileId);
-            setError(null);
-            const fallbackId =
-              resumeChatId === list[0]?.id ? null : (list[0]?.id ?? null);
-            if (
-              fallbackId &&
-              fallbackId !== resumeChatId &&
-              messagesRef.current.length === 0
-            ) {
-              await loadThread(fallbackId, {
-                bootstrapGeneration: generation,
-                allowEmpty: true,
-              });
-            }
-            return;
-          }
-          throw err;
-        }
+        await resumeVaultChat(list, generation, [
+          urlChatId,
+          rememberedChatId,
+          list[0]?.id,
+        ]);
       }
     } catch (err) {
       if (generation !== bootstrapGeneration.current) return;
@@ -775,7 +781,7 @@ export default function VaultChatPanel({
         setLoadingHistory(false);
       }
     }
-  }, [loadMetaAndChats, loadThread, startFreshChat, isDrawer, vaultProfileId]);
+  }, [loadMetaAndChats, resumeVaultChat, startFreshChat, isDrawer, vaultProfileId]);
 
   const bootstrapRef = useRef(bootstrap);
   bootstrapRef.current = bootstrap;
