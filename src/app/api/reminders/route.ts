@@ -5,12 +5,12 @@ import {
   getActiveGuardianProfile,
   requireEditableGuardianProfile,
 } from "@/lib/profiles/server";
+import { getUserTimeZone } from "@/lib/timezone/server";
 import {
   calendarDateInZone,
   formatReminderWhen,
   zonedDateTimeToIso,
 } from "@/lib/reminders/time";
-import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
 
 export const runtime = "nodejs";
 
@@ -48,6 +48,7 @@ export async function POST(request: Request) {
   const auth = await requireUser();
   if (!isAuthed(auth)) return auth;
   const { supabase, user } = auth;
+  const userTz = await getUserTimeZone(supabase, user.id);
 
   let body: Record<string, unknown>;
   try {
@@ -72,7 +73,7 @@ export async function POST(request: Request) {
 
   const date = typeof body.date === "string" ? body.date.trim() : "";
   const time = typeof body.time === "string" ? body.time.trim() : "09:00";
-  const dueAt = zonedDateTimeToIso({ date, time, timeZone: GUARDIAN_TIME_ZONE });
+  const dueAt = zonedDateTimeToIso({ date, time, timeZone: userTz });
   if (!dueAt) {
     return NextResponse.json(
       { error: "Pick a valid date and time." },
@@ -120,7 +121,7 @@ export async function POST(request: Request) {
     profileId = active.id;
   }
 
-  const dueDate = calendarDateInZone(dueInstant, GUARDIAN_TIME_ZONE);
+  const dueDate = calendarDateInZone(dueInstant, userTz);
 
   const { data, error } = await supabase
     .from("alerts")
@@ -152,6 +153,6 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     reminder: data,
-    whenLabel: formatReminderWhen(data.due_at, data.due_date),
+    whenLabel: formatReminderWhen(data.due_at, data.due_date, userTz),
   });
 }

@@ -5,7 +5,8 @@ import { BellRing, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { daysRelativeTo, formatDisplayDate } from "@/lib/analysis/dates";
 import { formatReminderWhen } from "@/lib/reminders/time";
-import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
+import { calendarDateInUserZone } from "@/lib/timezone";
+import { useActiveProfile } from "@/components/ProfileProvider";
 
 type AlertRow = {
   id: string;
@@ -15,13 +16,8 @@ type AlertRow = {
   source: string | null;
 };
 
-function todayEasternIso(): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: GUARDIAN_TIME_ZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
+function todayInZone(timeZone: string): string {
+  return calendarDateInUserZone(new Date(), timeZone);
 }
 
 function urgencyStyle(days: number) {
@@ -40,11 +36,12 @@ function urgencyLabel(days: number, hasTime: boolean) {
 
 export default function AlertsPanel({ profileId }: { profileId: string }) {
   const supabase = createClient();
+  const { timeZone } = useActiveProfile();
   const [alerts, setAlerts] = useState<AlertRow[]>([]);
 
   const loadAlerts = useCallback(async () => {
     if (!supabase || !profileId) return;
-    const today = todayEasternIso();
+    const today = todayInZone(timeZone);
     const { data } = await supabase
       .from("alerts")
       .select("id, title, due_date, due_at, source")
@@ -54,7 +51,7 @@ export default function AlertsPanel({ profileId }: { profileId: string }) {
       .order("due_date", { ascending: true })
       .order("due_at", { ascending: true, nullsFirst: false });
     setAlerts((data as AlertRow[] | null) ?? []);
-  }, [profileId]);
+  }, [profileId, supabase, timeZone]);
 
   useEffect(() => {
     setAlerts([]);
@@ -93,7 +90,7 @@ export default function AlertsPanel({ profileId }: { profileId: string }) {
       </div>
       <ul className="space-y-2">
         {alerts.map((alert) => {
-          const days = daysRelativeTo(alert.due_date);
+          const days = daysRelativeTo(alert.due_date, new Date(), timeZone);
           const isUser = alert.source === "user";
           return (
             <li
@@ -110,8 +107,8 @@ export default function AlertsPanel({ profileId }: { profileId: string }) {
                 <p className="text-xs text-ink-muted">
                   {isUser ? "Reminder · " : "Due "}
                   {alert.due_at
-                    ? formatReminderWhen(alert.due_at, alert.due_date)
-                    : formatDisplayDate(alert.due_date)}
+                    ? formatReminderWhen(alert.due_at, alert.due_date, timeZone)
+                    : formatDisplayDate(alert.due_date, timeZone)}
                 </p>
               </div>
               <button

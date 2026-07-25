@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { User, SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { getUserTimeZone } from "@/lib/timezone/server";
 import {
   CHAT_MODEL,
   createLlmClient,
@@ -35,6 +36,9 @@ import {
   buildGideonSuggestions,
   buildGideonLogSuggestions,
   buildGideonVaultGuidance,
+  buildGideonTodayNote,
+  buildTodayDateAnswer,
+  isSimpleTodayDateQuestion,
   firstNameFrom,
   getVaultTemplate,
   gideonChatContextLabel,
@@ -315,6 +319,13 @@ type ChatSummary = {
   created_at: string;
 };
 
+type VaultChatRow = {
+  id: string;
+  title: string;
+  profile_id: string;
+  scoped_profile_id?: string | null;
+};
+
 type Authed = { supabase: SupabaseClient; user: User };
 
 async function requireUser(): Promise<Authed | NextResponse> {
@@ -415,6 +426,115 @@ async function listChats(
   return (data ?? []) as ChatSummary[];
 }
 
+function isMissingScopedProfileColumn(error: {
+  code?: string;
+  message?: string;
+} | null): boolean {
+  if (!error) return false;
+  if (error.code === "42703" || error.code === "PGRST204") return true;
+  const msg = error.message ?? "";
+  return /scoped_profile_id/i.test(msg) && /does not exist|unknown|schema cache/i.test(msg);
+}
+
+/** Load a chat row by id; RLS enforces owner + vault access. */
+async function loadVaultChatById(
+  supabase: SupabaseClient,
+  chatId: string
+): Promise<
+  | { ok: true; chat: VaultChatRow }
+  | { ok: false; reason: "not_found" | "query_error"; detail?: string }
+> {
+  const scoped = await supabase
+    .from("vault_chats")
+    .select("id, title, profile_id, scoped_profile_id")
+    .eq("id", chatId)
+    .maybeSingle();
+
+  if (!scoped.error) {
+    if (!scoped.data) return { ok: false, reason: "not_found" };
+    return { ok: true, chat: scoped.data as VaultChatRow };
+  }
+
+  if (isMissingScopedProfileColumn(scoped.error)) {
+    const base = await supabase
+      .from("vault_chats")
+      .select("id, title, profile_id")
+      .eq("id", chatId)
+      .maybeSingle();
+    if (base.error) {
+      console.error(
+        "vault_chats load failed:",
+        base.error.code,
+        base.error.message
+      );
+      return { ok: false, reason: "query_error", detail: base.error.message };
+    }
+    if (!base.data) return { ok: false, reason: "not_found" };
+    return {
+      ok: true,
+      chat: { ...base.data, scoped_profile_id: null },
+    };
+  }
+
+  console.error(
+    "vault_chats load failed:",
+    scoped.error.code,
+    scoped.error.message
+  );
+  return { ok: false, reason: "query_error", detail: scoped.error.message };
+}
+
+async function clearVaultChatScopedProfile(
+  supabase: SupabaseClient,
+  chatId: string
+): Promise<void> {
+  const { error } = await supabase
+    .from("vault_chats")
+    .update({ scoped_profile_id: null })
+    .eq("id", chatId);
+  if (error && !isMissingScopedProfileColumn(error)) {
+    console.error(
+      "vault_chats scoped_profile clear failed:",
+      error.code,
+      error.message
+    );
+  }
+}
+
+async function updateVaultChatRow(
+  supabase: SupabaseClient,
+  chatId: string,
+  updates: {
+    updated_at: string;
+    title?: string;
+    scoped_profile_id?: string | null;
+  }
+): Promise<void> {
+  const { error } = await supabase
+    .from("vault_chats")
+    .update(updates)
+    .eq("id", chatId);
+  if (!error) return;
+
+  if (
+    isMissingScopedProfileColumn(error) &&
+    "scoped_profile_id" in updates
+  ) {
+    const { scoped_profile_id: _ignored, ...rest } = updates;
+    const retry = await supabase.from("vault_chats").update(rest).eq("id", chatId);
+    if (retry.error) {
+      console.error(
+        "vault_chats update failed:",
+        retry.error.code,
+        retry.error.message
+      );
+    }
+    return;
+  }
+
+  console.error("vault_chats update failed:", error.code, error.message);
+}
+
 async function loadAskVaultInventory(
   supabase: SupabaseClient,
   userId: string,
@@ -455,16 +575,17 @@ export async function GET(request: Request) {
   if (chatId) {
     const accessibleProfiles = await listGuardianProfiles(supabase, user.id);
 
-    const { data: chat } = await supabase
-      .from("vault_chats")
-      .select("id, title, profile_id, scoped_profile_id")
-      .eq("id", chatId)
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    if (!chat) {
+    const loaded = await loadVaultChatById(supabase, chatId);
+    if (!loaded.ok) {
+      if (loaded.reason === "query_error") {
+        return NextResponse.json(
+          { error: "Couldn't load vault chat history." },
+          { status: 502 }
+        );
+      }
       return NextResponse.json({ error: "Chat not found." }, { status: 404 });
     }
+    const chat = loaded.chat;
 
     const chatProfile = await requireAccessibleGuardianProfile(
       supabase,
@@ -472,7 +593,10 @@ export async function GET(request: Request) {
       String(chat.profile_id)
     );
     if (!chatProfile) {
-      return NextResponse.json({ error: "Chat not found." }, { status: 404 });
+      return NextResponse.json(
+        { error: "Vault not found or not accessible." },
+        { status: 403 }
+      );
     }
 
     const threadChats = await listChats(supabase, user.id, chatProfile.id);
@@ -652,27 +776,12 @@ export async function PATCH(request: Request) {
 
   let chatIdRaw: unknown;
   let clearScopedProfile = false;
-  let profileIdRaw: unknown;
   try {
     const body = await request.json();
     chatIdRaw = body.chatId;
     clearScopedProfile = body.clearScopedProfile === true;
-    profileIdRaw = body.profileId;
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
-  }
-
-  const profileIdOverride =
-    typeof profileIdRaw === "string" && profileIdRaw.trim()
-      ? profileIdRaw.trim()
-      : null;
-  const active = await resolveVaultChatProfile(
-    supabase,
-    user,
-    profileIdOverride
-  );
-  if (!active) {
-    return vaultProfileNotFoundResponse(profileIdOverride);
   }
 
   const chatId =
@@ -681,19 +790,29 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Missing chatId or action." }, { status: 400 });
   }
 
-  const { error } = await supabase
-    .from("vault_chats")
-    .update({ scoped_profile_id: null })
-    .eq("id", chatId)
-    .eq("user_id", user.id)
-    .eq("profile_id", active.id);
-
-  if (error) {
+  const loaded = await loadVaultChatById(supabase, chatId);
+  if (!loaded.ok) {
+    if (loaded.reason === "query_error") {
+      return NextResponse.json(
+        { error: "Couldn't update chat scope." },
+        { status: 502 }
+      );
+    }
+    return NextResponse.json({ error: "Chat not found." }, { status: 404 });
+  }
+  const chatProfile = await requireAccessibleGuardianProfile(
+    supabase,
+    user.id,
+    String(loaded.chat.profile_id)
+  );
+  if (!chatProfile) {
     return NextResponse.json(
-      { error: "Couldn't update chat scope." },
-      { status: 502 }
+      { error: "Vault not found or not accessible." },
+      { status: 403 }
     );
   }
+
+  await clearVaultChatScopedProfile(supabase, chatId);
 
   return NextResponse.json({ ok: true, chatScopedProfile: null });
 }
@@ -831,6 +950,8 @@ export async function POST(request: Request) {
     return vaultProfileNotFoundResponse(profileIdOverride);
   }
 
+  const userTz = await getUserTimeZone(supabase, user.id);
+
   const linkedProfiles = canRollupLinkedVaultSearch(active.profile_type)
     ? await listLinkedProfilesForVaultRollup(supabase, user.id, active)
     : [];
@@ -856,22 +977,27 @@ export async function POST(request: Request) {
     typeof chatIdRaw === "string" && chatIdRaw.trim() ? chatIdRaw.trim() : null;
 
   if (requestedId) {
-    const { data: existingChat } = await supabase
-      .from("vault_chats")
-      .select("id, title, profile_id, scoped_profile_id")
-      .eq("id", requestedId)
-      .eq("user_id", user.id)
-      .maybeSingle();
-    if (!existingChat) {
+    const loaded = await loadVaultChatById(supabase, requestedId);
+    if (!loaded.ok) {
+      if (loaded.reason === "query_error") {
+        return NextResponse.json(
+          { error: "We couldn't start vault chat. Please try again." },
+          { status: 502 }
+        );
+      }
       return NextResponse.json({ error: "Chat not found." }, { status: 404 });
     }
+    const existingChat = loaded.chat;
     const chatOwnerProfile = await requireAccessibleGuardianProfile(
       supabase,
       user.id,
       String(existingChat.profile_id)
     );
     if (!chatOwnerProfile) {
-      return NextResponse.json({ error: "Chat not found." }, { status: 404 });
+      return NextResponse.json(
+        { error: "Vault not found or not accessible." },
+        { status: 403 }
+      );
     }
     chatId = existingChat.id;
     threadScopedProfileId =
@@ -900,12 +1026,7 @@ export async function POST(request: Request) {
 
   if (clearScopedProfile) {
     threadScopedProfileId = null;
-    await supabase
-      .from("vault_chats")
-      .update({ scoped_profile_id: null })
-      .eq("id", chatId)
-      .eq("user_id", user.id)
-      .eq("profile_id", active.id);
+    await clearVaultChatScopedProfile(supabase, chatId);
   }
 
   let crossVaultScopeId: string | null = null;
@@ -1039,12 +1160,16 @@ export async function POST(request: Request) {
   let answer: string;
   let attachedFileName: string | undefined;
 
+  const attachmentDocumentId =
+    typeof attachmentDocumentIdRaw === "string"
+      ? attachmentDocumentIdRaw.trim()
+      : "";
+
+  if (isSimpleTodayDateQuestion(question) && !attachmentDocumentId) {
+    answer = buildTodayDateAnswer(userTz);
+  } else {
   try {
     const showPictures = wantsShowPictures(question);
-    const attachmentDocumentId =
-      typeof attachmentDocumentIdRaw === "string"
-        ? attachmentDocumentIdRaw.trim()
-        : "";
     const attachedDoc = attachmentDocumentId
       ? await loadAttachedVaultDocument(supabase, {
           userId: user.id,
@@ -1155,6 +1280,7 @@ Active vault: ${active.display_name}. Cross-vault search: ${crossVaultProfile.di
     const system = `${withVaultPersonality(VAULT_CHAT_SYSTEM, profileKind)}
 
 Active profile: ${active.display_name} (${active.profile_type}).
+${buildGideonTodayNote(new Date(), userTz)}
 ${rollupNote}
 ${pictureNote}
 ${vaultEmptyNote}
@@ -1251,6 +1377,7 @@ ${workMemoryContext.trim() || "(none — user has no active work projects)"}
       { status: 502 }
     );
   }
+  }
 
   const { data: assistantMsg, error: assistantError } = await supabase
     .from("vault_chat_messages")
@@ -1305,7 +1432,7 @@ ${workMemoryContext.trim() || "(none — user has no active work projects)"}
     }
   }
 
-  await supabase.from("vault_chats").update(chatUpdates).eq("id", chatId);
+  await updateVaultChatRow(supabase, chatId, chatUpdates);
 
   const chats = await listChats(supabase, user.id, active.id);
   const proposedReminder = parseProposedReminder(answer);

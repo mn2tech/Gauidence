@@ -4,6 +4,9 @@ import {
   buildGideonSuggestions,
   buildGideonVaultGuidance,
   buildVaultScopeNote,
+  buildGideonTodayNote,
+  buildTodayDateAnswer,
+  isSimpleTodayDateQuestion,
   firstNameFrom,
   getVaultTemplate,
   gideonChatContextLabel,
@@ -27,10 +30,44 @@ describe("Gideon helpers", () => {
     assert.match(GIDEON_SYSTEM, /Payment status is unknown/);
     assert.match(GIDEON_SYSTEM, /GENERAL KNOWLEDGE/);
     assert.match(GIDEON_SYSTEM, /general knowledge rather than the user's vault/i);
+    assert.match(GIDEON_SYSTEM, /CURRENT DATE is provided/i);
     assert.equal(
       GIDEON_BRAND_LINE,
       "Guardian watches. Gideon explains. You decide."
     );
+  });
+
+  it("builds today's date note for vault chat", () => {
+    const note = buildGideonTodayNote(
+      new Date("2026-07-25T15:00:00-04:00")
+    );
+    assert.match(note, /CURRENT DATE \(authoritative\)/);
+    assert.match(note, /Saturday, July 25, 2026/);
+    assert.match(note, /Eastern Time/);
+    assert.match(note, /do not say you lack real-time date access/i);
+  });
+
+  it("detects simple today-date questions", () => {
+    assert.equal(isSimpleTodayDateQuestion("what is today's date"), true);
+    assert.equal(isSimpleTodayDateQuestion("what is today date"), true);
+    assert.equal(isSimpleTodayDateQuestion("what day is it"), true);
+    assert.equal(
+      isSimpleTodayDateQuestion("what us today July 25th which day"),
+      false
+    );
+    assert.equal(
+      isSimpleTodayDateQuestion("summarize my vault documents"),
+      false
+    );
+  });
+
+  it("builds a direct today-date answer", () => {
+    const answer = buildTodayDateAnswer(
+      "Asia/Kolkata",
+      new Date("2026-07-25T15:00:00+05:30")
+    );
+    assert.match(answer, /Today is Saturday, July 25, 2026/);
+    assert.match(answer, /India Standard Time/);
   });
 
   it("parses first name from full name", () => {

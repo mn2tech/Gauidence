@@ -6,6 +6,12 @@ import { useRouter } from "next/navigation";
 import { AlertTriangle, BellRing, Check, Loader2, Mail, UserRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { VAULT_ORGANIZATION_SUGGESTIONS_ENABLED } from "@/lib/features/organization";
+import { useActiveProfile } from "@/components/ProfileProvider";
+import { detectBrowserTimeZone } from "@/lib/timezone";
+import {
+  TIMEZONE_OPTIONS,
+  timezoneOptionLabel,
+} from "@/lib/timezone/options";
 
 type Props = {
   userId: string;
@@ -32,6 +38,27 @@ export default function SettingsForm({
 }: Props) {
   const supabase = createClient();
   const router = useRouter();
+  const {
+    timeZone,
+    timeZoneLabel,
+    timeZoneSource,
+    updateTimeZone,
+  } = useActiveProfile();
+
+  const timezoneChoices = (() => {
+    const options = [...TIMEZONE_OPTIONS];
+    if (!options.some((o) => o.value === timeZone)) {
+      options.unshift({
+        value: timeZone,
+        label: timezoneOptionLabel(timeZone),
+      });
+    }
+    return options;
+  })();
+
+  const [savingTimeZone, setSavingTimeZone] = useState(false);
+  const [timeZoneSaved, setTimeZoneSaved] = useState(false);
+  const [timeZoneError, setTimeZoneError] = useState<string | null>(null);
 
   const [fullName, setFullName] = useState(initialFullName);
   const [companyName, setCompanyName] = useState(initialCompanyName);
@@ -308,6 +335,74 @@ export default function SettingsForm({
             {nameSaved ? "Saved" : "Save profile"}
           </button>
         </form>
+      </section>
+
+      <section className="rounded-2xl border border-stone-200 bg-white p-6">
+        <h2 className="text-base font-semibold">Timezone</h2>
+        <p className="mt-1 text-sm text-ink-muted">
+          Used for Gideon&apos;s &quot;today,&quot; reminders, Daily Logs, and due
+          dates. Currently: <span className="font-medium">{timeZoneLabel}</span>
+          {timeZoneSource === "auto" ? " (detected from your device)" : null}
+        </p>
+        <div className="mt-4 space-y-3">
+          <div>
+            <label htmlFor="timeZone" className="block text-sm font-medium">
+              Your timezone
+            </label>
+            <select
+              id="timeZone"
+              value={timeZone}
+              disabled={savingTimeZone}
+              onChange={(e) => {
+                const next = e.target.value;
+                setTimeZoneError(null);
+                setTimeZoneSaved(false);
+                setSavingTimeZone(true);
+                void updateTimeZone(next, "manual").then((ok) => {
+                  setSavingTimeZone(false);
+                  if (ok) setTimeZoneSaved(true);
+                  else setTimeZoneError("Couldn't save timezone.");
+                });
+              }}
+              className={inputClass}
+            >
+              {timezoneChoices.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button
+            type="button"
+            disabled={savingTimeZone}
+            onClick={() => {
+              const detected = detectBrowserTimeZone();
+              setTimeZoneError(null);
+              setTimeZoneSaved(false);
+              setSavingTimeZone(true);
+              void updateTimeZone(detected, "auto").then((ok) => {
+                setSavingTimeZone(false);
+                if (ok) setTimeZoneSaved(true);
+                else setTimeZoneError("Couldn't detect timezone.");
+              });
+            }}
+            className="inline-flex items-center gap-2 rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-stone-50 disabled:opacity-50"
+          >
+            {savingTimeZone ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : null}
+            Use my device timezone
+          </button>
+          {timeZoneError ? (
+            <p role="alert" className="text-sm text-red-700">
+              {timeZoneError}
+            </p>
+          ) : null}
+          {timeZoneSaved ? (
+            <p className="text-sm text-emerald-700">Timezone saved.</p>
+          ) : null}
+        </div>
       </section>
 
       {/* AI Auto-Organization */}

@@ -5,6 +5,7 @@ import {
   getActiveGuardianProfile,
   requireEditableGuardianProfile,
 } from "@/lib/profiles/server";
+import { getUserTimeZone } from "@/lib/timezone/server";
 import { isValidLogDate, todayLogDate } from "@/lib/logs/types";
 import { refreshUserAwards } from "@/lib/awards/grant";
 
@@ -127,6 +128,7 @@ export async function POST(request: Request) {
   const auth = await requireUser();
   if (!isAuthed(auth)) return auth;
   const { supabase, user } = auth;
+  const userTz = await getUserTimeZone(supabase, user.id);
 
   let body: Record<string, unknown>;
   try {
@@ -178,7 +180,7 @@ export async function POST(request: Request) {
   const quick = body.quick === true;
   const logDate = isValidLogDate(body.logDate)
     ? body.logDate
-    : todayLogDate();
+    : todayLogDate(userTz);
 
   const tags = Array.isArray(body.tags)
     ? body.tags

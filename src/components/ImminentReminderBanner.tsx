@@ -7,6 +7,7 @@ import {
   formatReminderWhen,
   isImminentReminder,
 } from "@/lib/reminders/time";
+import { useActiveProfile } from "@/components/ProfileProvider";
 
 type ReminderRow = {
   id: string;
@@ -25,6 +26,7 @@ export default function ImminentReminderBanner({
 }: {
   profileId: string | null;
 }) {
+  const { timeZone } = useActiveProfile();
   const [reminder, setReminder] = useState<ReminderRow | null>(null);
 
   const load = useCallback(async () => {
@@ -80,7 +82,7 @@ export default function ImminentReminderBanner({
   if (!reminder?.due_at) return null;
 
   const overdue = new Date(reminder.due_at).getTime() < Date.now();
-  const when = formatReminderWhen(reminder.due_at, reminder.due_date);
+  const when = formatReminderWhen(reminder.due_at, reminder.due_date, timeZone);
 
   return (
     <div

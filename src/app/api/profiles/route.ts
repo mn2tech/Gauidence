@@ -16,6 +16,8 @@ import {
   requireOwnedGuardianProfile,
   setActiveGuardianProfile,
 } from "@/lib/profiles/server";
+import { getUserTimeZoneRow } from "@/lib/timezone/server";
+import { guardianTimeZoneLabel } from "@/lib/timezone";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { refreshUserAwards } from "@/lib/awards/grant";
 
@@ -56,13 +58,14 @@ export async function GET() {
   try {
     // Resolve active first: it auto-creates the personal vault for new
     // users, which must exist before the list is fetched.
-    const [active, accountRow] = await Promise.all([
+    const [active, accountRow, timeZoneRow] = await Promise.all([
       getActiveGuardianProfile(supabase, user),
       supabase
         .from("profiles")
         .select("full_name, email")
         .eq("id", user.id)
         .maybeSingle(),
+      getUserTimeZoneRow(supabase, user.id),
     ]);
     const profiles = await listGuardianProfiles(supabase, user.id);
     const accountName =
@@ -78,6 +81,9 @@ export async function GET() {
       activeProfileId: active?.id ?? null,
       active,
       accountName,
+      timeZone: timeZoneRow.time_zone,
+      timeZoneSource: timeZoneRow.time_zone_source,
+      timeZoneLabel: guardianTimeZoneLabel(timeZoneRow.time_zone),
     });
   } catch {
     return NextResponse.json(

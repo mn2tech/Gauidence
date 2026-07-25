@@ -86,12 +86,15 @@ import { useGideonVoiceInput } from "@/hooks/useGideonVoiceInput";
 import { documentsHref } from "@/lib/routes";
 import type { WorkProject } from "@/lib/work-memory/types";
 
-function defaultReminderDateTime(): { date: string; time: string } {
+function defaultReminderDateTime(timeZone: string = GUARDIAN_TIME_ZONE): {
+  date: string;
+  time: string;
+} {
   const now = new Date();
   const inOneHour = new Date(now.getTime() + 60 * 60 * 1000);
-  const date = calendarDateInZone(inOneHour, GUARDIAN_TIME_ZONE);
+  const date = calendarDateInZone(inOneHour, timeZone);
   const time = new Intl.DateTimeFormat("en-GB", {
-    timeZone: GUARDIAN_TIME_ZONE,
+    timeZone,
     hour: "2-digit",
     minute: "2-digit",
     hourCycle: "h23",
@@ -465,7 +468,7 @@ export default function VaultChatPanel({
   const requestedWorkProjectId = isScopedPanel
     ? null
     : searchParams.get("projectId");
-  const { active, profiles, loading: profilesLoading, switchProfile, refresh } =
+  const { active, profiles, loading: profilesLoading, switchProfile, refresh, timeZone, timeZoneLabel } =
     useActiveProfile();
   const needsSetup = !profilesLoading && profiles.length === 0;
   const bootstrapTried = useRef(false);
@@ -664,7 +667,7 @@ export default function VaultChatPanel({
         refresh?: boolean;
         silent?: boolean;
       }
-    ): Promise<number> => {
+    ): Promise<{ messageCount: number; applied: boolean }> => {
       const generation = options?.bootstrapGeneration;
       const res = await fetch(
         vaultChatApiUrl({ chatId }, vaultProfileId, { omitProfileId: true })
@@ -680,7 +683,7 @@ export default function VaultChatPanel({
         generation !== undefined &&
         generation !== bootstrapGeneration.current
       ) {
-        return 0;
+        return { messageCount: 0, applied: false };
       }
       if (!res.ok) {
         const err = new Error(body.error ?? "Couldn't load chat.");
@@ -692,14 +695,14 @@ export default function VaultChatPanel({
               syncAskUrlRef.current
             );
           }
-          return 0;
+          return { messageCount: 0, applied: false };
         }
         throw err;
       }
       if (body.chats) setChats(body.chats);
       const resolvedChatId = body.chatId ?? chatId;
       const serverMessages = body.messages ?? [];
-      let appliedCount = 0;
+      let applied = false;
 
       const applyThread = () => {
         setActiveChatId(resolvedChatId);
@@ -708,7 +711,7 @@ export default function VaultChatPanel({
         const storageProfileId =
           body.meta?.profileId ?? vaultProfileId ?? null;
         rememberVaultChat(storageProfileId, resolvedChatId);
-        appliedCount = serverMessages.length;
+        applied = true;
       };
 
       if (options?.refresh) {
@@ -718,7 +721,7 @@ export default function VaultChatPanel({
           messagesRef.current.length > 0 || sendingRef.current;
         if (hasLocalMessages) {
           if (body.chats) setChats(body.chats);
-          return 0;
+          return { messageCount: 0, applied: false };
         }
         if (serverMessages.length > 0 || options?.allowEmpty) {
           applyThread();
@@ -735,7 +738,7 @@ export default function VaultChatPanel({
           ...body.meta,
         }));
       }
-      return appliedCount;
+      return { messageCount: serverMessages.length, applied };
     },
     [vaultProfileId]
   );
@@ -763,10 +766,11 @@ export default function VaultChatPanel({
         if (generation !== bootstrapGeneration.current) return;
         if (messagesRef.current.length > 0 || sendingRef.current) return;
         try {
-          const count = await loadThread(chatId, {
+          const { applied } = await loadThread(chatId, {
             bootstrapGeneration: generation,
+            allowEmpty: true,
           });
-          if (count > 0) return;
+          if (applied) return;
         } catch (err) {
           if (generation !== bootstrapGeneration.current) return;
           const message =
@@ -1044,12 +1048,11 @@ export default function VaultChatPanel({
     setLoadingHistory(true);
     setError(null);
     try {
-      await loadThread(chatId, { allowEmpty: true });
-      setSidebarOpen(false);
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Couldn't load chat.";
-      if (message === "Chat not found." || isChatNotFoundError(message)) {
+      const { applied } = await loadThread(chatId, {
+        allowEmpty: true,
+        silent: true,
+      });
+      if (!applied) {
         clearStaleChatPointer(chatId, vaultProfileId, syncAskUrl);
         setActiveChatId(null);
         setMessages([]);
@@ -1060,6 +1063,10 @@ export default function VaultChatPanel({
         }
         return;
       }
+      setSidebarOpen(false);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Couldn't load chat.";
       setError(message);
     } finally {
       setLoadingHistory(false);
@@ -1188,7 +1195,7 @@ export default function VaultChatPanel({
 
   const openReminderForm = () => {
     setPlusOpen(false);
-    const defaults = defaultReminderDateTime();
+    const defaults = defaultReminderDateTime(timeZone);
     setReminderTitle("");
     setReminderDate(defaults.date);
     setReminderTime(defaults.time);
@@ -1322,7 +1329,7 @@ export default function VaultChatPanel({
       window.dispatchEvent(new Event("guardian:alerts-updated"));
       const title = body.reminder?.title ?? proposal.title;
       const when =
-        body.whenLabel ?? proposedReminderWhenLabel(proposal);
+        body.whenLabel ?? proposedReminderWhenLabel(proposal, timeZone);
       pushLocalNote(
         `Reminder set: "${title}" — ${when}. You'll see it under Attention on the dashboard.`
       );
@@ -1627,7 +1634,7 @@ export default function VaultChatPanel({
     m: VaultMessage,
     options?: { hideCitationPreviews?: boolean }
   ) => {
-    const proposed = parseProposedReminder(m.content);
+    const proposed = parseProposedReminder(m.content, Date.now(), timeZone);
     const displayContent = stripProposedReminderSection(m.content);
     const sections = parseGideonSections(
       displayContent || (proposed ? "" : m.content)
@@ -1699,7 +1706,7 @@ export default function VaultChatPanel({
               {proposed.title}
             </p>
             <p className="mt-0.5 text-xs text-ink-muted">
-              {proposedReminderWhenLabel(proposed)}
+              {proposedReminderWhenLabel(proposed, timeZone)}
             </p>
             {alreadySet ? (
               <p className="mt-2 text-xs font-medium text-emerald-800">
@@ -2531,7 +2538,7 @@ export default function VaultChatPanel({
                 <p className="mt-1 text-xs text-ink-muted">
                   Saved for{" "}
                   {active?.display_name ?? meta?.profileName ?? "this space"}{" "}
-                  (Eastern Time). Shows under Attention on the dashboard.
+                  ({timeZoneLabel}). Shows under Attention on the dashboard.
                 </p>
               </div>
               <button

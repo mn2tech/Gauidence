@@ -32,7 +32,8 @@ const SECTION_START = /^#{1,3}\s*PROPOSED REMINDER\s*$/i;
  */
 export function parseProposedReminder(
   content: string,
-  nowMs: number = Date.now()
+  nowMs: number = Date.now(),
+  timeZone: string = GUARDIAN_TIME_ZONE
 ): ProposedReminder | null {
   const lines = content.split(/\r?\n/);
   let i = lines.findIndex((line) => SECTION_START.test(line.trim()));
@@ -58,7 +59,7 @@ export function parseProposedReminder(
   const dueAt = zonedDateTimeToIso({
     date,
     time,
-    timeZone: GUARDIAN_TIME_ZONE,
+    timeZone,
   });
   if (!dueAt) return null;
   const dueMs = new Date(dueAt).getTime();
@@ -90,12 +91,13 @@ export function stripProposedReminderSection(content: string): string {
 }
 
 export function proposedReminderWhenLabel(
-  proposal: ProposedReminder
+  proposal: ProposedReminder,
+  timeZone: string = GUARDIAN_TIME_ZONE
 ): string {
   const dueAt = zonedDateTimeToIso({
     date: proposal.date,
     time: proposal.time,
-    timeZone: GUARDIAN_TIME_ZONE,
+    timeZone,
   });
-  return formatReminderWhen(dueAt, proposal.date);
+  return formatReminderWhen(dueAt, proposal.date, timeZone);
 }
