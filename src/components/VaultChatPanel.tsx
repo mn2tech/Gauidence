@@ -501,7 +501,8 @@ export default function VaultChatPanel({
     : null;
   const effectiveProfile = scopedProfile ?? active;
   const profileId = effectiveProfile?.id ?? meta?.profileId ?? null;
-  const vaultProfileId = scopedProfileId ?? active?.id ?? null;
+  const vaultProfileId =
+    scopedProfileId ?? active?.id ?? meta?.profileId ?? null;
 
   const syncAskUrl = useCallback(
     (chatId: string | null) => {
@@ -604,7 +605,10 @@ export default function VaultChatPanel({
   }, [vaultProfileId]);
 
   const loadThread = useCallback(
-    async (chatId: string, options?: { bootstrapGeneration?: number }) => {
+    async (
+      chatId: string,
+      options?: { bootstrapGeneration?: number; allowEmpty?: boolean }
+    ) => {
       const generation = options?.bootstrapGeneration;
       const res = await fetch(
         vaultChatApiUrl({ chatId }, vaultProfileId)
@@ -625,9 +629,12 @@ export default function VaultChatPanel({
       }
       if (body.chats) setChats(body.chats);
       const resolvedChatId = body.chatId ?? chatId;
-      setActiveChatId(resolvedChatId);
-      setMessages(body.messages ?? []);
-      syncAskUrlRef.current(resolvedChatId);
+      const serverMessages = body.messages ?? [];
+      if (serverMessages.length > 0 || options?.allowEmpty) {
+        setActiveChatId(resolvedChatId);
+        setMessages(serverMessages);
+        syncAskUrlRef.current(resolvedChatId);
+      }
       if (body.meta) {
         setMeta((prev) => ({
           firstName: prev?.firstName ?? null,
@@ -665,7 +672,10 @@ export default function VaultChatPanel({
         !activeChatIdRef.current
       ) {
         deepLinkChatConsumed.current = urlChatId;
-        await loadThread(urlChatId, { bootstrapGeneration: generation });
+        await loadThread(urlChatId, {
+          bootstrapGeneration: generation,
+          allowEmpty: true,
+        });
       }
     } catch (err) {
       if (generation !== bootstrapGeneration.current) return;
@@ -794,10 +804,6 @@ export default function VaultChatPanel({
   }, [workProject]);
 
   useEffect(() => {
-    deepLinkChatConsumed.current = null;
-  }, [vaultProfileId]);
-
-  useEffect(() => {
     if (needsSetup || scopedProfileId) return;
     const onProfile = (e: Event) => {
       const profileId = (e as CustomEvent<{ profileId?: string }>).detail
@@ -898,7 +904,7 @@ export default function VaultChatPanel({
     setLoadingHistory(true);
     setError(null);
     try {
-      await loadThread(chatId);
+      await loadThread(chatId, { allowEmpty: true });
       setSidebarOpen(false);
     } catch (err) {
       const message =
@@ -1274,7 +1280,7 @@ export default function VaultChatPanel({
             ? { workProjectId: requestedWorkProjectId }
             : {}),
         },
-        vaultProfileId
+        vaultProfileId ?? profileId
       );
 
       const postOnce = () =>
@@ -1338,64 +1344,32 @@ export default function VaultChatPanel({
             : prev
         );
       }
+      const turn = body.messages ?? [];
+      const optimisticAttachment = options?.attachment;
+      const mergedTurn = turn.map((m, index) => {
+        if (
+          index === 0 &&
+          m.role === "user" &&
+          optimisticAttachment &&
+          !m.attachment
+        ) {
+          return {
+            ...m,
+            attachment: optimisticAttachment,
+            content: userContent || m.content,
+          };
+        }
+        return m;
+      });
+      setMessages((prev) => [
+        ...prev.filter(
+          (m) =>
+            m.id !== optimisticId && m.id !== options?.replaceUserMessageId
+        ),
+        ...mergedTurn,
+      ]);
       dispatchAwardsFromResponse(body);
       void loadMetaAndChats();
-
-      if (resolvedChatId) {
-        try {
-          await loadThread(resolvedChatId);
-        } catch {
-          const turn = body.messages ?? [];
-          const optimisticAttachment = options?.attachment;
-          const mergedTurn = turn.map((m, index) => {
-            if (
-              index === 0 &&
-              m.role === "user" &&
-              optimisticAttachment &&
-              !m.attachment
-            ) {
-              return {
-                ...m,
-                attachment: optimisticAttachment,
-                content: userContent || m.content,
-              };
-            }
-            return m;
-          });
-          setMessages((prev) => [
-            ...prev.filter(
-              (m) =>
-                m.id !== optimisticId && m.id !== options?.replaceUserMessageId
-            ),
-            ...mergedTurn,
-          ]);
-        }
-      } else {
-        const turn = body.messages ?? [];
-        const optimisticAttachment = options?.attachment;
-        const mergedTurn = turn.map((m, index) => {
-          if (
-            index === 0 &&
-            m.role === "user" &&
-            optimisticAttachment &&
-            !m.attachment
-          ) {
-            return {
-              ...m,
-              attachment: optimisticAttachment,
-              content: userContent || m.content,
-            };
-          }
-          return m;
-        });
-        setMessages((prev) => [
-          ...prev.filter(
-            (m) =>
-              m.id !== optimisticId && m.id !== options?.replaceUserMessageId
-          ),
-          ...mergedTurn,
-        ]);
-      }
     } catch {
       if (options?.replaceUserMessageId) {
         setMessages((prev) =>
