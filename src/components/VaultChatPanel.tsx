@@ -524,6 +524,8 @@ export default function VaultChatPanel({
       vaultProfileId,
     ]
   );
+  const syncAskUrlRef = useRef(syncAskUrl);
+  syncAskUrlRef.current = syncAskUrl;
 
   const {
     listening: voiceListening,
@@ -603,8 +605,8 @@ export default function VaultChatPanel({
   }, [vaultProfileId]);
 
   const loadThread = useCallback(
-    async (chatId: string) => {
-      const generation = bootstrapGeneration.current;
+    async (chatId: string, options?: { bootstrapGeneration?: number }) => {
+      const generation = options?.bootstrapGeneration;
       const res = await fetch(
         vaultChatApiUrl({ chatId }, vaultProfileId)
       );
@@ -616,12 +618,17 @@ export default function VaultChatPanel({
         meta?: Partial<Meta>;
       };
       if (!res.ok) throw new Error(body.error ?? "Couldn't load chat.");
-      if (generation !== bootstrapGeneration.current) return;
+      if (
+        generation !== undefined &&
+        generation !== bootstrapGeneration.current
+      ) {
+        return;
+      }
       if (body.chats) setChats(body.chats);
       const resolvedChatId = body.chatId ?? chatId;
       setActiveChatId(resolvedChatId);
       setMessages(body.messages ?? []);
-      syncAskUrl(resolvedChatId);
+      syncAskUrlRef.current(resolvedChatId);
       if (body.meta) {
         setMeta((prev) => ({
           firstName: prev?.firstName ?? null,
@@ -632,7 +639,7 @@ export default function VaultChatPanel({
         }));
       }
     },
-    [vaultProfileId, syncAskUrl]
+    [vaultProfileId]
   );
 
   const bootstrap = useCallback(async () => {
@@ -668,7 +675,7 @@ export default function VaultChatPanel({
 
       if (deepChat) deepLinkChatConsumed.current = deepChat;
       try {
-        await loadThread(initialChatId);
+        await loadThread(initialChatId, { bootstrapGeneration: generation });
       } catch (err) {
         if (generation !== bootstrapGeneration.current) return;
         const message =
@@ -691,6 +698,34 @@ export default function VaultChatPanel({
       }
     }
   }, [loadMetaAndChats, loadThread, startFreshChat, isDrawer]);
+
+  const bootstrapRef = useRef(bootstrap);
+  bootstrapRef.current = bootstrap;
+
+  useEffect(() => {
+    if (profilesLoading) return;
+    if (needsSetup) {
+      setLoadingHistory(false);
+      return;
+    }
+    if (scopedProfileId) {
+      if (!profiles.some((p) => p.id === scopedProfileId)) return;
+      void bootstrapRef.current();
+      return;
+    }
+    if (!active?.id) return;
+    if (requestedProfileId && active.id !== requestedProfileId) {
+      // Wait until profile switch lands before loading chats.
+      return;
+    }
+    void bootstrapRef.current();
+  }, [
+    needsSetup,
+    profilesLoading,
+    active?.id,
+    scopedProfileId,
+    profiles.length,
+  ]);
 
   useEffect(() => {
     if (profilesLoading || profiles.length > 0 || bootstrapTried.current) return;
@@ -780,33 +815,6 @@ export default function VaultChatPanel({
   }, [vaultProfileId]);
 
   useEffect(() => {
-    if (profilesLoading) return;
-    if (needsSetup) {
-      setLoadingHistory(false);
-      return;
-    }
-    if (scopedProfileId) {
-      if (!profiles.some((p) => p.id === scopedProfileId)) return;
-      void bootstrap();
-      return;
-    }
-    if (!active?.id) return;
-    if (requestedProfileId && active.id !== requestedProfileId) {
-      // Wait until profile switch lands before loading chats.
-      return;
-    }
-    void bootstrap();
-  }, [
-    bootstrap,
-    needsSetup,
-    profilesLoading,
-    requestedProfileId,
-    active?.id,
-    scopedProfileId,
-    profiles.length,
-  ]);
-
-  useEffect(() => {
     if (needsSetup || scopedProfileId) return;
     const onProfile = () => {
       bootstrapGeneration.current += 1;
@@ -816,13 +824,13 @@ export default function VaultChatPanel({
       setMessages([]);
       setError(null);
       setLoadingHistory(true);
-      syncAskUrl(null);
-      void bootstrap();
+      syncAskUrlRef.current(null);
+      void bootstrapRef.current();
     };
     window.addEventListener("guardian:profile-changed", onProfile);
     return () =>
       window.removeEventListener("guardian:profile-changed", onProfile);
-  }, [bootstrap, needsSetup, scopedProfileId, syncAskUrl]);
+  }, [needsSetup, scopedProfileId]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -1334,7 +1342,7 @@ export default function VaultChatPanel({
       if (body.chats) setChats(body.chats);
       if (body.chatId) {
         setActiveChatId(body.chatId);
-        syncAskUrl(body.chatId);
+        syncAskUrlRef.current(body.chatId);
       }
       if (body.chatScopedProfile !== undefined) {
         setMeta((prev) =>
