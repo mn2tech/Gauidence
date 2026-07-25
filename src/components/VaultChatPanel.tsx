@@ -9,7 +9,7 @@ import {
   type MouseEvent,
 } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import PlanLimitAlert from "@/components/PlanLimitAlert";
 import {
   ExternalLink,
@@ -409,6 +409,8 @@ export default function VaultChatPanel({
   const isPage = variant === "page";
   const isDrawer = variant === "drawer";
   const isScopedPanel = Boolean(scopedProfileId) || isDrawer;
+  const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const requestedChatId = isScopedPanel ? null : searchParams.get("chatId");
   const requestedProfileId = isScopedPanel ? null : searchParams.get("profileId");
@@ -477,6 +479,8 @@ export default function VaultChatPanel({
   const pendingAttachmentRef = useRef<PendingVaultAttachment | null>(null);
   const profileSwitchRef = useRef(false);
   const deepLinkChatConsumed = useRef<string | null>(null);
+  const requestedChatIdRef = useRef<string | null>(requestedChatId);
+  requestedChatIdRef.current = requestedChatId;
   const bootstrapGeneration = useRef(0);
   const workProjectPrefillDone = useRef(false);
   const sendQuestionRef = useRef<(questionRaw: string) => Promise<void>>(
@@ -492,6 +496,34 @@ export default function VaultChatPanel({
     : null;
   const effectiveProfile = scopedProfile ?? active;
   const profileId = effectiveProfile?.id ?? meta?.profileId ?? null;
+  const vaultProfileId = scopedProfileId ?? active?.id ?? null;
+
+  const syncAskUrl = useCallback(
+    (chatId: string | null) => {
+      if (isScopedPanel || isDrawer) return;
+      const params = new URLSearchParams(searchParams.toString());
+      if (chatId) params.set("chatId", chatId);
+      else params.delete("chatId");
+      if (vaultProfileId) params.set("profileId", vaultProfileId);
+      else params.delete("profileId");
+      const qs = params.toString();
+      const next = `${pathname}${qs ? `?${qs}` : ""}`;
+      const current = `${pathname}${
+        searchParams.toString() ? `?${searchParams.toString()}` : ""
+      }`;
+      if (next !== current) {
+        router.replace(next, { scroll: false });
+      }
+    },
+    [
+      isScopedPanel,
+      isDrawer,
+      pathname,
+      router,
+      searchParams,
+      vaultProfileId,
+    ]
+  );
 
   const {
     listening: voiceListening,
@@ -558,7 +590,7 @@ export default function VaultChatPanel({
   );
 
   const loadMetaAndChats = useCallback(async () => {
-    const res = await fetch(vaultChatApiUrl(undefined, scopedProfileId));
+    const res = await fetch(vaultChatApiUrl(undefined, vaultProfileId));
     const body = (await res.json().catch(() => ({}))) as {
       error?: string;
       chats?: ChatSummary[];
@@ -568,12 +600,13 @@ export default function VaultChatPanel({
     setChats(body.chats ?? []);
     if (body.meta) setMeta(body.meta);
     return body.chats ?? [];
-  }, [scopedProfileId]);
+  }, [vaultProfileId]);
 
   const loadThread = useCallback(
     async (chatId: string) => {
+      const generation = bootstrapGeneration.current;
       const res = await fetch(
-        vaultChatApiUrl({ chatId }, scopedProfileId)
+        vaultChatApiUrl({ chatId }, vaultProfileId)
       );
       const body = (await res.json().catch(() => ({}))) as {
         error?: string;
@@ -583,9 +616,12 @@ export default function VaultChatPanel({
         meta?: Partial<Meta>;
       };
       if (!res.ok) throw new Error(body.error ?? "Couldn't load chat.");
+      if (generation !== bootstrapGeneration.current) return;
       if (body.chats) setChats(body.chats);
-      setActiveChatId(body.chatId ?? chatId);
+      const resolvedChatId = body.chatId ?? chatId;
+      setActiveChatId(resolvedChatId);
       setMessages(body.messages ?? []);
+      syncAskUrl(resolvedChatId);
       if (body.meta) {
         setMeta((prev) => ({
           firstName: prev?.firstName ?? null,
@@ -596,7 +632,7 @@ export default function VaultChatPanel({
         }));
       }
     },
-    [scopedProfileId]
+    [vaultProfileId, syncAskUrl]
   );
 
   const bootstrap = useCallback(async () => {
@@ -617,10 +653,10 @@ export default function VaultChatPanel({
       }
 
       const deepChat =
-        requestedChatId &&
-        deepLinkChatConsumed.current !== requestedChatId &&
-        list.some((c) => c.id === requestedChatId)
-          ? requestedChatId
+        requestedChatIdRef.current &&
+        deepLinkChatConsumed.current !== requestedChatIdRef.current &&
+        list.some((c) => c.id === requestedChatIdRef.current)
+          ? requestedChatIdRef.current
           : null;
 
       const initialChatId = deepChat ?? list[0]?.id ?? null;
@@ -654,7 +690,7 @@ export default function VaultChatPanel({
         setLoadingHistory(false);
       }
     }
-  }, [loadMetaAndChats, loadThread, requestedChatId, startFreshChat, isDrawer]);
+  }, [loadMetaAndChats, loadThread, startFreshChat, isDrawer]);
 
   useEffect(() => {
     if (profilesLoading || profiles.length > 0 || bootstrapTried.current) return;
@@ -740,6 +776,10 @@ export default function VaultChatPanel({
   }, [workProject]);
 
   useEffect(() => {
+    deepLinkChatConsumed.current = null;
+  }, [vaultProfileId]);
+
+  useEffect(() => {
     if (profilesLoading) return;
     if (needsSetup) {
       setLoadingHistory(false);
@@ -750,7 +790,8 @@ export default function VaultChatPanel({
       void bootstrap();
       return;
     }
-    if (requestedProfileId && active?.id !== requestedProfileId) {
+    if (!active?.id) return;
+    if (requestedProfileId && active.id !== requestedProfileId) {
       // Wait until profile switch lands before loading chats.
       return;
     }
@@ -762,7 +803,7 @@ export default function VaultChatPanel({
     requestedProfileId,
     active?.id,
     scopedProfileId,
-    profiles,
+    profiles.length,
   ]);
 
   useEffect(() => {
@@ -775,12 +816,13 @@ export default function VaultChatPanel({
       setMessages([]);
       setError(null);
       setLoadingHistory(true);
+      syncAskUrl(null);
       void bootstrap();
     };
     window.addEventListener("guardian:profile-changed", onProfile);
     return () =>
       window.removeEventListener("guardian:profile-changed", onProfile);
-  }, [bootstrap, needsSetup, scopedProfileId]);
+  }, [bootstrap, needsSetup, scopedProfileId, syncAskUrl]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -850,6 +892,7 @@ export default function VaultChatPanel({
     setMessages([]);
     setDismissedVaultScopeIds(new Set());
     setSidebarOpen(false);
+    syncAskUrl(null);
     try {
       await loadMetaAndChats();
     } catch {
@@ -886,7 +929,7 @@ export default function VaultChatPanel({
     e.stopPropagation();
     setError(null);
     try {
-      const res = await fetch(vaultChatApiUrl({ chatId }, scopedProfileId), {
+      const res = await fetch(vaultChatApiUrl({ chatId }, vaultProfileId), {
         method: "DELETE",
       });
       const body = (await res.json().catch(() => ({}))) as {
@@ -902,6 +945,7 @@ export default function VaultChatPanel({
       if (activeChatId === chatId) {
         setActiveChatId(null);
         setMessages([]);
+        syncAskUrl(null);
       }
     } catch {
       setError("Couldn't delete chat.");
@@ -1023,7 +1067,7 @@ export default function VaultChatPanel({
               chatId: activeChatId,
               clearScopedProfile: true,
             },
-            scopedProfileId
+            vaultProfileId
           )
         ),
       });
@@ -1236,7 +1280,7 @@ export default function VaultChatPanel({
             ? { workProjectId: requestedWorkProjectId }
             : {}),
         },
-        scopedProfileId
+        vaultProfileId
       );
 
       const postOnce = () =>
@@ -1288,7 +1332,10 @@ export default function VaultChatPanel({
         return;
       }
       if (body.chats) setChats(body.chats);
-      if (body.chatId) setActiveChatId(body.chatId);
+      if (body.chatId) {
+        setActiveChatId(body.chatId);
+        syncAskUrl(body.chatId);
+      }
       if (body.chatScopedProfile !== undefined) {
         setMeta((prev) =>
           prev
