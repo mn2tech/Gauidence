@@ -401,6 +401,25 @@ function withVaultChatProfileId<T extends Record<string, unknown>>(
   return { ...body, profileId: scopedProfileId };
 }
 
+function vaultChatStorageKey(profileId: string): string {
+  return `gideon:lastChat:${profileId}`;
+}
+
+function readRememberedVaultChat(profileId: string | null): string | null {
+  if (!profileId || typeof window === "undefined") return null;
+  return sessionStorage.getItem(vaultChatStorageKey(profileId));
+}
+
+function rememberVaultChat(profileId: string | null, chatId: string | null) {
+  if (!profileId || !chatId || typeof window === "undefined") return;
+  sessionStorage.setItem(vaultChatStorageKey(profileId), chatId);
+}
+
+function forgetVaultChat(profileId: string | null) {
+  if (!profileId || typeof window === "undefined") return;
+  sessionStorage.removeItem(vaultChatStorageKey(profileId));
+}
+
 export default function VaultChatPanel({
   variant = "embedded",
   scopedProfileId,
@@ -634,6 +653,7 @@ export default function VaultChatPanel({
         setActiveChatId(resolvedChatId);
         setMessages(serverMessages);
         syncAskUrlRef.current(resolvedChatId);
+        rememberVaultChat(vaultProfileId, resolvedChatId);
       }
       if (body.meta) {
         setMeta((prev) => ({
@@ -665,14 +685,21 @@ export default function VaultChatPanel({
           ? requestedChatIdRef.current
           : null;
 
+      const rememberedChatId = (() => {
+        const stored = readRememberedVaultChat(vaultProfileId);
+        return stored && list.some((c) => c.id === stored) ? stored : null;
+      })();
+
+      const resumeChatId = urlChatId ?? rememberedChatId ?? list[0]?.id ?? null;
+
       if (
-        urlChatId &&
+        resumeChatId &&
         messagesRef.current.length === 0 &&
         !sendingRef.current &&
         !activeChatIdRef.current
       ) {
-        deepLinkChatConsumed.current = urlChatId;
-        await loadThread(urlChatId, {
+        if (urlChatId) deepLinkChatConsumed.current = urlChatId;
+        await loadThread(resumeChatId, {
           bootstrapGeneration: generation,
           allowEmpty: true,
         });
@@ -685,7 +712,7 @@ export default function VaultChatPanel({
         setLoadingHistory(false);
       }
     }
-  }, [loadMetaAndChats, loadThread, startFreshChat, isDrawer]);
+  }, [loadMetaAndChats, loadThread, startFreshChat, isDrawer, vaultProfileId]);
 
   const bootstrapRef = useRef(bootstrap);
   bootstrapRef.current = bootstrap;
@@ -805,11 +832,9 @@ export default function VaultChatPanel({
 
   useEffect(() => {
     if (needsSetup || scopedProfileId) return;
-    const onProfile = (e: Event) => {
-      const profileId = (e as CustomEvent<{ profileId?: string }>).detail
-        ?.profileId;
+    const onProfile = () => {
       bootstrapGeneration.current += 1;
-      bootstrappedVaultRef.current = profileId ?? null;
+      bootstrappedVaultRef.current = null;
       deepLinkChatConsumed.current = null;
       setChats([]);
       setActiveChatId(null);
@@ -817,7 +842,6 @@ export default function VaultChatPanel({
       setError(null);
       setLoadingHistory(true);
       syncAskUrlRef.current(null);
-      void bootstrapRef.current();
     };
     window.addEventListener("guardian:profile-changed", onProfile);
     return () =>
@@ -892,6 +916,7 @@ export default function VaultChatPanel({
     setMessages([]);
     setDismissedVaultScopeIds(new Set());
     setSidebarOpen(false);
+    forgetVaultChat(vaultProfileId);
     syncAskUrl(null);
     try {
       await loadMetaAndChats();
@@ -1336,6 +1361,7 @@ export default function VaultChatPanel({
       if (resolvedChatId) {
         setActiveChatId(resolvedChatId);
         syncAskUrlRef.current(resolvedChatId);
+        rememberVaultChat(vaultProfileId ?? profileId, resolvedChatId);
       }
       if (body.chatScopedProfile !== undefined) {
         setMeta((prev) =>
