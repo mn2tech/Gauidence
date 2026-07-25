@@ -380,7 +380,8 @@ const SECTION_STYLES: Record<string, string> = {
 
 function vaultChatApiUrl(
   params?: Record<string, string | undefined>,
-  scopedProfileId?: string | null
+  scopedProfileId?: string | null,
+  options?: { omitProfileId?: boolean }
 ): string {
   const sp = new URLSearchParams();
   if (params) {
@@ -388,7 +389,9 @@ function vaultChatApiUrl(
       if (value) sp.set(key, value);
     }
   }
-  if (scopedProfileId) sp.set("profileId", scopedProfileId);
+  if (scopedProfileId && !options?.omitProfileId) {
+    sp.set("profileId", scopedProfileId);
+  }
   const query = sp.toString();
   return `/api/documents/vault-chat${query ? `?${query}` : ""}`;
 }
@@ -425,10 +428,27 @@ function forgetVaultChat(profileId: string | null) {
   sessionStorage.removeItem(vaultChatStorageKey(profileId));
 }
 
+function isChatNotFoundError(message: string): boolean {
+  return message === "Chat not found." || message === "Chat not found";
+}
+
 function readUrlChatId(): string | null {
   if (typeof window === "undefined") return null;
   const chatId = new URLSearchParams(window.location.search).get("chatId");
   return chatId?.trim() ? chatId.trim() : null;
+}
+
+function clearStaleChatPointer(
+  chatId: string,
+  profileId: string | null,
+  syncUrl: (chatId: string | null) => void
+) {
+  if (readRememberedVaultChat(profileId) === chatId) {
+    forgetVaultChat(profileId);
+  }
+  if (readUrlChatId() === chatId) {
+    syncUrl(null);
+  }
 }
 
 export default function VaultChatPanel({
@@ -642,11 +662,12 @@ export default function VaultChatPanel({
         bootstrapGeneration?: number;
         allowEmpty?: boolean;
         refresh?: boolean;
+        silent?: boolean;
       }
     ): Promise<number> => {
       const generation = options?.bootstrapGeneration;
       const res = await fetch(
-        vaultChatApiUrl({ chatId }, vaultProfileId)
+        vaultChatApiUrl({ chatId }, vaultProfileId, { omitProfileId: true })
       );
       const body = (await res.json().catch(() => ({}))) as {
         error?: string;
@@ -661,7 +682,20 @@ export default function VaultChatPanel({
       ) {
         return 0;
       }
-      if (!res.ok) throw new Error(body.error ?? "Couldn't load chat.");
+      if (!res.ok) {
+        const err = new Error(body.error ?? "Couldn't load chat.");
+        if (options?.silent || options?.refresh) {
+          if (isChatNotFoundError(err.message)) {
+            clearStaleChatPointer(
+              chatId,
+              vaultProfileId,
+              syncAskUrlRef.current
+            );
+          }
+          return 0;
+        }
+        throw err;
+      }
       if (body.chats) setChats(body.chats);
       const resolvedChatId = body.chatId ?? chatId;
       const serverMessages = body.messages ?? [];
@@ -671,7 +705,9 @@ export default function VaultChatPanel({
         setActiveChatId(resolvedChatId);
         setMessages(serverMessages);
         syncAskUrlRef.current(resolvedChatId);
-        rememberVaultChat(vaultProfileId, resolvedChatId);
+        const storageProfileId =
+          body.meta?.profileId ?? vaultProfileId ?? null;
+        rememberVaultChat(storageProfileId, resolvedChatId);
         appliedCount = serverMessages.length;
       };
 
@@ -735,10 +771,12 @@ export default function VaultChatPanel({
           if (generation !== bootstrapGeneration.current) return;
           const message =
             err instanceof Error ? err.message : "Couldn't load Ask Gideon.";
-          if (message === "Chat not found.") {
-            if (readRememberedVaultChat(vaultProfileId) === chatId) {
-              forgetVaultChat(vaultProfileId);
-            }
+          if (isChatNotFoundError(message)) {
+            clearStaleChatPointer(
+              chatId,
+              vaultProfileId,
+              syncAskUrlRef.current
+            );
             continue;
           }
           throw err;
@@ -768,9 +806,9 @@ export default function VaultChatPanel({
       ) {
         if (urlChatId) deepLinkChatConsumed.current = urlChatId;
         await resumeVaultChat(list, generation, [
+          ...list.map((c) => c.id),
           urlChatId,
           rememberedChatId,
-          list[0]?.id,
         ]);
       }
     } catch (err) {
@@ -1011,8 +1049,8 @@ export default function VaultChatPanel({
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Couldn't load chat.";
-      if (message === "Chat not found.") {
-        forgetVaultChat(vaultProfileId);
+      if (message === "Chat not found." || isChatNotFoundError(message)) {
+        clearStaleChatPointer(chatId, vaultProfileId, syncAskUrl);
         setActiveChatId(null);
         setMessages([]);
         try {
@@ -1404,7 +1442,8 @@ export default function VaultChatPanel({
       if (
         !res.ok &&
         res.status === 404 &&
-        body.error === "Chat not found." &&
+        (body.error === "Chat not found." ||
+          isChatNotFoundError(body.error ?? "")) &&
         postBody.chatId
       ) {
         setActiveChatId(null);
@@ -1471,7 +1510,7 @@ export default function VaultChatPanel({
       ]);
       dispatchAwardsFromResponse(body);
       if (resolvedChatId) {
-        void loadThread(resolvedChatId, { refresh: true });
+        void loadThread(resolvedChatId, { refresh: true, silent: true });
       } else {
         void loadMetaAndChats();
       }

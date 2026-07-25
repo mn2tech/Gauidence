@@ -449,15 +449,96 @@ export async function GET(request: Request) {
   const { supabase, user } = auth;
 
   const url = new URL(request.url);
+  const chatIdRaw = url.searchParams.get("chatId");
+  const chatId = chatIdRaw?.trim() ? chatIdRaw.trim() : null;
+
+  if (chatId) {
+    const accessibleProfiles = await listGuardianProfiles(supabase, user.id);
+
+    const { data: chat } = await supabase
+      .from("vault_chats")
+      .select("id, title, profile_id, scoped_profile_id")
+      .eq("id", chatId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (!chat) {
+      return NextResponse.json({ error: "Chat not found." }, { status: 404 });
+    }
+
+    const chatProfile = await requireAccessibleGuardianProfile(
+      supabase,
+      user.id,
+      String(chat.profile_id)
+    );
+    if (!chatProfile) {
+      return NextResponse.json({ error: "Chat not found." }, { status: 404 });
+    }
+
+    const threadChats = await listChats(supabase, user.id, chatProfile.id);
+
+    const scopedProfile =
+      typeof chat.scoped_profile_id === "string"
+        ? accessibleProfiles.find((p) => p.id === chat.scoped_profile_id) ??
+          null
+        : null;
+
+    const { data: messages, error } = await supabase
+      .from("vault_chat_messages")
+      .select("id, role, content, citations, created_at")
+      .eq("chat_id", chat.id)
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      return NextResponse.json(
+        { error: "Couldn't load vault chat history." },
+        { status: 502 }
+      );
+    }
+
+    const profileKind = suggestionKindFrom(chatProfile.profile_type);
+    const template = getVaultTemplate(profileKind);
+    const scopeMeta = await askGideonScopeMeta(
+      supabase,
+      user.id,
+      chatProfile,
+      scopedProfile?.display_name
+    );
+
+    return NextResponse.json({
+      chats: threadChats,
+      chatId: chat.id,
+      title: chat.title,
+      messages: (messages ?? []) as ChatMessageRow[],
+      meta: {
+        profileId: chatProfile.id,
+        profileName: chatProfile.display_name,
+        profileType: chatProfile.profile_type,
+        askContextLabel: askGideonContextLabel(chatProfile),
+        chatContextLabel: scopeMeta.chatContextLabel,
+        vaultScopeNote: scopeMeta.vaultScopeNote,
+        templateLabel: template.label,
+        templateBadge: template.badge,
+        chatScopedProfile: scopedProfile
+          ? {
+              profileId: scopedProfile.id,
+              profileName: scopedProfile.display_name,
+            }
+          : null,
+        ...(await loadAskVaultInventory(supabase, user.id, chatProfile.id))
+          .inventory,
+      },
+    });
+  }
+
   const profileIdParam = url.searchParams.get("profileId");
   const active = await resolveVaultChatProfile(supabase, user, profileIdParam);
   if (!active) {
     return vaultProfileNotFoundResponse(profileIdParam);
   }
-  const chatId = url.searchParams.get("chatId");
   const chats = await listChats(supabase, user.id, active.id);
 
-  if (!chatId) {
+  {
     const { docs, inventory } = await loadAskVaultInventory(
       supabase,
       user.id,
@@ -561,82 +642,6 @@ export async function GET(request: Request) {
       },
     });
   }
-
-  const accessibleProfiles = await listGuardianProfiles(supabase, user.id);
-
-  const { data: chat } = await supabase
-    .from("vault_chats")
-    .select("id, title, profile_id, scoped_profile_id")
-    .eq("id", chatId)
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (!chat) {
-    return NextResponse.json({ error: "Chat not found." }, { status: 404 });
-  }
-
-  const chatProfile = await requireAccessibleGuardianProfile(
-    supabase,
-    user.id,
-    String(chat.profile_id)
-  );
-  if (!chatProfile) {
-    return NextResponse.json({ error: "Chat not found." }, { status: 404 });
-  }
-
-  const threadChats = await listChats(supabase, user.id, chatProfile.id);
-
-  const scopedProfile =
-    typeof chat.scoped_profile_id === "string"
-      ? accessibleProfiles.find((p) => p.id === chat.scoped_profile_id) ?? null
-      : null;
-
-  const { data: messages, error } = await supabase
-    .from("vault_chat_messages")
-    .select("id, role, content, citations, created_at")
-    .eq("chat_id", chat.id)
-    .order("created_at", { ascending: true });
-
-  if (error) {
-    return NextResponse.json(
-      { error: "Couldn't load vault chat history." },
-      { status: 502 }
-    );
-  }
-
-  const profileKind = suggestionKindFrom(chatProfile.profile_type);
-  const template = getVaultTemplate(profileKind);
-  const scopeMeta = await askGideonScopeMeta(
-    supabase,
-    user.id,
-    chatProfile,
-    scopedProfile?.display_name
-  );
-
-  return NextResponse.json({
-    chats: threadChats,
-    chatId: chat.id,
-    title: chat.title,
-    messages: (messages ?? []) as ChatMessageRow[],
-    meta: {
-      profileId: chatProfile.id,
-      profileName: chatProfile.display_name,
-      profileType: chatProfile.profile_type,
-      askContextLabel: askGideonContextLabel(chatProfile),
-      chatContextLabel: scopeMeta.chatContextLabel,
-      vaultScopeNote: scopeMeta.vaultScopeNote,
-      templateLabel: template.label,
-      templateBadge: template.badge,
-      chatScopedProfile: scopedProfile
-        ? {
-            profileId: scopedProfile.id,
-            profileName: scopedProfile.display_name,
-          }
-        : null,
-      ...(await loadAskVaultInventory(supabase, user.id, chatProfile.id))
-        .inventory,
-    },
-  });
 }
 
 /** Clear temporary cross-vault scope on a chat thread. */
