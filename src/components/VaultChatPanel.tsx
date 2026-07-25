@@ -643,80 +643,33 @@ export default function VaultChatPanel({
 
   const bootstrap = useCallback(async () => {
     const generation = ++bootstrapGeneration.current;
-    const hadConversation =
-      sendingRef.current ||
-      messagesRef.current.length > 0 ||
-      Boolean(activeChatIdRef.current);
-
     setLoadingHistory(true);
     setError(null);
-
-    if (!hadConversation) {
-      setChats([]);
-      setActiveChatId(null);
-      setMessages([]);
-    }
 
     try {
       const list = await loadMetaAndChats();
       if (generation !== bootstrapGeneration.current) return;
 
-      if (startFreshChat || isDrawer) {
-        if (!hadConversation) {
-          setActiveChatId(null);
-          setMessages([]);
-        }
-        return;
-      }
+      if (startFreshChat || isDrawer) return;
 
-      // User may have sent a message while bootstrap was in flight — keep it.
-      if (
-        sendingRef.current ||
-        messagesRef.current.length > 0 ||
-        activeChatIdRef.current
-      ) {
-        return;
-      }
-
-      const deepChat =
+      const urlChatId =
         requestedChatIdRef.current &&
-        deepLinkChatConsumed.current !== requestedChatIdRef.current &&
         list.some((c) => c.id === requestedChatIdRef.current)
           ? requestedChatIdRef.current
           : null;
 
-      const initialChatId = deepChat ?? list[0]?.id ?? null;
-      if (!initialChatId) {
-        setActiveChatId(null);
-        setMessages([]);
-        return;
-      }
-
-      if (deepChat) deepLinkChatConsumed.current = deepChat;
-      try {
-        await loadThread(initialChatId, { bootstrapGeneration: generation });
-      } catch (err) {
-        if (generation !== bootstrapGeneration.current) return;
-        const message =
-          err instanceof Error ? err.message : "Couldn't load Ask Gideon.";
-        if (message === "Chat not found.") {
-          setActiveChatId(null);
-          setMessages([]);
-          return;
-        }
-        throw err;
+      if (
+        urlChatId &&
+        messagesRef.current.length === 0 &&
+        !sendingRef.current &&
+        !activeChatIdRef.current
+      ) {
+        deepLinkChatConsumed.current = urlChatId;
+        await loadThread(urlChatId, { bootstrapGeneration: generation });
       }
     } catch (err) {
       if (generation !== bootstrapGeneration.current) return;
-      if (
-        !sendingRef.current &&
-        messagesRef.current.length === 0 &&
-        !activeChatIdRef.current
-      ) {
-        setError(err instanceof Error ? err.message : "Couldn't load Ask Gideon.");
-        setMessages([]);
-        setActiveChatId(null);
-      }
+      setError(err instanceof Error ? err.message : "Couldn't load Ask Gideon.");
     } finally {
       if (generation === bootstrapGeneration.current) {
         setLoadingHistory(false);
@@ -1373,9 +1326,10 @@ export default function VaultChatPanel({
         return;
       }
       if (body.chats) setChats(body.chats);
-      if (body.chatId) {
-        setActiveChatId(body.chatId);
-        syncAskUrlRef.current(body.chatId);
+      const resolvedChatId = body.chatId ?? activeChatIdRef.current;
+      if (resolvedChatId) {
+        setActiveChatId(resolvedChatId);
+        syncAskUrlRef.current(resolvedChatId);
       }
       if (body.chatScopedProfile !== undefined) {
         setMeta((prev) =>
@@ -1384,32 +1338,64 @@ export default function VaultChatPanel({
             : prev
         );
       }
-      const turn = body.messages ?? [];
-      const optimisticAttachment = options?.attachment;
-      const mergedTurn = turn.map((m, index) => {
-        if (
-          index === 0 &&
-          m.role === "user" &&
-          optimisticAttachment &&
-          !m.attachment
-        ) {
-          return {
-            ...m,
-            attachment: optimisticAttachment,
-            content: userContent || m.content,
-          };
-        }
-        return m;
-      });
-      setMessages((prev) => [
-        ...prev.filter(
-          (m) =>
-            m.id !== optimisticId && m.id !== options?.replaceUserMessageId
-        ),
-        ...mergedTurn,
-      ]);
       dispatchAwardsFromResponse(body);
       void loadMetaAndChats();
+
+      if (resolvedChatId) {
+        try {
+          await loadThread(resolvedChatId);
+        } catch {
+          const turn = body.messages ?? [];
+          const optimisticAttachment = options?.attachment;
+          const mergedTurn = turn.map((m, index) => {
+            if (
+              index === 0 &&
+              m.role === "user" &&
+              optimisticAttachment &&
+              !m.attachment
+            ) {
+              return {
+                ...m,
+                attachment: optimisticAttachment,
+                content: userContent || m.content,
+              };
+            }
+            return m;
+          });
+          setMessages((prev) => [
+            ...prev.filter(
+              (m) =>
+                m.id !== optimisticId && m.id !== options?.replaceUserMessageId
+            ),
+            ...mergedTurn,
+          ]);
+        }
+      } else {
+        const turn = body.messages ?? [];
+        const optimisticAttachment = options?.attachment;
+        const mergedTurn = turn.map((m, index) => {
+          if (
+            index === 0 &&
+            m.role === "user" &&
+            optimisticAttachment &&
+            !m.attachment
+          ) {
+            return {
+              ...m,
+              attachment: optimisticAttachment,
+              content: userContent || m.content,
+            };
+          }
+          return m;
+        });
+        setMessages((prev) => [
+          ...prev.filter(
+            (m) =>
+              m.id !== optimisticId && m.id !== options?.replaceUserMessageId
+          ),
+          ...mergedTurn,
+        ]);
+      }
     } catch {
       if (options?.replaceUserMessageId) {
         setMessages((prev) =>
@@ -1434,7 +1420,7 @@ export default function VaultChatPanel({
     e.preventDefault();
     const question = input.trim();
     const attachment = pendingAttachment;
-    if ((!question && !attachment) || sending || vaultBusy) return;
+    if ((!question && !attachment) || sending || vaultBusy || loadingHistory) return;
 
     if (attachment) {
       const { file, previewUrl: stagedPreviewUrl } = attachment;
@@ -1962,7 +1948,7 @@ export default function VaultChatPanel({
                   <button
                     key={q}
                     type="button"
-                    disabled={sending}
+                    disabled={sending || loadingHistory}
                     onClick={() => void sendQuestion(q)}
                     className="rounded-full border border-stone-300 bg-white px-3 py-1.5 text-left text-xs font-medium text-foreground transition hover:border-brand hover:bg-brand-light/40 disabled:opacity-50"
                   >
