@@ -1017,6 +1017,10 @@ export async function POST(request: Request) {
   const requestedId =
     typeof chatIdRaw === "string" && chatIdRaw.trim() ? chatIdRaw.trim() : null;
 
+  if (regenerateAssistantId && !requestedId) {
+    return NextResponse.json({ error: "Chat not found." }, { status: 400 });
+  }
+
   if (requestedId) {
     const loaded = await loadVaultChatById(supabase, requestedId);
     if (!loaded.ok) {
@@ -1047,6 +1051,12 @@ export async function POST(request: Request) {
         ? existingChat.scoped_profile_id
         : null;
   } else {
+    if (!question) {
+      return NextResponse.json(
+        { error: "Enter a question." },
+        { status: 400 }
+      );
+    }
     const { data: created, error: chatError } = await supabase
       .from("vault_chats")
       .insert({
@@ -1150,9 +1160,6 @@ export async function POST(request: Request) {
   let userMsg: ChatMessageRow | null = null;
 
   if (regenerateAssistantId) {
-    if (!requestedId) {
-      return NextResponse.json({ error: "Chat not found." }, { status: 400 });
-    }
     const assistantIdx = priorMessages.findIndex(
       (row) => row.id === regenerateAssistantId
     );
@@ -1196,9 +1203,17 @@ export async function POST(request: Request) {
     );
   }
 
+  if (!question) {
+    return NextResponse.json(
+      { error: "Enter a question." },
+      { status: 400 }
+    );
+  }
+
+  const regenerateUserMsg = userMsg;
   const historySource =
-    regenerateAssistantId && userMsg
-      ? priorMessages.filter((row) => row.id !== userMsg.id)
+    regenerateAssistantId && regenerateUserMsg
+      ? priorMessages.filter((row) => row.id !== regenerateUserMsg.id)
       : priorMessages;
 
   const history = historySource
