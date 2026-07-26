@@ -14,12 +14,14 @@ export function isImageMimeType(mime: string | null | undefined): boolean {
 
 /** User asked to see / show pictures rather than only describe. */
 export function wantsShowPictures(question: string): boolean {
-  return /\b(show|see|view|display|look at|open)\b.{0,40}\b(pic(ture)?s?|photos?|images?|scans?)\b|\b(pic(ture)?s?|photos?|images?)\b.{0,20}\b(show|see|view|display)\b/i.test(
+  return /\b(show|see|view|display|look at|open)\b.{0,40}\b(pic(ture)?s?|photos?|images?|scans?|flyers?)\b|\b(pic(ture)?s?|photos?|images?|flyers?)\b.{0,20}\b(show|see|view|display)\b/i.test(
     question
   );
 }
 
 /** User is asking about one specific image (not a gallery). */
 export function wantsSingleImageFocus(question: string): boolean {
-  return /\b(this|the)\s+(photo|image|picture|pic|scan)\b/i.test(question);
+  return /\b(this|the)\s+(photo|image|picture|pic|scan|flyer)\b|\b\w+\s+(camp\s+)?flyer\b/i.test(
+    question
+  );
 }

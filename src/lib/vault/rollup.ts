@@ -12,7 +12,10 @@ import {
   isGroupStyleProfile,
   type GuardianProfileType,
 } from "@/lib/profiles/types";
-import { retrieveVaultChunks } from "./indexDocument";
+import {
+  retrieveVaultChunks,
+  retrieveVaultChunksMulti,
+} from "./indexDocument";
 import type { RetrievedChunk } from "./retrieve";
 
 export type LinkedVaultProfile = {
@@ -116,4 +119,65 @@ export async function retrieveVaultChunksAcrossProfiles(
     .flat()
     .sort((a, b) => b.similarity - a.similarity)
     .slice(0, matchCount);
+}
+
+function tagChunksWithProfileNames(
+  chunks: RetrievedChunk[],
+  profileNames: Record<string, string>
+): RetrievedChunk[] {
+  return chunks.map((row) => ({
+    ...row,
+    profile_name:
+      row.profile_name ??
+      (row.profile_id ? profileNames[row.profile_id] : undefined),
+  }));
+}
+
+/**
+ * Search every vault the user can access — single RPC when available, otherwise
+ * per-profile merge (same pattern as container rollup).
+ */
+export async function retrieveAllAccessibleVaultChunks(
+  supabase: SupabaseClient,
+  queryEmbedding: number[],
+  scopes: LinkedVaultProfile[],
+  matchCount = 8
+): Promise<RetrievedChunk[]> {
+  if (scopes.length === 0) return [];
+
+  const profileNames = Object.fromEntries(
+    scopes.map((s) => [s.id, s.display_name])
+  );
+  const profileIds = scopes.map((s) => s.id);
+
+  if (scopes.length === 1) {
+    const rows = await retrieveVaultChunks(
+      supabase,
+      queryEmbedding,
+      scopes[0].id,
+      matchCount
+    );
+    return rows.map((row) => ({
+      ...row,
+      profile_id: scopes[0].id,
+      profile_name: scopes[0].display_name,
+    }));
+  }
+
+  const multi = await retrieveVaultChunksMulti(
+    supabase,
+    queryEmbedding,
+    profileIds,
+    matchCount
+  );
+  if (multi !== null) {
+    return tagChunksWithProfileNames(multi, profileNames);
+  }
+
+  return retrieveVaultChunksAcrossProfiles(
+    supabase,
+    queryEmbedding,
+    scopes,
+    matchCount
+  );
 }

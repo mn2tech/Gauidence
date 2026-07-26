@@ -92,3 +92,30 @@ export async function retrieveVaultChunks(
   }
   return (data ?? []) as RetrievedChunk[];
 }
+
+/** Search multiple vaults in one RPC. Returns null when the RPC is not deployed yet. */
+export async function retrieveVaultChunksMulti(
+  supabase: SupabaseClient,
+  queryEmbedding: number[],
+  profileIds: string[],
+  matchCount = 8
+): Promise<RetrievedChunk[] | null> {
+  if (profileIds.length === 0) return [];
+  const { data, error } = await supabase.rpc("match_document_chunks_multi", {
+    query_embedding: queryEmbedding,
+    match_count: matchCount,
+    filter_profile_ids: profileIds,
+  });
+  if (error) {
+    const msg = error.message ?? "";
+    if (
+      error.code === "42883" ||
+      /match_document_chunks_multi/i.test(msg) ||
+      /does not exist/i.test(msg)
+    ) {
+      return null;
+    }
+    throw new Error(`Vault multi-retrieval failed: ${error.message}`);
+  }
+  return (data ?? []) as RetrievedChunk[];
+}

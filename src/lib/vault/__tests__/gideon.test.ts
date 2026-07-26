@@ -156,10 +156,16 @@ describe("Gideon helpers", () => {
       gideonChatContextLabel("family", "Smith Family"),
       "You are chatting with Gideon · Smith Family"
     );
-    assert.equal(VAULT_SCOPE_NOTE, "Searching only inside this vault.");
+    assert.equal(VAULT_SCOPE_NOTE, "Searching all your vaults.");
     assert.equal(
       buildVaultScopeNote({ displayName: "Nolan", profileKind: "child" }),
       "Searching only Nolan's vault."
+    );
+    assert.equal(
+      buildVaultScopeNote({
+        allVaultNames: ["Personal", "Business", "Nolan"],
+      }),
+      "Searching all 3 vaults: Personal, Business, Nolan."
     );
     assert.equal(
       buildVaultScopeNote({

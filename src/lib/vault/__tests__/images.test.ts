@@ -16,6 +16,7 @@ describe("vault image helpers", () => {
   it("detects show-pictures intent", () => {
     assert.equal(wantsShowPictures("show me pictures of the receipt"), true);
     assert.equal(wantsShowPictures("Can you show the photos?"), true);
+    assert.equal(wantsShowPictures("show Nolans summer camp flyer"), true);
     assert.equal(wantsShowPictures("What does the invoice say?"), false);
   });
 

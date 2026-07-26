@@ -82,7 +82,17 @@ import {
 } from "@/lib/reminders/propose";
 import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
 import { dispatchAwardsFromResponse } from "@/lib/awards/client";
+import {
+  consumeVaultChatStream,
+  isVaultChatStreamResponse,
+} from "@/lib/vault/vaultChatStream";
 import { useGideonVoiceInput } from "@/hooks/useGideonVoiceInput";
+import { useGideonSpeechOutput } from "@/hooks/useGideonSpeechOutput";
+import GideonAssistantActions from "@/components/GideonAssistantActions";
+import {
+  formatAssistantMessagePlainText,
+  formatAssistantMessageSpeechText,
+} from "@/lib/vault/assistantMessageText";
 import { documentsHref } from "@/lib/routes";
 import type { WorkProject } from "@/lib/work-memory/types";
 
@@ -479,6 +489,9 @@ export default function VaultChatPanel({
   const [input, setInput] = useState("");
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [sending, setSending] = useState(false);
+  const [streamingAssistantId, setStreamingAssistantId] = useState<string | null>(
+    null
+  );
   const [loadingLabel, setLoadingLabel] = useState<string>(
     GIDEON_LOADING_STATES[0]
   );
@@ -498,7 +511,11 @@ export default function VaultChatPanel({
   const [logTitle, setLogTitle] = useState("");
   const [logContent, setLogContent] = useState("");
   const [savingLog, setSavingLog] = useState(false);
+  const lastWriteProfileIdRef = useRef<string | null>(null);
   const [reminderOpen, setReminderOpen] = useState(false);
+  const [reminderTargetProfileId, setReminderTargetProfileId] = useState<
+    string | null
+  >(null);
   const [reminderTitle, setReminderTitle] = useState("");
   const [reminderDate, setReminderDate] = useState("");
   const [reminderTime, setReminderTime] = useState("");
@@ -556,6 +573,9 @@ export default function VaultChatPanel({
     : null;
   const effectiveProfile = scopedProfile ?? active;
   const profileId = effectiveProfile?.id ?? meta?.profileId ?? null;
+  const profileNameForId = (id: string | null | undefined) =>
+    profiles.find((p) => p.id === id)?.display_name ?? null;
+  const reminderSaveProfileId = reminderTargetProfileId ?? profileId;
   const vaultProfileId =
     scopedProfileId ?? active?.id ?? meta?.profileId ?? null;
 
@@ -594,6 +614,12 @@ export default function VaultChatPanel({
     onError: (msg) => setError(msg),
     disabled: sending || vaultBusy || loadingHistory || !profileId,
   });
+  const {
+    speak: speakAssistant,
+    stop: stopAssistantSpeech,
+    speakingMessageId,
+    supported: speechOutputSupported,
+  } = useGideonSpeechOutput();
   const docsHref = documentsHref(profileId);
 
   pendingAttachmentRef.current = pendingAttachment;
@@ -1199,6 +1225,7 @@ export default function VaultChatPanel({
     setReminderTitle("");
     setReminderDate(defaults.date);
     setReminderTime(defaults.time);
+    setReminderTargetProfileId(null);
     setReminderOpen(true);
   };
 
@@ -1232,17 +1259,51 @@ export default function VaultChatPanel({
     setDismissedVaultScopeIds((prev) => new Set(prev).add(messageId));
   };
 
-  const continueInScopedVault = async (profileId: string, messageId: string) => {
+  const continueInScopedVault = async (
+    profileId: string,
+    profileName: string,
+    messageId: string
+  ) => {
+    if (!activeChatId) return;
     setSwitchingVaultScopeId(messageId);
     try {
-      const ok = await switchProfile(profileId);
-      if (ok) {
-        await refresh();
-        setDismissedVaultScopeIds((prev) => new Set(prev).add(messageId));
-        setMeta((prev) =>
-          prev ? { ...prev, chatScopedProfile: null } : prev
-        );
+      const res = await fetch("/api/documents/vault-chat", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          withVaultChatProfileId(
+            {
+              chatId: activeChatId,
+              setScopedProfile: profileId,
+            },
+            vaultProfileId
+          )
+        ),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        chatScopedProfile?: Meta["chatScopedProfile"];
+      };
+      if (!res.ok) {
+        setError(body.error ?? "Couldn't update chat scope.");
+        return;
       }
+      setDismissedVaultScopeIds((prev) => new Set(prev).add(messageId));
+      setMeta((prev) =>
+        prev
+          ? {
+              ...prev,
+              chatScopedProfile:
+                body.chatScopedProfile ??
+                (profileId !== (effectiveProfile?.id ?? profileId)
+                  ? { profileId, profileName }
+                  : null),
+            }
+          : prev
+      );
+      void loadThread(activeChatId, { refresh: true, silent: true });
+    } catch {
+      setError("Couldn't update chat scope. Check your connection and try again.");
     } finally {
       setSwitchingVaultScopeId(null);
     }
@@ -1251,7 +1312,7 @@ export default function VaultChatPanel({
   const saveInlineReminder = async (e: FormEvent) => {
     e.preventDefault();
     if (
-      !profileId ||
+      !reminderSaveProfileId ||
       !reminderTitle.trim() ||
       savingReminder ||
       vaultBusy ||
@@ -1266,7 +1327,7 @@ export default function VaultChatPanel({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          profileId,
+          profileId: reminderSaveProfileId,
           title: reminderTitle.trim(),
           date: reminderDate,
           time: reminderTime,
@@ -1285,6 +1346,7 @@ export default function VaultChatPanel({
       const when = body.whenLabel ?? `${reminderDate} ${reminderTime}`;
       setReminderOpen(false);
       setReminderTitle("");
+      setReminderTargetProfileId(null);
       window.dispatchEvent(new Event("guardian:alerts-updated"));
       pushLocalNote(
         `Reminder set: "${title}" — ${when}. You'll see it under Attention on the dashboard.`
@@ -1298,9 +1360,11 @@ export default function VaultChatPanel({
 
   const confirmProposedReminder = async (
     messageId: string,
-    proposal: ProposedReminder
+    proposal: ProposedReminder,
+    targetProfileId?: string | null
   ) => {
-    if (!profileId || confirmingReminderId || savingReminder || vaultBusy || sending) {
+    const saveProfileId = targetProfileId ?? profileId;
+    if (!saveProfileId || confirmingReminderId || savingReminder || vaultBusy || sending) {
       return;
     }
     setConfirmingReminderId(messageId);
@@ -1310,7 +1374,7 @@ export default function VaultChatPanel({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          profileId,
+          profileId: saveProfileId,
           title: proposal.title,
           date: proposal.date,
           time: proposal.time,
@@ -1342,7 +1406,8 @@ export default function VaultChatPanel({
 
   const saveInlineLog = async (e: FormEvent) => {
     e.preventDefault();
-    if (!profileId || !logContent.trim() || savingLog || vaultBusy || sending) {
+    const saveProfileId = lastWriteProfileIdRef.current ?? profileId;
+    if (!saveProfileId || !logContent.trim() || savingLog || vaultBusy || sending) {
       return;
     }
     setSavingLog(true);
@@ -1353,7 +1418,7 @@ export default function VaultChatPanel({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          profileId,
+          profileId: saveProfileId,
           content: logContent.trim(),
           title: title || undefined,
           quick: true,
@@ -1386,18 +1451,21 @@ export default function VaultChatPanel({
       attachment?: VaultMessageAttachment;
       userDisplayContent?: string;
       replaceUserMessageId?: string;
+      regenerateAssistantId?: string;
     }
   ) => {
     const question = questionRaw.trim();
     if (!question || sending || vaultBusy) return;
 
+    stopAssistantSpeech();
     setSending(true);
     setError(null);
     setInput("");
 
+    const isRegenerate = Boolean(options?.regenerateAssistantId);
     const optimisticId = `local-${Date.now()}`;
     const userContent = options?.userDisplayContent?.trim() ?? question;
-    if (!options?.replaceUserMessageId) {
+    if (!options?.replaceUserMessageId && !isRegenerate) {
       setMessages((prev) => [
         ...prev,
         {
@@ -1417,6 +1485,9 @@ export default function VaultChatPanel({
         {
           question,
           chatId: chatIdForSend,
+          ...(options?.regenerateAssistantId
+            ? { regenerateAssistantId: options.regenerateAssistantId }
+            : {}),
           ...(options?.attachment?.documentId &&
           !isPendingAttachmentId(options.attachment.documentId)
             ? { attachmentDocumentId: options.attachment.documentId }
@@ -1435,34 +1506,15 @@ export default function VaultChatPanel({
           body: JSON.stringify(postBody),
         });
 
-      let res = await postOnce();
-      let body = (await res.json().catch(() => ({}))) as {
-        error?: string;
-        code?: string;
-        messages?: VaultMessage[];
-        chatId?: string;
-        chats?: ChatSummary[];
-        vaultScope?: VaultMessage["vaultScope"];
-        chatScopedProfile?: Meta["chatScopedProfile"];
+      const readErrorBody = async (response: Response) => {
+        if (isVaultChatStreamResponse(response)) return {};
+        return (await response.json().catch(() => ({}))) as {
+          error?: string;
+          code?: string;
+        };
       };
 
-      if (
-        !res.ok &&
-        res.status === 404 &&
-        (body.error === "Chat not found." ||
-          isChatNotFoundError(body.error ?? "")) &&
-        postBody.chatId
-      ) {
-        setActiveChatId(null);
-        const retryBody = { ...postBody, chatId: null };
-        res = await fetch("/api/documents/vault-chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(retryBody),
-        });
-        body = (await res.json().catch(() => ({}))) as typeof body;
-      }
-      if (!res.ok) {
+      const rollbackOptimistic = () => {
         if (options?.replaceUserMessageId) {
           setMessages((prev) =>
             prev.filter((m) => m.id !== options.replaceUserMessageId)
@@ -1470,57 +1522,206 @@ export default function VaultChatPanel({
         } else {
           setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
         }
+      };
+
+      let assistantStreamId: string | null = null;
+
+      const applyVaultChatTurn = (body: {
+        messages?: VaultMessage[];
+        chatId?: string;
+        chats?: ChatSummary[];
+        chatScopedProfile?: Meta["chatScopedProfile"];
+        writeProfile?: { profileId: string; profileName: string };
+      }) => {
+        if (body.chats) setChats(body.chats);
+        const resolvedChatId = body.chatId ?? activeChatIdRef.current;
+        if (resolvedChatId) {
+          setActiveChatId(resolvedChatId);
+          syncAskUrlRef.current(resolvedChatId);
+          rememberVaultChat(vaultProfileId ?? profileId, resolvedChatId);
+        }
+        if (body.chatScopedProfile !== undefined) {
+          setMeta((prev) =>
+            prev
+              ? { ...prev, chatScopedProfile: body.chatScopedProfile ?? null }
+              : prev
+          );
+        }
+        if (body.writeProfile?.profileId) {
+          lastWriteProfileIdRef.current = body.writeProfile.profileId;
+        }
+        const turn = body.messages ?? [];
+        const optimisticAttachment = options?.attachment;
+        const mergedTurn = turn.map((m, index) => {
+          if (
+            index === 0 &&
+            m.role === "user" &&
+            optimisticAttachment &&
+            !m.attachment
+          ) {
+            return {
+              ...m,
+              attachment: optimisticAttachment,
+              content: userContent || m.content,
+            };
+          }
+          return m;
+        });
+        setMessages((prev) => [
+          ...prev.filter(
+            (m) =>
+              m.id !== optimisticId &&
+              m.id !== options?.replaceUserMessageId &&
+              m.id !== options?.regenerateAssistantId &&
+              m.id !== assistantStreamId
+          ),
+          ...mergedTurn,
+        ]);
+        dispatchAwardsFromResponse(body);
+        if (resolvedChatId) {
+          void loadThread(resolvedChatId, { refresh: true, silent: true });
+        } else {
+          void loadMetaAndChats();
+        }
+      };
+
+      let res = await postOnce();
+
+      if (!res.ok && res.status === 404 && postBody.chatId) {
+        const errBody = await readErrorBody(res);
+        if (
+          errBody.error === "Chat not found." ||
+          isChatNotFoundError(errBody.error ?? "")
+        ) {
+          setActiveChatId(null);
+          const retryBody = { ...postBody, chatId: null };
+          res = await fetch("/api/documents/vault-chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(retryBody),
+          });
+        }
+      }
+
+      if (!res.ok) {
+        const errBody = await readErrorBody(res);
+        rollbackOptimistic();
+        if (isRegenerate && activeChatIdRef.current) {
+          void loadThread(activeChatIdRef.current, {
+            refresh: true,
+            silent: true,
+          });
+        }
         setInput(question);
         setError(
-          body.error ?? "I couldn't complete that request right now. Please try again.",
-          body.code
+          errBody.error ??
+            "I couldn't complete that request right now. Please try again.",
+          errBody.code
         );
         return;
       }
-      if (body.chats) setChats(body.chats);
-      const resolvedChatId = body.chatId ?? activeChatIdRef.current;
-      if (resolvedChatId) {
-        setActiveChatId(resolvedChatId);
-        syncAskUrlRef.current(resolvedChatId);
-        rememberVaultChat(vaultProfileId ?? profileId, resolvedChatId);
+
+      if (isVaultChatStreamResponse(res)) {
+        const streamId = `stream-${Date.now()}`;
+        assistantStreamId = streamId;
+        const optimisticAttachment = options?.attachment;
+
+        await consumeVaultChatStream(res, {
+          onMeta: (event) => {
+            setStreamingAssistantId(streamId);
+            if (event.chatId) {
+              setActiveChatId(event.chatId);
+              syncAskUrlRef.current(event.chatId);
+              rememberVaultChat(vaultProfileId ?? profileId, event.chatId);
+            }
+            setMessages((prev) => {
+              const withoutStale = prev.filter(
+                (m) =>
+                  m.id !== optimisticId &&
+                  m.id !== options?.replaceUserMessageId &&
+                  m.id !== options?.regenerateAssistantId &&
+                  m.id !== streamId
+              );
+              if (isRegenerate) {
+                return [
+                  ...withoutStale,
+                  {
+                    id: streamId,
+                    role: "assistant",
+                    content: "",
+                    created_at: new Date().toISOString(),
+                  },
+                ];
+              }
+              const userFromServer: VaultMessage = {
+                ...event.userMsg,
+                ...(optimisticAttachment
+                  ? {
+                      attachment: optimisticAttachment,
+                      content: userContent || event.userMsg.content,
+                    }
+                  : {}),
+              };
+              return [
+                ...withoutStale,
+                userFromServer,
+                {
+                  id: streamId,
+                  role: "assistant",
+                  content: "",
+                  created_at: new Date().toISOString(),
+                },
+              ];
+            });
+          },
+          onDelta: (text) => {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === streamId
+                  ? { ...m, content: m.content + text }
+                  : m
+              )
+            );
+          },
+          onDone: (event) => {
+            applyVaultChatTurn(event);
+            setStreamingAssistantId(null);
+          },
+          onError: (message) => {
+            setStreamingAssistantId(null);
+            setMessages((prev) =>
+              prev.filter(
+                (m) =>
+                  m.id !== optimisticId &&
+                  m.id !== options?.replaceUserMessageId &&
+                  m.id !== options?.regenerateAssistantId &&
+                  m.id !== streamId
+              )
+            );
+            if (isRegenerate && activeChatIdRef.current) {
+              void loadThread(activeChatIdRef.current, {
+                refresh: true,
+                silent: true,
+              });
+            }
+            setInput(question);
+            setError(message);
+          },
+        });
+        return;
       }
-      if (body.chatScopedProfile !== undefined) {
-        setMeta((prev) =>
-          prev
-            ? { ...prev, chatScopedProfile: body.chatScopedProfile ?? null }
-            : prev
-        );
-      }
-      const turn = body.messages ?? [];
-      const optimisticAttachment = options?.attachment;
-      const mergedTurn = turn.map((m, index) => {
-        if (
-          index === 0 &&
-          m.role === "user" &&
-          optimisticAttachment &&
-          !m.attachment
-        ) {
-          return {
-            ...m,
-            attachment: optimisticAttachment,
-            content: userContent || m.content,
-          };
-        }
-        return m;
-      });
-      setMessages((prev) => [
-        ...prev.filter(
-          (m) =>
-            m.id !== optimisticId && m.id !== options?.replaceUserMessageId
-        ),
-        ...mergedTurn,
-      ]);
-      dispatchAwardsFromResponse(body);
-      if (resolvedChatId) {
-        void loadThread(resolvedChatId, { refresh: true, silent: true });
-      } else {
-        void loadMetaAndChats();
-      }
+
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        code?: string;
+        messages?: VaultMessage[];
+        chatId?: string;
+        chats?: ChatSummary[];
+        vaultScope?: VaultMessage["vaultScope"];
+        chatScopedProfile?: Meta["chatScopedProfile"];
+        writeProfile?: { profileId: string; profileName: string };
+      };
+      applyVaultChatTurn(body);
     } catch {
       if (options?.replaceUserMessageId) {
         setMessages((prev) =>
@@ -1533,6 +1734,7 @@ export default function VaultChatPanel({
       setError("I couldn't complete that request right now. Please try again.");
     } finally {
       setSending(false);
+      setStreamingAssistantId(null);
     }
   };
   sendQuestionRef.current = sendQuestion;
@@ -1630,9 +1832,34 @@ export default function VaultChatPanel({
     await sendQuestion(question);
   };
 
+  const regenerateAssistantReply = (
+    assistantMessage: VaultMessage,
+    userMessage: VaultMessage
+  ) => {
+    setMessages((prev) => prev.filter((m) => m.id !== assistantMessage.id));
+    setConfirmedReminderIds((prev) => {
+      const next = new Set(prev);
+      next.delete(assistantMessage.id);
+      return next;
+    });
+    setDismissedVaultScopeIds((prev) => {
+      const next = new Set(prev);
+      next.delete(assistantMessage.id);
+      return next;
+    });
+    void sendQuestion(userMessage.content, {
+      regenerateAssistantId: assistantMessage.id,
+      attachment: userMessage.attachment ?? undefined,
+    });
+  };
+
   const renderAssistantContent = (
     m: VaultMessage,
-    options?: { hideCitationPreviews?: boolean }
+    options?: {
+      hideCitationPreviews?: boolean;
+      userMessage?: VaultMessage;
+      isStreaming?: boolean;
+    }
   ) => {
     const proposed = parseProposedReminder(m.content, Date.now(), timeZone);
     const displayContent = stripProposedReminderSection(m.content);
@@ -1665,6 +1892,10 @@ export default function VaultChatPanel({
       !dismissedVaultScopeIds.has(m.id) &&
       vaultScope.profileId !== effectiveProfile?.id;
     const switchingVault = switchingVaultScopeId === m.id;
+    const plainText = formatAssistantMessagePlainText(m.content);
+    const speechText = formatAssistantMessageSpeechText(m.content);
+    const showActions =
+      !options?.isStreaming && Boolean(plainText.trim() || m.content.trim());
 
     return (
       <div className="min-w-0 flex-1 space-y-2">
@@ -1708,6 +1939,11 @@ export default function VaultChatPanel({
             <p className="mt-0.5 text-xs text-ink-muted">
               {proposedReminderWhenLabel(proposed, timeZone)}
             </p>
+            {m.vaultScope ? (
+              <p className="mt-1 text-xs text-amber-900/80">
+                Will save to {m.vaultScope.profileName}&apos;s vault
+              </p>
+            ) : null}
             {alreadySet ? (
               <p className="mt-2 text-xs font-medium text-emerald-800">
                 Reminder saved. You decide what happens next.
@@ -1717,7 +1953,13 @@ export default function VaultChatPanel({
                 <button
                   type="button"
                   disabled={confirming || savingReminder || sending || vaultBusy}
-                  onClick={() => void confirmProposedReminder(m.id, proposed)}
+                  onClick={() =>
+                    void confirmProposedReminder(
+                      m.id,
+                      proposed,
+                      m.vaultScope?.profileId
+                    )
+                  }
                   className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand/90 disabled:opacity-60"
                 >
                   {confirming ? (
@@ -1731,6 +1973,7 @@ export default function VaultChatPanel({
                   type="button"
                   disabled={confirming || savingReminder}
                   onClick={() => {
+                    setReminderTargetProfileId(m.vaultScope?.profileId ?? null);
                     setReminderTitle(proposed.title);
                     setReminderDate(proposed.date);
                     setReminderTime(proposed.time);
@@ -1776,7 +2019,11 @@ export default function VaultChatPanel({
                 type="button"
                 disabled={switchingVault || sending || vaultBusy}
                 onClick={() =>
-                  void continueInScopedVault(vaultScope.profileId, m.id)
+                  void continueInScopedVault(
+                    vaultScope.profileId,
+                    vaultScope.profileName,
+                    m.id
+                  )
                 }
                 className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand/90 disabled:opacity-60"
               >
@@ -1824,6 +2071,24 @@ export default function VaultChatPanel({
               </div>
             ))}
           </div>
+        ) : null}
+        {showActions ? (
+          <GideonAssistantActions
+            messageId={m.id}
+            plainText={plainText}
+            speechText={speechText}
+            speaking={speakingMessageId === m.id}
+            speechSupported={speechOutputSupported}
+            disabled={sending || vaultBusy || Boolean(streamingAssistantId)}
+            canRegenerate={Boolean(options?.userMessage && activeChatId)}
+            onSpeak={speakAssistant}
+            onRegenerate={
+              options?.userMessage
+                ? () =>
+                    regenerateAssistantReply(m, options.userMessage!)
+                : undefined
+            }
+          />
         ) : null}
       </div>
     );
@@ -2175,11 +2440,16 @@ export default function VaultChatPanel({
                       (c) =>
                         c.documentId === messages[index - 1]?.attachment?.documentId
                     ),
+                  userMessage:
+                    index > 0 && messages[index - 1]?.role === "user"
+                      ? messages[index - 1]
+                      : undefined,
+                  isStreaming: streamingAssistantId === m.id,
                 })}
               </div>
             )
           )}
-          {(sending || vaultBusy || savingLog) && (
+          {(sending || vaultBusy || savingLog) && !streamingAssistantId && (
             <div className="flex items-center gap-2 text-xs text-ink-muted">
               <GideonAvatar size={40} variant="portrait" pulse />
               {savingLog
@@ -2537,13 +2807,19 @@ export default function VaultChatPanel({
                 </h3>
                 <p className="mt-1 text-xs text-ink-muted">
                   Saved for{" "}
-                  {active?.display_name ?? meta?.profileName ?? "this space"}{" "}
+                  {profileNameForId(reminderSaveProfileId) ??
+                    active?.display_name ??
+                    meta?.profileName ??
+                    "this space"}{" "}
                   ({timeZoneLabel}). Shows under Attention on the dashboard.
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() => setReminderOpen(false)}
+                onClick={() => {
+                  setReminderOpen(false);
+                  setReminderTargetProfileId(null);
+                }}
                 aria-label="Close"
                 className="rounded-full p-1 text-ink-muted hover:bg-stone-100 hover:text-foreground"
               >

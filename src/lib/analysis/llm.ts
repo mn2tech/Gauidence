@@ -420,6 +420,35 @@ function imageBlockFromBase64(
   };
 }
 
+function buildChatMessages(
+  messages: { role: "user" | "assistant"; content: string }[],
+  attachedImage?: { mimeType: string; base64: string; fileName: string }
+): Anthropic.Messages.MessageParam[] {
+  return messages.map((m, index) => {
+    const isLastUser =
+      m.role === "user" && index === messages.length - 1;
+    if (
+      isLastUser &&
+      attachedImage &&
+      attachedImage.base64.trim()
+    ) {
+      const parts: ContentPart[] = [
+        {
+          type: "text",
+          text: `Attached file: ${attachedImage.fileName}\n\n${m.content}`,
+        },
+      ];
+      const imageBlock = imageBlockFromBase64(
+        attachedImage.mimeType,
+        attachedImage.base64
+      );
+      if (imageBlock) parts.push(imageBlock);
+      return { role: "user", content: parts };
+    }
+    return { role: m.role, content: m.content };
+  });
+}
+
 /** Multi-turn chat for Ask-your-document (text-only messages). */
 export async function runChatCompletion(
   client: LlmClient,
@@ -434,31 +463,7 @@ export async function runChatCompletion(
 ): Promise<string> {
   try {
     const model = args.model ?? ANALYSIS_MODEL;
-    const messages: Anthropic.Messages.MessageParam[] = args.messages.map(
-      (m, index) => {
-        const isLastUser =
-          m.role === "user" && index === args.messages.length - 1;
-        if (
-          isLastUser &&
-          args.attachedImage &&
-          args.attachedImage.base64.trim()
-        ) {
-          const parts: ContentPart[] = [
-            {
-              type: "text",
-              text: `Attached file: ${args.attachedImage.fileName}\n\n${m.content}`,
-            },
-          ];
-          const imageBlock = imageBlockFromBase64(
-            args.attachedImage.mimeType,
-            args.attachedImage.base64
-          );
-          if (imageBlock) parts.push(imageBlock);
-          return { role: "user", content: parts };
-        }
-        return { role: m.role, content: m.content };
-      }
-    );
+    const messages = buildChatMessages(args.messages, args.attachedImage);
     const response = await client.messages.create({
       model,
       max_tokens: args.maxTokens ?? 2048,
@@ -468,6 +473,48 @@ export async function runChatCompletion(
     });
     captureAnthropicUsage(model, response.usage);
     const textBlock = response.content.find((b) => b.type === "text");
+    return textBlock && textBlock.type === "text" ? textBlock.text.trim() : "";
+  } catch (err) {
+    mapAnthropicError(err);
+  }
+}
+
+/** Streaming variant — invokes onDelta for each text chunk. */
+export async function runChatCompletionStream(
+  client: LlmClient,
+  args: {
+    system: string;
+    messages: { role: "user" | "assistant"; content: string }[];
+    model?: string;
+    maxTokens?: number;
+    attachedImage?: { mimeType: string; base64: string; fileName: string };
+    onDelta: (text: string) => void;
+  }
+): Promise<string> {
+  try {
+    const model = args.model ?? ANALYSIS_MODEL;
+    const messages = buildChatMessages(args.messages, args.attachedImage);
+    const stream = client.messages.stream({
+      model,
+      max_tokens: args.maxTokens ?? 2048,
+      temperature: 0,
+      system: args.system,
+      messages,
+    });
+
+    for await (const event of stream) {
+      if (
+        event.type === "content_block_delta" &&
+        event.delta.type === "text_delta"
+      ) {
+        const chunk = event.delta.text;
+        if (chunk) args.onDelta(chunk);
+      }
+    }
+
+    const finalMessage = await stream.finalMessage();
+    captureAnthropicUsage(model, finalMessage.usage);
+    const textBlock = finalMessage.content.find((b) => b.type === "text");
     return textBlock && textBlock.type === "text" ? textBlock.text.trim() : "";
   } catch (err) {
     mapAnthropicError(err);
