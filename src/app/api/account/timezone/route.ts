@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import type { User, SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import {
-  detectBrowserTimeZone,
   guardianTimeZoneLabel,
   isValidIanaTimeZone,
 } from "@/lib/timezone";
@@ -60,8 +59,9 @@ export async function GET() {
 }
 
 /**
- * Set timezone manually, or auto-detect from the device on first visit.
- * Body: { timeZone?: string, source?: "auto" | "manual", detect?: true }
+ * Set timezone manually, or auto-detect from the client device.
+ * Body: { timeZone: string, source?: "auto" | "manual" }
+ * Auto-detect must send the browser IANA zone — the server cannot infer it.
  */
 export async function PATCH(request: Request) {
   const auth = await requireUser();
@@ -77,14 +77,22 @@ export async function PATCH(request: Request) {
 
   const current = await getUserTimeZoneRow(supabase, user.id);
   const requestedSource = parseSource(body.source);
-  const detect = body.detect === true;
 
   let nextZone = current.time_zone;
   let nextSource = current.time_zone_source;
 
-  if (detect || requestedSource === "auto") {
+  if (requestedSource === "auto") {
     if (current.time_zone_source !== "manual") {
-      nextZone = detectBrowserTimeZone();
+      if (
+        typeof body.timeZone !== "string" ||
+        !isValidIanaTimeZone(body.timeZone.trim())
+      ) {
+        return NextResponse.json(
+          { error: "Missing timeZone for auto detect." },
+          { status: 400 }
+        );
+      }
+      nextZone = body.timeZone.trim();
       nextSource = "auto";
     }
   } else if (typeof body.timeZone === "string") {
@@ -99,7 +107,7 @@ export async function PATCH(request: Request) {
     nextSource = requestedSource ?? "manual";
   } else {
     return NextResponse.json(
-      { error: "Missing timeZone or detect flag." },
+      { error: "Missing timeZone." },
       { status: 400 }
     );
   }

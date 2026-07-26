@@ -12,6 +12,7 @@ import {
 import type { GuardianProfile } from "@/lib/profiles/types";
 import {
   GUARDIAN_TIME_ZONE,
+  detectBrowserTimeZone,
   type TimeZoneSource,
 } from "@/lib/timezone";
 
@@ -78,11 +79,18 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       if (body.timeZoneLabel) setTimeZoneLabel(body.timeZoneLabel);
       if (body.timeZoneSource) setTimeZoneSource(body.timeZoneSource);
 
-      if (body.timeZoneSource === "default") {
+      const clientTz = detectBrowserTimeZone();
+      const shouldAutoDetect =
+        body.timeZoneSource === "default" ||
+        (body.timeZoneSource === "auto" &&
+          body.timeZone === "UTC" &&
+          clientTz !== "UTC");
+
+      if (shouldAutoDetect) {
         void fetch("/api/account/timezone", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ detect: true }),
+          body: JSON.stringify({ timeZone: clientTz, source: "auto" }),
         })
           .then((r) => r.json())
           .then(

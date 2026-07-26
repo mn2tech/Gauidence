@@ -82,6 +82,10 @@ import {
   retrieveRelevantDailyLogs,
 } from "@/lib/logs/retrieve";
 import {
+  formatAlertsForGideon,
+  retrieveUpcomingAlertsForGideon,
+} from "@/lib/reminders/retrieve";
+import {
   parseProposedReminder,
   wantsReminderAgent,
   REMINDER_AGENT_SYSTEM_NOTE,
@@ -1221,6 +1225,17 @@ export async function POST(request: Request) {
       limit: retrievalScopes.length > 1 ? 4 : 3,
     });
     const logContext = formatDailyLogsForGideon(dailyLogs, profileNames);
+    const upcomingAlerts = await retrieveUpcomingAlertsForGideon(supabase, {
+      profileIds: allSearchIds,
+      profileNames,
+      question,
+      timeZone: userTz,
+      limit: retrievalScopes.length > 1 ? 10 : 12,
+    });
+    const scheduleContext = formatAlertsForGideon(upcomingAlerts, {
+      profileNames,
+      timeZone: userTz,
+    });
     const linkedContext = await loadLinkedOrgContext(
       supabase,
       user.id,
@@ -1248,7 +1263,7 @@ export async function POST(request: Request) {
         ? `This is a container profile. Search includes this vault plus linked member vaults (${linkedProfiles
             .map((p) => p.display_name)
             .join(", ")}). Attribute facts to the vault owner named in each source. Do not invent links across unrelated people.`
-        : "Search this profile's vault and Daily Logs first; use GENERAL KNOWLEDGE when the vault does not contain the answer.";
+        : "Search this profile's vault, Daily Logs, and upcoming schedule first; use GENERAL KNOWLEDGE when the vault does not contain the answer.";
     const pictureNote = showPictures
       ? `The user wants to see pictures. Prefer naming image file names from the retrieved excerpts (jpg/png/webp/etc.) so the UI can display them. If no image files were retrieved, say so clearly.`
       : "";
@@ -1264,8 +1279,9 @@ export async function POST(request: Request) {
       !formatted.context.trim() &&
       !attachedContext.trim() &&
       !logContext.trim() &&
+      !scheduleContext.trim() &&
       !linkedContext.trim()
-        ? "No vault excerpts, Daily Logs, or linked profile structure matched this question (or the vault is empty). Do not invent vault facts. Use ## GENERAL KNOWLEDGE for general questions, and ## GIDEON'S SUGGESTION to upload documents when that would help."
+        ? "No vault excerpts, Daily Logs, upcoming schedule items, or linked profile structure matched this question (or the vault is empty). Do not invent vault facts. Use ## GENERAL KNOWLEDGE for general questions, and ## GIDEON'S SUGGESTION to upload documents when that would help."
         : "";
 
     const reminderAgent = wantsReminderAgent(question);
@@ -1304,6 +1320,10 @@ ${attachedContext.trim() || "(none)"}
 --- RETRIEVED DAILY LOGS (user-entered notes; vault owner labeled when linked) ---
 ${logContext.trim() || "(none)"}
 --- END DAILY LOGS ---
+
+--- UPCOMING SCHEDULE (saved reminders and document deadlines; vault owner labeled when linked) ---
+${scheduleContext.trim() || "(none)"}
+--- END UPCOMING SCHEDULE ---
 
 --- LINKED PROFILE STRUCTURE ---
 ${linkedContext.trim() || "(none)"}
@@ -1439,7 +1459,7 @@ ${workMemoryContext.trim() || "(none — user has no active work projects)"}
   await updateVaultChatRow(supabase, chatId, chatUpdates);
 
   const chats = await listChats(supabase, user.id, active.id);
-  const proposedReminder = parseProposedReminder(answer);
+  const proposedReminder = parseProposedReminder(answer, Date.now(), userTz);
   const newlyGranted = await refreshUserAwards(user.id, supabase);
   const vaultScope =
     usedCrossVault && crossVaultProfile
