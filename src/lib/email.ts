@@ -166,6 +166,98 @@ export function renderVaultInviteEmail(args: VaultInviteEmailArgs) {
   return { subject, html, text };
 }
 
+export type VaultActivityKind = "document" | "daily_log";
+
+export type VaultActivityEmailArgs = {
+  to: string;
+  vaultName: string;
+  actorName: string;
+  kind: VaultActivityKind;
+  itemLabel: string;
+  preview?: string | null;
+  openUrl: string;
+};
+
+function vaultActivityKindLabel(kind: VaultActivityKind): string {
+  return kind === "document" ? "a document" : "a Daily Log";
+}
+
+export function renderVaultActivityEmail(args: VaultActivityEmailArgs) {
+  const action =
+    args.kind === "document"
+      ? `uploaded <strong>${escapeHtml(args.itemLabel)}</strong>`
+      : `added ${escapeHtml(args.itemLabel)}`;
+  const subject = `${args.actorName} updated ${args.vaultName} in Guardian`;
+  const preview = args.preview?.trim();
+  const previewBlock = preview
+    ? `<p style="margin:12px 0 0;padding:12px 14px;border-left:3px solid #0f766e;background:#f5f5f4;border-radius:8px;font-size:14px;color:#44403c;line-height:1.5;white-space:pre-wrap;">${escapeHtml(preview)}</p>`
+    : "";
+
+  const html = `
+  <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#fafaf9;padding:32px 16px;">
+    <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e7e5e4;border-radius:16px;overflow:hidden;">
+      <div style="padding:24px;">
+        <div style="font-size:18px;font-weight:700;color:#1c1917;">Guardian</div>
+        <p style="margin:16px 0 8px;font-size:15px;color:#1c1917;line-height:1.5;">
+          <strong>${escapeHtml(args.actorName)}</strong> ${action} to
+          <strong>${escapeHtml(args.vaultName)}</strong>.
+        </p>
+        <p style="margin:0;font-size:14px;color:#57534e;line-height:1.6;">
+          Someone on your team added ${vaultActivityKindLabel(args.kind)} to a shared vault you can access.
+        </p>
+        ${previewBlock}
+        <a href="${escapeHtml(args.openUrl)}"
+          style="display:inline-block;margin-top:20px;padding:12px 20px;border-radius:999px;background:#0f766e;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;">
+          Open vault
+        </a>
+        <p style="margin:20px 0 0;font-size:12px;color:#78716c;line-height:1.5;">
+          You can turn off shared vault activity emails in Settings.
+        </p>
+      </div>
+    </div>
+  </div>`;
+
+  const textLines = [
+    `${args.actorName} updated ${args.vaultName} in Guardian.`,
+    "",
+    args.kind === "document"
+      ? `Uploaded: ${args.itemLabel}`
+      : `Daily Log: ${args.itemLabel}`,
+  ];
+  if (preview) {
+    textLines.push("", preview);
+  }
+  textLines.push("", `Open vault: ${args.openUrl}`, "", "Turn off these emails in Settings.");
+  const text = textLines.join("\n");
+
+  return { subject, html, text };
+}
+
+/** Sends a shared-vault activity email. Returns false when Resend isn't configured. */
+export async function sendVaultActivityEmail(args: VaultActivityEmailArgs) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return false;
+
+  const from =
+    process.env.INVITE_FROM_EMAIL ??
+    process.env.REMINDER_FROM_EMAIL ??
+    "Guardian <onboarding@resend.dev>";
+  const resend = new Resend(apiKey);
+  const { subject, html, text } = renderVaultActivityEmail(args);
+  const { error } = await resend.emails.send({
+    from,
+    to: args.to,
+    subject,
+    html,
+    text,
+  });
+  if (error) {
+    console.error("Vault activity email failed:", args.to, error.message);
+    return false;
+  }
+  return true;
+}
+
 /** Sends a vault collaborator invite. Returns false when Resend isn't configured. */
 export async function sendVaultInviteEmail(args: VaultInviteEmailArgs) {
   const apiKey = process.env.RESEND_API_KEY;

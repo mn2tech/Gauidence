@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, BellRing, Check, Loader2, Mail, UserRound } from "lucide-react";
+import { AlertTriangle, BellRing, Check, Loader2, Mail, UserRound, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { VAULT_ORGANIZATION_SUGGESTIONS_ENABLED } from "@/lib/features/organization";
 import { useActiveProfile } from "@/components/ProfileProvider";
@@ -21,6 +21,7 @@ type Props = {
   avatarUrl: string | null;
   initialRemindersEnabled: boolean;
   initialTipsEnabled: boolean;
+  initialVaultActivityEnabled?: boolean;
   initialAutoOrganizeMode?: "off" | "suggest" | "auto";
   initialAutoOrganizeThreshold?: number;
 };
@@ -33,6 +34,7 @@ export default function SettingsForm({
   avatarUrl,
   initialRemindersEnabled,
   initialTipsEnabled,
+  initialVaultActivityEnabled = true,
   initialAutoOrganizeMode = "suggest",
   initialAutoOrganizeThreshold = 0.85,
 }: Props) {
@@ -79,6 +81,14 @@ export default function SettingsForm({
   const [tipsEnabled, setTipsEnabled] = useState(initialTipsEnabled);
   const [savingTips, setSavingTips] = useState(false);
   const [tipsError, setTipsError] = useState<string | null>(null);
+
+  const [vaultActivityEnabled, setVaultActivityEnabled] = useState(
+    initialVaultActivityEnabled
+  );
+  const [savingVaultActivity, setSavingVaultActivity] = useState(false);
+  const [vaultActivityError, setVaultActivityError] = useState<string | null>(
+    null
+  );
 
   const [autoOrganizeMode, setAutoOrganizeMode] = useState<
     "off" | "suggest" | "auto"
@@ -185,6 +195,26 @@ export default function SettingsForm({
       setTipsError("We couldn't save that change. Please try again.");
     }
     setSavingTips(false);
+  }
+
+  async function handleToggleVaultActivity() {
+    if (!supabase || savingVaultActivity) return;
+    const next = !vaultActivityEnabled;
+    setVaultActivityError(null);
+    setVaultActivityEnabled(next);
+    setSavingVaultActivity(true);
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        email_vault_activity_enabled: next,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", userId);
+    if (error) {
+      setVaultActivityEnabled(!next);
+      setVaultActivityError("We couldn't save that change. Please try again.");
+    }
+    setSavingVaultActivity(false);
   }
 
   async function handleSaveAutoOrganize(e: React.FormEvent) {
@@ -610,6 +640,44 @@ export default function SettingsForm({
             <span
               className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
                 tipsEnabled ? "translate-x-[22px]" : "translate-x-0.5"
+              }`}
+            />
+          </button>
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-stone-200 bg-white p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-brand" />
+              <h2 className="text-base font-semibold">Shared vault activity</h2>
+            </div>
+            <p className="mt-2 text-sm leading-relaxed text-ink-muted">
+              Email {email} when someone else adds a document or Daily Log to a
+              shared vault you belong to — for example your Wednesday practice
+              group.
+            </p>
+            {vaultActivityError && (
+              <p role="alert" className="mt-2 text-sm text-red-700">
+                {vaultActivityError}
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={vaultActivityEnabled}
+            aria-label="Shared vault activity emails"
+            onClick={handleToggleVaultActivity}
+            disabled={savingVaultActivity}
+            className={`relative mt-1 inline-flex h-6 w-11 shrink-0 items-center rounded-full transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-60 ${
+              vaultActivityEnabled ? "bg-brand" : "bg-stone-300"
+            }`}
+          >
+            <span
+              className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
+                vaultActivityEnabled ? "translate-x-[22px]" : "translate-x-0.5"
               }`}
             />
           </button>

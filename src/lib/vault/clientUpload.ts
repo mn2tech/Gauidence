@@ -20,6 +20,7 @@ export {
 
 import type { OrganizationSuggestionPayload } from "@/lib/organization/types";
 import { ANALYZE_CLIENT_TIMEOUT_MS } from "@/lib/analysis/timeout";
+import { notifyVaultActivityClient } from "@/lib/vault/clientNotifyActivity";
 
 export type VaultUploadResult = {
   documentId: string;
@@ -106,6 +107,11 @@ export async function uploadAndAnalyzeToVault(args: {
   }
 
   void syncDocumentAwards(inserted.id);
+  notifyVaultActivityClient({
+    profileId: args.profileId,
+    kind: "document",
+    documentId: inserted.id,
+  });
 
   args.onStatus?.("Reading the document…");
   try {

@@ -234,6 +234,17 @@ export async function POST(request: Request) {
       })
   );
 
+  void import("@/lib/vault/notifyActivity").then(({ notifyVaultActivity }) =>
+    notifyVaultActivity(supabase, {
+      profileId: data.profile_id,
+      actorUserId: user.id,
+      kind: "daily_log",
+      logId: data.id,
+    }).catch((err) => {
+      console.error("Vault activity notify failed:", err);
+    })
+  );
+
   const newlyGranted = await refreshUserAwards(user.id, supabase);
   return NextResponse.json({ log: data, newlyGranted }, { status: 201 });
 }

@@ -41,6 +41,7 @@ import MoveDocumentButton from "@/components/MoveDocumentButton";
 import OrganizationSuggestionModal from "@/components/OrganizationSuggestionModal";
 import SearchHighlight from "@/components/SearchHighlight";
 import { syncDocumentAwards } from "@/lib/awards/client";
+import { notifyVaultActivityClient } from "@/lib/vault/clientNotifyActivity";
 import type { OrganizationSuggestionPayload } from "@/lib/organization/types";
 
 type DocumentRow = {
@@ -377,6 +378,11 @@ export default function DocumentManager({
       await loadDocuments();
       setUploading(false);
       void syncDocumentAwards(inserted.id);
+      notifyVaultActivityClient({
+        profileId,
+        kind: "document",
+        documentId: inserted.id,
+      });
       if (fileInputRef.current) fileInputRef.current.value = "";
       if (cameraInputRef.current) cameraInputRef.current.value = "";
       // Auto-analyze once after upload — not on every page load.

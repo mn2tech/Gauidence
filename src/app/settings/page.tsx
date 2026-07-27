@@ -24,7 +24,7 @@ export default async function SettingsPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, avatar_url, email, email_reminders_enabled, email_tips_enabled, company_name, push_notifications_enabled, auto_organize_mode, auto_organize_threshold")
+    .select("full_name, avatar_url, email, email_reminders_enabled, email_tips_enabled, email_vault_activity_enabled, company_name, push_notifications_enabled, auto_organize_mode, auto_organize_threshold")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -76,6 +76,9 @@ export default async function SettingsPage() {
             avatarUrl={profile?.avatar_url ?? null}
             initialRemindersEnabled={profile?.email_reminders_enabled !== false}
             initialTipsEnabled={profile?.email_tips_enabled !== false}
+            initialVaultActivityEnabled={
+              profile?.email_vault_activity_enabled !== false
+            }
             initialAutoOrganizeMode={
               profile?.auto_organize_mode === "off" ||
               profile?.auto_organize_mode === "auto"
