@@ -287,6 +287,18 @@ describe("guardian profiles helpers", () => {
       [familyId, fleetId, "standalone-child"].sort()
     );
 
+    const sharedClientOnly = [
+      sample({
+        id: "cli1",
+        profile_type: "client",
+        display_name: "Crossroads",
+        parent_profile_id: "biz1",
+        access_role: "editor",
+      }),
+    ];
+    assert.equal(topLevelProfiles(sharedClientOnly).length, 1);
+    assert.equal(topLevelProfiles(sharedClientOnly)[0]?.id, "cli1");
+
     assert.match(
       formatLinkedFamilyForGideon("Our Family", [
         {

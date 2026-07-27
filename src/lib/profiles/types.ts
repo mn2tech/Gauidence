@@ -224,11 +224,11 @@ export type GuardianProfile = {
   access_role?: GuardianProfileAccessRole;
 };
 
-/** Business and client vaults can invite Editor collaborators. */
+/** Only client vaults can invite Editor collaborators (not the parent business). */
 export function canShareGuardianProfile(
   profile: Pick<GuardianProfile, "profile_type">
 ): boolean {
-  return profile.profile_type === "business" || profile.profile_type === "client";
+  return profile.profile_type === "client";
 }
 
 export function isProfileOwner(
@@ -598,7 +598,13 @@ export function isLinkedOrgMember(profile: {
 export function topLevelProfiles(
   profiles: GuardianProfile[]
 ): GuardianProfile[] {
-  return profiles.filter((p) => !isLinkedMemberProfile(p));
+  const byId = new Set(profiles.map((p) => p.id));
+  return profiles.filter((p) => {
+    if (!isLinkedMemberProfile(p)) return true;
+    const parentId = p.parent_profile_id;
+    // Shared nested vaults (parent not in list) still appear at the root.
+    return !parentId || !byId.has(parentId);
+  });
 }
 
 export type LinkedPersonSummary = {

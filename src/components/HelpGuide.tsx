@@ -35,8 +35,8 @@ const HOW_TO = [
   },
   {
     icon: Users,
-    title: "Shared business & client vaults",
-    body: "Invite another Guardian user as an Editor on a business or client vault. They can add documents and Daily Logs and Ask Gideon. Gideon chats stay private to each person. Only the owner manages access.",
+    title: "Shared client vaults",
+    body: "Invite another Guardian user as an Editor on a client vault. They see only that client's documents and Daily Logs — not your whole business. Gideon chats stay private to each person.",
     href: "/settings/profiles",
     linkLabel: "Manage people & spaces",
   },

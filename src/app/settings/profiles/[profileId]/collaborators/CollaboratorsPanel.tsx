@@ -87,7 +87,7 @@ export default function CollaboratorsPanel({
     return (
       <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
         <p className="text-sm text-ink-muted">
-          Only the owner of a business or client vault can manage collaborators.
+          Only the owner of a client vault can manage collaborators.
         </p>
         <Link
           href="/settings/profiles"
@@ -210,7 +210,8 @@ export default function CollaboratorsPanel({
             </span>{" "}
             <span className="font-medium text-foreground">{vaultName}</span>.
             Editors can add documents and Daily Logs and Ask Gideon. Their chats
-            stay private.
+            stay private. Parent business vaults and other clients are not
+            shared.
           </p>
         </div>
         <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-light text-brand">

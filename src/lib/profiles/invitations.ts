@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "crypto";
 
 export const INVITE_TTL_DAYS = 7;
-export const SHAREABLE_PROFILE_TYPES = ["business", "client"] as const;
+export const SHAREABLE_PROFILE_TYPES = ["client"] as const;
 
 export function normalizeInviteEmail(email: string): string {
   return email.trim().toLowerCase();

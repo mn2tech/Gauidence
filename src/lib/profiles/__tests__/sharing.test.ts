@@ -54,8 +54,8 @@ describe("shared vault helpers", () => {
     assert.notEqual(hashInviteToken(token), hashInviteToken(token + "x"));
   });
 
-  it("limits sharing to business and client vaults for owners", () => {
-    assert.equal(canShareGuardianProfile(sample()), true);
+  it("limits sharing to client vaults for owners", () => {
+    assert.equal(canShareGuardianProfile(sample()), false);
     assert.equal(
       canShareGuardianProfile(sample({ profile_type: "client" })),
       true
@@ -64,11 +64,12 @@ describe("shared vault helpers", () => {
       canShareGuardianProfile(sample({ profile_type: "personal" })),
       false
     );
-    assert.equal(canManageProfileAccess(sample()), true);
+    assert.equal(canManageProfileAccess(sample()), false);
     assert.equal(
-      canManageProfileAccess(sample({ access_role: "editor" })),
-      false
+      canManageProfileAccess(sample({ profile_type: "client" })),
+      true
     );
+    assert.equal(canManageProfileAccess(sample({ access_role: "editor" })), false);
     assert.equal(isProfileOwner(sample({ access_role: "editor" })), false);
   });
 });

@@ -55,7 +55,7 @@ export async function GET(_request: Request, ctx: Ctx) {
   }
   if (!canShareGuardianProfile(owned)) {
     return NextResponse.json(
-      { error: "Only business and client vaults can have collaborators." },
+      { error: "Only client vaults can have collaborators." },
       { status: 400 }
     );
   }
@@ -127,7 +127,7 @@ export async function POST(request: Request, ctx: Ctx) {
   }
   if (!canShareGuardianProfile(owned)) {
     return NextResponse.json(
-      { error: "Only business and client vaults can have collaborators." },
+      { error: "Only client vaults can have collaborators." },
       { status: 400 }
     );
   }
