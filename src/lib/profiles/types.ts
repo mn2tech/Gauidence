@@ -224,11 +224,24 @@ export type GuardianProfile = {
   access_role?: GuardianProfileAccessRole;
 };
 
-/** Only client vaults can invite Editor collaborators (not the parent business). */
+/** Leaf vault types that can invite Editor collaborators (exact vault only). */
+export const SHAREABLE_PROFILE_TYPES = [
+  "client",
+  "vehicle",
+  "home",
+  "pet",
+  "child",
+  "student",
+] as const;
+
+export type ShareableProfileType = (typeof SHAREABLE_PROFILE_TYPES)[number];
+
 export function canShareGuardianProfile(
   profile: Pick<GuardianProfile, "profile_type">
 ): boolean {
-  return profile.profile_type === "client";
+  return (SHAREABLE_PROFILE_TYPES as readonly string[]).includes(
+    profile.profile_type
+  );
 }
 
 export function isProfileOwner(

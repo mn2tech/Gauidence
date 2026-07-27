@@ -1,9 +1,11 @@
 "use client";
 
 import { useMemo, useState, type FormEvent } from "react";
-import { Loader2, PawPrint, Plus } from "lucide-react";
+import Link from "next/link";
+import { Loader2, PawPrint, Plus, Users } from "lucide-react";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
+  canManageProfileAccess,
   petsOf,
   unlinkedOfTypes,
   type GuardianProfile,
@@ -240,14 +242,25 @@ export default function LinkedPetsPanel({ parent }: Props) {
                   {pet.description?.trim() || "Pet"}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => void openVault(pet.id)}
-                disabled={openingId === pet.id}
-                className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium hover:bg-stone-50 disabled:opacity-60"
-              >
-                {openingId === pet.id ? "Opening…" : "Open vault"}
-              </button>
+              <div className="flex flex-wrap gap-2">
+                {canManageProfileAccess(pet) ? (
+                  <Link
+                    href={`/settings/profiles/${pet.id}/collaborators`}
+                    className="inline-flex items-center gap-1 rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium hover:bg-stone-50"
+                  >
+                    <Users className="h-3.5 w-3.5" />
+                    Share vault
+                  </Link>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => void openVault(pet.id)}
+                  disabled={openingId === pet.id}
+                  className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium hover:bg-stone-50 disabled:opacity-60"
+                >
+                  {openingId === pet.id ? "Opening…" : "Open vault"}
+                </button>
+              </div>
             </li>
           ))
         )}

@@ -87,7 +87,7 @@ export default function CollaboratorsPanel({
     return (
       <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
         <p className="text-sm text-ink-muted">
-          Only the owner of a client vault can manage collaborators.
+          Only the owner of a shareable vault can manage collaborators.
         </p>
         <Link
           href="/settings/profiles"

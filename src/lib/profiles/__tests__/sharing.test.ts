@@ -10,6 +10,7 @@ import {
   canManageProfileAccess,
   canShareGuardianProfile,
   isProfileOwner,
+  SHAREABLE_PROFILE_TYPES,
   type GuardianProfile,
 } from "../types.ts";
 
@@ -54,20 +55,41 @@ describe("shared vault helpers", () => {
     assert.notEqual(hashInviteToken(token), hashInviteToken(token + "x"));
   });
 
-  it("limits sharing to client vaults for owners", () => {
-    assert.equal(canShareGuardianProfile(sample()), false);
-    assert.equal(
-      canShareGuardianProfile(sample({ profile_type: "client" })),
-      true
-    );
+  it("allows sharing on family and client leaf vaults", () => {
+    for (const profileType of SHAREABLE_PROFILE_TYPES) {
+      assert.equal(
+        canShareGuardianProfile(sample({ profile_type: profileType })),
+        true,
+        profileType
+      );
+      assert.equal(
+        canManageProfileAccess(sample({ profile_type: profileType })),
+        true,
+        profileType
+      );
+    }
+  });
+
+  it("blocks sharing on containers and private vault types", () => {
+    const blocked = [
+      "personal",
+      "business",
+      "family",
+      "vehicles",
+      "hobby",
+      "spouse_partner",
+    ] as const;
+    for (const profileType of blocked) {
+      assert.equal(
+        canShareGuardianProfile(sample({ profile_type: profileType })),
+        false,
+        profileType
+      );
+    }
+    assert.equal(canManageProfileAccess(sample()), false);
     assert.equal(
       canShareGuardianProfile(sample({ profile_type: "personal" })),
       false
-    );
-    assert.equal(canManageProfileAccess(sample()), false);
-    assert.equal(
-      canManageProfileAccess(sample({ profile_type: "client" })),
-      true
     );
     assert.equal(canManageProfileAccess(sample({ access_role: "editor" })), false);
     assert.equal(isProfileOwner(sample({ access_role: "editor" })), false);

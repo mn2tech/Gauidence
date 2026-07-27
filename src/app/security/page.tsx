@@ -33,7 +33,7 @@ const sections = [
     title: "How user access is separated",
     paragraphs: [
       "Every document, profile, alert, and document chat in the database is tied to an account and a vault. Row Level Security (RLS) policies are enforced at the database level, which means the database itself refuses to return rows you are not allowed to see — even if application code contains a bug.",
-      "By default, vaults belong to one owner. On client vaults, the owner can invite another signed-in Guardian user as an Editor. Editors can add documents and Daily Logs and Ask Gideon on that exact client vault only — not the parent business or other clients. Gideon conversations stay private to each person. Other vaults on either account remain private.",
+      "By default, vaults belong to one owner. On shareable vaults (client, vehicle, home, pet, child, or student), the owner can invite another signed-in Guardian user as an Editor. Editors can add documents and Daily Logs and Ask Gideon on that exact vault only — not sibling vaults or the rest of the account. Gideon conversations stay private to each person. Other vaults on either account remain private.",
     ],
   },
   {
