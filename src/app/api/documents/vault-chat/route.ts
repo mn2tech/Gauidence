@@ -971,6 +971,7 @@ export async function POST(request: Request) {
       : null;
 
   let question = sanitizeChatQuestion(questionRaw);
+  const initialQuestion = question;
   if (!question && !regenerateAssistantId) {
     return NextResponse.json(
       { error: "Enter a question." },
@@ -1051,7 +1052,7 @@ export async function POST(request: Request) {
         ? existingChat.scoped_profile_id
         : null;
   } else {
-    if (!question) {
+    if (!initialQuestion) {
       return NextResponse.json(
         { error: "Enter a question." },
         { status: 400 }
@@ -1062,7 +1063,7 @@ export async function POST(request: Request) {
       .insert({
         user_id: user.id,
         profile_id: active.id,
-        title: titleFromQuestion(question),
+        title: titleFromQuestion(initialQuestion),
       })
       .select("id")
       .single();

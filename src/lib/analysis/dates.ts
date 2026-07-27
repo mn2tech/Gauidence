@@ -12,6 +12,26 @@ export function daysRelativeTo(
   return Math.round((target.getTime() - today.getTime()) / 86_400_000);
 }
 
+/** Compact countdown badge: days, weeks, months, or years from a day delta. */
+export function formatDaysAsRelativeUnit(days: number): string {
+  if (days < 0) return "Past";
+  if (days === 0) return "Today";
+  if (days === 1) return "Tomorrow";
+  if (days >= 365) {
+    const n = Math.floor(days / 365);
+    return `${n} year${n === 1 ? "" : "s"}`;
+  }
+  if (days >= 30) {
+    const n = Math.floor(days / 30);
+    return `${n} month${n === 1 ? "" : "s"}`;
+  }
+  if (days >= 7) {
+    const n = Math.floor(days / 7);
+    return `${n} week${n === 1 ? "" : "s"}`;
+  }
+  return `${days} day${days === 1 ? "" : "s"}`;
+}
+
 /**
  * Format a calendar ISO date (YYYY-MM-DD) for display.
  * Uses noon UTC + UTC zone so US Eastern (and similar) do not shift the

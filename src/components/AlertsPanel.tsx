@@ -3,7 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { BellRing, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { daysRelativeTo, formatDisplayDate } from "@/lib/analysis/dates";
+import {
+  daysRelativeTo,
+  formatDaysAsRelativeUnit,
+  formatDisplayDate,
+} from "@/lib/analysis/dates";
 import { formatReminderWhen } from "@/lib/reminders/time";
 import { calendarDateInUserZone } from "@/lib/timezone";
 import { useActiveProfile } from "@/components/ProfileProvider";
@@ -25,13 +29,6 @@ function urgencyStyle(days: number) {
   if (days <= 1) return "bg-red-50 text-red-700";
   if (days <= 7) return "bg-amber-50 text-amber-700";
   return "bg-brand-light text-brand-dark";
-}
-
-function urgencyLabel(days: number, hasTime: boolean) {
-  if (days < 0) return "Past";
-  if (days === 0) return hasTime ? "Today" : "Today";
-  if (days === 1) return "Tomorrow";
-  return `${days} days`;
 }
 
 export default function AlertsPanel({ profileId }: { profileId: string }) {
@@ -100,7 +97,7 @@ export default function AlertsPanel({ profileId }: { profileId: string }) {
               <span
                 className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${urgencyStyle(days)}`}
               >
-                {urgencyLabel(days, Boolean(alert.due_at))}
+                {formatDaysAsRelativeUnit(days)}
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{alert.title}</p>
