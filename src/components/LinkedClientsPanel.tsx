@@ -1,9 +1,11 @@
 "use client";
 
 import { useMemo, useState, type FormEvent } from "react";
-import { Briefcase, Loader2, Plus } from "lucide-react";
+import Link from "next/link";
+import { Briefcase, Loader2, Plus, Users } from "lucide-react";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
+  canManageProfileAccess,
   clientsOf,
   type GuardianProfile,
 } from "@/lib/profiles/types";
@@ -167,14 +169,25 @@ export default function LinkedClientsPanel({ parent }: Props) {
                   {cli.description?.trim() || "Client"}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => void openVault(cli.id)}
-                disabled={openingId === cli.id}
-                className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium hover:bg-stone-50 disabled:opacity-60"
-              >
-                {openingId === cli.id ? "Opening…" : "Open vault"}
-              </button>
+              <div className="flex flex-wrap gap-2">
+                {canManageProfileAccess(cli) ? (
+                  <Link
+                    href={`/settings/profiles/${cli.id}/collaborators`}
+                    className="inline-flex items-center gap-1 rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium hover:bg-stone-50"
+                  >
+                    <Users className="h-3.5 w-3.5" />
+                    Share vault
+                  </Link>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => void openVault(cli.id)}
+                  disabled={openingId === cli.id}
+                  className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium hover:bg-stone-50 disabled:opacity-60"
+                >
+                  {openingId === cli.id ? "Opening…" : "Open vault"}
+                </button>
+              </div>
             </li>
           ))
         )}

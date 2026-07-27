@@ -200,6 +200,15 @@ function NestedMemberRow({
             Make default
           </button>
         )}
+        {canManageProfileAccess(child) ? (
+          <Link
+            href={`/settings/profiles/${child.id}/collaborators`}
+            className="inline-flex items-center gap-1 rounded-full border border-stone-300 px-2.5 py-1 text-[11px] font-medium"
+          >
+            <Users className="h-3 w-3" />
+            Manage access
+          </Link>
+        ) : null}
         <button
           type="button"
           onClick={() => setEditing(child)}

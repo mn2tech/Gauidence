@@ -16,6 +16,7 @@ import {
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
   canManageProfileAccess,
+  profileTypeLabel,
   type GuardianProfile,
 } from "@/lib/profiles/types";
 
@@ -185,6 +186,9 @@ export default function CollaboratorsPanel({
     }
   };
 
+  const vaultName = vault?.display_name ?? profile.display_name;
+  const vaultKind = vault?.profile_type ?? profile.profile_type;
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-3">
@@ -200,11 +204,12 @@ export default function CollaboratorsPanel({
             Manage access
           </h1>
           <p className="mt-1 text-sm text-ink-muted">
-            Invite Editors to{" "}
+            Invite Editors to the{" "}
             <span className="font-medium text-foreground">
-              {vault?.display_name ?? profile.display_name}
-            </span>
-            . They can add documents and Daily Logs and Ask Gideon. Their chats
+              {profileTypeLabel(vaultKind).toLowerCase()} vault
+            </span>{" "}
+            <span className="font-medium text-foreground">{vaultName}</span>.
+            Editors can add documents and Daily Logs and Ask Gideon. Their chats
             stay private.
           </p>
         </div>
