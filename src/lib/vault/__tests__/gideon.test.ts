@@ -25,6 +25,7 @@ import {
   PRIVACY_CARD_POINTS,
   ONBOARDING_STARTER_QUESTIONS,
 } from "../gideon.ts";
+import { defaultGideonWriteProfileId } from "../detectVaultScope.ts";
 
 describe("Gideon helpers", () => {
   it("exposes brand line and system identity", () => {
@@ -225,5 +226,37 @@ Payment status is unclear.`);
     );
     assert.equal(sections.length, 1);
     assert.equal(sections[0]?.kind, "body");
+  });
+});
+
+describe("defaultGideonWriteProfileId", () => {
+  it("prefers chat-scoped nested vault over chat home", () => {
+    assert.equal(
+      defaultGideonWriteProfileId({
+        activeProfileId: "biz",
+        chatHomeProfileId: "biz",
+        chatScopedProfileId: "crossroads",
+      }),
+      "crossroads"
+    );
+  });
+
+  it("uses active when scoped matches home or is unset", () => {
+    assert.equal(
+      defaultGideonWriteProfileId({
+        activeProfileId: "personal",
+        chatHomeProfileId: "personal",
+        chatScopedProfileId: null,
+      }),
+      "personal"
+    );
+    assert.equal(
+      defaultGideonWriteProfileId({
+        activeProfileId: "personal",
+        chatHomeProfileId: "personal",
+        chatScopedProfileId: "personal",
+      }),
+      "personal"
+    );
   });
 });

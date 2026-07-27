@@ -175,6 +175,25 @@ export function dominantRetrievalProfileId(
  * Vault Gideon should use when saving reminders, logs, or other writes.
  * Prefers an explicit name in the question, then a dominant retrieval source.
  */
+/**
+ * When a chat is scoped to a nested vault (e.g. client under a business),
+ * default writes to the scoped vault instead of the chat home container.
+ */
+export function defaultGideonWriteProfileId(args: {
+  activeProfileId: string;
+  chatHomeProfileId: string;
+  chatScopedProfileId?: string | null;
+}): string {
+  const scoped =
+    typeof args.chatScopedProfileId === "string" && args.chatScopedProfileId.trim()
+      ? args.chatScopedProfileId.trim()
+      : null;
+  if (scoped && scoped !== args.chatHomeProfileId) {
+    return scoped;
+  }
+  return args.activeProfileId;
+}
+
 export function resolveGideonWriteVault(args: {
   question: string;
   activeProfileId: string;

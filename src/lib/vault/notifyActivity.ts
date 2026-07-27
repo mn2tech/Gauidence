@@ -22,6 +22,19 @@ export function truncateActivityPreview(text: string, max = PREVIEW_MAX): string
   return `${trimmed.slice(0, max - 1).trimEnd()}…`;
 }
 
+/** Email label for a vault — nested clients show as "Crossroads · NM2TECH". */
+export function formatVaultActivityVaultName(
+  displayName: string,
+  parentDisplayName?: string | null
+): string {
+  const name = displayName.trim() || "Shared vault";
+  const parent = parentDisplayName?.trim();
+  if (parent && parent !== name) {
+    return `${name} · ${parent}`;
+  }
+  return name;
+}
+
 export function dailyLogActivityLabel(title: string | null, content: string): string {
   const t = title?.trim();
   if (t) return t;
@@ -74,7 +87,7 @@ export async function notifyVaultActivity(
       .eq("profile_id", profileId),
     admin
       .from("guardian_profiles")
-      .select("display_name")
+      .select("display_name, parent_profile_id")
       .eq("id", profileId)
       .maybeSingle(),
   ]);
@@ -85,7 +98,21 @@ export async function notifyVaultActivity(
     return { sent: 0, skipped: true };
   }
 
-  const vaultName = vault?.display_name?.trim() || "Shared vault";
+  const parentProfileId = vault?.parent_profile_id as string | null | undefined;
+  let parentDisplayName: string | null = null;
+  if (parentProfileId) {
+    const { data: parentVault } = await admin
+      .from("guardian_profiles")
+      .select("display_name")
+      .eq("id", parentProfileId)
+      .maybeSingle();
+    parentDisplayName = (parentVault?.display_name as string | null) ?? null;
+  }
+
+  const vaultName = formatVaultActivityVaultName(
+    String(vault?.display_name ?? ""),
+    parentDisplayName
+  );
   const base = appBaseUrl();
 
   let itemLabel = kind === "document" ? "Document" : "Daily Log";

@@ -1406,7 +1406,7 @@ export default function VaultChatPanel({
 
   const saveInlineLog = async (e: FormEvent) => {
     e.preventDefault();
-    const saveProfileId = lastWriteProfileIdRef.current ?? profileId;
+    const saveProfileId = profileId ?? lastWriteProfileIdRef.current;
     if (!saveProfileId || !logContent.trim() || savingLog || vaultBusy || sending) {
       return;
     }

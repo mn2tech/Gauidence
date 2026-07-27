@@ -4,6 +4,7 @@ import { renderVaultActivityEmail } from "@/lib/email";
 import {
   dailyLogActivityLabel,
   filterActivityEmailRecipients,
+  formatVaultActivityVaultName,
   pickVaultActivityRecipients,
   truncateActivityPreview,
 } from "@/lib/vault/notifyActivity";
@@ -60,6 +61,26 @@ describe("dailyLogActivityLabel", () => {
     assert.equal(
       dailyLogActivityLabel(null, "First line\nSecond line"),
       "First line"
+    );
+  });
+});
+
+describe("formatVaultActivityVaultName", () => {
+  it("combines nested vault with parent", () => {
+    assert.equal(
+      formatVaultActivityVaultName("Crossroads", "NM2TECH - Next Move"),
+      "Crossroads · NM2TECH - Next Move"
+    );
+  });
+
+  it("uses vault name alone when no parent", () => {
+    assert.equal(formatVaultActivityVaultName("NM2TECH - Next Move"), "NM2TECH - Next Move");
+  });
+
+  it("skips duplicate parent label", () => {
+    assert.equal(
+      formatVaultActivityVaultName("Acme", "Acme"),
+      "Acme"
     );
   });
 });

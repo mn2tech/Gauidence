@@ -18,6 +18,7 @@ import { wantsShowPictures, wantsSingleImageFocus } from "@/lib/vault/images";
 import {
   buildVaultScopePayload,
   chatScopedProfilePayload,
+  defaultGideonWriteProfileId,
   resolveGideonWriteVault,
   type VaultScopeCandidate,
 } from "@/lib/vault/detectVaultScope";
@@ -147,7 +148,11 @@ export function createVaultChatStreamResponse(
 
         const resolvedWriteVault = resolveGideonWriteVault({
           question: args.question,
-          activeProfileId: args.active.id,
+          activeProfileId: defaultGideonWriteProfileId({
+            activeProfileId: args.active.id,
+            chatHomeProfileId: args.chatHomeProfileId,
+            chatScopedProfileId: args.chatScopedProfileId,
+          }),
           accessibleProfiles: args.accessibleProfiles,
           retrievedChunks: args.chunks,
         });
