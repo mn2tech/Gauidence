@@ -3,17 +3,46 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { sendExpertAssignedEmail } from "@/lib/email";
 import { appBaseUrl } from "@/lib/profiles/invitations";
+import { grantExpertEntitlement } from "@/lib/experts/entitlements";
 import { getExpertCatalog } from "@/lib/experts/load-expert";
 import { isExpertInstallable } from "@/lib/experts/expert-types";
 import type { UserExpert } from "@/lib/experts/expert-types";
 import { USER_EXPERT_SELECT } from "@/lib/experts/server";
 
 export type AssignExpertResult =
-  | { ok: true; installation: UserExpert; created: boolean; emailed: boolean }
+  | {
+      ok: true;
+      installation?: UserExpert;
+      grantOnly: boolean;
+      created: boolean;
+      entitled: boolean;
+      emailed: boolean;
+    }
   | { ok: false; status: number; error: string; userExpertId?: string };
 
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
+}
+
+function validateAssignableExpert(expertId: string) {
+  const catalogItem = getExpertCatalog().find((e) => e.id === expertId);
+  if (!catalogItem || catalogItem.effectiveStatus === "unavailable") {
+    return { ok: false as const, status: 404, error: "Expert not found." };
+  }
+
+  if (
+    catalogItem.effectiveStatus === "coming-soon" ||
+    catalogItem.effectiveStatus === "archived" ||
+    !isExpertInstallable(catalogItem.status)
+  ) {
+    return {
+      ok: false as const,
+      status: 403,
+      error: "This expert is not available for assignment.",
+    };
+  }
+
+  return { ok: true as const, catalogItem };
 }
 
 export async function findUserIdByEmail(
@@ -90,22 +119,9 @@ export async function assignExpertToUser(params: {
   profileId?: string | null;
   assignedByUserId?: string | null;
 }): Promise<AssignExpertResult> {
-  const catalogItem = getExpertCatalog().find((e) => e.id === params.expertId);
-  if (!catalogItem || catalogItem.effectiveStatus === "unavailable") {
-    return { ok: false, status: 404, error: "Expert not found." };
-  }
-
-  if (
-    catalogItem.effectiveStatus === "coming-soon" ||
-    catalogItem.effectiveStatus === "archived" ||
-    !isExpertInstallable(catalogItem.status)
-  ) {
-    return {
-      ok: false,
-      status: 403,
-      error: "This expert is not available for assignment.",
-    };
-  }
+  const validation = validateAssignableExpert(params.expertId);
+  if (!validation.ok) return validation;
+  const { catalogItem } = validation;
 
   const resolvedProfileId = await resolveTargetProfileId(
     params.admin,
@@ -120,6 +136,15 @@ export async function assignExpertToUser(params: {
     };
   }
 
+  const entitled = await grantExpertEntitlement(params.admin, {
+    userId: params.targetUserId,
+    expertId: params.expertId,
+    grantedBy: params.assignedByUserId,
+  });
+  if (!entitled) {
+    return { ok: false, status: 502, error: "Couldn't grant expert access." };
+  }
+
   const { data: existing } = await params.admin
     .from("user_experts")
     .select(USER_EXPERT_SELECT)
@@ -132,7 +157,9 @@ export async function assignExpertToUser(params: {
     return {
       ok: true,
       installation: existing as UserExpert,
+      grantOnly: false,
       created: false,
+      entitled: true,
       emailed: false,
     };
   }
@@ -178,7 +205,9 @@ export async function assignExpertToUser(params: {
   return {
     ok: true,
     installation: data as UserExpert,
+    grantOnly: false,
     created: true,
+    entitled: true,
     emailed: false,
   };
 }
@@ -202,13 +231,94 @@ async function resolveAssignerName(
   return "Guardian";
 }
 
+async function sendAssignNotification(params: {
+  targetEmail: string;
+  expertId: string;
+  assignerName: string;
+  grantOnly: boolean;
+  installationId?: string;
+}): Promise<boolean> {
+  const catalogItem = getExpertCatalog().find((e) => e.id === params.expertId);
+  const openUrl = params.grantOnly
+    ? `${appBaseUrl()}/experts`
+    : `${appBaseUrl()}/experts/${params.expertId}?installation=${params.installationId}`;
+
+  return sendExpertAssignedEmail({
+    to: normalizeEmail(params.targetEmail),
+    expertName: catalogItem?.name ?? params.expertId,
+    expertDescription:
+      catalogItem?.description ??
+      "A Guardian Expert has been added to your account.",
+    assignerName: params.assignerName,
+    openUrl,
+    grantOnly: params.grantOnly,
+  });
+}
+
+export async function grantExpertAccessByEmail(params: {
+  admin: SupabaseClient;
+  targetEmail: string;
+  expertId: string;
+  assignedByUserId?: string | null;
+}): Promise<AssignExpertResult> {
+  const validation = validateAssignableExpert(params.expertId);
+  if (!validation.ok) return validation;
+
+  const userId = await findUserIdByEmail(params.admin, params.targetEmail);
+  if (!userId) {
+    return {
+      ok: false,
+      status: 404,
+      error: "No Guardian account found for that email.",
+    };
+  }
+
+  const entitled = await grantExpertEntitlement(params.admin, {
+    userId,
+    expertId: params.expertId,
+    grantedBy: params.assignedByUserId,
+  });
+  if (!entitled) {
+    return { ok: false, status: 502, error: "Couldn't grant expert access." };
+  }
+
+  const assignerName = await resolveAssignerName(
+    params.admin,
+    params.assignedByUserId
+  );
+  const emailed = await sendAssignNotification({
+    targetEmail: params.targetEmail,
+    expertId: params.expertId,
+    assignerName,
+    grantOnly: true,
+  });
+
+  return {
+    ok: true,
+    grantOnly: true,
+    created: true,
+    entitled: true,
+    emailed,
+  };
+}
+
 export async function assignExpertByEmail(params: {
   admin: SupabaseClient;
   targetEmail: string;
   expertId: string;
   profileId?: string | null;
   assignedByUserId?: string | null;
+  grantOnly?: boolean;
 }): Promise<AssignExpertResult> {
+  if (params.grantOnly) {
+    return grantExpertAccessByEmail({
+      admin: params.admin,
+      targetEmail: params.targetEmail,
+      expertId: params.expertId,
+      assignedByUserId: params.assignedByUserId,
+    });
+  }
+
   const userId = await findUserIdByEmail(params.admin, params.targetEmail);
   if (!userId) {
     return {
@@ -226,24 +336,22 @@ export async function assignExpertByEmail(params: {
     assignedByUserId: params.assignedByUserId,
   });
 
-  if (!result.ok || !result.created) {
+  if (!result.ok) return result;
+
+  if (!result.created) {
     return result;
   }
 
-  const catalogItem = getExpertCatalog().find((e) => e.id === params.expertId);
   const assignerName = await resolveAssignerName(
     params.admin,
     params.assignedByUserId
   );
-  const openUrl = `${appBaseUrl()}/experts/${params.expertId}?installation=${result.installation.id}`;
-  const emailed = await sendExpertAssignedEmail({
-    to: normalizeEmail(params.targetEmail),
-    expertName: catalogItem?.name ?? params.expertId,
-    expertDescription:
-      catalogItem?.description ??
-      "A Guardian Expert has been added to your account.",
+  const emailed = await sendAssignNotification({
+    targetEmail: params.targetEmail,
+    expertId: params.expertId,
     assignerName,
-    openUrl,
+    grantOnly: false,
+    installationId: result.installation?.id,
   });
 
   return { ...result, emailed };

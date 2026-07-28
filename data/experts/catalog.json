@@ -9,7 +9,8 @@
       "icon": "graduation-cap",
       "status": "beta",
       "version": "1.0.0",
-      "file": "ninth-grade-study-coach.json"
+      "file": "ninth-grade-study-coach.json",
+      "visibility": "restricted"
     },
     {
       "id": "empi-coordinator",
@@ -20,7 +21,8 @@
       "icon": "database",
       "status": "beta",
       "version": "1.0.0",
-      "file": "empi-coordinator.json"
+      "file": "empi-coordinator.json",
+      "visibility": "restricted"
     },
     {
       "id": "example-expert",
@@ -31,7 +33,8 @@
       "icon": "sparkles",
       "status": "development",
       "version": "1.0.0",
-      "file": "example-expert.json"
+      "file": "example-expert.json",
+      "visibility": "public"
     }
   ]
 }

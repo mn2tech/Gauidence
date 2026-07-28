@@ -55,12 +55,15 @@ export async function POST(request: Request) {
     );
   }
 
+  const grantOnly = body.grantOnly === true;
+
   const result = await assignExpertByEmail({
     admin,
     targetEmail,
     expertId,
-    profileId,
+    profileId: grantOnly ? null : profileId,
     assignedByUserId: user.id,
+    grantOnly,
   });
 
   if (!result.ok) {
@@ -72,17 +75,23 @@ export async function POST(request: Request) {
     );
   }
 
-  const message = result.created
+  const message = result.grantOnly
     ? result.emailed
-      ? "Expert assigned successfully. Notification email sent."
-      : "Expert assigned successfully. Email was not sent (check RESEND_API_KEY)."
-    : "Expert was already installed for that profile.";
+      ? "Expert access granted. Notification email sent."
+      : "Expert access granted. Email was not sent (check RESEND_API_KEY)."
+    : result.created
+      ? result.emailed
+        ? "Expert assigned successfully. Notification email sent."
+        : "Expert assigned successfully. Email was not sent (check RESEND_API_KEY)."
+      : "Expert was already installed for that profile. Access was confirmed.";
 
   return NextResponse.json(
     {
       installation: result.installation,
       created: result.created,
       emailed: result.emailed,
+      grantOnly: result.grantOnly,
+      entitled: result.entitled,
       message,
     },
     { status: result.created ? 201 : 200 }

@@ -89,7 +89,15 @@ export default function ExpertCatalog({
         </p>
       ) : null}
 
-      {Object.keys(grouped).length === 0 ? (
+      {experts.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-stone-200 p-8 text-center text-sm text-ink-muted">
+          <p className="font-medium text-foreground">No experts assigned yet</p>
+          <p className="mt-2">
+            Restricted experts only appear here after an admin grants you access. Contact
+            your administrator if you expected to see one.
+          </p>
+        </div>
+      ) : Object.keys(grouped).length === 0 ? (
         <div className="rounded-2xl border border-dashed border-stone-200 p-8 text-center text-sm text-ink-muted">
           No experts match your search.
         </div>

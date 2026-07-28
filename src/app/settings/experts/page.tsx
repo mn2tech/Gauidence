@@ -39,8 +39,15 @@ export default async function AdminExpertsPage() {
           </p>
           <h1 className="mt-2 text-2xl font-bold tracking-tight">Assign experts</h1>
           <p className="mt-2 text-sm text-ink-muted">
-            Install a Guardian Expert on a user&apos;s vault. The user still needs
-            Experts access via <code className="text-xs">GUARDIAN_EXPERTS_FLAG</code>.
+            Control who can see restricted experts and assign them by email. Users still
+            need Experts access via{" "}
+            <code className="text-xs">GUARDIAN_EXPERTS_FLAG</code>.
+          </p>
+          <p className="mt-2 text-sm text-ink-muted">
+            <span className="font-medium text-foreground">Restricted</span> experts are
+            hidden until you grant access.{" "}
+            <span className="font-medium text-foreground">Public</span> experts appear for
+            everyone with Experts access.
           </p>
 
           <div className="mt-8 rounded-2xl border border-stone-200 bg-white p-6">
@@ -55,6 +62,11 @@ export default async function AdminExpertsPage() {
                   <span className="font-medium text-foreground">{expert.name}</span>
                   {" — "}
                   {expert.description}
+                  {expert.visibility === "public" ? (
+                    <span className="text-ink-muted"> (public)</span>
+                  ) : (
+                    <span className="text-ink-muted"> (restricted)</span>
+                  )}
                 </li>
               ))}
             </ul>

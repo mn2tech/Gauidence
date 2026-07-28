@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 import ExpertCatalog from "@/components/experts/ExpertCatalog";
-import { getExpertCatalog } from "@/lib/experts/load-expert";
+import { getCatalogForUser } from "@/lib/experts/entitlements";
 import { listUserExpertsForUser } from "@/lib/experts/server";
 import { requireExpertsPageAccess } from "@/lib/experts/page-helpers";
 
@@ -18,7 +18,8 @@ type PageProps = {
 
 export default async function ExpertsPage({ searchParams }: PageProps) {
   const { supabase, user } = await requireExpertsPageAccess();
-  const experts = getExpertCatalog().map(
+  const experts = await getCatalogForUser(supabase, user.id, user.email);
+  const catalogForUi = experts.map(
     ({ validationError: _validationError, effectiveStatus, ...item }) => ({
       ...item,
       effectiveStatus,
@@ -44,7 +45,7 @@ export default async function ExpertsPage({ searchParams }: PageProps) {
           </p>
           <div className="mt-8">
             <ExpertCatalog
-              initialExperts={experts}
+              initialExperts={catalogForUi}
               initialInstallations={installations}
             />
           </div>

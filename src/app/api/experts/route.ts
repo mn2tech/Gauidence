@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getExpertCatalog } from "@/lib/experts/load-expert";
-import { getExpertPublicById } from "@/lib/experts/load-expert";
+import { getCatalogForUser, userHasExpertAccess } from "@/lib/experts/entitlements";
 import {
   isExpertAuthed,
   listUserExpertsForUser,
@@ -13,12 +12,17 @@ export async function GET() {
   const auth = await requireExpertUser();
   if (!isExpertAuthed(auth)) return auth;
 
-  const experts = getExpertCatalog().map(
-    ({ validationError: _validationError, ...item }) => item
+  const experts = await getCatalogForUser(
+    auth.supabase,
+    auth.user.id,
+    auth.user.email
   );
   const installations = await listUserExpertsForUser(auth.supabase, auth.user.id);
 
-  return NextResponse.json({ experts, installations });
+  return NextResponse.json({
+    experts: experts.map(({ validationError: _validationError, ...item }) => item),
+    installations,
+  });
 }
 
 export async function POST(request: Request) {
@@ -41,11 +45,31 @@ export async function POST(request: Request) {
     );
   }
 
-  const catalogItem = getExpertCatalog().find((e) => e.id === expertId);
+  const catalogItem = (await getCatalogForUser(
+    auth.supabase,
+    auth.user.id,
+    auth.user.email
+  )).find((e) => e.id === expertId);
+
   if (!catalogItem || catalogItem.effectiveStatus === "unavailable") {
     return NextResponse.json({ error: "Expert not found." }, { status: 404 });
   }
 
+  const hasAccess = await userHasExpertAccess(
+    auth.supabase,
+    auth.user.id,
+    expertId,
+    auth.user.email
+  );
+  if (!hasAccess) {
+    return NextResponse.json(
+      { error: "You do not have access to this expert." },
+      { status: 403 }
+    );
+  }
+
+  const { getExpertPublicById } = await import("@/lib/experts/load-expert");
+  const publicExpert = getExpertPublicById(expertId);
   if (
     catalogItem.effectiveStatus === "coming-soon" ||
     catalogItem.effectiveStatus === "archived"
@@ -56,7 +80,6 @@ export async function POST(request: Request) {
     );
   }
 
-  const publicExpert = getExpertPublicById(expertId);
   if (!publicExpert) {
     return NextResponse.json({ error: "Expert not found." }, { status: 404 });
   }

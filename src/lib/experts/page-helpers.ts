@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { canAccessGuardianExperts } from "@/lib/features/experts";
 import { getExpertPublicById } from "@/lib/experts/load-expert";
+import { userHasExpertAccess } from "@/lib/experts/entitlements";
 import {
   listUserExpertsByExpertId,
   requireOwnedUserExpert,
@@ -49,6 +50,14 @@ export async function loadExpertPageData(
   const { supabase, user } = await requireExpertsPageAccess();
   const expert = getExpertPublicById(expertId);
   if (!expert) redirect("/experts");
+
+  const canAccess = await userHasExpertAccess(
+    supabase,
+    user.id,
+    expertId,
+    user.email
+  );
+  if (!canAccess) redirect("/experts");
 
   const installation = await resolveExpertInstallation(
     supabase,

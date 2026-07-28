@@ -16,6 +16,8 @@ export const expertCategorySchema = z.enum([
   "Personal",
 ]);
 
+export const expertVisibilitySchema = z.enum(["public", "restricted"]);
+
 export const moduleStatusSchema = z.enum(["draft", "published", "archived"]);
 
 export const sourceTypeSchema = z.enum([
@@ -160,6 +162,7 @@ export const expertCatalogItemSchema = z.object({
   status: expertStatusSchema,
   version: z.string().min(1),
   file: z.string().min(1),
+  visibility: expertVisibilitySchema.default("restricted"),
 });
 
 export const expertCatalogSchema = z.object({
@@ -167,6 +170,7 @@ export const expertCatalogSchema = z.object({
 });
 
 export type ExpertStatus = z.infer<typeof expertStatusSchema>;
+export type ExpertVisibility = z.infer<typeof expertVisibilitySchema>;
 export type ExpertCategory = z.infer<typeof expertCategorySchema>;
 export type ModuleStatus = z.infer<typeof moduleStatusSchema>;
 export type ExpertCapability = z.infer<typeof expertCapabilitySchema>;

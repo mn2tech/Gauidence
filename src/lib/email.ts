@@ -278,18 +278,24 @@ export type ExpertAssignedEmailArgs = {
   expertDescription: string;
   assignerName: string;
   openUrl: string;
+  grantOnly?: boolean;
 };
 
 export function renderExpertAssignedEmail(args: ExpertAssignedEmailArgs) {
-  const subject = `You have a new Guardian Expert: ${args.expertName}`;
+  const action = args.grantOnly
+    ? "granted you access to"
+    : "assigned";
+  const subject = args.grantOnly
+    ? `You can now access ${args.expertName} in Guardian`
+    : `You have a new Guardian Expert: ${args.expertName}`;
   const html = `
   <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#fafaf9;padding:32px 16px;">
     <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e7e5e4;border-radius:16px;overflow:hidden;">
       <div style="padding:24px;">
         <div style="font-size:18px;font-weight:700;color:#1c1917;">Guardian</div>
         <p style="margin:16px 0 8px;font-size:15px;color:#1c1917;line-height:1.5;">
-          ${escapeHtml(args.assignerName)} assigned
-          <strong>${escapeHtml(args.expertName)}</strong> to your account.
+          ${escapeHtml(args.assignerName)} ${action}
+          <strong>${escapeHtml(args.expertName)}</strong>${args.grantOnly ? "" : " to your account"}.
         </p>
         <p style="margin:0 0 20px;font-size:14px;color:#57534e;line-height:1.6;">
           ${escapeHtml(args.expertDescription)}
@@ -299,19 +305,19 @@ export function renderExpertAssignedEmail(args: ExpertAssignedEmailArgs) {
           Open Guardian Experts
         </a>
         <p style="margin:20px 0 0;font-size:12px;color:#78716c;line-height:1.5;">
-          Sign in with this email address to start learning. If you didn’t expect this email, you can ignore it.
+          Sign in with this email address to get started. If you didn’t expect this email, you can ignore it.
         </p>
       </div>
     </div>
   </div>`;
   const text = [
-    `${args.assignerName} assigned ${args.expertName} to your Guardian account.`,
+    `${args.assignerName} ${action} ${args.expertName}${args.grantOnly ? "" : " to your Guardian account"}.`,
     "",
     args.expertDescription,
     "",
     `Open Guardian Experts: ${args.openUrl}`,
     "",
-    "Sign in with this email address to start learning.",
+    "Sign in with this email address to get started.",
   ].join("\n");
   return { subject, html, text };
 }
