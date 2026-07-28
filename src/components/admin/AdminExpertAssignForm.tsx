@@ -10,6 +10,7 @@ type Props = {
 type AssignResponse = {
   installation?: { id: string; expert_id: string; profile_id: string };
   created?: boolean;
+  emailed?: boolean;
   message?: string;
   error?: string;
 };
@@ -121,11 +122,24 @@ export default function AdminExpertAssignForm({ experts }: Props) {
           <p className="mt-1 font-mono text-xs">
             Installation: {result.installation.id}
           </p>
-          <p className="mt-2 text-emerald-900">
-            The user can open it from{" "}
-            <span className="font-semibold">Guardian Experts</span> (
-            <code className="text-xs">/experts</code>).
-          </p>
+          {result.emailed ? (
+            <p className="mt-2 text-emerald-900">
+              A notification email was sent to the user.
+            </p>
+          ) : result.created ? (
+            <p className="mt-2 text-emerald-900">
+              No email was sent — check <code className="text-xs">RESEND_API_KEY</code>{" "}
+              on the server. They can still open{" "}
+              <span className="font-semibold">Guardian Experts</span> (
+              <code className="text-xs">/experts</code>).
+            </p>
+          ) : (
+            <p className="mt-2 text-emerald-900">
+              The user can open it from{" "}
+              <span className="font-semibold">Guardian Experts</span> (
+              <code className="text-xs">/experts</code>).
+            </p>
+          )}
         </div>
       ) : null}
 

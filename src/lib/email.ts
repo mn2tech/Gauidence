@@ -272,6 +272,75 @@ export async function sendVaultActivityEmail(args: VaultActivityEmailArgs) {
   return true;
 }
 
+export type ExpertAssignedEmailArgs = {
+  to: string;
+  expertName: string;
+  expertDescription: string;
+  assignerName: string;
+  openUrl: string;
+};
+
+export function renderExpertAssignedEmail(args: ExpertAssignedEmailArgs) {
+  const subject = `You have a new Guardian Expert: ${args.expertName}`;
+  const html = `
+  <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#fafaf9;padding:32px 16px;">
+    <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e7e5e4;border-radius:16px;overflow:hidden;">
+      <div style="padding:24px;">
+        <div style="font-size:18px;font-weight:700;color:#1c1917;">Guardian</div>
+        <p style="margin:16px 0 8px;font-size:15px;color:#1c1917;line-height:1.5;">
+          ${escapeHtml(args.assignerName)} assigned
+          <strong>${escapeHtml(args.expertName)}</strong> to your account.
+        </p>
+        <p style="margin:0 0 20px;font-size:14px;color:#57534e;line-height:1.6;">
+          ${escapeHtml(args.expertDescription)}
+        </p>
+        <a href="${escapeHtml(args.openUrl)}"
+          style="display:inline-block;padding:12px 20px;border-radius:999px;background:#0f766e;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;">
+          Open Guardian Experts
+        </a>
+        <p style="margin:20px 0 0;font-size:12px;color:#78716c;line-height:1.5;">
+          Sign in with this email address to start learning. If you didn’t expect this email, you can ignore it.
+        </p>
+      </div>
+    </div>
+  </div>`;
+  const text = [
+    `${args.assignerName} assigned ${args.expertName} to your Guardian account.`,
+    "",
+    args.expertDescription,
+    "",
+    `Open Guardian Experts: ${args.openUrl}`,
+    "",
+    "Sign in with this email address to start learning.",
+  ].join("\n");
+  return { subject, html, text };
+}
+
+/** Sends an expert assignment notification. Returns false when Resend isn't configured. */
+export async function sendExpertAssignedEmail(args: ExpertAssignedEmailArgs) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return false;
+
+  const from =
+    process.env.INVITE_FROM_EMAIL ??
+    process.env.REMINDER_FROM_EMAIL ??
+    "Guardian <onboarding@resend.dev>";
+  const resend = new Resend(apiKey);
+  const { subject, html, text } = renderExpertAssignedEmail(args);
+  const { error } = await resend.emails.send({
+    from,
+    to: args.to,
+    subject,
+    html,
+    text,
+  });
+  if (error) {
+    console.error("Expert assigned email failed:", args.to, error.message);
+    return false;
+  }
+  return true;
+}
+
 /** Sends a vault collaborator invite. Returns false when Resend isn't configured. */
 export async function sendVaultInviteEmail(args: VaultInviteEmailArgs) {
   const apiKey = process.env.RESEND_API_KEY;

@@ -28,6 +28,14 @@ describe("expert loader", () => {
     assert.ok(expert!.capabilities.some((c) => c.route === "scenarios"));
   });
 
+  it("loads 9th Grade Study Coach expert JSON", () => {
+    const expert = getExpertById("ninth-grade-study-coach");
+    assert.ok(expert);
+    assert.equal(expert?.category, "Learning");
+    assert.equal(expert?.roadmap.length, 3);
+    assert.ok(expert!.knowledgeTopics.some((t) => t.id === "topic-algebra"));
+  });
+
   it("does not expose systemPrompt in public expert view", () => {
     const expert = getExpertPublicById("example-expert");
     assert.ok(expert);

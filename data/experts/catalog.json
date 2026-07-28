@@ -1,6 +1,17 @@
 {
   "experts": [
     {
+      "id": "ninth-grade-study-coach",
+      "name": "9th Grade Study Coach",
+      "shortName": "Study Coach",
+      "category": "Learning",
+      "description": "A friendly coach for freshman year: study skills, core subjects, and getting ready for tests.",
+      "icon": "graduation-cap",
+      "status": "beta",
+      "version": "1.0.0",
+      "file": "ninth-grade-study-coach.json"
+    },
+    {
       "id": "empi-coordinator",
       "name": "EMPI Coordinator",
       "shortName": "EMPI",

@@ -72,13 +72,18 @@ export async function POST(request: Request) {
     );
   }
 
+  const message = result.created
+    ? result.emailed
+      ? "Expert assigned successfully. Notification email sent."
+      : "Expert assigned successfully. Email was not sent (check RESEND_API_KEY)."
+    : "Expert was already installed for that profile.";
+
   return NextResponse.json(
     {
       installation: result.installation,
       created: result.created,
-      message: result.created
-        ? "Expert assigned successfully."
-        : "Expert was already installed for that profile.",
+      emailed: result.emailed,
+      message,
     },
     { status: result.created ? 201 : 200 }
   );

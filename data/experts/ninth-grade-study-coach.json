@@ -1,0 +1,604 @@
+{
+  "id": "ninth-grade-study-coach",
+  "version": "1.0.0",
+  "name": "9th Grade Study Coach",
+  "shortName": "Study Coach",
+  "category": "Learning",
+  "icon": "graduation-cap",
+  "status": "beta",
+  "description": "A friendly coach for freshman year: study skills, core subjects, and getting ready for tests.",
+  "longDescription": "Build confidence in 9th grade with practical study habits, help across typical freshman subjects (Algebra I, English 9, Biology, history), and strategies for tests and projects. Designed for students — clear, encouraging, and focused on understanding.",
+  "primaryGoal": "Learn how to study smarter, understand core 9th grade topics, and build habits that last through high school.",
+  "disclaimer": "For learning and practice only. Follow your school's honor code — this coach helps you understand ideas, not copy answers on graded work. Do not share personal information (full name, school address, passwords) in Ask. Talk to a parent, teacher, or counselor for serious academic or personal concerns.",
+
+  "theme": {
+    "accent": "green",
+    "style": "friendly"
+  },
+
+  "capabilities": [
+    {
+      "id": "learn",
+      "title": "Learn",
+      "description": "Follow modules on study skills, freshman subjects, and test prep.",
+      "icon": "book-open",
+      "route": "learn",
+      "enabled": true
+    },
+    {
+      "id": "ask",
+      "title": "Ask",
+      "description": "Get help understanding topics and study strategies.",
+      "icon": "message-circle",
+      "route": "ask",
+      "enabled": true
+    },
+    {
+      "id": "scenarios",
+      "title": "Scenarios",
+      "description": "Practice planning and school decisions with fictional situations.",
+      "icon": "target",
+      "route": "scenarios",
+      "enabled": true
+    },
+    {
+      "id": "quiz",
+      "title": "Quiz",
+      "description": "Check your study skills and subject basics.",
+      "icon": "brain",
+      "route": "quiz",
+      "enabled": true
+    }
+  ],
+
+  "systemPrompt": "You are the 9th Grade Study Coach inside Guardian — a supportive tutor for high school freshmen (about age 14–15). Help students with study skills, organization, and typical 9th grade subjects: Algebra I (linear equations, graphing, exponents), English 9 (reading, thesis, paragraphs, evidence), Biology (cells, ecosystems, scientific method), and introductory history/civics (sources, timelines, short essays). Use clear, encouraging language — respectful and not childish. Break problems into steps. When explaining math or writing, teach the process; give hints before full solutions on practice problems. For assigned homework the student must turn in, do NOT provide final answers to copy — guide them with questions, similar examples, and the next step instead. Promote academic integrity and asking teachers for help. Never collect personal details. If a topic is beyond 9th grade scope, say so briefly and offer a simpler foundation. Encourage breaks, sleep, and talking to adults when stressed.",
+
+  "responseRules": [
+    "Use short paragraphs and numbered steps when explaining.",
+    "Match a freshman reading level; define new terms simply.",
+    "On graded assignments, coach understanding — do not write submissions for the student.",
+    "Use fresh practice examples rather than reproducing textbook copyright content.",
+    "Celebrate effort and good study habits, not just correct answers.",
+    "Suggest using their Guardian student vault and Gideon for their own notes and due dates."
+  ],
+
+  "starterQuestions": [
+    "How should I study for a biology test?",
+    "How do I write a thesis statement for an essay?",
+    "What is the best way to solve a two-step equation?",
+    "I have two tests and a project due — how do I plan my week?"
+  ],
+
+  "roadmap": [
+    {
+      "id": "module-study-skills",
+      "order": 1,
+      "title": "Study Skills & Organization",
+      "description": "Build habits that make freshman year manageable.",
+      "estimatedMinutes": 15,
+      "learningObjectives": [
+        "Use a simple weekly planning routine",
+        "Take notes you can actually review",
+        "Know when and how to ask teachers for help"
+      ],
+      "lessonTopicIds": ["topic-planning", "topic-note-taking"],
+      "quizIds": ["quiz-study-skills"],
+      "status": "published"
+    },
+    {
+      "id": "module-core-subjects",
+      "order": 2,
+      "title": "Core 9th Grade Subjects",
+      "description": "Foundations in math, English, science, and history.",
+      "estimatedMinutes": 25,
+      "learningObjectives": [
+        "Recognize key skills in Algebra I and English 9",
+        "Explain basic biology vocabulary and the scientific method",
+        "Use sources and timelines in history work"
+      ],
+      "lessonTopicIds": ["topic-algebra", "topic-english", "topic-biology", "topic-history"],
+      "quizIds": ["quiz-subjects"],
+      "status": "published"
+    },
+    {
+      "id": "module-tests-projects",
+      "order": 3,
+      "title": "Tests & Projects",
+      "description": "Prepare for exams and longer assignments without cramming.",
+      "estimatedMinutes": 15,
+      "learningObjectives": [
+        "Spread studying over several days",
+        "Break projects into milestones",
+        "Manage test-day stress with simple strategies"
+      ],
+      "lessonTopicIds": ["topic-test-prep", "topic-projects"],
+      "quizIds": [],
+      "status": "published"
+    }
+  ],
+
+  "knowledgeTopics": [
+    {
+      "id": "topic-planning",
+      "title": "Planning Your Week",
+      "category": "study-skills",
+      "summary": "A simple plan beats cramming — map deadlines first, then study in small blocks.",
+      "details": [
+        "List every due date from syllabi, classroom boards, or your planner app.",
+        "Work backward: start projects at least a few days before they are due.",
+        "Study in 25–40 minute blocks with short breaks (Pomodoro-style).",
+        "Do the hardest subject when you have the most energy, not at midnight.",
+        "Keep one place for school tasks — paper planner or app — and check it daily."
+      ],
+      "examples": [
+        {
+          "title": "Thursday biology quiz",
+          "description": "Review notes Monday (15 min), practice questions Tuesday, quick recap Wednesday — instead of one stressed hour Wednesday night."
+        }
+      ],
+      "keyPoints": [
+        "Deadlines drive the plan",
+        "Small daily sessions beat marathon cramming",
+        "Sleep matters for memory"
+      ],
+      "commonMistakes": [
+        "Only writing homework due tomorrow and missing long-term projects",
+        "Multitasking with social media during study blocks"
+      ],
+      "starterQuestions": [
+        "How do I plan when everything is due the same week?",
+        "What is a good study block length?"
+      ],
+      "relatedTopicIds": ["topic-note-taking", "topic-test-prep"],
+      "sourceType": "guardian-curated"
+    },
+    {
+      "id": "topic-note-taking",
+      "title": "Notes That Help Later",
+      "category": "study-skills",
+      "summary": "Good notes are short, organized, and reviewed — not a transcript of every word the teacher says.",
+      "details": [
+        "Write the date, class, and topic at the top of each page.",
+        "Capture main ideas, definitions, and examples — skip filler words.",
+        "Leave margin space for questions or labels (Cornell-style: cues on the left, notes on the right).",
+        "Review notes within 24 hours for five minutes — it locks in memory.",
+        "Star or highlight what the teacher repeated or put on the board."
+      ],
+      "examples": [
+        {
+          "title": "Biology cell unit",
+          "description": "One page: organelle names, one job each, one drawing — better than copying every slide word for word."
+        }
+      ],
+      "keyPoints": [
+        "Notes are for future you",
+        "Review beats rewriting",
+        "Ask questions in the margin when confused"
+      ],
+      "commonMistakes": [
+        "Never rereading notes until the night before the test",
+        "Trying to write every word instead of main ideas"
+      ],
+      "starterQuestions": [
+        "What should I write down in class?",
+        "How do I study from my notes?"
+      ],
+      "relatedTopicIds": ["topic-planning", "topic-test-prep"],
+      "sourceType": "guardian-curated"
+    },
+    {
+      "id": "topic-algebra",
+      "title": "Algebra I Basics",
+      "category": "math",
+      "summary": "Freshman algebra builds on equations, graphing, and patterns — step-by-step work matters more than speed.",
+      "details": [
+        "Two-step equations: undo addition/subtraction first, then multiplication/division.",
+        "Keep equations balanced — do the same operation to both sides.",
+        "Graph linear equations in slope-intercept form y = mx + b (m = slope, b = y-intercept).",
+        "Word problems: define a variable, write an equation, check if the answer makes sense.",
+        "Show your work so you can find mistakes and earn partial credit."
+      ],
+      "examples": [
+        {
+          "title": "Solve 3x + 5 = 20",
+          "description": "Subtract 5 from both sides → 3x = 15 → divide by 3 → x = 5. Check: 3(5) + 5 = 20."
+        }
+      ],
+      "keyPoints": [
+        "One step at a time",
+        "Check your answer",
+        "Practice similar problems, not just watching videos"
+      ],
+      "commonMistakes": [
+        "Skipping steps and losing track of negative signs",
+        "Memorizing answers without understanding the method"
+      ],
+      "starterQuestions": [
+        "How do I solve a two-step equation?",
+        "What is slope in a graph?"
+      ],
+      "relatedTopicIds": ["topic-planning"],
+      "sourceType": "guardian-curated"
+    },
+    {
+      "id": "topic-english",
+      "title": "English 9 Reading & Writing",
+      "category": "english",
+      "summary": "Essays need a clear thesis, organized paragraphs, and evidence from the text.",
+      "details": [
+        "Thesis = your main argument in one sentence (what you are proving).",
+        "Body paragraphs: topic sentence → evidence (quote or example) → explain how it supports the thesis.",
+        "When reading, annotate: underline key lines, note character motives and themes.",
+        "Revise for clarity: read aloud, cut repeated words, fix run-on sentences.",
+        "Cite sources and quotes the way your teacher asks (MLA is common in 9th grade)."
+      ],
+      "examples": [
+        {
+          "title": "Literary analysis",
+          "description": "Thesis: The protagonist's choices show growing responsibility. Each paragraph uses one scene from the book as evidence."
+        }
+      ],
+      "keyPoints": [
+        "Thesis drives the essay",
+        "Evidence plus explanation",
+        "Draft early so you can revise"
+      ],
+      "commonMistakes": [
+        "Summarizing the plot without analyzing",
+        "Quotes dropped in without explaining them"
+      ],
+      "starterQuestions": [
+        "How do I write a thesis?",
+        "How long should a body paragraph be?"
+      ],
+      "relatedTopicIds": ["topic-projects"],
+      "sourceType": "guardian-curated"
+    },
+    {
+      "id": "topic-biology",
+      "title": "Biology Foundations",
+      "category": "science",
+      "summary": "9th grade biology often starts with cells, organization of life, and ecosystems — vocabulary and diagrams go together.",
+      "details": [
+        "Cell theory: all living things are made of cells; cells come from cells.",
+        "Know major organelles and jobs (nucleus, mitochondria, cell membrane, etc.).",
+        "Scientific method: question, hypothesis, experiment, data, conclusion.",
+        "Ecosystems: producers, consumers, decomposers; energy flows, matter cycles.",
+        "Use labeled drawings and flashcards for terms — spelling counts on tests."
+      ],
+      "examples": [
+        {
+          "title": "Mitochondria",
+          "description": "Often called the powerhouse of the cell — where cellular respiration releases energy (ATP) for the cell to use."
+        }
+      ],
+      "keyPoints": [
+        "Learn terms with pictures",
+        "Connect micro (cells) to macro (ecosystems)",
+        "Practice explaining processes in your own words"
+      ],
+      "commonMistakes": [
+        "Memorizing definitions without understanding function",
+        "Ignoring lab safety and procedure questions on tests"
+      ],
+      "starterQuestions": [
+        "What are the main parts of a cell?",
+        "How does the scientific method work?"
+      ],
+      "relatedTopicIds": ["topic-test-prep"],
+      "sourceType": "guardian-curated"
+    },
+    {
+      "id": "topic-history",
+      "title": "History & Civics Basics",
+      "category": "social-studies",
+      "summary": "History class is about evidence and context — dates matter, but so does why events happened.",
+      "details": [
+        "Primary sources = from the time period; secondary sources = later analysis.",
+        "Timelines help you see cause and effect across events.",
+        "Short essays: claim, evidence from documents, reasoning linking evidence to claim.",
+        "Compare perspectives — whose voice is included or missing?",
+        "Study maps, key terms, and big themes your teacher emphasized in class."
+      ],
+      "examples": [
+        {
+          "title": "Document-based question",
+          "description": "Use at least two sources to support your answer; explain how each source supports your claim."
+        }
+      ],
+      "keyPoints": [
+        "Use evidence from sources",
+        "Context before judgment",
+        "Themes repeat across units"
+      ],
+      "commonMistakes": [
+        "Listing facts without explaining significance",
+        "Using only one document in a multi-source prompt"
+      ],
+      "starterQuestions": [
+        "What is a primary source?",
+        "How do I study for a history test?"
+      ],
+      "relatedTopicIds": ["topic-english", "topic-test-prep"],
+      "sourceType": "guardian-curated"
+    },
+    {
+      "id": "topic-test-prep",
+      "title": "Studying for Tests",
+      "category": "study-skills",
+      "summary": "Active review — practice questions, flashcards, teaching aloud — beats rereading the chapter once.",
+      "details": [
+        "Start three to five days early for unit tests when possible.",
+        "Make a one-page cheat sheet of formulas, terms, and big ideas (even if you cannot use it on test day, making it helps).",
+        "Practice problems for math; practice questions for science and history.",
+        "Sleep well the night before — all-nighters hurt recall.",
+        "Read test directions carefully; answer easy questions first to build confidence."
+      ],
+      "examples": [
+        {
+          "title": "Active recall",
+          "description": "Cover definitions and try to say them aloud before peeking — stronger than highlighting everything."
+        }
+      ],
+      "keyPoints": [
+        "Practice beats passive rereading",
+        "Spread study over days",
+        "Arrive prepared with materials your teacher allows"
+      ],
+      "commonMistakes": [
+        "Only rereading the textbook",
+        "Studying new material the morning of the test instead of reviewing"
+      ],
+      "starterQuestions": [
+        "How do I study for a math test?",
+        "What should I do the night before an exam?"
+      ],
+      "relatedTopicIds": ["topic-planning", "topic-note-taking"],
+      "sourceType": "guardian-curated"
+    },
+    {
+      "id": "topic-projects",
+      "title": "Projects & Long Assignments",
+      "category": "study-skills",
+      "summary": "Big assignments need milestones — research, outline, draft, revise — not one panic session.",
+      "details": [
+        "Read the rubric first; highlight what gets the most points.",
+        "Break the project into steps with mini-deadlines before the final due date.",
+        "Research: use trusted sources; track where each fact came from.",
+        "Outline before drafting essays or slide decks.",
+        "Leave time for proofreading and asking a teacher or peer to review."
+      ],
+      "examples": [
+        {
+          "title": "Research paper",
+          "description": "Week 1: topic and sources. Week 2: outline. Week 3: draft. Week 4: revise and submit."
+        }
+      ],
+      "keyPoints": [
+        "Rubric is your checklist",
+        "Milestones prevent last-minute rush",
+        "Revision is part of the grade"
+      ],
+      "commonMistakes": [
+        "Starting the night before",
+        "Ignoring citation requirements until the end"
+      ],
+      "starterQuestions": [
+        "How do I start a research project?",
+        "What goes in an essay outline?"
+      ],
+      "relatedTopicIds": ["topic-english", "topic-planning"],
+      "sourceType": "guardian-curated"
+    }
+  ],
+
+  "glossary": [
+    {
+      "term": "Thesis",
+      "definition": "The main argument or claim of an essay, usually one sentence in the introduction.",
+      "category": "english",
+      "relatedTopicIds": ["topic-english"]
+    },
+    {
+      "term": "Slope",
+      "definition": "In a line equation y = mx + b, m is the slope — how steep the line is.",
+      "category": "math",
+      "relatedTopicIds": ["topic-algebra"]
+    },
+    {
+      "term": "Primary Source",
+      "definition": "A document or artifact from the time period being studied.",
+      "category": "social-studies",
+      "relatedTopicIds": ["topic-history"]
+    },
+    {
+      "term": "Hypothesis",
+      "definition": "A testable prediction in a science experiment.",
+      "category": "science",
+      "relatedTopicIds": ["topic-biology"]
+    },
+    {
+      "term": "Active Recall",
+      "definition": "Studying by trying to remember information without looking — then checking answers.",
+      "category": "study-skills",
+      "relatedTopicIds": ["topic-test-prep"]
+    },
+    {
+      "term": "Rubric",
+      "definition": "A scoring guide that shows what teachers expect on an assignment.",
+      "category": "study-skills",
+      "relatedTopicIds": ["topic-projects"]
+    }
+  ],
+
+  "quizzes": [
+    {
+      "id": "quiz-study-skills",
+      "title": "Study Skills Quiz",
+      "moduleId": "module-study-skills",
+      "description": "Check your planning and note-taking basics.",
+      "passingScore": 70,
+      "questions": [
+        {
+          "id": "q-skills-1",
+          "type": "multiple-choice",
+          "question": "What is usually the best way to prepare for a test on Friday?",
+          "options": [
+            "Study only Thursday night for four hours",
+            "Review in short sessions across several days",
+            "Reread the chapter once without practicing",
+            "Skip sleep to finish studying"
+          ],
+          "correctOptionIndex": 1,
+          "explanation": "Spreading study over days with active practice improves memory more than one cram session."
+        },
+        {
+          "id": "q-skills-2",
+          "type": "true-false",
+          "question": "Good notes should capture every word the teacher says.",
+          "options": ["True", "False"],
+          "correctOptionIndex": 1,
+          "explanation": "Focus on main ideas, definitions, and examples — not a full transcript."
+        },
+        {
+          "id": "q-skills-3",
+          "type": "multiple-choice",
+          "question": "When you are stuck on homework you must turn in, what should you do first?",
+          "options": [
+            "Copy the full answer from an AI tool",
+            "Try the next step, use hints, then ask your teacher",
+            "Skip the assignment",
+            "Change the due date yourself"
+          ],
+          "correctOptionIndex": 1,
+          "explanation": "Understanding matters — use hints and teacher help while following your school's honor code."
+        }
+      ]
+    },
+    {
+      "id": "quiz-subjects",
+      "title": "9th Grade Subject Basics",
+      "moduleId": "module-core-subjects",
+      "description": "Quick check on math, English, science, and history foundations.",
+      "passingScore": 70,
+      "questions": [
+        {
+          "id": "q-subj-1",
+          "type": "multiple-choice",
+          "question": "In y = 2x + 3, what is the slope?",
+          "options": ["2", "3", "x", "5"],
+          "correctOptionIndex": 0,
+          "explanation": "In slope-intercept form y = mx + b, the coefficient of x (m) is the slope."
+        },
+        {
+          "id": "q-subj-2",
+          "type": "multiple-choice",
+          "question": "Which is a primary source?",
+          "options": [
+            "A textbook chapter written in 2020 about the Civil War",
+            "A letter written by a soldier during the Civil War",
+            "A study guide made by your teacher",
+            "A Wikipedia article"
+          ],
+          "correctOptionIndex": 1,
+          "explanation": "Primary sources come from the time period; textbooks and later articles are secondary."
+        },
+        {
+          "id": "q-subj-3",
+          "type": "true-false",
+          "question": "The mitochondria is often described as the powerhouse of the cell.",
+          "options": ["True", "False"],
+          "correctOptionIndex": 0,
+          "explanation": "Mitochondria produce ATP through cellular respiration — energy for the cell."
+        },
+        {
+          "id": "q-subj-4",
+          "type": "multiple-choice",
+          "question": "What belongs in a strong body paragraph?",
+          "options": [
+            "Only a quote with no explanation",
+            "Topic sentence, evidence, and explanation",
+            "A brand-new thesis unrelated to the essay",
+            "Only the plot summary of the book"
+          ],
+          "correctOptionIndex": 1,
+          "explanation": "Each paragraph should support the thesis with evidence and your analysis."
+        }
+      ]
+    }
+  ],
+
+  "scenarios": [
+    {
+      "id": "scenario-busy-week",
+      "title": "Busy Week Planning",
+      "difficulty": "beginner",
+      "category": "study-skills",
+      "fictional": true,
+      "notice": "Fictional school situation for practice.",
+      "context": "It is Sunday. You have a math test Wednesday, a history project due Friday, and regular homework each night. You also have soccer practice Tuesday and Thursday.",
+      "records": {
+        "math_test": "Wednesday",
+        "history_project": "Friday",
+        "soccer": "Tuesday and Thursday"
+      },
+      "question": "What is the smartest first step?",
+      "choices": [
+        "Ignore the project until Thursday night",
+        "List all deadlines and block study time before Wednesday and around practice",
+        "Skip soccer to avoid planning",
+        "Study only your favorite subject all week"
+      ],
+      "correctChoiceIndex": 1,
+      "explanation": "Listing deadlines and scheduling short study blocks — especially before the math test — protects both grades and activities.",
+      "learningPoints": [
+        "Plan around fixed events like practice",
+        "Start projects early",
+        "Math test prep should begin before Tuesday night"
+      ]
+    },
+    {
+      "id": "scenario-stuck-homework",
+      "title": "Stuck on Graded Homework",
+      "difficulty": "beginner",
+      "category": "study-skills",
+      "fictional": true,
+      "notice": "Practice making good choices about academic integrity.",
+      "context": "You are stuck on problem 7 of tonight's algebra homework. It will be collected tomorrow for a grade.",
+      "question": "What is the best approach?",
+      "choices": [
+        "Paste the full solution from the internet",
+        "Identify where you got lost, try a similar example, ask for a hint, then visit office hours or email your teacher",
+        "Leave it blank and hope for extra credit",
+        "Copy a friend's paper"
+      ],
+      "correctChoiceIndex": 1,
+      "explanation": "Learn the method with hints and teacher support — that builds skills and follows honor code expectations.",
+      "learningPoints": [
+        "Partial work with effort often earns partial credit",
+        "Teachers expect questions when you are stuck",
+        "Copying undermines learning and can have serious consequences"
+      ]
+    }
+  ],
+
+  "interviewQuestions": [
+    {
+      "id": "interview-study-routine",
+      "category": "study-skills",
+      "difficulty": "beginner",
+      "question": "Describe a study routine that would help you before a big test.",
+      "answerGuide": [
+        "Start early, not the night before only",
+        "Use active recall or practice problems",
+        "Review notes and key terms",
+        "Include breaks and sleep",
+        "Adjust based on what the test covers"
+      ],
+      "followUpQuestions": [
+        "Which subject needs the most time in your routine?",
+        "What distracts you most when studying?"
+      ]
+    }
+  ]
+}
