@@ -5,6 +5,7 @@ import type { ExpertCatalogItem } from "@/lib/experts/expert-schema";
 
 type Props = {
   experts: ExpertCatalogItem[];
+  onSuccess?: () => void;
 };
 
 type AssignMode = "assign" | "grant";
@@ -19,7 +20,7 @@ type AssignResponse = {
   error?: string;
 };
 
-export default function AdminExpertAssignForm({ experts }: Props) {
+export default function AdminExpertAssignForm({ experts, onSuccess }: Props) {
   const [targetEmail, setTargetEmail] = useState("");
   const [expertId, setExpertId] = useState(
     experts.find((e) => e.id === "empi-coordinator")?.id ?? experts[0]?.id ?? ""
@@ -58,6 +59,7 @@ export default function AdminExpertAssignForm({ experts }: Props) {
     }
 
     setResult(data);
+    onSuccess?.();
     if (data.created) {
       setTargetEmail("");
       setProfileId("");

@@ -62,7 +62,7 @@ export default async function SettingsPage() {
                   href="/settings/experts"
                   className="text-sm font-semibold text-brand hover:text-brand-dark"
                 >
-                  Assign experts (admin) →
+                  Manage expert access (admin) →
                 </a>
               </p>
             </>
