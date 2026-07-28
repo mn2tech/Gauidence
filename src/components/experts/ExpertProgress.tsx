@@ -1,14 +1,20 @@
-"use client";
-
+import Link from "next/link";
 import type { ExpertModuleProgress } from "@/lib/experts/expert-types";
 import type { ExpertRoadmapModule } from "@/lib/experts/expert-schema";
 
 type Props = {
   modules: ExpertRoadmapModule[];
   progress: ExpertModuleProgress[];
+  expertId?: string;
+  userExpertId?: string;
 };
 
-export default function ExpertProgress({ modules, progress }: Props) {
+export default function ExpertProgress({
+  modules,
+  progress,
+  expertId,
+  userExpertId,
+}: Props) {
   const published = modules.filter((m) => m.status === "published");
   if (published.length === 0) return null;
 
@@ -43,7 +49,17 @@ export default function ExpertProgress({ modules, progress }: Props) {
       </div>
       {current ? (
         <p className="mt-4 text-sm text-ink-muted">
-          Current module: <span className="font-medium text-foreground">{current.title}</span>
+          Current module:{" "}
+          {expertId && userExpertId ? (
+            <Link
+              href={`/experts/${expertId}/learn?installation=${encodeURIComponent(userExpertId)}&module=${encodeURIComponent(current.id)}`}
+              className="font-medium text-brand hover:underline"
+            >
+              {current.title}
+            </Link>
+          ) : (
+            <span className="font-medium text-foreground">{current.title}</span>
+          )}
         </p>
       ) : null}
     </div>

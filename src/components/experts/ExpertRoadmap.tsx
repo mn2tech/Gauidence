@@ -10,7 +10,12 @@ type Props = {
   modules: ExpertRoadmapModule[];
   progress: ExpertModuleProgress[];
   compact?: boolean;
+  activeModuleId?: string;
 };
+
+function moduleHref(expertId: string, userExpertId: string, moduleId: string) {
+  return `/experts/${expertId}/learn?installation=${encodeURIComponent(userExpertId)}&module=${encodeURIComponent(moduleId)}`;
+}
 
 function statusLabel(status?: string): string {
   switch (status) {
@@ -31,6 +36,7 @@ export default function ExpertRoadmap({
   modules,
   progress,
   compact = false,
+  activeModuleId,
 }: Props) {
   const published = [...modules]
     .filter((m) => m.status === "published")
@@ -43,9 +49,9 @@ export default function ExpertRoadmap({
     <div className="rounded-2xl border border-stone-200 bg-white p-5">
       <div className="flex items-center justify-between gap-3">
         <h2 className="font-semibold">Roadmap</h2>
-        {!compact ? (
+        {compact ? (
           <Link
-            href={`/experts/${expertId}/learn?installation=${userExpertId}`}
+            href={moduleHref(expertId, userExpertId, published[0]!.id)}
             className="text-sm font-medium text-brand hover:underline"
           >
             Open learning
@@ -55,10 +61,16 @@ export default function ExpertRoadmap({
       <div className="mt-4 space-y-3">
         {published.map((module) => {
           const moduleProgress = progressMap.get(module.id);
+          const isActive = activeModuleId === module.id;
           return (
-            <div
+            <Link
               key={module.id}
-              className="rounded-xl border border-stone-200 p-4"
+              href={moduleHref(expertId, userExpertId, module.id)}
+              className={`block rounded-xl border p-4 transition hover:border-brand/40 hover:bg-brand-light/10 ${
+                isActive
+                  ? "border-brand/50 bg-brand-light/20"
+                  : "border-stone-200"
+              }`}
             >
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
@@ -81,7 +93,7 @@ export default function ExpertRoadmap({
                   <span>{module.lessonTopicIds.length} lessons</span>
                 </div>
               ) : null}
-            </div>
+            </Link>
           );
         })}
       </div>

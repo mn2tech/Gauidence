@@ -52,14 +52,17 @@ export default async function ExpertLearnPage({ params, searchParams }: PageProp
             userExpertId={installation.id}
             modules={expert.roadmap}
             progress={progress ?? []}
+            activeModuleId={activeModuleId ?? undefined}
           />
           {activeModule ? (
+            <div id="expert-lessons">
             <ExpertLesson
               userExpertId={installation.id}
               module={activeModule}
               topics={topics}
               progress={moduleProgress}
             />
+            </div>
           ) : null}
         </section>
       </main>

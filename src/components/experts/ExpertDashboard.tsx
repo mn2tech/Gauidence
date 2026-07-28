@@ -30,7 +30,12 @@ export default function ExpertDashboard({
         <p className="mt-2 text-sm text-ink-muted">{expert.primaryGoal}</p>
       </div>
 
-      <ExpertProgress modules={expert.roadmap} progress={progress} />
+      <ExpertProgress
+        modules={expert.roadmap}
+        progress={progress}
+        expertId={expert.id}
+        userExpertId={userExpertId}
+      />
       <ExpertCapabilities
         expertId={expert.id}
         userExpertId={userExpertId}
