@@ -7,9 +7,13 @@ import {
   normalizeInviteEmail,
 } from "../invitations.ts";
 import {
+  canEditGuardianProfile,
   canManageProfileAccess,
   canShareGuardianProfile,
+  collaboratorRoleLabel,
   isProfileOwner,
+  isSharedGuardianProfile,
+  parseCollaboratorInviteRole,
   SHAREABLE_PROFILE_TYPES,
   type GuardianProfile,
 } from "../types.ts";
@@ -93,5 +97,12 @@ describe("shared vault helpers", () => {
     );
     assert.equal(canManageProfileAccess(sample({ access_role: "editor" })), false);
     assert.equal(isProfileOwner(sample({ access_role: "editor" })), false);
+    assert.equal(canEditGuardianProfile(sample({ access_role: "editor" })), true);
+    assert.equal(canEditGuardianProfile(sample({ access_role: "viewer" })), false);
+    assert.equal(isSharedGuardianProfile(sample({ access_role: "viewer" })), true);
+    assert.equal(collaboratorRoleLabel("viewer"), "Viewer");
+    assert.equal(parseCollaboratorInviteRole("viewer"), "viewer");
+    assert.equal(parseCollaboratorInviteRole("editor"), "editor");
+    assert.equal(parseCollaboratorInviteRole("invalid"), "editor");
   });
 });

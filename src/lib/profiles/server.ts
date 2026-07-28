@@ -3,6 +3,8 @@ import "server-only";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
+  canEditGuardianProfile,
+  isGuardianProfileAccessRole,
   isGuardianProfileType,
   type GuardianProfile,
   type GuardianProfileAccessRole,
@@ -53,7 +55,7 @@ async function membershipRoleMap(
     .eq("user_id", userId);
   const map = new Map<string, GuardianProfileAccessRole>();
   for (const row of data ?? []) {
-    const role = row.role === "owner" || row.role === "editor" ? row.role : null;
+    const role = isGuardianProfileAccessRole(row.role) ? row.role : null;
     if (role && row.profile_id) map.set(String(row.profile_id), role);
   }
   return map;
@@ -328,7 +330,11 @@ export async function requireAccessibleGuardianProfile(
     .eq("user_id", userId)
     .maybeSingle();
 
-  if (member?.role === "owner" || member?.role === "editor") {
+  if (
+    member?.role === "owner" ||
+    member?.role === "editor" ||
+    member?.role === "viewer"
+  ) {
     const { data } = await supabase
       .from("guardian_profiles")
       .select(PROFILE_SELECT)
@@ -358,7 +364,7 @@ export async function requireEditableGuardianProfile(
     profileId
   );
   if (!profile) return null;
-  if (profile.access_role === "owner" || profile.access_role === "editor") {
+  if (canEditGuardianProfile(profile)) {
     return profile;
   }
   return null;

@@ -9,6 +9,7 @@ import {
   nestedUnder,
   profileSubtitle,
   profileTypeLabel,
+  sharedProfileAccessBadge,
   topLevelProfiles,
   type GuardianProfile,
 } from "@/lib/profiles/types";
@@ -41,8 +42,10 @@ function SwitcherRow({
       <span className="min-w-0">
         <span className="block truncate font-medium">
           {profile.display_name}
-          {profile.access_role === "editor" ? (
-            <span className="ml-1 text-[10px] font-medium text-brand">Shared</span>
+          {sharedProfileAccessBadge(profile) ? (
+            <span className="ml-1 text-[10px] font-medium text-brand">
+              {sharedProfileAccessBadge(profile)}
+            </span>
           ) : null}
         </span>
         <span className="block truncate text-[11px] text-ink-muted">

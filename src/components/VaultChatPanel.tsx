@@ -42,6 +42,7 @@ import {
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
   VAULT_CREATE_CARDS,
+  canEditGuardianProfile,
   topLevelProfiles,
   vaultCreateHref,
 } from "@/lib/profiles/types";
@@ -572,6 +573,9 @@ export default function VaultChatPanel({
     ? profiles.find((p) => p.id === scopedProfileId) ?? null
     : null;
   const effectiveProfile = scopedProfile ?? active;
+  const canEditVault = effectiveProfile
+    ? canEditGuardianProfile(effectiveProfile)
+    : true;
   const profileId = effectiveProfile?.id ?? meta?.profileId ?? null;
   const profileNameForId = (id: string | null | undefined) =>
     profiles.find((p) => p.id === id)?.display_name ?? null;
@@ -2226,7 +2230,7 @@ export default function VaultChatPanel({
                     <button
                       key={action.id}
                       type="button"
-                      disabled={vaultBusy || sending || !profileId}
+                      disabled={vaultBusy || sending || !profileId || !canEditVault}
                       onClick={() => runFirstMemoryAction(action.id)}
                       className="flex flex-col items-center gap-1.5 rounded-xl border border-stone-200 bg-white px-3 py-3 text-center transition hover:border-brand hover:bg-brand-light/40 disabled:opacity-50"
                     >
@@ -2302,7 +2306,7 @@ export default function VaultChatPanel({
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  disabled={vaultBusy || sending || !profileId}
+                  disabled={vaultBusy || sending || !profileId || !canEditVault}
                   onClick={openCamera}
                   className="inline-flex rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark disabled:opacity-50"
                 >
@@ -2310,7 +2314,7 @@ export default function VaultChatPanel({
                 </button>
                 <button
                   type="button"
-                  disabled={vaultBusy || sending || !profileId}
+                  disabled={vaultBusy || sending || !profileId || !canEditVault}
                   onClick={openFilePicker}
                   className="inline-flex rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-stone-50 disabled:opacity-50"
                 >
@@ -2318,7 +2322,7 @@ export default function VaultChatPanel({
                 </button>
                 <button
                   type="button"
-                  disabled={vaultBusy || sending || !profileId}
+                  disabled={vaultBusy || sending || !profileId || !canEditVault}
                   onClick={openLogForm}
                   className="inline-flex rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-stone-50 disabled:opacity-50"
                 >
@@ -2578,7 +2582,7 @@ export default function VaultChatPanel({
                 aria-expanded={plusOpen}
                 aria-haspopup="menu"
                 aria-label="Add to vault"
-                disabled={vaultBusy || sending || !profileId}
+                disabled={vaultBusy || sending || !profileId || !canEditVault}
                 className={`inline-flex h-9 w-9 items-center justify-center rounded-full border transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50 ${
                   emptyVault
                     ? "border-brand/40 bg-brand-light text-brand hover:bg-brand/15"
@@ -2595,7 +2599,7 @@ export default function VaultChatPanel({
                   <button
                     type="button"
                     role="menuitem"
-                    disabled={vaultBusy || sending || !profileId}
+                    disabled={vaultBusy || sending || !profileId || !canEditVault}
                     onClick={openFilePicker}
                     className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm font-medium text-foreground hover:bg-stone-50 disabled:opacity-50"
                   >
@@ -2608,7 +2612,7 @@ export default function VaultChatPanel({
                   <button
                     type="button"
                     role="menuitem"
-                    disabled={vaultBusy || sending || !profileId}
+                    disabled={vaultBusy || sending || !profileId || !canEditVault}
                     onClick={openCamera}
                     className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-medium text-foreground hover:bg-stone-50 disabled:opacity-50"
                   >
@@ -2618,7 +2622,7 @@ export default function VaultChatPanel({
                   <button
                     type="button"
                     role="menuitem"
-                    disabled={vaultBusy || sending || !profileId}
+                    disabled={vaultBusy || sending || !profileId || !canEditVault}
                     onClick={openLogForm}
                     className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-medium text-foreground hover:bg-stone-50 disabled:opacity-50"
                   >
@@ -2628,7 +2632,7 @@ export default function VaultChatPanel({
                   <button
                     type="button"
                     role="menuitem"
-                    disabled={vaultBusy || sending || !profileId}
+                    disabled={vaultBusy || sending || !profileId || !canEditVault}
                     onClick={openReminderForm}
                     className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-medium text-foreground hover:bg-stone-50 disabled:opacity-50"
                   >

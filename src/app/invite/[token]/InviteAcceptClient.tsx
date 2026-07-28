@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { collaboratorRoleLabel } from "@/lib/profiles/types";
 
 type Peek = {
   email: string;
@@ -130,7 +131,7 @@ export default function InviteAcceptClient({ token }: { token: string }) {
         <span className="font-semibold text-foreground">
           {peek?.vaultName ?? "a vault"}
         </span>{" "}
-        as an Editor.
+        as {collaboratorRoleLabel(peek?.role ?? "editor")}.
       </p>
       <p className="mt-1 text-center text-xs text-ink-muted">
         Invitation for {peek?.email}

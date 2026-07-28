@@ -151,7 +151,7 @@ export async function POST(_request: Request, ctx: Ctx) {
       {
         profile_id: invite.profile_id,
         user_id: user.id,
-        role: "editor",
+        role: invite.role,
         invited_by: invite.invited_by_user_id,
       },
       { onConflict: "profile_id,user_id" }

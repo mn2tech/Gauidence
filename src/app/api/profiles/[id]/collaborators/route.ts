@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { User, SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { requireOwnedGuardianProfile } from "@/lib/profiles/server";
-import { canShareGuardianProfile } from "@/lib/profiles/types";
+import { canShareGuardianProfile, parseCollaboratorInviteRole } from "@/lib/profiles/types";
 import {
   createInviteToken,
   hashInviteToken,
@@ -138,6 +138,7 @@ export async function POST(request: Request, ctx: Ctx) {
     );
   }
   const email = normalizeInviteEmail(emailRaw);
+  const inviteRole = parseCollaboratorInviteRole(body.role);
   if (user.email && normalizeInviteEmail(user.email) === email) {
     return NextResponse.json(
       { error: "You already own this vault." },
@@ -184,12 +185,12 @@ export async function POST(request: Request, ctx: Ctx) {
     .insert({
       profile_id: profileId,
       invited_email_normalized: email,
-      role: "editor",
+      role: inviteRole,
       token_hash: tokenHash,
       invited_by_user_id: user.id,
       expires_at: expiresAt,
     })
-    .select("id, invited_email_normalized, expires_at, created_at")
+    .select("id, invited_email_normalized, role, expires_at, created_at")
     .single();
 
   if (error || !invitation) {
@@ -215,12 +216,14 @@ export async function POST(request: Request, ctx: Ctx) {
     vaultName: owned.display_name,
     inviterName,
     acceptUrl,
+    accessRole: inviteRole,
   });
 
   return NextResponse.json({
     invitation: {
       id: invitation.id,
       email: invitation.invited_email_normalized,
+      role: invitation.role,
       expiresAt: invitation.expires_at,
       createdAt: invitation.created_at,
     },

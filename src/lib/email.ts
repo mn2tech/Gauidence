@@ -126,9 +126,23 @@ export type VaultInviteEmailArgs = {
   vaultName: string;
   inviterName: string;
   acceptUrl: string;
+  accessRole?: "editor" | "viewer";
 };
 
+function vaultInviteAccessLabel(role: "editor" | "viewer" | undefined): string {
+  return role === "viewer" ? "a Viewer" : "an Editor";
+}
+
+function vaultInviteAccessDescription(role: "editor" | "viewer" | undefined): string {
+  if (role === "viewer") {
+    return "You can view documents and ask Gideon about that vault. You cannot add or edit vault content.";
+  }
+  return "You can add documents and Daily Logs, and ask Gideon about that vault.";
+}
+
 export function renderVaultInviteEmail(args: VaultInviteEmailArgs) {
+  const accessLabel = vaultInviteAccessLabel(args.accessRole);
+  const accessDescription = vaultInviteAccessDescription(args.accessRole);
   const subject = `${args.inviterName} invited you to a Guardian vault`;
   const html = `
   <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#fafaf9;padding:32px 16px;">
@@ -137,10 +151,10 @@ export function renderVaultInviteEmail(args: VaultInviteEmailArgs) {
         <div style="font-size:18px;font-weight:700;color:#1c1917;">Guardian</div>
         <p style="margin:16px 0 8px;font-size:15px;color:#1c1917;line-height:1.5;">
           ${escapeHtml(args.inviterName)} invited you to collaborate on
-          <strong>${escapeHtml(args.vaultName)}</strong> as an Editor.
+          <strong>${escapeHtml(args.vaultName)}</strong> as ${accessLabel}.
         </p>
         <p style="margin:0 0 20px;font-size:14px;color:#57534e;line-height:1.6;">
-          You can add documents and Daily Logs, and ask Gideon about that vault.
+          ${escapeHtml(accessDescription)}
           Your Gideon conversations stay private to you.
         </p>
         <a href="${escapeHtml(args.acceptUrl)}"
@@ -154,9 +168,9 @@ export function renderVaultInviteEmail(args: VaultInviteEmailArgs) {
     </div>
   </div>`;
   const text = [
-    `${args.inviterName} invited you to collaborate on ${args.vaultName} as an Editor.`,
+    `${args.inviterName} invited you to collaborate on ${args.vaultName} as ${accessLabel}.`,
     "",
-    "You can add documents and Daily Logs, and ask Gideon about that vault.",
+    accessDescription,
     "Your Gideon conversations stay private to you.",
     "",
     `Accept: ${args.acceptUrl}`,

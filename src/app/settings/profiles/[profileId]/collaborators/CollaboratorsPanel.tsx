@@ -16,8 +16,12 @@ import {
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
   canManageProfileAccess,
+  collaboratorRoleDescription,
+  collaboratorRoleLabel,
+  parseCollaboratorInviteRole,
   profileTypeLabel,
   type GuardianProfile,
+  type GuardianProfileCollaboratorRole,
 } from "@/lib/profiles/types";
 import { collaboratorDisplayName } from "@/lib/profiles/collaboratorDisplay";
 
@@ -33,6 +37,7 @@ type Member = {
 type Invitation = {
   id: string;
   email: string;
+  role: string;
   expiresAt: string;
   createdAt: string;
 };
@@ -50,6 +55,8 @@ export default function CollaboratorsPanel({
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [vault, setVault] = useState<GuardianProfile | null>(profile);
   const [email, setEmail] = useState("");
+  const [inviteRole, setInviteRole] =
+    useState<GuardianProfileCollaboratorRole>("editor");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -110,7 +117,7 @@ export default function CollaboratorsPanel({
       const res = await fetch(`/api/profiles/${profileId}/collaborators`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, role: inviteRole }),
       });
       const body = (await res.json().catch(() => ({}))) as {
         error?: string;
@@ -148,6 +155,33 @@ export default function CollaboratorsPanel({
         return;
       }
       await load();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const updateMemberRole = async (
+    userId: string,
+    role: GuardianProfileCollaboratorRole
+  ) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/profiles/${profileId}/collaborators/${userId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ role }),
+        }
+      );
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(body.error ?? "Couldn't update access level.");
+        return;
+      }
+      await load();
+      await refresh();
     } finally {
       setBusy(false);
     }
@@ -205,14 +239,14 @@ export default function CollaboratorsPanel({
             Manage access
           </h1>
           <p className="mt-1 text-sm text-ink-muted">
-            Invite Editors to the{" "}
+            Invite people to the{" "}
             <span className="font-medium text-foreground">
               {profileTypeLabel(vaultKind).toLowerCase()} vault
             </span>{" "}
             <span className="font-medium text-foreground">{vaultName}</span>.
-            Editors can add documents and Daily Logs and Ask Gideon. Their chats
-            stay private. Parent business vaults and other clients are not
-            shared.
+            Choose view or edit access. Editors can add documents and Daily
+            Logs; viewers can read and ask Gideon. Gideon chats stay private.
+            Parent business vaults and other clients are not shared.
           </p>
         </div>
         <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-light text-brand">
@@ -227,28 +261,52 @@ export default function CollaboratorsPanel({
       ) : null}
 
       <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-        <h2 className="text-sm font-semibold">Invite an Editor</h2>
-        <form onSubmit={invite} className="mt-3 flex flex-col gap-2 sm:flex-row">
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="colleague@company.com"
-            className="min-w-0 flex-1 rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand"
-          />
-          <button
-            type="submit"
-            disabled={busy}
-            className="inline-flex items-center justify-center gap-1.5 rounded-full bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50"
-          >
-            {busy ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <UserPlus className="h-4 w-4" />
-            )}
-            Send invite
-          </button>
+        <h2 className="text-sm font-semibold">Invite someone</h2>
+        <form onSubmit={invite} className="mt-3 space-y-3">
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="colleague@company.com"
+              className="min-w-0 flex-1 rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand"
+            />
+            <button
+              type="submit"
+              disabled={busy}
+              className="inline-flex items-center justify-center gap-1.5 rounded-full bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50"
+            >
+              {busy ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <UserPlus className="h-4 w-4" />
+              )}
+              Send invite
+            </button>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <label
+              htmlFor="invite-access-level"
+              className="text-xs font-medium text-ink-muted"
+            >
+              Access level
+            </label>
+            <select
+              id="invite-access-level"
+              value={inviteRole}
+              onChange={(e) =>
+                setInviteRole(parseCollaboratorInviteRole(e.target.value))
+              }
+              className="rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand sm:max-w-xs"
+            >
+              <option value="editor">Edit — add and change vault content</option>
+              <option value="viewer">View — read and ask Gideon only</option>
+            </select>
+          </div>
+          <p className="text-xs text-ink-muted">
+            {collaboratorRoleDescription(inviteRole)}
+          </p>
         </form>
         {lastInviteUrl ? (
           <div className="mt-3 rounded-xl border border-stone-200 bg-stone-50 p-3">
@@ -285,20 +343,37 @@ export default function CollaboratorsPanel({
                     {m.isYou ? " (you)" : ""}
                   </p>
                   <p className="truncate text-xs text-ink-muted">
-                    {m.role === "owner" ? "Owner" : "Editor"}
+                    {collaboratorRoleLabel(m.role)}
                     {m.fullName && m.email ? ` · ${m.email}` : ""}
                   </p>
                 </div>
-                {m.role === "editor" ? (
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => void removeMember(m.userId)}
-                    className="inline-flex items-center gap-1 rounded-full border border-stone-300 px-2.5 py-1 text-xs font-medium text-foreground hover:bg-stone-50 disabled:opacity-50"
-                  >
-                    <UserMinus className="h-3.5 w-3.5" />
-                    Remove
-                  </button>
+                {m.role === "editor" || m.role === "viewer" ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <select
+                      value={m.role}
+                      disabled={busy}
+                      onChange={(e) =>
+                        void updateMemberRole(
+                          m.userId,
+                          parseCollaboratorInviteRole(e.target.value)
+                        )
+                      }
+                      className="rounded-full border border-stone-300 bg-white px-2.5 py-1 text-xs font-medium text-foreground"
+                      aria-label={`Access level for ${collaboratorDisplayName(m)}`}
+                    >
+                      <option value="editor">Edit</option>
+                      <option value="viewer">View</option>
+                    </select>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void removeMember(m.userId)}
+                      className="inline-flex items-center gap-1 rounded-full border border-stone-300 px-2.5 py-1 text-xs font-medium text-foreground hover:bg-stone-50 disabled:opacity-50"
+                    >
+                      <UserMinus className="h-3.5 w-3.5" />
+                      Remove
+                    </button>
+                  </div>
                 ) : null}
               </li>
             ))}
@@ -321,7 +396,8 @@ export default function CollaboratorsPanel({
                     {inv.email}
                   </p>
                   <p className="text-xs text-ink-muted">
-                    Expires {new Date(inv.expiresAt).toLocaleDateString()}
+                    {collaboratorRoleLabel(inv.role)} · Expires{" "}
+                    {new Date(inv.expiresAt).toLocaleDateString()}
                   </p>
                 </div>
                 <button

@@ -197,7 +197,60 @@ export function vaultCreateHref(
   return `/settings/profiles?${params.toString()}`;
 }
 
-export type GuardianProfileAccessRole = "owner" | "editor";
+export type GuardianProfileCollaboratorRole = "editor" | "viewer";
+export type GuardianProfileAccessRole = "owner" | "editor" | "viewer";
+
+export function isGuardianProfileAccessRole(
+  value: unknown
+): value is GuardianProfileAccessRole {
+  return value === "owner" || value === "editor" || value === "viewer";
+}
+
+export function parseCollaboratorInviteRole(
+  raw: unknown
+): GuardianProfileCollaboratorRole {
+  return raw === "viewer" ? "viewer" : "editor";
+}
+
+export function collaboratorRoleLabel(role: string): string {
+  if (role === "owner") return "Owner";
+  if (role === "viewer") return "Viewer";
+  if (role === "editor") return "Editor";
+  return "Member";
+}
+
+export function collaboratorRoleDescription(role: GuardianProfileCollaboratorRole): string {
+  if (role === "viewer") {
+    return "Can view documents and ask Gideon. Cannot add or edit vault content.";
+  }
+  return "Can add documents and Daily Logs and ask Gideon.";
+}
+
+export function canEditGuardianProfile(
+  profile: Pick<GuardianProfile, "access_role" | "owner_user_id">,
+  userId?: string | null
+): boolean {
+  if (profile.access_role === "owner" || profile.access_role === "editor") {
+    return true;
+  }
+  if (profile.access_role === "viewer") return false;
+  if (userId) return profile.owner_user_id === userId;
+  return profile.access_role == null;
+}
+
+export function isSharedGuardianProfile(
+  profile: Pick<GuardianProfile, "access_role">
+): boolean {
+  return profile.access_role === "editor" || profile.access_role === "viewer";
+}
+
+export function sharedProfileAccessBadge(
+  profile: Pick<GuardianProfile, "access_role">
+): string | null {
+  if (profile.access_role === "viewer") return "View only";
+  if (profile.access_role === "editor") return "Shared";
+  return null;
+}
 
 export type GuardianProfile = {
   id: string;
@@ -249,7 +302,9 @@ export function isProfileOwner(
   userId?: string | null
 ): boolean {
   if (profile.access_role === "owner") return true;
-  if (profile.access_role === "editor") return false;
+  if (profile.access_role === "editor" || profile.access_role === "viewer") {
+    return false;
+  }
   if (userId) return profile.owner_user_id === userId;
   return false;
 }
@@ -309,8 +364,11 @@ export function profileCompanyContext(profile: GuardianProfile): string | null {
 
 export function vaultLabel(profile: GuardianProfile): string {
   const name = profile.display_name.trim() || "Profile";
-  const shared =
-    profile.access_role === "editor" ? " (shared)" : "";
+  const shared = isSharedGuardianProfile(profile)
+    ? profile.access_role === "viewer"
+      ? " (shared, view only)"
+      : " (shared)"
+    : "";
   if (
     isGroupStyleProfile(profile.profile_type) ||
     isAssetStyleProfile(profile.profile_type)

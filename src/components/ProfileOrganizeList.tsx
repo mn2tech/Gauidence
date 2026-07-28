@@ -25,9 +25,11 @@ import {
   isGroupStyleProfile,
   isNestableProfileType,
   isProfileOwner,
+  isSharedGuardianProfile,
   petsOf,
   profileAvatarLabel,
   profileSubtitle,
+  sharedProfileAccessBadge,
   profileTypeLabel,
   studentsOf,
   topLevelProfiles,
@@ -556,9 +558,9 @@ export default function ProfileOrganizeList({
                             Active
                           </span>
                         ) : null}
-                        {p.access_role === "editor" ? (
+                        {sharedProfileAccessBadge(p) ? (
                           <span className="ml-2 text-[11px] font-medium text-brand">
-                            Shared
+                            {sharedProfileAccessBadge(p)}
                           </span>
                         ) : null}
                         {nested.length > 0 ? (
@@ -623,7 +625,7 @@ export default function ProfileOrganizeList({
                         <Trash2 className="h-3 w-3" />
                         Delete
                       </button>
-                    ) : p.access_role === "editor" ? (
+                    ) : isSharedGuardianProfile(p) ? (
                       <button
                         type="button"
                         disabled={busy}
