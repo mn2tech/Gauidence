@@ -5,6 +5,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type ClipboardEvent,
   type FormEvent,
   type MouseEvent,
 } from "react";
@@ -70,6 +71,7 @@ import {
 import { isImageFileName } from "@/lib/vault/images";
 import { renderPdfThumbnailFromFile, renderPdfThumbnailFromUrl } from "@/lib/vault/pdfThumbnail";
 import { renderGideonText } from "@/components/gideonText";
+import { clipboardImageToFile } from "@/lib/vault/clipboardImage";
 import { uploadAndAnalyzeToVault } from "@/lib/vault/clientUpload";
 import ProfileSetupHub from "@/components/ProfileSetupHub";
 import AskGideonSidebar from "@/components/AskGideonSidebar";
@@ -673,6 +675,17 @@ export default function VaultChatPanel({
       });
     },
     [profileId, vaultBusy, sending, revokePendingPreview]
+  );
+
+  const handleComposerPaste = useCallback(
+    (e: ClipboardEvent<HTMLFormElement>) => {
+      if (!profileId || vaultBusy || sending || !canEditVault) return;
+      const file = clipboardImageToFile(e.clipboardData);
+      if (!file) return;
+      e.preventDefault();
+      stageVaultFile(file);
+    },
+    [profileId, vaultBusy, sending, canEditVault, stageVaultFile]
   );
 
   const loadMetaAndChats = useCallback(async () => {
@@ -2518,6 +2531,7 @@ export default function VaultChatPanel({
   const composer = (
     <form
       onSubmit={send}
+      onPaste={handleComposerPaste}
       className={
         isPage || isDrawer
           ? "shrink-0 border-t border-stone-200 bg-white px-4 py-3 sm:px-8"
@@ -2565,10 +2579,10 @@ export default function VaultChatPanel({
                   : pendingAttachment
                     ? "Write a message…"
                     : emptyVault
-                      ? "Ask anything — or use + to scan / upload…"
+                      ? "Ask anything — paste a screenshot, or use + to scan / upload…"
                       : logsOnly
                         ? "Ask about Daily Logs or anything else…"
-                        : "Ask about your documents or anything else…"
+                        : "Ask about your documents, paste a screenshot, or ask anything…"
               }
               className="w-full border-0 bg-transparent py-1.5 text-sm outline-none placeholder:text-ink-muted disabled:opacity-50"
             />
