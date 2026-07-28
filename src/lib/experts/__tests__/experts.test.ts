@@ -20,6 +20,14 @@ describe("expert loader", () => {
     assert.equal(expert?.knowledgeTopics.length, 3);
   });
 
+  it("loads EMPI Coordinator expert JSON", () => {
+    const expert = getExpertById("empi-coordinator");
+    assert.ok(expert);
+    assert.equal(expert?.name, "EMPI Coordinator");
+    assert.equal(expert?.roadmap.length, 3);
+    assert.ok(expert!.capabilities.some((c) => c.route === "scenarios"));
+  });
+
   it("does not expose systemPrompt in public expert view", () => {
     const expert = getExpertPublicById("example-expert");
     assert.ok(expert);

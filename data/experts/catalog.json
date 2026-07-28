@@ -1,6 +1,17 @@
 {
   "experts": [
     {
+      "id": "empi-coordinator",
+      "name": "EMPI Coordinator",
+      "shortName": "EMPI",
+      "category": "Professional",
+      "description": "Learn enterprise master patient index concepts, matching workflows, and identity stewardship.",
+      "icon": "database",
+      "status": "beta",
+      "version": "1.0.0",
+      "file": "empi-coordinator.json"
+    },
+    {
       "id": "example-expert",
       "name": "Example Expert",
       "shortName": "Example",

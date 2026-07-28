@@ -1,0 +1,558 @@
+{
+  "id": "empi-coordinator",
+  "version": "1.0.0",
+  "name": "EMPI Coordinator",
+  "shortName": "EMPI",
+  "category": "Professional",
+  "icon": "database",
+  "status": "beta",
+  "description": "Learn enterprise master patient index concepts, matching workflows, and identity stewardship.",
+  "longDescription": "Build practical skills for coordinating patient identity across systems: EMPI fundamentals, deterministic and probabilistic matching, duplicate review, merge decisions, and audit-aware operations.",
+  "primaryGoal": "Develop coordinator-level judgment for patient identity matching, stewardship, and operational accountability.",
+  "disclaimer": "Educational content only. Not medical advice, legal advice, or HIPAA compliance guidance. Do not enter real PHI into Ask Expert. Follow your organization's policies and qualified compliance review.",
+
+  "theme": {
+    "accent": "blue",
+    "style": "professional"
+  },
+
+  "capabilities": [
+    {
+      "id": "learn",
+      "title": "Learn",
+      "description": "Follow a structured path through EMPI fundamentals and stewardship workflows.",
+      "icon": "book-open",
+      "route": "learn",
+      "enabled": true
+    },
+    {
+      "id": "ask",
+      "title": "Ask",
+      "description": "Ask questions grounded in EMPI knowledge topics.",
+      "icon": "message-circle",
+      "route": "ask",
+      "enabled": true
+    },
+    {
+      "id": "scenarios",
+      "title": "Scenarios",
+      "description": "Practice duplicate-review and merge decisions with fictional cases.",
+      "icon": "target",
+      "route": "scenarios",
+      "enabled": true
+    },
+    {
+      "id": "quiz",
+      "title": "Quiz",
+      "description": "Test your understanding of matching concepts and terminology.",
+      "icon": "brain",
+      "route": "quiz",
+      "enabled": true
+    }
+  ],
+
+  "systemPrompt": "You are the EMPI Coordinator expert inside Guardian. Help users learn enterprise master patient index (EMPI) and master patient index (MPI) operations: patient matching, identity stewardship, duplicate review, merge/unmerge concepts, survivorship, and audit accountability. Use clear, practical language for healthcare data stewards and coordinators. Stay within educational scope. Never provide medical advice, legal advice, or definitive HIPAA compliance guidance. Do not request or process real patient identifiers or PHI. When uncertain, say so and recommend following organizational policy and qualified review.",
+
+  "responseRules": [
+    "Keep answers focused on EMPI/MPI operations and stewardship workflows.",
+    "Use fictional examples only; never ask for real patient data.",
+    "Distinguish educational guidance from organization-specific policy.",
+    "Reference relevant learning topics when helpful.",
+    "Encourage documentation, audit trails, and escalation when match confidence is unclear."
+  ],
+
+  "starterQuestions": [
+    "What is the difference between an MPI and an EMPI?",
+    "When should a potential duplicate go to manual review?",
+    "What is a golden record in patient identity management?",
+    "How do deterministic and probabilistic matching differ?"
+  ],
+
+  "roadmap": [
+    {
+      "id": "module-fundamentals",
+      "order": 1,
+      "title": "EMPI Fundamentals",
+      "description": "Understand why enterprise patient identity exists and who the key stakeholders are.",
+      "estimatedMinutes": 15,
+      "learningObjectives": [
+        "Explain the purpose of EMPI in care delivery and data exchange",
+        "Identify common identifiers used in patient matching",
+        "Describe roles of data stewards, HIM, and IT in identity operations"
+      ],
+      "lessonTopicIds": ["topic-empi-purpose", "topic-identifiers"],
+      "quizIds": ["quiz-fundamentals"],
+      "status": "published"
+    },
+    {
+      "id": "module-matching",
+      "order": 2,
+      "title": "Patient Matching",
+      "description": "Learn how records are linked, scored, and routed for review.",
+      "estimatedMinutes": 20,
+      "learningObjectives": [
+        "Compare deterministic and probabilistic matching",
+        "Interpret match scores and thresholds",
+        "Know when to auto-link versus escalate to manual review"
+      ],
+      "lessonTopicIds": ["topic-matching-methods", "topic-match-thresholds"],
+      "quizIds": [],
+      "status": "published"
+    },
+    {
+      "id": "module-stewardship",
+      "order": 3,
+      "title": "Identity Stewardship",
+      "description": "Practice stewardship decisions: duplicates, merges, overlays, and audit accountability.",
+      "estimatedMinutes": 20,
+      "learningObjectives": [
+        "Differentiate merge, overlay, and unmerge concepts",
+        "Apply a basic duplicate-review decision framework",
+        "Describe audit and accountability expectations for identity changes"
+      ],
+      "lessonTopicIds": ["topic-stewardship", "topic-audit"],
+      "quizIds": ["quiz-stewardship"],
+      "status": "published"
+    }
+  ],
+
+  "knowledgeTopics": [
+    {
+      "id": "topic-empi-purpose",
+      "title": "Purpose of EMPI",
+      "category": "fundamentals",
+      "summary": "An Enterprise Master Patient Index (EMPI) creates a trusted view of patient identity across multiple source systems.",
+      "details": [
+        "Hospitals and health systems often have many applications, each with its own medical record number (MRN).",
+        "EMPI links those records to a single enterprise identity so clinicians and analysts see consistent patient context.",
+        "Accurate identity supports clinical safety, care coordination, reporting, and revenue cycle integrity.",
+        "Poor identity quality creates duplicate records, split records, and downstream operational risk."
+      ],
+      "examples": [
+        {
+          "title": "Cross-facility patient",
+          "description": "A patient registered in the ED and again in outpatient rehab may appear as two records until EMPI matching links or flags them for review."
+        }
+      ],
+      "keyPoints": [
+        "EMPI is an operational system of record for identity, not clinical content",
+        "Identity quality is a shared responsibility across registration, HIM, and IT",
+        "Stewardship workflows exist because perfect automation is impossible"
+      ],
+      "commonMistakes": [
+        "Treating EMPI as only an IT project instead of a clinical operations program",
+        "Assuming one strong identifier eliminates all duplicates"
+      ],
+      "starterQuestions": [
+        "Why do health systems need an EMPI?",
+        "Who owns patient identity quality in a hospital?"
+      ],
+      "relatedTopicIds": ["topic-identifiers", "topic-matching-methods"],
+      "sourceType": "guardian-curated"
+    },
+    {
+      "id": "topic-identifiers",
+      "title": "Patient Identifiers and Match Keys",
+      "category": "fundamentals",
+      "summary": "Matching relies on demographic and identifier fields, each with different reliability and privacy constraints.",
+      "details": [
+        "Common match keys include legal name components, date of birth, sex, address, phone, and government identifiers where permitted.",
+        "Facility MRNs are local to a source system and are not portable enterprise identifiers by themselves.",
+        "Enterprise identifiers (enterprise ID, universal ID) are assigned after identity resolution.",
+        "Organizations define which fields are required at registration because missing data weakens matching."
+      ],
+      "examples": [
+        {
+          "title": "Weak registration data",
+          "description": "Records with missing DOB or generic names like 'Baby Boy' increase false positives and manual review volume."
+        }
+      ],
+      "keyPoints": [
+        "Data quality at registration directly affects EMPI performance",
+        "Not every identifier should be used in automated matching",
+        "Policies govern use of sensitive identifiers"
+      ],
+      "commonMistakes": [
+        "Using outdated addresses as high-confidence keys",
+        "Ignoring nickname and maiden name variants in matching rules"
+      ],
+      "starterQuestions": [
+        "What makes a good match key?",
+        "Why are MRNs insufficient as a universal patient ID?"
+      ],
+      "relatedTopicIds": ["topic-empi-purpose", "topic-matching-methods"],
+      "sourceType": "guardian-curated"
+    },
+    {
+      "id": "topic-matching-methods",
+      "title": "Deterministic vs Probabilistic Matching",
+      "category": "matching",
+      "summary": "Deterministic rules require exact agreement on defined fields; probabilistic models score similarity across weighted attributes.",
+      "details": [
+        "Deterministic matching is fast and explainable, e.g. exact match on enterprise ID or a defined composite key.",
+        "Probabilistic matching assigns weights to fields (name, DOB, address) and produces a match score.",
+        "High scores may auto-link; borderline scores route to manual review queues.",
+        "Algorithms may include phonetic name matching, nickname tables, and address normalization."
+      ],
+      "examples": [
+        {
+          "title": "Nickname variation",
+          "description": "Robert vs Bob may score highly on DOB and address but require nickname logic rather than exact first-name match."
+        }
+      ],
+      "keyPoints": [
+        "No single algorithm fits all populations and use cases",
+        "Tuning thresholds balances missed duplicates against false merges",
+        "Manual review is a feature, not a failure"
+      ],
+      "commonMistakes": [
+        "Auto-merging on name and DOB alone in high-risk populations",
+        "Disabling review queues to reduce backlog without measuring harm"
+      ],
+      "starterQuestions": [
+        "When is deterministic matching preferred?",
+        "What does a match score represent?"
+      ],
+      "relatedTopicIds": ["topic-match-thresholds", "topic-stewardship"],
+      "sourceType": "guardian-curated"
+    },
+    {
+      "id": "topic-match-thresholds",
+      "title": "Scores, Thresholds, and Review Queues",
+      "category": "matching",
+      "summary": "Thresholds translate algorithm output into operational actions: auto-link, review, or create new identity.",
+      "details": [
+        "Organizations typically define auto-link, manual review, and reject/create bands.",
+        "Review queues should prioritize high-risk pairs and aging worklists.",
+        "Metrics include duplicate rate, auto-link rate, review turnaround, and post-merge correction rate.",
+        "Threshold changes should be governed, tested, and communicated to stewardship teams."
+      ],
+      "examples": [
+        {
+          "title": "Borderline score",
+          "description": "Two records share name and DOB but different SSN last-four values; coordinator escalates instead of merging."
+        }
+      ],
+      "keyPoints": [
+        "Threshold tuning is ongoing operations work",
+        "Review decisions need consistent documentation",
+        "Safety favors caution when identifiers conflict"
+      ],
+      "commonMistakes": [
+        "Clearing queues by lowering thresholds without quality monitoring",
+        "Treating all manual reviews as equal priority"
+      ],
+      "starterQuestions": [
+        "What happens when a pair falls below the auto-link threshold?",
+        "Which metrics show EMPI health?"
+      ],
+      "relatedTopicIds": ["topic-matching-methods", "topic-stewardship"],
+      "sourceType": "guardian-curated"
+    },
+    {
+      "id": "topic-stewardship",
+      "title": "Stewardship: Duplicates, Merges, and Overlays",
+      "category": "stewardship",
+      "summary": "Data stewards adjudicate potential duplicates and decide how source records roll up to an enterprise identity.",
+      "details": [
+        "A duplicate pair is two records believed to represent the same person.",
+        "Merge combines identities so downstream systems reference one enterprise ID.",
+        "Overlay links source records to a golden record while preserving source attributes where appropriate.",
+        "Unmerge reverses an incorrect merge and must be rare, controlled, and heavily audited.",
+        "Survivorship rules decide which source value wins for each data element on the golden record."
+      ],
+      "examples": [
+        {
+          "title": "Twin or mother-baby edge case",
+          "description": "Similar demographics around delivery may create false positives; stewards apply policy and additional verification."
+        }
+      ],
+      "keyPoints": [
+        "Incorrect merges are high-impact patient safety events",
+        "Stewards document rationale for non-obvious decisions",
+        "Escalation paths exist for ambiguous cases"
+      ],
+      "commonMistakes": [
+        "Merging because names look similar without checking conflicting identifiers",
+        "Using unmerge as a routine cleanup tool"
+      ],
+      "starterQuestions": [
+        "What is the difference between merge and overlay?",
+        "When should I escalate instead of deciding alone?"
+      ],
+      "relatedTopicIds": ["topic-audit", "topic-match-thresholds"],
+      "sourceType": "guardian-curated"
+    },
+    {
+      "id": "topic-audit",
+      "title": "Audit, Accountability, and Policy",
+      "category": "operations",
+      "summary": "Identity changes must be traceable, policy-aligned, and reviewable for compliance and patient safety.",
+      "details": [
+        "Audit logs should capture who changed identity, when, why, and which records were affected.",
+        "Coordinators follow organizational policies for break-glass access and exception handling.",
+        "Training and periodic competency review reduce inconsistent stewardship decisions.",
+        "Educational content does not replace organizational compliance review or legal counsel."
+      ],
+      "examples": [
+        {
+          "title": "Post-merge correction",
+          "description": "A merge is reversed after discovery of conflicting insurance identifiers; audit trail supports investigation and notification workflows."
+        }
+      ],
+      "keyPoints": [
+        "Accountability is as important as algorithm accuracy",
+        "Policy defines acceptable evidence for merge decisions",
+        "Never enter real PHI into training tools outside approved environments"
+      ],
+      "commonMistakes": [
+        "Making identity changes without ticket or case documentation",
+        "Assuming vendor defaults match local policy without validation"
+      ],
+      "starterQuestions": [
+        "What should an identity audit log include?",
+        "How do coordinators work with compliance teams?"
+      ],
+      "relatedTopicIds": ["topic-stewardship"],
+      "sourceType": "guardian-curated"
+    }
+  ],
+
+  "glossary": [
+    {
+      "term": "EMPI",
+      "definition": "Enterprise Master Patient Index — a system that resolves and maintains patient identity across an organization.",
+      "category": "fundamentals",
+      "relatedTopicIds": ["topic-empi-purpose"]
+    },
+    {
+      "term": "MPI",
+      "definition": "Master Patient Index — often used interchangeably with EMPI, though some organizations distinguish enterprise vs facility scope.",
+      "category": "fundamentals",
+      "relatedTopicIds": ["topic-empi-purpose"]
+    },
+    {
+      "term": "Golden Record",
+      "definition": "The authoritative enterprise view of a patient's identity built from contributing source records.",
+      "category": "stewardship",
+      "relatedTopicIds": ["topic-stewardship"]
+    },
+    {
+      "term": "Deterministic Match",
+      "definition": "A match based on exact agreement of predefined fields or keys.",
+      "category": "matching",
+      "relatedTopicIds": ["topic-matching-methods"]
+    },
+    {
+      "term": "Probabilistic Match",
+      "definition": "A match based on weighted similarity scoring across demographic attributes.",
+      "category": "matching",
+      "relatedTopicIds": ["topic-matching-methods"]
+    },
+    {
+      "term": "Match Score",
+      "definition": "A numeric confidence output used to route pairs to auto-link, review, or reject actions.",
+      "category": "matching",
+      "relatedTopicIds": ["topic-match-thresholds"]
+    },
+    {
+      "term": "Overlay",
+      "definition": "Linking source records to an enterprise identity while retaining source-specific attributes.",
+      "category": "stewardship",
+      "relatedTopicIds": ["topic-stewardship"]
+    },
+    {
+      "term": "Survivorship",
+      "definition": "Rules that determine which source value populates each field on the golden record.",
+      "category": "stewardship",
+      "relatedTopicIds": ["topic-stewardship"]
+    }
+  ],
+
+  "quizzes": [
+    {
+      "id": "quiz-fundamentals",
+      "title": "EMPI Fundamentals Quiz",
+      "moduleId": "module-fundamentals",
+      "description": "Check your understanding of EMPI purpose and identifiers.",
+      "passingScore": 70,
+      "questions": [
+        {
+          "id": "q-fund-1",
+          "type": "multiple-choice",
+          "question": "What is the primary purpose of an EMPI?",
+          "options": [
+            "Store clinical notes from the EHR",
+            "Maintain a trusted enterprise view of patient identity across systems",
+            "Replace the hospital billing system",
+            "Archive imaging studies"
+          ],
+          "correctOptionIndex": 1,
+          "explanation": "EMPI focuses on identity resolution across systems, not clinical document storage."
+        },
+        {
+          "id": "q-fund-2",
+          "type": "true-false",
+          "question": "A facility MRN alone is always sufficient as a universal enterprise patient identifier.",
+          "options": ["True", "False"],
+          "correctOptionIndex": 1,
+          "explanation": "MRNs are typically local to a source system; enterprise identity requires cross-system resolution."
+        },
+        {
+          "id": "q-fund-3",
+          "type": "multiple-choice",
+          "question": "Which factor most directly weakens automated patient matching?",
+          "options": [
+            "Strong audit logging",
+            "Missing or poor-quality registration demographics",
+            "A staffed manual review queue",
+            "Periodic algorithm tuning"
+          ],
+          "correctOptionIndex": 1,
+          "explanation": "Registration data quality is foundational; missing DOB or weak names increase errors and review volume."
+        }
+      ]
+    },
+    {
+      "id": "quiz-stewardship",
+      "title": "Stewardship Quiz",
+      "moduleId": "module-stewardship",
+      "description": "Test merge, overlay, and accountability concepts.",
+      "passingScore": 70,
+      "questions": [
+        {
+          "id": "q-stew-1",
+          "type": "multiple-choice",
+          "question": "Two records share name and DOB but have conflicting government identifier fragments. Best next step?",
+          "options": [
+            "Auto-merge immediately to reduce queue volume",
+            "Escalate or manually review per policy before merging",
+            "Delete both records",
+            "Ignore because name and DOB match"
+          ],
+          "correctOptionIndex": 1,
+          "explanation": "Conflicting high-risk identifiers require manual review and documented rationale."
+        },
+        {
+          "id": "q-stew-2",
+          "type": "multiple-choice",
+          "question": "What is survivorship?",
+          "options": [
+            "Deleting inactive patients from all systems",
+            "Rules that decide which source value wins on the golden record",
+            "A type of probabilistic match score",
+            "Emergency access to clinical charts"
+          ],
+          "correctOptionIndex": 1,
+          "explanation": "Survivorship governs which contributing source populates each attribute on the enterprise identity."
+        },
+        {
+          "id": "q-stew-3",
+          "type": "true-false",
+          "question": "Unmerge should be a routine way to clean up duplicate review backlogs.",
+          "options": ["True", "False"],
+          "correctOptionIndex": 1,
+          "explanation": "Unmerge is a controlled, exceptional correction for incorrect merges — not routine queue management."
+        }
+      ]
+    }
+  ],
+
+  "scenarios": [
+    {
+      "id": "scenario-duplicate-review",
+      "title": "Borderline Duplicate Pair",
+      "difficulty": "intermediate",
+      "category": "matching",
+      "fictional": true,
+      "notice": "Fictional training scenario. Do not use real patient information.",
+      "context": "You are reviewing a probabilistic match pair in the stewardship queue. Both records are from different outpatient clinics in the same health system.",
+      "records": {
+        "record_a": "Maria L. Gomez, DOB 1982-04-12, MRN OP-44102, address 118 Oak St",
+        "record_b": "Maria Gomez, DOB 1982-04-12, MRN OP-88719, address 220 Lake Ave",
+        "match_score": 0.91,
+        "conflict": "Different phone numbers and addresses; same DOB and similar name"
+      },
+      "question": "What is the best stewardship action?",
+      "choices": [
+        "Auto-merge because the score is above 0.90",
+        "Reject as not a duplicate because addresses differ",
+        "Perform manual review, verify additional evidence per policy, document decision",
+        "Create a third duplicate record to preserve both addresses"
+      ],
+      "correctChoiceIndex": 2,
+      "explanation": "High scores with demographic conflicts often need manual verification. Coordinators gather evidence, follow policy, and document outcomes.",
+      "learningPoints": [
+        "Scores inform but do not replace judgment",
+        "Address changes are common and require context",
+        "Documentation supports audit and patient safety"
+      ]
+    },
+    {
+      "id": "scenario-twin-edge",
+      "title": "NICU Name Collision",
+      "difficulty": "advanced",
+      "category": "stewardship",
+      "fictional": true,
+      "notice": "Fictional training scenario for edge-case awareness.",
+      "context": "Two newborns in the NICU have temporary similar names and the same admission date. A probabilistic engine flags a high-similarity pair.",
+      "records": {
+        "record_a": "Baby Boy Smith, DOB 2026-03-01, MRN NB-1001",
+        "record_b": "Baby Smith, DOB 2026-03-01, MRN NB-1002",
+        "match_score": 0.88,
+        "context_note": "Mother names differ on source records"
+      },
+      "question": "What should the coordinator do first?",
+      "choices": [
+        "Merge immediately to prevent duplicate bills",
+        "Hold for manual review with NICU registration policy and maternal identifiers",
+        "Delete the lower MRN record",
+        "Lower the match threshold globally"
+      ],
+      "correctChoiceIndex": 1,
+      "explanation": "Newborn and twin scenarios are high-risk for false merges. Use policy-driven manual review with additional verifying attributes.",
+      "learningPoints": [
+        "Pediatric and temporary names are high-risk match populations",
+        "Escalation protects patient safety",
+        "Threshold changes are governance decisions, not queue shortcuts"
+      ]
+    }
+  ],
+
+  "interviewQuestions": [
+    {
+      "id": "interview-stewardship-framework",
+      "category": "stewardship",
+      "difficulty": "intermediate",
+      "question": "Walk through how you would adjudicate a potential duplicate pair with a high match score but conflicting identifiers.",
+      "answerGuide": [
+        "Confirm the pair context and source systems involved",
+        "Check organizational policy for required evidence",
+        "Look for conflicting high-risk identifiers",
+        "Gather additional verification where permitted",
+        "Decide merge, reject, or escalate with documentation",
+        "Note audit and notification requirements"
+      ],
+      "followUpQuestions": [
+        "What evidence would you accept before merging?",
+        "When would you escalate to a senior steward or compliance?"
+      ]
+    },
+    {
+      "id": "interview-operations-metrics",
+      "category": "operations",
+      "difficulty": "beginner",
+      "question": "Which metrics would you track to monitor EMPI program health?",
+      "answerGuide": [
+        "Duplicate and split record rates",
+        "Auto-link versus manual review volumes",
+        "Review queue aging and turnaround time",
+        "Post-merge correction or unmerge rate",
+        "Registration data quality indicators"
+      ],
+      "followUpQuestions": [
+        "How would a rising false-merge rate change your threshold strategy?"
+      ]
+    }
+  ]
+}

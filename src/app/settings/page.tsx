@@ -48,14 +48,24 @@ export default async function SettingsPage() {
             </a>
           </p>
           {showUsage ? (
-            <p className="mt-2">
-              <a
-                href="/settings/usage"
-                className="text-sm font-semibold text-brand hover:text-brand-dark"
-              >
-                AI usage (admin) →
-              </a>
-            </p>
+            <>
+              <p className="mt-2">
+                <a
+                  href="/settings/usage"
+                  className="text-sm font-semibold text-brand hover:text-brand-dark"
+                >
+                  AI usage (admin) →
+                </a>
+              </p>
+              <p className="mt-2">
+                <a
+                  href="/settings/experts"
+                  className="text-sm font-semibold text-brand hover:text-brand-dark"
+                >
+                  Assign experts (admin) →
+                </a>
+              </p>
+            </>
           ) : null}
           <div className="mt-8">
             <Suspense
