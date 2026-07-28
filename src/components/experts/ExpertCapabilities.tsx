@@ -1,21 +1,32 @@
 "use client";
 
 import Link from "next/link";
-import type { ExpertCapability } from "@/lib/experts/expert-schema";
+import type { ExpertCapability, ExpertRoadmapModule } from "@/lib/experts/expert-schema";
 import { resolveExpertIcon } from "@/lib/experts/icons";
 
 type Props = {
   expertId: string;
   userExpertId: string;
   capabilities: ExpertCapability[];
+  roadmap?: ExpertRoadmapModule[];
 };
+
+function learnHref(expertId: string, userExpertId: string, roadmap: ExpertRoadmapModule[]) {
+  const first = [...roadmap]
+    .filter((m) => m.status === "published")
+    .sort((a, b) => a.order - b.order)[0];
+  if (!first) {
+    return `/experts/${expertId}/learn?installation=${encodeURIComponent(userExpertId)}`;
+  }
+  return `/experts/${expertId}/learn?installation=${encodeURIComponent(userExpertId)}&module=${encodeURIComponent(first.id)}#expert-lessons`;
+}
 
 export default function ExpertCapabilities({
   expertId,
   userExpertId,
   capabilities,
-}: Props) {
-  const enabled = capabilities.filter((c) => c.enabled);
+  roadmap = [],
+}: Props) {  const enabled = capabilities.filter((c) => c.enabled);
   if (enabled.length === 0) return null;
 
   return (
@@ -27,8 +38,11 @@ export default function ExpertCapabilities({
           return (
             <Link
               key={capability.id}
-              href={`/experts/${expertId}/${capability.route}?installation=${userExpertId}`}
-              className="rounded-xl border border-stone-200 p-4 transition hover:border-brand/40 hover:bg-brand-light/20"
+              href={
+                capability.route === "learn" && roadmap.length > 0
+                  ? learnHref(expertId, userExpertId, roadmap)
+                  : `/experts/${expertId}/${capability.route}?installation=${encodeURIComponent(userExpertId)}`
+              }              className="rounded-xl border border-stone-200 p-4 transition hover:border-brand/40 hover:bg-brand-light/20"
             >
               <div className="flex items-start gap-3">
                 <span className="rounded-lg bg-brand-light p-2 text-brand">

@@ -11,10 +11,17 @@ type Props = {
   progress: ExpertModuleProgress[];
   compact?: boolean;
   activeModuleId?: string;
+  scrollToLessons?: boolean;
 };
 
-function moduleHref(expertId: string, userExpertId: string, moduleId: string) {
-  return `/experts/${expertId}/learn?installation=${encodeURIComponent(userExpertId)}&module=${encodeURIComponent(moduleId)}`;
+function moduleHref(
+  expertId: string,
+  userExpertId: string,
+  moduleId: string,
+  scrollToLessons = false
+) {
+  const base = `/experts/${expertId}/learn?installation=${encodeURIComponent(userExpertId)}&module=${encodeURIComponent(moduleId)}`;
+  return scrollToLessons ? `${base}#expert-lessons` : base;
 }
 
 function statusLabel(status?: string): string {
@@ -37,6 +44,7 @@ export default function ExpertRoadmap({
   progress,
   compact = false,
   activeModuleId,
+  scrollToLessons = false,
 }: Props) {
   const published = [...modules]
     .filter((m) => m.status === "published")
@@ -51,7 +59,7 @@ export default function ExpertRoadmap({
         <h2 className="font-semibold">Roadmap</h2>
         {compact ? (
           <Link
-            href={moduleHref(expertId, userExpertId, published[0]!.id)}
+            href={moduleHref(expertId, userExpertId, published[0]!.id, true)}
             className="text-sm font-medium text-brand hover:underline"
           >
             Open learning
@@ -65,7 +73,7 @@ export default function ExpertRoadmap({
           return (
             <Link
               key={module.id}
-              href={moduleHref(expertId, userExpertId, module.id)}
+              href={moduleHref(expertId, userExpertId, module.id, scrollToLessons)}
               className={`block rounded-xl border p-4 transition hover:border-brand/40 hover:bg-brand-light/10 ${
                 isActive
                   ? "border-brand/50 bg-brand-light/20"

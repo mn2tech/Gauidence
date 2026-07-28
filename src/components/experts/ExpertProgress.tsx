@@ -52,7 +52,7 @@ export default function ExpertProgress({
           Current module:{" "}
           {expertId && userExpertId ? (
             <Link
-              href={`/experts/${expertId}/learn?installation=${encodeURIComponent(userExpertId)}&module=${encodeURIComponent(current.id)}`}
+              href={`/experts/${expertId}/learn?installation=${encodeURIComponent(userExpertId)}&module=${encodeURIComponent(current.id)}#expert-lessons`}
               className="font-medium text-brand hover:underline"
             >
               {current.title}

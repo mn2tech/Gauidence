@@ -16,16 +16,36 @@ export default function ExpertHeader({ expert, userExpertId, currentRoute }: Pro
   const Icon = resolveExpertIcon(expert.icon);
   const accent = expertAccentClass(expert.theme.accent);
 
+  const published = [...expert.roadmap]
+    .filter((m) => m.status === "published")
+    .sort((a, b) => a.order - b.order);
+  const firstModule = published[0];
+
+  const capabilityHref = (route: string) => {
+    if (route === "learn" && firstModule) {
+      return `/experts/${expert.id}/learn?installation=${encodeURIComponent(userExpertId)}&module=${encodeURIComponent(firstModule.id)}#expert-lessons`;
+    }
+    return `/experts/${expert.id}/${route}?installation=${encodeURIComponent(userExpertId)}`;
+  };
+
   const links = [
-    { href: `/experts/${expert.id}?installation=${userExpertId}`, label: "Dashboard", route: "dashboard" },
+    {
+      href: `/experts/${expert.id}?installation=${encodeURIComponent(userExpertId)}`,
+      label: "Dashboard",
+      route: "dashboard",
+    },
     ...expert.capabilities
       .filter((c: ExpertCapability) => c.enabled)
       .map((c: ExpertCapability) => ({
-        href: `/experts/${expert.id}/${c.route}?installation=${userExpertId}`,
+        href: capabilityHref(c.route),
         label: c.title,
         route: c.route,
       })),
-    { href: `/experts/${expert.id}/glossary?installation=${userExpertId}`, label: "Glossary", route: "glossary" },
+    {
+      href: `/experts/${expert.id}/glossary?installation=${encodeURIComponent(userExpertId)}`,
+      label: "Glossary",
+      route: "glossary",
+    },
   ];
 
   return (

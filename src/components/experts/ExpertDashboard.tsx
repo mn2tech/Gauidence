@@ -40,6 +40,7 @@ export default function ExpertDashboard({
         expertId={expert.id}
         userExpertId={userExpertId}
         capabilities={expert.capabilities}
+        roadmap={expert.roadmap}
       />
 
       {expert.starterQuestions.length > 0 ? (
@@ -61,6 +62,7 @@ export default function ExpertDashboard({
         modules={expert.roadmap}
         progress={progress}
         compact
+        scrollToLessons
       />
       <ExpertActivityPanel activity={activity} />
     </div>
