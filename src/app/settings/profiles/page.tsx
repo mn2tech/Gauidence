@@ -21,7 +21,7 @@ export default async function ProfilesSettingsPage() {
   return (
     <div className="flex min-h-screen flex-col">
       <SiteHeader />
-      <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 sm:py-10">
         <Suspense fallback={<p className="text-sm text-ink-muted">Loading…</p>}>
           <ProfilesManager />
         </Suspense>

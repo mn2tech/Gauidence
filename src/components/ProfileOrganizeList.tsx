@@ -1,8 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type DragEvent, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent,
+  type ReactNode,
+} from "react";
 import Link from "next/link";
-import { ChevronDown, GripVertical, Trash2, Users } from "lucide-react";
+import {
+  ChevronDown,
+  GripVertical,
+  MoreHorizontal,
+  Pencil,
+  Star,
+  Trash2,
+  Users,
+} from "lucide-react";
 import ProfileAvatar from "@/components/ProfileAvatar";
 import {
   canAttachChildToParent,
@@ -21,11 +37,11 @@ import {
   familyMembersOf,
   hobbiesOf,
   homesOf,
-  otherSpacesOf,
   isGroupStyleProfile,
   isNestableProfileType,
   isProfileOwner,
   isSharedGuardianProfile,
+  otherSpacesOf,
   petsOf,
   profileAvatarLabel,
   profileSubtitle,
@@ -60,6 +76,403 @@ function persistCollapsed(map: Record<string, boolean>) {
   }
 }
 
+function useDesktopDrag(): boolean {
+  const [enabled, setEnabled] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)");
+    const update = () => setEnabled(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  return enabled;
+}
+
+function ProfileRowBadges({
+  profile,
+  activeId,
+  nestedCount,
+}: {
+  profile: GuardianProfile;
+  activeId?: string;
+  nestedCount?: number;
+}) {
+  return (
+    <>
+      {profile.is_default ? (
+        <span className="ml-2 text-[11px] font-medium text-brand">Default</span>
+      ) : null}
+      {activeId === profile.id ? (
+        <span className="ml-2 text-[11px] font-medium text-ink-muted">Active</span>
+      ) : null}
+      {sharedProfileAccessBadge(profile) ? (
+        <span className="ml-2 text-[11px] font-medium text-brand">
+          {sharedProfileAccessBadge(profile)}
+        </span>
+      ) : null}
+      {nestedCount != null && nestedCount > 0 ? (
+        <span className="ml-2 text-[11px] font-medium text-ink-muted">
+          {nestedCount} nested
+        </span>
+      ) : null}
+    </>
+  );
+}
+
+function ProfileEditForm({
+  editing,
+  setEditing,
+  busy,
+  onSaveEdit,
+}: {
+  editing: GuardianProfile;
+  setEditing: (p: GuardianProfile | null) => void;
+  busy: boolean;
+  onSaveEdit: () => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <input
+        value={editing.display_name}
+        onChange={(e) =>
+          setEditing({ ...editing, display_name: e.target.value })
+        }
+        className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm"
+      />
+      <div className="flex gap-2">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onSaveEdit}
+          className="rounded-full bg-brand px-3 py-1.5 text-xs font-semibold text-white"
+        >
+          Save
+        </button>
+        <button
+          type="button"
+          onClick={() => setEditing(null)}
+          className="rounded-full border border-stone-300 px-3 py-1.5 text-xs"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ProfileRowActions({
+  profile,
+  activeId,
+  busy,
+  moving,
+  moveOptions,
+  onSwitch,
+  onSetDefault,
+  onEdit,
+  onRemove,
+  onLeave,
+  onMove,
+}: {
+  profile: GuardianProfile;
+  activeId?: string;
+  busy: boolean;
+  moving: boolean;
+  moveOptions: GuardianProfile[];
+  onSwitch: () => void;
+  onSetDefault: () => void;
+  onEdit: () => void;
+  onRemove: () => void;
+  onLeave?: () => void;
+  onMove: (parentId: string | null) => void;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const isActive = activeId === profile.id;
+  const owned = isProfileOwner(profile);
+  const shared = isSharedGuardianProfile(profile);
+  const canMove =
+    owned && isNestableProfileType(profile.profile_type) &&
+    (moveOptions.length > 0 || profile.parent_profile_id);
+  const showManageAccess = canManageProfileAccess(profile);
+  const hasMenu =
+    (owned && !profile.is_default) ||
+    showManageAccess ||
+    owned ||
+    shared ||
+    canMove;
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [menuOpen]);
+
+  const menuItemClass =
+    "flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-foreground hover:bg-stone-50 disabled:opacity-50";
+
+  return (
+    <div className="flex shrink-0 items-center gap-1.5">
+      {!isActive ? (
+        <button
+          type="button"
+          onClick={onSwitch}
+          className="rounded-full bg-brand px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-dark"
+        >
+          Open
+        </button>
+      ) : null}
+      {hasMenu ? (
+        <div className="relative" ref={menuRef}>
+          <button
+            type="button"
+            onClick={() => setMenuOpen((o) => !o)}
+            aria-expanded={menuOpen}
+            aria-haspopup="menu"
+            aria-label={`Actions for ${profile.display_name}`}
+            disabled={busy || moving}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-stone-300 text-ink-muted transition hover:bg-stone-50 hover:text-foreground disabled:opacity-50"
+          >
+            <MoreHorizontal className="h-4 w-4" />
+          </button>
+          {menuOpen ? (
+            <div
+              role="menu"
+              className="absolute right-0 z-40 mt-1 w-56 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-stone-200 bg-white py-1 shadow-lg"
+            >
+              {owned ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onEdit();
+                  }}
+                  className={menuItemClass}
+                >
+                  <Pencil className="h-4 w-4 shrink-0 text-ink-muted" />
+                  Edit name
+                </button>
+              ) : null}
+              {owned && !profile.is_default ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={busy}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onSetDefault();
+                  }}
+                  className={menuItemClass}
+                >
+                  <Star className="h-4 w-4 shrink-0 text-ink-muted" />
+                  Make default
+                </button>
+              ) : null}
+              {showManageAccess ? (
+                <Link
+                  href={`/settings/profiles/${profile.id}/collaborators`}
+                  role="menuitem"
+                  onClick={() => setMenuOpen(false)}
+                  className={menuItemClass}
+                >
+                  <Users className="h-4 w-4 shrink-0 text-ink-muted" />
+                  Manage access
+                </Link>
+              ) : null}
+              {canMove ? (
+                <>
+                  <p className="border-t border-stone-100 px-3 py-2 text-[11px] font-medium text-ink-muted">
+                    Move under
+                  </p>
+                  {profile.parent_profile_id ? (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      disabled={busy || moving}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        onMove(null);
+                      }}
+                      className={menuItemClass}
+                    >
+                      Top level
+                    </button>
+                  ) : null}
+                  {moveOptions.map((container) => (
+                    <button
+                      key={container.id}
+                      type="button"
+                      role="menuitem"
+                      disabled={busy || moving}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        onMove(container.id);
+                      }}
+                      className={menuItemClass}
+                    >
+                      {container.display_name}
+                    </button>
+                  ))}
+                </>
+              ) : null}
+              {owned ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onRemove();
+                  }}
+                  className={`${menuItemClass} text-red-700 hover:bg-red-50`}
+                >
+                  <Trash2 className="h-4 w-4 shrink-0" />
+                  Delete
+                </button>
+              ) : shared && onLeave ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={busy}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onLeave();
+                  }}
+                  className={menuItemClass}
+                >
+                  Leave shared vault
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ProfileVaultRow({
+  profile,
+  activeId,
+  busy,
+  moving,
+  moveOptions,
+  avatarSize,
+  avatarEditable,
+  subtitle,
+  nestedCount,
+  leading,
+  dragEnabled,
+  onDragStart,
+  onSwitch,
+  onSetDefault,
+  onEdit,
+  onRemove,
+  onLeave,
+  onMove,
+  editing,
+  setEditing,
+  onSaveEdit,
+  onRefresh,
+  onAvatarError,
+  className,
+}: {
+  profile: GuardianProfile;
+  activeId?: string;
+  busy: boolean;
+  moving: boolean;
+  moveOptions: GuardianProfile[];
+  avatarSize: "sm" | "md";
+  avatarEditable: boolean;
+  subtitle: ReactNode;
+  nestedCount?: number;
+  leading?: ReactNode;
+  dragEnabled: boolean;
+  onDragStart?: (e: DragEvent, id: string) => void;
+  onSwitch: () => void;
+  onSetDefault: () => void;
+  onEdit: () => void;
+  onRemove: () => void;
+  onLeave?: () => void;
+  onMove: (parentId: string | null) => void;
+  editing: GuardianProfile | null;
+  setEditing: (p: GuardianProfile | null) => void;
+  onSaveEdit: () => void;
+  onRefresh: () => void | Promise<void>;
+  onAvatarError: (message: string) => void;
+  className?: string;
+}) {
+  if (editing?.id === profile.id) {
+    return (
+      <li className={className ?? "rounded-xl bg-stone-50 px-3 py-2"}>
+        <ProfileEditForm
+          editing={editing}
+          setEditing={setEditing}
+          busy={busy}
+          onSaveEdit={onSaveEdit}
+        />
+      </li>
+    );
+  }
+
+  return (
+    <li
+      draggable={dragEnabled}
+      onDragStart={
+        dragEnabled && onDragStart
+          ? (e) => onDragStart(e, profile.id)
+          : undefined
+      }
+      className={`${className ?? "rounded-xl bg-stone-50 px-3 py-2"} ${
+        dragEnabled ? "cursor-grab active:cursor-grabbing" : ""
+      }`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-1 items-start gap-2">
+          {leading}
+          <ProfileAvatar
+            profile={profile}
+            size={avatarSize}
+            editable={avatarEditable}
+            onUpdated={onRefresh}
+            onError={onAvatarError}
+          />
+          <div className="min-w-0 flex-1">
+            <p
+              className={
+                avatarSize === "md" ? "font-semibold" : "text-sm font-medium"
+              }
+            >
+              {profile.display_name}
+              <ProfileRowBadges
+                profile={profile}
+                activeId={activeId}
+                nestedCount={nestedCount}
+              />
+            </p>
+            <p className="text-[11px] text-ink-muted sm:text-xs">{subtitle}</p>
+          </div>
+        </div>
+        <ProfileRowActions
+          profile={profile}
+          activeId={activeId}
+          busy={busy}
+          moving={moving}
+          moveOptions={moveOptions}
+          onSwitch={onSwitch}
+          onSetDefault={onSetDefault}
+          onEdit={onEdit}
+          onRemove={onRemove}
+          onLeave={onLeave}
+          onMove={onMove}
+        />
+      </div>
+    </li>
+  );
+}
+
 type Props = {
   profiles: GuardianProfile[];
   activeId?: string;
@@ -75,163 +488,6 @@ type Props = {
   onAvatarError: (message: string) => void;
 };
 
-function NestedMemberRow({
-  child,
-  activeId,
-  busy,
-  editing,
-  setEditing,
-  onSaveEdit,
-  onSwitch,
-  onSetDefault,
-  onRemove,
-  dragEnabled,
-  onDragStart,
-  moveControl,
-  onRefresh,
-  onAvatarError,
-}: {
-  child: GuardianProfile;
-  activeId?: string;
-  busy: boolean;
-  editing: GuardianProfile | null;
-  setEditing: (p: GuardianProfile | null) => void;
-  onSaveEdit: () => void;
-  onSwitch: () => void;
-  onSetDefault: () => void;
-  onRemove: () => void;
-  dragEnabled: boolean;
-  onDragStart: (e: DragEvent, id: string) => void;
-  moveControl: ReactNode;
-  onRefresh: () => void | Promise<void>;
-  onAvatarError: (message: string) => void;
-}) {
-  if (editing?.id === child.id) {
-    return (
-      <li className="rounded-xl bg-stone-50 px-3 py-2">
-        <div className="space-y-2">
-          <input
-            value={editing.display_name}
-            onChange={(e) =>
-              setEditing({ ...editing, display_name: e.target.value })
-            }
-            className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm"
-          />
-          <div className="flex gap-2">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={onSaveEdit}
-              className="rounded-full bg-brand px-3 py-1.5 text-xs font-semibold text-white"
-            >
-              Save
-            </button>
-            <button
-              type="button"
-              onClick={() => setEditing(null)}
-              className="rounded-full border border-stone-300 px-3 py-1.5 text-xs"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      </li>
-    );
-  }
-
-  return (
-    <li
-      draggable={dragEnabled}
-      onDragStart={(e) => onDragStart(e, child.id)}
-      className={`flex flex-wrap items-start justify-between gap-2 rounded-xl bg-stone-50 px-3 py-2 ${
-        dragEnabled ? "cursor-grab active:cursor-grabbing" : ""
-      }`}
-    >
-      <div className="flex min-w-0 items-start gap-2">
-        {dragEnabled ? (
-          <GripVertical
-            className="mt-2 h-3.5 w-3.5 shrink-0 text-ink-muted"
-            aria-hidden
-          />
-        ) : null}
-        <ProfileAvatar
-          profile={child}
-          size="sm"
-          editable
-          onUpdated={onRefresh}
-          onError={onAvatarError}
-        />
-        <div className="min-w-0">
-          <p className="text-sm font-medium">
-            {child.display_name}
-            {child.is_default ? (
-              <span className="ml-2 text-[11px] font-medium text-brand">
-                Default
-              </span>
-            ) : null}
-            {activeId === child.id ? (
-              <span className="ml-2 text-[11px] font-medium text-ink-muted">
-                Active
-              </span>
-            ) : null}
-          </p>
-          <p className="text-[11px] text-ink-muted">
-            {profileTypeLabel(child.profile_type)}
-            {child.job_title ? ` · ${child.job_title}` : ""}
-          </p>
-        </div>
-      </div>
-      <div className="flex flex-wrap gap-1.5">
-        {moveControl}
-        {activeId !== child.id && (
-          <button
-            type="button"
-            onClick={onSwitch}
-            className="rounded-full border border-stone-300 px-2.5 py-1 text-[11px] font-medium"
-          >
-            Switch
-          </button>
-        )}
-        {!child.is_default && (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={onSetDefault}
-            className="rounded-full border border-stone-300 px-2.5 py-1 text-[11px] font-medium"
-          >
-            Make default
-          </button>
-        )}
-        {canManageProfileAccess(child) ? (
-          <Link
-            href={`/settings/profiles/${child.id}/collaborators`}
-            className="inline-flex items-center gap-1 rounded-full border border-stone-300 px-2.5 py-1 text-[11px] font-medium"
-          >
-            <Users className="h-3 w-3" />
-            Manage access
-          </Link>
-        ) : null}
-        <button
-          type="button"
-          onClick={() => setEditing(child)}
-          className="rounded-full border border-stone-300 px-2.5 py-1 text-[11px] font-medium"
-        >
-          Edit
-        </button>
-        <button
-          type="button"
-          onClick={onRemove}
-          aria-label={`Delete ${child.display_name}`}
-          className="inline-flex items-center gap-1 rounded-full border border-red-200 px-2.5 py-1 text-[11px] font-medium text-red-700 hover:bg-red-50"
-        >
-          <Trash2 className="h-3 w-3" />
-          Delete
-        </button>
-      </div>
-    </li>
-  );
-}
-
 export default function ProfileOrganizeList({
   profiles,
   activeId,
@@ -246,6 +502,7 @@ export default function ProfileOrganizeList({
   onRefresh,
   onAvatarError,
 }: Props) {
+  const desktopDrag = useDesktopDrag();
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
@@ -334,6 +591,22 @@ export default function ProfileOrganizeList({
     }
   };
 
+  const moveProfile = async (profileId: string, parentId: string | null) => {
+    setMovingId(profileId);
+    try {
+      await onMoveUnder(profileId, parentId);
+      if (parentId) {
+        setCollapsed((prev) => {
+          const next = { ...prev, [parentId]: false };
+          persistCollapsed(next);
+          return next;
+        });
+      }
+    } finally {
+      setMovingId(null);
+    }
+  };
+
   const moveOptionsFor = (child: GuardianProfile) =>
     containers.filter(
       (c) =>
@@ -341,49 +614,92 @@ export default function ProfileOrganizeList({
         canAttachChildToParent(child.profile_type, c.profile_type)
     );
 
-  const renderMoveSelect = (child: GuardianProfile) => {
-    if (!isNestableProfileType(child.profile_type)) return null;
-    const options = moveOptionsFor(child);
-    if (options.length === 0 && !child.parent_profile_id) return null;
+  const leaveSharedVault = async (profile: GuardianProfile) => {
+    if (
+      !window.confirm(
+        "Leave this shared vault? You can rejoin if invited again."
+      )
+    ) {
+      return;
+    }
+    const res = await fetch(`/api/profiles/${profile.id}/collaborators/me`, {
+      method: "DELETE",
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      onAvatarError(body.error ?? "Couldn't leave this vault.");
+      return;
+    }
+    await onRefresh();
+  };
+
+  const renderNestedSection = (
+    label: string,
+    children: GuardianProfile[]
+  ) => {
+    if (children.length === 0) return null;
     return (
-      <label className="inline-flex items-center gap-1 text-[11px] text-ink-muted">
-        <span className="sr-only">Move under</span>
-        <select
-          disabled={busy || movingId === child.id}
-          value={child.parent_profile_id ?? ""}
-          onChange={(e) => {
-            const v = e.target.value;
-            void (async () => {
-              setMovingId(child.id);
-              try {
-                await onMoveUnder(child.id, v || null);
-              } finally {
-                setMovingId(null);
-              }
-            })();
-          }}
-          className="max-w-[9rem] rounded-full border border-stone-300 bg-white px-2 py-1 text-[11px] font-medium text-foreground"
-          aria-label={`Move ${child.display_name} under`}
-        >
-          <option value="">Top level</option>
-          {options.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.display_name}
-            </option>
-          ))}
-        </select>
-      </label>
+      <>
+        <li className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">
+          {label}
+        </li>
+        {children.map((child) => (
+          <ProfileVaultRow
+            key={child.id}
+            profile={child}
+            activeId={activeId}
+            busy={busy}
+            moving={movingId === child.id}
+            moveOptions={moveOptionsFor(child)}
+            avatarSize="sm"
+            avatarEditable={isProfileOwner(child)}
+            subtitle={
+              <>
+                {profileTypeLabel(child.profile_type)}
+                {child.job_title ? ` · ${child.job_title}` : ""}
+              </>
+            }
+            leading={
+              desktopDrag ? (
+                <GripVertical
+                  className="mt-2 h-3.5 w-3.5 shrink-0 text-ink-muted"
+                  aria-hidden
+                />
+              ) : (
+                <span className="w-3.5 shrink-0" aria-hidden />
+              )
+            }
+            dragEnabled={desktopDrag}
+            onDragStart={onDragStart}
+            onSwitch={() => onSwitch(child.id)}
+            onSetDefault={() => onSetDefault(child.id)}
+            onEdit={() => setEditing(child)}
+            onRemove={() => onRemove(child)}
+            onLeave={
+              isSharedGuardianProfile(child)
+                ? () => void leaveSharedVault(child)
+                : undefined
+            }
+            onMove={(parentId) => void moveProfile(child.id, parentId)}
+            editing={editing}
+            setEditing={setEditing}
+            onSaveEdit={onSaveEdit}
+            onRefresh={onRefresh}
+            onAvatarError={onAvatarError}
+          />
+        ))}
+      </>
     );
   };
 
   return (
     <div className="space-y-3">
       <p className="text-xs text-ink-muted">
-        Drag a child, spouse, home, employee, client, vehicle, or other space
-        onto a Family, Business, or Nonprofit card — or use Move under. Tap the
-        chevron to collapse nested members. Use the camera on a profile to pick an
-        avatar or upload a{" "}
-        photo or logo.
+        {desktopDrag
+          ? "Drag members onto a Family, Business, or Nonprofit card — or use Move under in the menu. "
+          : "Use Move under in the ⋯ menu to reorganize. "}
+        Tap the chevron to collapse nested members. Use the camera on a profile
+        to pick an avatar or upload a photo or logo.
       </p>
 
       <ul
@@ -454,9 +770,11 @@ export default function ProfileOrganizeList({
           return (
             <li
               key={p.id}
-              draggable={nestable}
+              draggable={desktopDrag && nestable}
               onDragStart={
-                nestable ? (e) => onDragStart(e, p.id) : undefined
+                desktopDrag && nestable
+                  ? (e) => onDragStart(e, p.id)
+                  : undefined
               }
               onDragOver={(e) => {
                 if (!canDropHere) return;
@@ -477,41 +795,18 @@ export default function ProfileOrganizeList({
                 isDropHighlight
                   ? "border-brand ring-2 ring-brand/30"
                   : "border-stone-200"
-              } ${nestable ? "cursor-grab active:cursor-grabbing" : ""}`}
+              } ${desktopDrag && nestable ? "cursor-grab active:cursor-grabbing" : ""}`}
             >
               {editing?.id === p.id ? (
-                <div className="space-y-3">
-                  <input
-                    value={editing.display_name}
-                    onChange={(e) =>
-                      setEditing({
-                        ...editing,
-                        display_name: e.target.value,
-                      })
-                    }
-                    className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm"
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={onSaveEdit}
-                      className="rounded-full bg-brand px-3 py-1.5 text-xs font-semibold text-white"
-                    >
-                      Save
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditing(null)}
-                      className="rounded-full border border-stone-300 px-3 py-1.5 text-xs"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
+                <ProfileEditForm
+                  editing={editing}
+                  setEditing={setEditing}
+                  busy={busy}
+                  onSaveEdit={onSaveEdit}
+                />
               ) : (
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="flex min-w-0 items-start gap-2">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 flex-1 items-start gap-2">
                     {isContainer && nested.length > 0 ? (
                       <button
                         type="button"
@@ -522,7 +817,7 @@ export default function ProfileOrganizeList({
                             ? `Expand ${p.display_name}`
                             : `Collapse ${p.display_name}`
                         }
-                        className="mt-2 rounded-md p-0.5 text-ink-muted hover:bg-stone-100 hover:text-foreground"
+                        className="mt-2 shrink-0 rounded-md p-0.5 text-ink-muted hover:bg-stone-100 hover:text-foreground"
                       >
                         <ChevronDown
                           className={`h-4 w-4 transition-transform ${
@@ -530,7 +825,7 @@ export default function ProfileOrganizeList({
                           }`}
                         />
                       </button>
-                    ) : nestable ? (
+                    ) : desktopDrag && nestable ? (
                       <GripVertical
                         className="mt-2.5 h-4 w-4 shrink-0 text-ink-muted"
                         aria-hidden
@@ -545,29 +840,14 @@ export default function ProfileOrganizeList({
                       onUpdated={onRefresh}
                       onError={onAvatarError}
                     />
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <p className="font-semibold">
                         {p.display_name}
-                        {p.is_default ? (
-                          <span className="ml-2 text-[11px] font-medium text-brand">
-                            Default
-                          </span>
-                        ) : null}
-                        {activeId === p.id ? (
-                          <span className="ml-2 text-[11px] font-medium text-ink-muted">
-                            Active
-                          </span>
-                        ) : null}
-                        {sharedProfileAccessBadge(p) ? (
-                          <span className="ml-2 text-[11px] font-medium text-brand">
-                            {sharedProfileAccessBadge(p)}
-                          </span>
-                        ) : null}
-                        {nested.length > 0 ? (
-                          <span className="ml-2 text-[11px] font-medium text-ink-muted">
-                            {nested.length} nested
-                          </span>
-                        ) : null}
+                        <ProfileRowBadges
+                          profile={p}
+                          activeId={activeId}
+                          nestedCount={nested.length}
+                        />
                       </p>
                       <p className="text-xs text-ink-muted">
                         {profileSubtitle(p)}
@@ -576,285 +856,37 @@ export default function ProfileOrganizeList({
                       </p>
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {isProfileOwner(p) ? renderMoveSelect(p) : null}
-                    {activeId !== p.id && (
-                      <button
-                        type="button"
-                        onClick={() => onSwitch(p.id)}
-                        className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium"
-                      >
-                        Switch
-                      </button>
-                    )}
-                    {canManageProfileAccess(p) ? (
-                      <Link
-                        href={`/settings/profiles/${p.id}/collaborators`}
-                        className="inline-flex items-center gap-1 rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium"
-                      >
-                        <Users className="h-3 w-3" />
-                        Manage access
-                      </Link>
-                    ) : null}
-                    {isProfileOwner(p) && !p.is_default ? (
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => onSetDefault(p.id)}
-                        className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium"
-                      >
-                        Make default
-                      </button>
-                    ) : null}
-                    {isProfileOwner(p) ? (
-                      <button
-                        type="button"
-                        onClick={() => setEditing(p)}
-                        className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium"
-                      >
-                        Edit
-                      </button>
-                    ) : null}
-                    {isProfileOwner(p) ? (
-                      <button
-                        type="button"
-                        onClick={() => onRemove(p)}
-                        aria-label={`Delete ${p.display_name}`}
-                        className="inline-flex items-center gap-1 rounded-full border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                        Delete
-                      </button>
-                    ) : isSharedGuardianProfile(p) ? (
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={async () => {
-                          if (
-                            !window.confirm(
-                              "Leave this shared vault? You can rejoin if invited again."
-                            )
-                          ) {
-                            return;
-                          }
-                          const res = await fetch(
-                            `/api/profiles/${p.id}/collaborators/me`,
-                            { method: "DELETE" }
-                          );
-                          if (!res.ok) {
-                            const body = (await res
-                              .json()
-                              .catch(() => ({}))) as { error?: string };
-                            onAvatarError(
-                              body.error ?? "Couldn't leave this vault."
-                            );
-                            return;
-                          }
-                          await onRefresh();
-                        }}
-                        className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium"
-                      >
-                        Leave
-                      </button>
-                    ) : null}
-                  </div>
+                  <ProfileRowActions
+                    profile={p}
+                    activeId={activeId}
+                    busy={busy}
+                    moving={movingId === p.id}
+                    moveOptions={moveOptionsFor(p)}
+                    onSwitch={() => onSwitch(p.id)}
+                    onSetDefault={() => onSetDefault(p.id)}
+                    onEdit={() => setEditing(p)}
+                    onRemove={() => onRemove(p)}
+                    onLeave={
+                      isSharedGuardianProfile(p)
+                        ? () => void leaveSharedVault(p)
+                        : undefined
+                    }
+                    onMove={(parentId) => void moveProfile(p.id, parentId)}
+                  />
                 </div>
               )}
 
               {nested.length > 0 && !isCollapsed ? (
                 <ul className="mt-3 space-y-2 border-t border-stone-100 pt-3">
-                  {nestedEmployees.length > 0 ? (
-                    <li className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">
-                      Employees
-                    </li>
-                  ) : null}
-                  {nestedEmployees.map((child) => (
-                    <NestedMemberRow
-                      key={child.id}
-                      child={child}
-                      activeId={activeId}
-                      busy={busy}
-                      editing={editing}
-                      setEditing={setEditing}
-                      onSaveEdit={onSaveEdit}
-                      onSwitch={() => onSwitch(child.id)}
-                      onSetDefault={() => onSetDefault(child.id)}
-                      onRemove={() => onRemove(child)}
-                      dragEnabled
-                      onDragStart={onDragStart}
-                      moveControl={renderMoveSelect(child)}
-                      onRefresh={onRefresh}
-                      onAvatarError={onAvatarError}
-                    />
-                  ))}
-                  {nestedClients.length > 0 ? (
-                    <li className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">
-                      Clients
-                    </li>
-                  ) : null}
-                  {nestedClients.map((child) => (
-                    <NestedMemberRow
-                      key={child.id}
-                      child={child}
-                      activeId={activeId}
-                      busy={busy}
-                      editing={editing}
-                      setEditing={setEditing}
-                      onSaveEdit={onSaveEdit}
-                      onSwitch={() => onSwitch(child.id)}
-                      onSetDefault={() => onSetDefault(child.id)}
-                      onRemove={() => onRemove(child)}
-                      dragEnabled
-                      onDragStart={onDragStart}
-                      moveControl={renderMoveSelect(child)}
-                      onRefresh={onRefresh}
-                      onAvatarError={onAvatarError}
-                    />
-                  ))}
-                  {nestedFamily.length > 0 ? (
-                    <li className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">
-                      Family members
-                    </li>
-                  ) : null}
-                  {nestedFamily.map((child) => (
-                    <NestedMemberRow
-                      key={child.id}
-                      child={child}
-                      activeId={activeId}
-                      busy={busy}
-                      editing={editing}
-                      setEditing={setEditing}
-                      onSaveEdit={onSaveEdit}
-                      onSwitch={() => onSwitch(child.id)}
-                      onSetDefault={() => onSetDefault(child.id)}
-                      onRemove={() => onRemove(child)}
-                      dragEnabled
-                      onDragStart={onDragStart}
-                      moveControl={renderMoveSelect(child)}
-                      onRefresh={onRefresh}
-                      onAvatarError={onAvatarError}
-                    />
-                  ))}
-                  {nestedStudents.length > 0 ? (
-                    <li className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">
-                      Students
-                    </li>
-                  ) : null}
-                  {nestedStudents.map((child) => (
-                    <NestedMemberRow
-                      key={child.id}
-                      child={child}
-                      activeId={activeId}
-                      busy={busy}
-                      editing={editing}
-                      setEditing={setEditing}
-                      onSaveEdit={onSaveEdit}
-                      onSwitch={() => onSwitch(child.id)}
-                      onSetDefault={() => onSetDefault(child.id)}
-                      onRemove={() => onRemove(child)}
-                      dragEnabled
-                      onDragStart={onDragStart}
-                      moveControl={renderMoveSelect(child)}
-                      onRefresh={onRefresh}
-                      onAvatarError={onAvatarError}
-                    />
-                  ))}
-                  {nestedPets.length > 0 ? (
-                    <li className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">
-                      Pets
-                    </li>
-                  ) : null}
-                  {nestedPets.map((child) => (
-                    <NestedMemberRow
-                      key={child.id}
-                      child={child}
-                      activeId={activeId}
-                      busy={busy}
-                      editing={editing}
-                      setEditing={setEditing}
-                      onSaveEdit={onSaveEdit}
-                      onSwitch={() => onSwitch(child.id)}
-                      onSetDefault={() => onSetDefault(child.id)}
-                      onRemove={() => onRemove(child)}
-                      dragEnabled
-                      onDragStart={onDragStart}
-                      moveControl={renderMoveSelect(child)}
-                      onRefresh={onRefresh}
-                      onAvatarError={onAvatarError}
-                    />
-                  ))}
-                  {nestedHomes.length > 0 ? (
-                    <li className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">
-                      Homes
-                    </li>
-                  ) : null}
-                  {nestedHomes.map((child) => (
-                    <NestedMemberRow
-                      key={child.id}
-                      child={child}
-                      activeId={activeId}
-                      busy={busy}
-                      editing={editing}
-                      setEditing={setEditing}
-                      onSaveEdit={onSaveEdit}
-                      onSwitch={() => onSwitch(child.id)}
-                      onSetDefault={() => onSetDefault(child.id)}
-                      onRemove={() => onRemove(child)}
-                      dragEnabled
-                      onDragStart={onDragStart}
-                      moveControl={renderMoveSelect(child)}
-                      onRefresh={onRefresh}
-                      onAvatarError={onAvatarError}
-                    />
-                  ))}
-                  {nestedVehicles.length > 0 ? (
-                    <li className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">
-                      Vehicles
-                    </li>
-                  ) : null}
-                  {nestedVehicles.map((child) => (
-                    <NestedMemberRow
-                      key={child.id}
-                      child={child}
-                      activeId={activeId}
-                      busy={busy}
-                      editing={editing}
-                      setEditing={setEditing}
-                      onSaveEdit={onSaveEdit}
-                      onSwitch={() => onSwitch(child.id)}
-                      onSetDefault={() => onSetDefault(child.id)}
-                      onRemove={() => onRemove(child)}
-                      dragEnabled
-                      onDragStart={onDragStart}
-                      moveControl={renderMoveSelect(child)}
-                      onRefresh={onRefresh}
-                      onAvatarError={onAvatarError}
-                    />
-                  ))}
-                  {nestedOthers.length > 0 ? (
-                    <li className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">
-                      Other
-                    </li>
-                  ) : null}
-                  {nestedOthers.map((child) => (
-                    <NestedMemberRow
-                      key={child.id}
-                      child={child}
-                      activeId={activeId}
-                      busy={busy}
-                      editing={editing}
-                      setEditing={setEditing}
-                      onSaveEdit={onSaveEdit}
-                      onSwitch={() => onSwitch(child.id)}
-                      onSetDefault={() => onSetDefault(child.id)}
-                      onRemove={() => onRemove(child)}
-                      dragEnabled
-                      onDragStart={onDragStart}
-                      moveControl={renderMoveSelect(child)}
-                      onRefresh={onRefresh}
-                      onAvatarError={onAvatarError}
-                    />
-                  ))}
+                  {renderNestedSection("Employees", nestedEmployees)}
+                  {renderNestedSection("Clients", nestedClients)}
+                  {renderNestedSection("Family members", nestedFamily)}
+                  {renderNestedSection("Students", nestedStudents)}
+                  {renderNestedSection("Pets", nestedPets)}
+                  {renderNestedSection("Hobbies", nestedHobbies)}
+                  {renderNestedSection("Homes", nestedHomes)}
+                  {renderNestedSection("Vehicles", nestedVehicles)}
+                  {renderNestedSection("Other", nestedOthers)}
                 </ul>
               ) : null}
 
