@@ -12,6 +12,7 @@ import {
   topLevelProfiles,
   type GuardianProfile,
 } from "@/lib/profiles/types";
+import { useVaultSubVaultMenu } from "@/components/VaultSubVaultMenu";
 
 type ChatSummary = {
   id: string;
@@ -59,12 +60,14 @@ function VaultRow({
   selected,
   indented,
   onSelect,
+  onContextMenu,
   className = "",
 }: {
   profile: GuardianProfile;
   selected: boolean;
   indented?: boolean;
   onSelect: () => void;
+  onContextMenu?: (e: MouseEvent, profile: GuardianProfile) => void;
   className?: string;
 }) {
   return (
@@ -73,6 +76,9 @@ function VaultRow({
       role="option"
       aria-selected={selected}
       onClick={onSelect}
+      onContextMenu={
+        onContextMenu ? (e) => onContextMenu(e, profile) : undefined
+      }
       className={`flex w-full items-center gap-2 rounded-lg py-1.5 text-left text-sm transition ${
         indented ? "pl-6 pr-2" : "px-2"
       } ${
@@ -103,6 +109,7 @@ function VaultGroup({
   onSelect,
   onSelectChild,
   activeChildId,
+  onContextMenu,
 }: {
   profile: GuardianProfile;
   subVaults: GuardianProfile[];
@@ -112,6 +119,7 @@ function VaultGroup({
   onSelect: () => void;
   onSelectChild: (id: string) => void;
   activeChildId?: string;
+  onContextMenu?: (e: MouseEvent, profile: GuardianProfile) => void;
 }) {
   const hasSubVaults = subVaults.length > 0;
 
@@ -147,6 +155,7 @@ function VaultGroup({
             profile={profile}
             selected={!hasSubVaults && selected}
             onSelect={onSelect}
+            onContextMenu={onContextMenu}
             className={hasSubVaults ? "rounded-l-none pl-0 hover:bg-transparent" : undefined}
           />
         </div>
@@ -159,6 +168,7 @@ function VaultGroup({
               selected={activeChildId === child.id}
               indented
               onSelect={() => onSelectChild(child.id)}
+              onContextMenu={onContextMenu}
             />
           ))
         : null}
@@ -168,6 +178,7 @@ function VaultGroup({
 
 function VaultList({ onPicked }: { onPicked?: () => void }) {
   const { profiles, active, loading, switchProfile } = useActiveProfile();
+  const { handleContextMenu, overlay } = useVaultSubVaultMenu();
   const topLevel = topLevelProfiles(profiles);
   const [expandedParents, setExpandedParents] = useState<Set<string>>(
     () => new Set()
@@ -219,35 +230,39 @@ function VaultList({ onPicked }: { onPicked?: () => void }) {
   }
 
   return (
-    <ul className="space-y-0.5" role="listbox" aria-label="Vaults">
-      {topLevel.map((p) => {
-        const subVaults = nestedUnder(profiles, p);
-        return (
-          <VaultGroup
-            key={p.id}
-            profile={p}
-            subVaults={subVaults}
-            selected={active?.id === p.id}
-            activeChildId={
-              active?.parent_profile_id === p.id ? active.id : undefined
-            }
-            expanded={subVaults.length === 0 || expandedParents.has(p.id)}
-            onToggleExpand={() => toggleParent(p.id)}
-            onSelect={() => pick(p.id)}
-            onSelectChild={pick}
-          />
-        );
-      })}
-      <li className="pt-1">
-        <Link
-          href="/settings/profiles?add=1&return=%2Fask"
-          className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-brand hover:bg-white/80"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          Add vault
-        </Link>
-      </li>
-    </ul>
+    <>
+      {overlay}
+      <ul className="space-y-0.5" role="listbox" aria-label="Vaults">
+        {topLevel.map((p) => {
+          const subVaults = nestedUnder(profiles, p);
+          return (
+            <VaultGroup
+              key={p.id}
+              profile={p}
+              subVaults={subVaults}
+              selected={active?.id === p.id}
+              activeChildId={
+                active?.parent_profile_id === p.id ? active.id : undefined
+              }
+              expanded={subVaults.length === 0 || expandedParents.has(p.id)}
+              onToggleExpand={() => toggleParent(p.id)}
+              onSelect={() => pick(p.id)}
+              onSelectChild={pick}
+              onContextMenu={handleContextMenu}
+            />
+          );
+        })}
+        <li className="pt-1">
+          <Link
+            href="/settings/profiles?add=1&return=%2Fask"
+            className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-brand hover:bg-white/80"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add vault
+          </Link>
+        </li>
+      </ul>
+    </>
   );
 }
 
@@ -305,6 +320,9 @@ export default function AskGideonSidebar({
           open={vaultsOpen}
           onToggle={() => setVaultsOpen((o) => !o)}
         >
+          <p className="mb-1 px-2 text-[10px] text-ink-muted">
+            Right-click a vault to add a sub-vault.
+          </p>
           <VaultList onPicked={onSidebarAction} />
         </CollapsibleSection>
       </div>

@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useState, type DragEvent } from "react";
+import { useCallback, useState, type DragEvent, type MouseEvent } from "react";
 import { GripVertical } from "lucide-react";
 import ProfileAvatar from "@/components/ProfileAvatar";
+import { useVaultSubVaultMenu } from "@/components/VaultSubVaultMenu";
 import { buildVaultMapTree, type VaultMapBranch } from "@/lib/profiles/vaultMap";
 import {
   canAttachChildToParent,
@@ -36,12 +37,14 @@ function MapNode({
   onSwitch,
   size = "md",
   drag,
+  onContextMenu,
 }: {
   profile: GuardianProfile;
   activeId?: string;
   onSwitch: (id: string) => void;
   size?: "md" | "sm";
   drag?: DragCtx & { draggable: boolean };
+  onContextMenu?: (e: MouseEvent, profile: GuardianProfile) => void;
 }) {
   const active = profile.id === activeId;
   const isMoving = drag?.movingId === profile.id;
@@ -67,6 +70,9 @@ function MapNode({
       <button
         type="button"
         onClick={() => onSwitch(profile.id)}
+        onContextMenu={
+          onContextMenu ? (e) => onContextMenu(e, profile) : undefined
+        }
         disabled={isMoving}
         className={`flex w-full flex-col items-center gap-1.5 rounded-xl border bg-white px-2 py-2.5 text-center transition hover:border-brand/40 hover:bg-brand-light/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-wait ${
           active
@@ -102,11 +108,13 @@ function OwnerNode({
   personalProfile,
   activeId,
   onSwitch,
+  onContextMenu,
 }: {
   label: string;
   personalProfile: GuardianProfile | null;
   activeId?: string;
   onSwitch: (id: string) => void;
+  onContextMenu?: (e: MouseEvent, profile: GuardianProfile) => void;
 }) {
   const active = personalProfile ? personalProfile.id === activeId : false;
 
@@ -115,6 +123,11 @@ function OwnerNode({
       <button
         type="button"
         onClick={() => onSwitch(personalProfile.id)}
+        onContextMenu={
+          onContextMenu
+            ? (e) => onContextMenu(e, personalProfile)
+            : undefined
+        }
         className={`flex min-w-[5.5rem] max-w-[8.5rem] flex-col items-center gap-1.5 rounded-xl border bg-white px-2 py-2.5 text-center transition hover:border-brand/40 hover:bg-brand-light/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${
           active
             ? "border-brand ring-2 ring-brand/25 shadow-sm"
@@ -160,11 +173,13 @@ function MemberGrid({
   activeId,
   onSwitch,
   drag,
+  onContextMenu,
 }: {
   members: GuardianProfile[];
   activeId?: string;
   onSwitch: (id: string) => void;
   drag: DragCtx;
+  onContextMenu?: (e: MouseEvent, profile: GuardianProfile) => void;
 }) {
   return (
     <ul className="flex flex-wrap justify-center gap-2">
@@ -175,6 +190,7 @@ function MemberGrid({
             activeId={activeId}
             onSwitch={onSwitch}
             size="sm"
+            onContextMenu={onContextMenu}
             drag={{ ...drag, draggable: isNestableProfileType(member.profile_type) }}
           />
         </li>
@@ -190,6 +206,7 @@ function BranchColumn({
   drag,
   canDropOn,
   onDropOn,
+  onContextMenu,
 }: {
   branch: VaultMapBranch;
   activeId?: string;
@@ -197,6 +214,7 @@ function BranchColumn({
   drag: DragCtx;
   canDropOn: (parent: GuardianProfile) => boolean;
   onDropOn: (parentId: string | null) => void;
+  onContextMenu?: (e: MouseEvent, profile: GuardianProfile) => void;
 }) {
   const visibleGroups = branch.groups.filter((g) => g.members.length > 0);
   const hasGroups = visibleGroups.length > 0;
@@ -237,6 +255,7 @@ function BranchColumn({
         profile={branch.profile}
         activeId={activeId}
         onSwitch={onSwitch}
+        onContextMenu={onContextMenu}
         drag={rootDraggable ? { ...drag, draggable: true } : undefined}
       />
       {isDropTarget ? (
@@ -256,6 +275,7 @@ function BranchColumn({
                 activeId={activeId}
                 onSwitch={onSwitch}
                 drag={drag}
+                onContextMenu={onContextMenu}
               />
             </div>
           ))}
@@ -268,6 +288,7 @@ function BranchColumn({
             activeId={activeId}
             onSwitch={onSwitch}
             drag={drag}
+            onContextMenu={onContextMenu}
           />
         </div>
       ) : null}
@@ -286,6 +307,7 @@ export default function ProfileVaultMap({
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const [movingId, setMovingId] = useState<string | null>(null);
+  const { handleContextMenu, overlay } = useVaultSubVaultMenu();
 
   const tree = buildVaultMapTree(profiles, ownerLabel);
   const dragged = dragId
@@ -376,6 +398,7 @@ export default function ProfileVaultMap({
       aria-labelledby="vault-map-heading"
       onDragEnd={endDrag}
     >
+      {overlay}
       <div className="mb-4">
         <h2
           id="vault-map-heading"
@@ -384,8 +407,8 @@ export default function ProfileVaultMap({
           Vault map
         </h2>
         <p className="mt-0.5 text-xs text-ink-muted">
-          Tap a vault to switch. Drag by the grip handle onto Family, Business,
-          or another space to reorganize.
+          Tap a vault to switch. Right-click to add a sub-vault. Drag by the grip
+          handle onto Family, Business, or another space to reorganize.
         </p>
       </div>
       <div className="flex flex-col items-center">
@@ -416,6 +439,7 @@ export default function ProfileVaultMap({
           personalProfile={personalProfile}
           activeId={activeId}
           onSwitch={onSwitch}
+          onContextMenu={handleContextMenu}
         />
         {hasBranches ? (
           <>
@@ -438,6 +462,7 @@ export default function ProfileVaultMap({
                   drag={drag}
                   canDropOn={canDropOn}
                   onDropOn={handleDropOn}
+                  onContextMenu={handleContextMenu}
                 />
               ))}
             </ul>

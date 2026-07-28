@@ -503,6 +503,112 @@ export function canAttachChildToParent(
   return false;
 }
 
+/** Quick-create option when nesting a new vault under a parent from context menus. */
+export type SubVaultCreateOption = {
+  optionId: string;
+  label: string;
+  profileType: GuardianProfileType;
+  nameLabel: string;
+};
+
+/** Creation options for right-click "add sub-vault" menus on a parent profile. */
+export function subVaultCreateOptions(
+  parent: Pick<GuardianProfile, "profile_type">
+): SubVaultCreateOption[] {
+  const type = parent.profile_type;
+  const out: SubVaultCreateOption[] = [];
+
+  if (canHaveLinkedEmployees(type)) {
+    out.push({
+      optionId: "employee",
+      label: "Employee",
+      profileType: "employee",
+      nameLabel: "Employee name",
+    });
+    out.push({
+      optionId: "client",
+      label: "Client",
+      profileType: "client",
+      nameLabel: "Client name",
+    });
+  }
+  if (canHaveLinkedFamilyMembers(type)) {
+    out.push({
+      optionId: "child",
+      label: "Child",
+      profileType: "child",
+      nameLabel: "Child's name",
+    });
+    out.push({
+      optionId: "spouse",
+      label: "Spouse or partner",
+      profileType: "spouse_partner",
+      nameLabel: "Name",
+    });
+    out.push({
+      optionId: "parent",
+      label: "Parent",
+      profileType: "parent",
+      nameLabel: "Name",
+    });
+    out.push({
+      optionId: "family",
+      label: "Family member",
+      profileType: "family_member",
+      nameLabel: "Name",
+    });
+  }
+  if (canHaveLinkedStudents(type)) {
+    out.push({
+      optionId: "student",
+      label: "Student",
+      profileType: "student",
+      nameLabel: "Student's name",
+    });
+  }
+  if (canHaveLinkedPets(type)) {
+    out.push({
+      optionId: "pet",
+      label: "Pet",
+      profileType: "pet",
+      nameLabel: "Pet's name",
+    });
+  }
+  if (canHaveLinkedHomes(type)) {
+    out.push({
+      optionId: "home",
+      label: "Home",
+      profileType: "home",
+      nameLabel: "Home name",
+    });
+  }
+  if (canHaveLinkedVehicles(type)) {
+    out.push({
+      optionId: "vehicle",
+      label: "Vehicle",
+      profileType: "vehicle",
+      nameLabel: "Vehicle name",
+    });
+  }
+  if (canHaveLinkedHobbies(type)) {
+    out.push({
+      optionId: "hobby",
+      label: "Hobby or sport",
+      profileType: "hobby",
+      nameLabel: "Name",
+    });
+  }
+  if (canHaveLinkedOtherSpaces(type)) {
+    out.push({
+      optionId: "other",
+      label: "Other space",
+      profileType: "other",
+      nameLabel: "Space name",
+    });
+  }
+  return out;
+}
+
 /** Unlinked nestable profiles eligible to attach under a given container. */
 export function unlinkedAttachableTo(
   profiles: GuardianProfile[],

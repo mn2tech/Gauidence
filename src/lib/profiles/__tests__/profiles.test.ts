@@ -10,6 +10,7 @@ import {
   canHaveLinkedHobbies,
   canHaveLinkedVehicles,
   canAttachChildToParent,
+  subVaultCreateOptions,
   clientsOf,
   employeesOf,
   familyMembersOf,
@@ -333,5 +334,26 @@ describe("guardian profiles helpers", () => {
     assert.equal(canAttachChildToParent("other", "family"), true);
     assert.equal(canAttachChildToParent("other", "business"), true);
     assert.equal(canAttachChildToParent("other", "vehicles"), false);
+  });
+
+  it("lists sub-vault create options for family and business containers", () => {
+    const familyOpts = subVaultCreateOptions({ profile_type: "family" });
+    assert.ok(familyOpts.some((o) => o.optionId === "child"));
+    assert.ok(familyOpts.some((o) => o.optionId === "pet"));
+    assert.ok(familyOpts.some((o) => o.optionId === "student"));
+    assert.ok(!familyOpts.some((o) => o.optionId === "employee"));
+
+    const bizOpts = subVaultCreateOptions({ profile_type: "business" });
+    assert.ok(bizOpts.some((o) => o.optionId === "employee"));
+    assert.ok(bizOpts.some((o) => o.optionId === "client"));
+    assert.ok(bizOpts.some((o) => o.optionId === "vehicle"));
+
+    const personalOpts = subVaultCreateOptions({ profile_type: "personal" });
+    assert.deepEqual(
+      personalOpts.map((o) => o.optionId),
+      ["hobby"]
+    );
+
+    assert.deepEqual(subVaultCreateOptions({ profile_type: "vehicle" }), []);
   });
 });
