@@ -613,29 +613,52 @@ export function gideonChatContextLabel(
 
 export const VAULT_SCOPE_NOTE = "Searching all your vaults.";
 
+function formatVaultNameList(vaultNames: string[]): string {
+  if (vaultNames.length <= 5) return vaultNames.join(", ");
+  return `${vaultNames.slice(0, 4).join(", ")}, and ${vaultNames.length - 4} more`;
+}
+
 export function buildVaultScopeNote(args: {
   displayName?: string | null;
   profileKind?: SuggestionProfileKind;
   linkedMemberNames?: string[];
   chatScopedProfileName?: string | null;
+  /** Every vault the user can access (for narrowed-search context). */
   allVaultNames?: string[];
+  /** Vaults actually searched in this chat thread. */
+  searchVaultNames?: string[];
 }): string {
-  const vaultNames = (args.allVaultNames ?? [])
+  const accessibleNames = (args.allVaultNames ?? [])
     .map((n) => n.trim())
     .filter(Boolean);
-  if (vaultNames.length > 1) {
-    const list =
-      vaultNames.length <= 5
-        ? vaultNames.join(", ")
-        : `${vaultNames.slice(0, 4).join(", ")}, and ${vaultNames.length - 4} more`;
-    return `Searching all ${vaultNames.length} vaults: ${list}.`;
+  const searchNames = (args.searchVaultNames ?? accessibleNames)
+    .map((n) => n.trim())
+    .filter(Boolean);
+  const scoped = args.chatScopedProfileName?.trim();
+  const searchNarrowed =
+    scoped != null &&
+    accessibleNames.length > 0 &&
+    searchNames.length < accessibleNames.length;
+
+  if (searchNarrowed && searchNames.length > 0) {
+    const list = formatVaultNameList(searchNames);
+    if (searchNames.length === 1) {
+      const name = searchNames[0]!;
+      const possessive = name.toLowerCase().endsWith("s") ? `${name}'` : `${name}'s`;
+      return `Searching only ${possessive} vault for this chat (${accessibleNames.length} vaults available).`;
+    }
+    return `Searching ${searchNames.length} vaults for this chat: ${list} (${accessibleNames.length} vaults available).`;
   }
-  if (vaultNames.length === 1) {
-    const name = vaultNames[0];
+
+  if (searchNames.length > 1) {
+    const list = formatVaultNameList(searchNames);
+    return `Searching all ${searchNames.length} vaults: ${list}.`;
+  }
+  if (searchNames.length === 1) {
+    const name = searchNames[0]!;
     const possessive = name.toLowerCase().endsWith("s") ? `${name}'` : `${name}'s`;
     return `Searching ${possessive} vault.`;
   }
-  const scoped = args.chatScopedProfileName?.trim();
   const activeName = args.displayName?.trim();
   if (scoped) {
     const activeLabel = activeName ? `${activeName}'s vault` : "this vault";

@@ -383,10 +383,28 @@ async function askGideonScopeMeta(
   supabase: SupabaseClient,
   userId: string,
   active: { id: string; display_name: string; profile_type: GuardianProfileType },
-  chatScopedProfileName?: string | null
+  options?: {
+    chatHomeProfileId?: string;
+    chatScopedProfileId?: string | null;
+  }
 ) {
   const profileKind = suggestionKindFrom(active.profile_type);
   const accessibleProfiles = await listGuardianProfiles(supabase, userId);
+  const chatHomeProfileId = options?.chatHomeProfileId ?? active.id;
+  const retrievalScopes = buildVaultChatRetrievalScopes({
+    accessibleProfiles: accessibleProfiles.map((p) => ({
+      id: p.id,
+      display_name: p.display_name,
+      profile_type: p.profile_type,
+    })),
+    chatHomeProfileId,
+    scopedProfileId: options?.chatScopedProfileId,
+  });
+  const scopedProfile =
+    typeof options?.chatScopedProfileId === "string"
+      ? accessibleProfiles.find((p) => p.id === options.chatScopedProfileId) ??
+        null
+      : null;
   return {
     profileKind,
     chatContextLabel: gideonChatContextLabel(profileKind, active.display_name),
@@ -394,7 +412,8 @@ async function askGideonScopeMeta(
       displayName: active.display_name,
       profileKind,
       allVaultNames: accessibleProfiles.map((p) => p.display_name),
-      chatScopedProfileName,
+      searchVaultNames: retrievalScopes.map((p) => p.display_name),
+      chatScopedProfileName: scopedProfile?.display_name,
     }),
   };
 }
@@ -637,12 +656,10 @@ export async function GET(request: Request) {
 
     const profileKind = suggestionKindFrom(chatProfile.profile_type);
     const template = getVaultTemplate(profileKind);
-    const scopeMeta = await askGideonScopeMeta(
-      supabase,
-      user.id,
-      chatProfile,
-      scopedProfile?.display_name
-    );
+    const scopeMeta = await askGideonScopeMeta(supabase, user.id, chatProfile, {
+      chatHomeProfileId: chatProfile.id,
+      chatScopedProfileId: chat.scoped_profile_id,
+    });
 
     return NextResponse.json({
       chats: threadChats,

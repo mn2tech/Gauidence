@@ -12,6 +12,7 @@ import {
   normalizeInviteEmail,
 } from "@/lib/profiles/invitations";
 import { sendVaultInviteEmail } from "@/lib/email";
+import { loadCollaboratorMemberAccounts } from "@/lib/profiles/collaboratorMembers";
 
 export const runtime = "nodejs";
 
@@ -78,17 +79,7 @@ export async function GET(_request: Request, ctx: Ctx) {
   ]);
 
   const memberIds = (members ?? []).map((m) => m.user_id as string);
-  const { data: profiles } =
-    memberIds.length > 0
-      ? await supabase
-          .from("profiles")
-          .select("id, email, full_name")
-          .in("id", memberIds)
-      : { data: [] as { id: string; email: string | null; full_name: string | null }[] };
-
-  const profileById = new Map(
-    (profiles ?? []).map((p) => [p.id, p] as const)
-  );
+  const profileById = await loadCollaboratorMemberAccounts(memberIds);
 
   return NextResponse.json({
     profile: owned,
@@ -100,7 +91,7 @@ export async function GET(_request: Request, ctx: Ctx) {
         invitedBy: m.invited_by,
         createdAt: m.created_at,
         email: account?.email ?? null,
-        fullName: account?.full_name ?? null,
+        fullName: account?.fullName ?? null,
         isYou: m.user_id === user.id,
       };
     }),

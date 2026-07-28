@@ -170,6 +170,27 @@ describe("Gideon helpers", () => {
     );
     assert.equal(
       buildVaultScopeNote({
+        allVaultNames: [
+          "JAKULLA",
+          "crossroadconnect",
+          "CROSSROADS",
+          "SHEFA",
+          "A",
+          "B",
+          "C",
+          "D",
+          "E",
+          "F",
+          "G",
+          "H",
+        ],
+        searchVaultNames: ["crossroadconnect", "CROSSROADS"],
+        chatScopedProfileName: "CROSSROADS",
+      }),
+      "Searching 2 vaults for this chat: crossroadconnect, CROSSROADS (12 vaults available)."
+    );
+    assert.equal(
+      buildVaultScopeNote({
         displayName: "Family",
         profileKind: "family",
         linkedMemberNames: ["Nolan", "Ava"],

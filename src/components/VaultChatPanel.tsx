@@ -2506,17 +2506,6 @@ export default function VaultChatPanel({
           </p>
           <p className="text-[11px] text-ink-muted">
             {meta.vaultScopeNote ?? VAULT_SCOPE_NOTE}
-            {meta.chatScopedProfile &&
-            meta.chatScopedProfile.profileId !== effectiveProfile?.id ? (
-              <>
-                {" "}
-                This chat is also using{" "}
-                <span className="font-medium text-foreground">
-                  {meta.chatScopedProfile.profileName}
-                </span>
-                &apos;s vault for follow-ups.
-              </>
-            ) : null}
           </p>
         </div>
       </div>

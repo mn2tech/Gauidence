@@ -19,6 +19,7 @@ import {
   profileTypeLabel,
   type GuardianProfile,
 } from "@/lib/profiles/types";
+import { collaboratorDisplayName } from "@/lib/profiles/collaboratorDisplay";
 
 type Member = {
   userId: string;
@@ -280,12 +281,12 @@ export default function CollaboratorsPanel({
               >
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">
-                    {m.fullName || m.email || "Member"}
+                    {collaboratorDisplayName(m)}
                     {m.isYou ? " (you)" : ""}
                   </p>
                   <p className="truncate text-xs text-ink-muted">
                     {m.role === "owner" ? "Owner" : "Editor"}
-                    {m.email ? ` · ${m.email}` : ""}
+                    {m.fullName && m.email ? ` · ${m.email}` : ""}
                   </p>
                 </div>
                 {m.role === "editor" ? (
