@@ -57,13 +57,6 @@ export default function RecruitWizard({
     [job.id]
   );
 
-  const pendingCount = candidates.filter(
-    (c) =>
-      c.processing_status === "pending" ||
-      c.processing_status === "failed" ||
-      c.processing_status === "extracted"
-  ).length;
-
   const selectedCandidate = selectedCandidateId
     ? candidates.find((c) => c.id === selectedCandidateId)
     : null;
@@ -125,7 +118,7 @@ export default function RecruitWizard({
         {step === "analyze" ? (
           <AnalyzeStep
             jobId={job.id}
-            pendingCount={pendingCount}
+            candidates={candidates}
             onComplete={() => void refreshCandidates()}
             onNext={() => void goToStep("review")}
           />

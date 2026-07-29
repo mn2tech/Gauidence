@@ -316,7 +316,16 @@ alter table public.recruitment_audit_logs enable row level security;
 drop policy if exists "Users can view accessible recruitment jobs" on public.recruitment_jobs;
 create policy "Users can view accessible recruitment jobs"
   on public.recruitment_jobs for select
-  using (public.can_access_recruitment_job(id));
+  using (
+    auth.uid() = owner_user_id
+    or public.can_access_guardian_profile(profile_id)
+    or exists (
+      select 1
+      from public.recruitment_job_shares s
+      where s.job_id = id
+        and s.user_id = auth.uid()
+    )
+  );
 
 drop policy if exists "Users can insert recruitment jobs in editable vaults" on public.recruitment_jobs;
 create policy "Users can insert recruitment jobs in editable vaults"

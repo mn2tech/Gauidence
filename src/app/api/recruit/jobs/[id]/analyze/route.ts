@@ -40,7 +40,9 @@ export async function POST(request: Request, context: RouteContext) {
     return (
       c.processing_status === "pending" ||
       c.processing_status === "extracted" ||
-      c.processing_status === "failed"
+      c.processing_status === "failed" ||
+      c.processing_status === "extracting" ||
+      c.processing_status === "analyzing"
     );
   });
 

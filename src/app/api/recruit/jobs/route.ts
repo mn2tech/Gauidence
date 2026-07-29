@@ -7,7 +7,8 @@ import {
   listRecruitmentJobs,
 } from "@/lib/recruit/server";
 import { JOB_SELECT, type RecruitmentJob } from "@/lib/recruit/types";
-import { parseJobFields, parseJobTitle } from "@/lib/recruit/validators";
+import { parseJobFields } from "@/lib/recruit/validators";
+import { recruitDbErrorMessage } from "@/lib/recruit/errors";
 
 export const runtime = "nodejs";
 
@@ -94,8 +95,15 @@ export async function POST(request: Request) {
     .single();
 
   if (error || !data) {
+    if (error) {
+      console.error("createRecruitmentJob:", error.message, error.code, error.details);
+    }
     return NextResponse.json(
-      { error: "Couldn't create job." },
+      {
+        error: error
+          ? recruitDbErrorMessage(error, "Couldn't create job.")
+          : "Couldn't create job.",
+      },
       { status: 502 }
     );
   }
