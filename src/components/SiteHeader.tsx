@@ -9,11 +9,14 @@ import ProfileSwitcher from "@/components/ProfileSwitcher";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import GlobalVaultSearch from "@/components/GlobalVaultSearch";
 import { DOCUMENTS_PATH } from "@/lib/routes";
+import { useOnboardingProgress } from "@/hooks/useOnboardingProgress";
 
 export default function SiteHeader() {
   const pathname = usePathname();
   const router = useRouter();
   const { active, profiles, loading: profilesLoading } = useActiveProfile();
+  const { progress: onboardingProgress, loading: onboardingLoading } =
+    useOnboardingProgress();
   const [signedIn, setSignedIn] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -40,6 +43,10 @@ export default function SiteHeader() {
   }, [pathname]);
 
   const needsSetup = signedIn && !profilesLoading && profiles.length === 0;
+  /** Hide power features until the user has added at least one document. */
+  const showPowerNav =
+    !needsSetup &&
+    (onboardingLoading || onboardingProgress.hasDocument);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -129,15 +136,19 @@ export default function SiteHeader() {
               <Link href={askHref} className="hover:text-foreground">
                 Ask Gideon
               </Link>
-              <Link href={researchHref} className="hover:text-foreground">
-                Research
-              </Link>
-              <Link href="/work-memory" className="hover:text-foreground">
-                Work Memory
-              </Link>
-              <Link href="/experts" className="hover:text-foreground">
-                Experts
-              </Link>
+              {showPowerNav ? (
+                <>
+                  <Link href={researchHref} className="hover:text-foreground">
+                    Research
+                  </Link>
+                  <Link href="/work-memory" className="hover:text-foreground">
+                    Work Memory
+                  </Link>
+                  <Link href="/experts" className="hover:text-foreground">
+                    Experts
+                  </Link>
+                </>
+              ) : null}
               <Link href={DOCUMENTS_PATH} className="hover:text-foreground">
                 Documents
               </Link>
@@ -246,15 +257,19 @@ export default function SiteHeader() {
                 <Link href={askHref} className={linkClass}>
                   Ask Gideon
                 </Link>
-                <Link href={researchHref} className={linkClass}>
-                  Research
-                </Link>
-                <Link href="/work-memory" className={linkClass}>
-                  Work Memory
-                </Link>
-                <Link href="/experts" className={linkClass}>
-                  Experts
-                </Link>
+                {showPowerNav ? (
+                  <>
+                    <Link href={researchHref} className={linkClass}>
+                      Research
+                    </Link>
+                    <Link href="/work-memory" className={linkClass}>
+                      Work Memory
+                    </Link>
+                    <Link href="/experts" className={linkClass}>
+                      Experts
+                    </Link>
+                  </>
+                ) : null}
                 <Link href={DOCUMENTS_PATH} className={linkClass}>
                   Documents
                 </Link>

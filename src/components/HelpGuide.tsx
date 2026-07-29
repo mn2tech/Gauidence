@@ -28,17 +28,17 @@ import {
 const HOW_TO = [
   {
     icon: Users,
-    title: "Vaults (people & spaces)",
+    title: "Vaults",
     body: "Each vault keeps its own documents, Daily Logs, alerts, and Gideon chats. Switch vaults from the header or dashboard.",
     href: "/settings/profiles",
-    linkLabel: "Manage people & spaces",
+    linkLabel: "Manage vaults",
   },
   {
     icon: Users,
     title: "Shared vaults",
     body: "Invite another Guardian user as an Editor on a client, vehicle, home, pet, child, or student vault. They see only that vault's documents and Daily Logs — not your whole account. Gideon chats stay private to each person.",
     href: "/settings/profiles",
-    linkLabel: "Manage people & spaces",
+    linkLabel: "Manage vaults",
   },
   {
     icon: Camera,

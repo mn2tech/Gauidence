@@ -3,6 +3,8 @@ import "server-only";
 import { Resend } from "resend";
 import { appBaseUrl } from "@/lib/profiles/invitations";
 import type { RetentionEmailKey } from "@/lib/retention/types";
+import type { OnboardingIntent } from "@/lib/onboarding/intent";
+import { tipForIntent } from "@/lib/retention/personaTips";
 
 function escapeHtml(value: string) {
   return value
@@ -44,67 +46,75 @@ function footerNote() {
   </p>`;
 }
 
+export type RetentionEmailArgs = {
+  email: string;
+  fullName?: string | null;
+  intent?: OnboardingIntent | null;
+};
+
 export function renderRetentionEmail(
   key: RetentionEmailKey,
-  args: { email: string; fullName?: string | null }
+  args: RetentionEmailArgs
 ) {
   const base = appBaseUrl();
   const name = firstName(args.fullName, args.email);
-  const dashboard = `${base}/dashboard`;
-  const createVault = `${base}/settings/profiles?add=1`;
   const upload = `${base}/dashboard?camera=1`;
   const ask = `${base}/ask`;
   const help = `${base}/help`;
+  const intent = args.intent ?? null;
 
   switch (key) {
-    case "welcome":
+    case "welcome": {
+      const tip = tipForIntent(intent, "welcome");
       return {
-        subject: "Welcome to Guardian — create your first vault",
+        subject: "Welcome to Guardian — add your first document",
         html: emailShell(`
           <p style="margin:16px 0 8px;font-size:15px;color:#1c1917;line-height:1.5;">
             Hi ${escapeHtml(name)}, welcome to Guardian.
           </p>
           <p style="margin:0 0 4px;font-size:14px;color:#57534e;line-height:1.6;">
-            Start by choosing who you&apos;re helping — yourself, family, a client,
-            or another space. Then scan or upload a document so Guardian can find
-            dates and key facts.
+            Your vault is ready. ${escapeHtml(tip.bodyExtra)}
+            Try ${escapeHtml(tip.example)}.
           </p>
-          ${cta(createVault, "Create your first vault")}
+          ${cta(ask, tip.ctaLabel)}
           ${footerNote()}
         `),
         text: [
           `Hi ${name}, welcome to Guardian.`,
           "",
-          "Start by choosing who you're helping, then scan or upload a document.",
+          `Your vault is ready. ${tip.bodyExtra}`,
+          `Try ${tip.example}.`,
           "",
-          `Create your first vault: ${createVault}`,
+          `${tip.ctaLabel}: ${ask}`,
           "",
           "You can turn off getting-started emails in Guardian Settings.",
         ].join("\n"),
       };
+    }
     case "nudge_no_vault":
       return {
-        subject: "Finish setting up Guardian — who are you helping?",
+        subject: "Finish setting up Guardian — add something to remember",
         html: emailShell(`
           <p style="margin:16px 0 8px;font-size:15px;color:#1c1917;line-height:1.5;">
             Hi ${escapeHtml(name)}, you&apos;re one step away.
           </p>
           <p style="margin:0 0 4px;font-size:14px;color:#57534e;line-height:1.6;">
-            Create a person or space so documents, Daily Logs, and Gideon have a
-            home. It only takes a minute.
+            Open Ask Gideon and upload a document, photo, or note so Guardian can
+            find dates and key facts. You can add more vaults anytime from Settings.
           </p>
-          ${cta(createVault, "Choose a starting space")}
+          ${cta(ask, "Open Ask Gideon")}
           ${footerNote()}
         `),
         text: [
           `Hi ${name}, you're one step away.`,
           "",
-          "Create a person or space so your documents have a home.",
+          "Open Ask Gideon and upload a document so Guardian can find key facts.",
           "",
-          `Get started: ${createVault}`,
+          `Get started: ${ask}`,
         ].join("\n"),
       };
-    case "nudge_no_document":
+    case "nudge_no_document": {
+      const tip = tipForIntent(intent, "nudge_no_document");
       return {
         subject: "Add your first document to Guardian",
         html: emailShell(`
@@ -112,21 +122,22 @@ export function renderRetentionEmail(
             Hi ${escapeHtml(name)}, your vault is ready.
           </p>
           <p style="margin:0 0 4px;font-size:14px;color:#57534e;line-height:1.6;">
-            Scan or upload a PDF or photo — Guardian will read dates, names, and
-            other facts so you can search and ask Gideon later.
+            ${escapeHtml(tip.bodyExtra)}
           </p>
-          ${cta(upload, "Scan or upload a document")}
+          ${cta(upload, tip.ctaLabel)}
           ${footerNote()}
         `),
         text: [
           `Hi ${name}, your vault is ready.`,
           "",
-          "Scan or upload a document so Guardian can find key facts.",
+          tip.bodyExtra,
           "",
-          `Upload: ${upload}`,
+          `${tip.ctaLabel}: ${upload}`,
         ].join("\n"),
       };
-    case "nudge_try_gideon":
+    }
+    case "nudge_try_gideon": {
+      const tip = tipForIntent(intent, "nudge_try_gideon");
       return {
         subject: "Try Ask Gideon on your documents",
         html: emailShell(`
@@ -134,22 +145,23 @@ export function renderRetentionEmail(
             Hi ${escapeHtml(name)}, your documents are in Guardian.
           </p>
           <p style="margin:0 0 4px;font-size:14px;color:#57534e;line-height:1.6;">
-            Ask Gideon a question about what&apos;s in your vault — or open
+            ${escapeHtml(tip.bodyExtra)} Or open
             <a href="${escapeHtml(help)}" style="color:#0f766e;">Help &amp; Quick Start</a>
             for a short walkthrough.
           </p>
-          ${cta(ask, "Ask Gideon")}
+          ${cta(ask, tip.ctaLabel)}
           ${footerNote()}
         `),
         text: [
           `Hi ${name}, your documents are in Guardian.`,
           "",
-          "Ask Gideon a question about what's in your vault.",
+          tip.bodyExtra,
           "",
           `Ask Gideon: ${ask}`,
           `Quick Start: ${help}`,
         ].join("\n"),
       };
+    }
     case "product_gideon_attachments":
       return {
         subject: "New in Ask Gideon: attach photos and PDFs in chat",
@@ -202,7 +214,7 @@ export function renderRetentionEmail(
 export async function sendRetentionEmail(
   to: string,
   key: RetentionEmailKey,
-  args: { fullName?: string | null }
+  args: { fullName?: string | null; intent?: OnboardingIntent | null }
 ): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) return false;
@@ -214,6 +226,7 @@ export async function sendRetentionEmail(
   const { subject, html, text } = renderRetentionEmail(key, {
     email: to,
     fullName: args.fullName,
+    intent: args.intent,
   });
 
   const resend = new Resend(apiKey);

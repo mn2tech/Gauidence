@@ -21,6 +21,7 @@ export {
 import type { OrganizationSuggestionPayload } from "@/lib/organization/types";
 import { ANALYZE_CLIENT_TIMEOUT_MS } from "@/lib/analysis/timeout";
 import { notifyVaultActivityClient } from "@/lib/vault/clientNotifyActivity";
+import type { Fact } from "@/lib/analysis/types";
 
 export type VaultUploadResult = {
   documentId: string;
@@ -29,6 +30,9 @@ export type VaultUploadResult = {
   analysisError?: string;
   organizationSuggestion?: OrganizationSuggestionPayload | null;
   organizationAutoApplied?: boolean;
+  summary?: string | null;
+  title?: string | null;
+  facts?: Fact[];
 };
 
 /**
@@ -149,6 +153,9 @@ export async function uploadAndAnalyzeToVault(args: {
     const body = (await res.json().catch(() => ({}))) as {
       organizationSuggestion?: OrganizationSuggestionPayload | null;
       organizationAutoApplied?: boolean;
+      summary?: string;
+      title?: string;
+      facts?: Fact[];
     };
 
     return {
@@ -157,6 +164,9 @@ export async function uploadAndAnalyzeToVault(args: {
       analyzed: true,
       organizationSuggestion: body.organizationSuggestion ?? null,
       organizationAutoApplied: Boolean(body.organizationAutoApplied),
+      summary: body.summary ?? null,
+      title: body.title ?? null,
+      facts: Array.isArray(body.facts) ? body.facts : [],
     };
   } catch (err) {
     const timedOut = err instanceof DOMException && err.name === "AbortError";

@@ -27,6 +27,7 @@ export function isEligibleForRetentionEmail(
     case "welcome":
       return true;
     case "nudge_no_vault":
+      // Rare after auto personal vault (0038); kept for pre-migration accounts.
       return !activity.hasVault;
     case "nudge_no_document":
       return activity.hasVault && !activity.hasDocument;

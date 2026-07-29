@@ -6,11 +6,7 @@ import { DOCUMENTS_PATH, dailyLogHref } from "@/lib/routes";
 
 export const GETTING_STARTED_DISMISS_KEY = "guardian:getting-started-dismissed";
 
-export type OnboardingStepId =
-  | "vault"
-  | "document"
-  | "daily_log"
-  | "ask_gideon";
+export type OnboardingStepId = "document" | "ask_gideon" | "daily_log";
 
 export type OnboardingProgress = {
   hasVault: boolean;
@@ -29,19 +25,15 @@ export type OnboardingStep = {
   done: (p: OnboardingProgress) => boolean;
 };
 
+/**
+ * Activation path: add a document, ask Gideon.
+ * Daily Log is explore-more (listed last, not required for the core story).
+ * Vault creation is automatic — not a checklist step.
+ */
 export const ONBOARDING_STEPS: OnboardingStep[] = [
   {
-    id: "vault",
-    title: "Create your first vault",
-    description:
-      "Choose who you're helping — yourself, family, a client, or another space.",
-    href: () => "/settings/profiles?add=1",
-    cta: "Create a vault",
-    done: (p) => p.hasVault,
-  },
-  {
     id: "document",
-    title: "Add a document",
+    title: "Add your first document",
     description:
       "Scan or upload a PDF or photo so Guardian can find dates and key facts.",
     href: (profileId) =>
@@ -52,15 +44,6 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     done: (p) => p.hasDocument,
   },
   {
-    id: "daily_log",
-    title: "Write a Daily Log",
-    description:
-      "Capture a quick note, event, or observation in that vault’s timeline.",
-    href: (profileId) => dailyLogHref(profileId),
-    cta: "Open Daily Log",
-    done: (p) => p.hasDailyLog,
-  },
-  {
     id: "ask_gideon",
     title: "Ask Gideon",
     description:
@@ -68,6 +51,15 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     href: () => "/ask",
     cta: "Ask Gideon",
     done: (p) => p.hasAskedGideon,
+  },
+  {
+    id: "daily_log",
+    title: "Write a Daily Log",
+    description:
+      "Optional — capture a quick note, event, or observation in that vault’s timeline.",
+    href: (profileId) => dailyLogHref(profileId),
+    cta: "Open Daily Log",
+    done: (p) => p.hasDailyLog,
   },
 ];
 
@@ -83,6 +75,49 @@ export function completedStepCount(progress: OnboardingProgress): number {
 
 export function isOnboardingComplete(progress: OnboardingProgress): boolean {
   return completedStepCount(progress) === ONBOARDING_STEPS.length;
+}
+
+/** Core activation: document + Ask Gideon (Daily Log is optional). */
+export function isActivationComplete(progress: OnboardingProgress): boolean {
+  return progress.hasDocument && progress.hasAskedGideon;
+}
+
+export type ActivationChip = {
+  step: 1 | 2;
+  total: 2;
+  title: string;
+  description: string;
+  href: (activeProfileId: string | null) => string;
+  cta: string;
+};
+
+export function nextActivationChip(
+  progress: OnboardingProgress
+): ActivationChip | null {
+  if (!progress.hasDocument) {
+    return {
+      step: 1,
+      total: 2,
+      title: "Add a document",
+      description: "Upload or scan something so Gideon has memory to work with.",
+      href: (profileId) =>
+        profileId
+          ? `/dashboard?docs=1&camera=1#documents-${profileId}`
+          : DOCUMENTS_PATH,
+      cta: "Scan or upload",
+    };
+  }
+  if (!progress.hasAskedGideon) {
+    return {
+      step: 2,
+      total: 2,
+      title: "Ask Gideon",
+      description: "Ask a question about what’s in your vault.",
+      href: () => "/ask",
+      cta: "Ask Gideon",
+    };
+  }
+  return null;
 }
 
 export function readGettingStartedDismissed(): boolean {

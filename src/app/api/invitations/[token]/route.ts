@@ -172,6 +172,18 @@ export async function POST(_request: Request, ctx: Ctx) {
 
   await setActiveGuardianProfile(supabase, user.id, invite.profile_id);
 
+  // Invited collaborators shouldn't hit first-run intent capture.
+  const now = new Date().toISOString();
+  await supabase
+    .from("profiles")
+    .update({
+      onboarding_completed_at: now,
+      onboarding_skipped: true,
+      updated_at: now,
+    })
+    .eq("id", user.id)
+    .is("onboarding_completed_at", null);
+
   return NextResponse.json({
     ok: true,
     profileId: invite.profile_id,

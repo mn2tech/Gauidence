@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Building2, GraduationCap, Home, Trophy, Users } from "lucide-react";
+import { Building2, GraduationCap, Home, Users } from "lucide-react";
 import {
   PROFILE_CREATE_GROUPS,
   type ProfileCreateGroupId,
@@ -31,11 +31,11 @@ export default function ProfileSetupHub({
   return (
     <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm sm:p-8">
       <h2 className="text-xl font-bold tracking-tight">
-        Who are you helping?
+        What kind of vault do you need?
       </h2>
       <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-        Choose a starting space. You can add more people, businesses, students,
-        and teachers anytime from Manage.
+        Choose a starting vault. You can add more for family, business, school,
+        and more anytime from Manage vaults.
       </p>
       <p className="mt-3 text-sm text-ink-muted">
         Need a walkthrough?{" "}
@@ -46,9 +46,8 @@ export default function ProfileSetupHub({
           Open Help &amp; Quick Start
         </Link>
       </p>
-      <p className="mt-3 flex items-center gap-2 text-sm text-ink-muted">
-        <Trophy className="h-4 w-4 shrink-0 text-amber-600" aria-hidden />
-        Create your first space to earn the <strong>Vault creator</strong> award.
+      <p className="mt-3 text-sm text-ink-muted">
+        Create your first space to get started.
       </p>
       <ul className="mt-6 grid gap-3 sm:grid-cols-2">
         {PROFILE_CREATE_GROUPS.map((g) => {

@@ -708,12 +708,15 @@ export function buildVaultScopeNote(args: {
   return VAULT_SCOPE_NOTE;
 }
 
-/** First-time welcome — trust-first, not identity-document-first. */
-export const WELCOME_AI_MEMORY_TITLE = "Welcome to your AI memory.";
-export const WELCOME_AI_MEMORY_BODY =
-  "Guardian helps you remember documents, daily events, notes, photos, and important information—so you can stop searching and simply ask Gideon.";
+/** Shared product line — signup, welcome, help. Trust-first, not identity-document-first. */
+export const GUARDIAN_PRODUCT_LINE =
+  "Guardian remembers what matters — documents, notes, deadlines — so you can ask instead of search.";
 
-export const EMPTY_VAULT_HEADLINE = "Your vault is empty.";
+/** First-time welcome fallback when no vault template applies. */
+export const WELCOME_AI_MEMORY_TITLE = "Welcome to your vault.";
+export const WELCOME_AI_MEMORY_BODY = GUARDIAN_PRODUCT_LINE;
+
+export const EMPTY_VAULT_HEADLINE = "Add something for Gideon to remember";
 export const EMPTY_VAULT_BODY =
   "Start with something simple—a receipt, flyer, note, or Daily Log—and discover how easy it is to ask Gideon instead of searching.";
 
@@ -794,13 +797,13 @@ export function buildGideonVaultGuidance(
 ): GideonVaultGuidance {
   const template = getVaultTemplate(profileKind);
   return {
-    headline: WELCOME_AI_MEMORY_TITLE,
-    intro: WELCOME_AI_MEMORY_BODY,
-    tips: [...ORGANIZE_EXAMPLES],
-    suggestions: [...ONBOARDING_STARTER_QUESTIONS],
+    headline: template.welcomeTitle,
+    intro: template.description,
+    tips: [...template.suggestedUploads],
+    suggestions: [...template.starterQuestions],
     badge: template.badge,
     label: template.label,
-    suggestedUploads: [...ORGANIZE_EXAMPLES],
+    suggestedUploads: [...template.suggestedUploads],
     personality: template.personality,
   };
 }

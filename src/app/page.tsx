@@ -57,9 +57,9 @@ export default async function Home({
               The documents that run your life, finally under control.
             </h1>
             <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-ink-muted">
-              Guardian stores your most important documents, explains what they
-              mean, calculates the dates you cannot miss, and keeps everything
-              private to you.
+              Guardian remembers what matters — documents, notes, deadlines —
+              so you can ask instead of search. Private by default, explained in
+              plain language.
             </p>
             <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
               <Link

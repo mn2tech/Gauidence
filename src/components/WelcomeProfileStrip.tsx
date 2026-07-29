@@ -154,8 +154,8 @@ export default function WelcomeProfileStrip({
         ) : null}
         <p className="mt-2 text-sm text-ink-muted">
           {profiles.length === 0
-            ? "Start by choosing a space below."
-            : "Who are you helping today?"}
+            ? "Start by choosing a vault below."
+            : "Which vault are you working in today?"}
         </p>
       </div>
 
@@ -163,7 +163,7 @@ export default function WelcomeProfileStrip({
       <div>
         <div className="flex items-baseline justify-between gap-3">
           <p className="text-sm font-medium text-foreground">
-            Your people & spaces
+            Your vaults
           </p>
           <Link
             href="/settings/profiles"

@@ -12,6 +12,7 @@ import {
   type RetentionEmailKey,
   type UserActivitySnapshot,
 } from "@/lib/retention/types";
+import { parseOnboardingIntent } from "@/lib/retention/personaTips";
 
 export type RetentionProfileRow = {
   id: string;
@@ -19,6 +20,7 @@ export type RetentionProfileRow = {
   full_name: string | null;
   created_at: string;
   email_tips_enabled: boolean;
+  onboarding_intent?: string | null;
 };
 
 async function loadSentKeys(userId: string): Promise<Set<RetentionEmailKey>> {
@@ -131,6 +133,7 @@ export async function processRetentionForUser(
   const key = due[0]!;
   const ok = await sendRetentionEmail(profile.email, key, {
     fullName: profile.full_name,
+    intent: parseOnboardingIntent(profile.onboarding_intent),
   });
   if (!ok) return { sent: [], skipped: false };
 
@@ -177,7 +180,7 @@ export async function runProductEmailCampaign(
 
   const { data: profiles, error } = await admin
     .from("profiles")
-    .select("id, email, full_name, created_at, email_tips_enabled")
+    .select("id, email, full_name, created_at, email_tips_enabled, onboarding_intent")
     .not("email", "is", null);
 
   if (error) {
@@ -221,6 +224,7 @@ export async function runProductEmailCampaign(
 
     const ok = await sendRetentionEmail(row.email, key, {
       fullName: row.full_name,
+      intent: parseOnboardingIntent(row.onboarding_intent),
     });
     if (!ok) {
       failed += 1;
@@ -253,7 +257,7 @@ export async function trySendWelcomeEmail(userId: string): Promise<boolean> {
 
   const { data: profile } = await admin
     .from("profiles")
-    .select("id, email, full_name, created_at, email_tips_enabled")
+    .select("id, email, full_name, created_at, email_tips_enabled, onboarding_intent")
     .eq("id", userId)
     .maybeSingle();
 
@@ -264,6 +268,9 @@ export async function trySendWelcomeEmail(userId: string): Promise<boolean> {
 
   const ok = await sendRetentionEmail(profile.email, "welcome", {
     fullName: profile.full_name,
+    intent: parseOnboardingIntent(
+      (profile as { onboarding_intent?: string | null }).onboarding_intent
+    ),
   });
   if (!ok) return false;
   return recordSent(userId, "welcome");
@@ -292,7 +299,7 @@ export async function runRetentionCampaign(): Promise<{
   const cutoff = new Date(Date.now() - 30 * 24 * 3_600_000).toISOString();
   const { data: profiles, error } = await admin
     .from("profiles")
-    .select("id, email, full_name, created_at, email_tips_enabled")
+    .select("id, email, full_name, created_at, email_tips_enabled, onboarding_intent")
     .not("email", "is", null)
     .eq("email_tips_enabled", true)
     .gte("created_at", cutoff);

@@ -4,6 +4,7 @@ import { ProfileProvider } from "@/components/ProfileProvider";
 import GideonNudge from "@/components/GideonNudge";
 import AwardToast from "@/components/AwardToast";
 import RetentionWelcomeTrigger from "@/components/RetentionWelcomeTrigger";
+import OnboardingGate from "@/components/OnboardingGate";
 
 export default function AppProviders({
   children,
@@ -12,10 +13,12 @@ export default function AppProviders({
 }) {
   return (
     <ProfileProvider>
-      {children}
-      <GideonNudge />
-      <AwardToast />
-      <RetentionWelcomeTrigger />
+      <OnboardingGate>
+        {children}
+        <GideonNudge />
+        <AwardToast />
+        <RetentionWelcomeTrigger />
+      </OnboardingGate>
     </ProfileProvider>
   );
 }

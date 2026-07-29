@@ -149,8 +149,8 @@ export default function AuthForm({ mode }: { mode: Mode }) {
       </h1>
       <p className="mt-2 text-sm text-ink-muted">
         {isSignup
-          ? "Start protecting the documents you cannot afford to lose."
-          : "Log in to get back to your documents."}
+          ? "Guardian remembers what matters — documents, notes, deadlines — so you can ask instead of search."
+          : "Log in to ask Gideon about your documents, notes, and deadlines."}
       </p>
 
       {!configured && (

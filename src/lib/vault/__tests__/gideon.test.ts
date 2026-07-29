@@ -19,11 +19,9 @@ import {
   EMPTY_VAULT_HEADLINE,
   EMPTY_VAULT_BODY,
   VAULT_SCOPE_NOTE,
-  WELCOME_AI_MEMORY_TITLE,
   TRY_GUARDIAN_EXAMPLES,
   ORGANIZE_EXAMPLES,
   PRIVACY_CARD_POINTS,
-  ONBOARDING_STARTER_QUESTIONS,
 } from "../gideon.ts";
 import { defaultGideonWriteProfileId } from "../detectVaultScope.ts";
 
@@ -117,20 +115,28 @@ describe("Gideon helpers", () => {
 
   it("returns trust-first onboarding guidance for empty vaults", () => {
     const guide = buildGideonVaultGuidance("teacher", "Ms. Rivera");
-    assert.equal(guide.headline, WELCOME_AI_MEMORY_TITLE);
-    assert.match(guide.intro, /AI memory|ask Gideon/i);
+    const teacher = getVaultTemplate("teacher");
+    assert.equal(guide.headline, teacher.welcomeTitle);
+    assert.equal(guide.intro, teacher.description);
     assert.equal(guide.badge, "🏫 Teacher");
     assert.equal(guide.label, "Teacher");
-    assert.ok(guide.suggestedUploads.some((t) => /Receipts|School|Meeting/i.test(t)));
+    assert.deepEqual(guide.suggestedUploads, [...teacher.suggestedUploads]);
+    assert.deepEqual(guide.suggestions, [...teacher.starterQuestions]);
+    assert.ok(guide.suggestedUploads.some((t) => /Lesson|Curriculum|Notes/i.test(t)));
     assert.ok(!guide.suggestedUploads.some((t) => /\bIDs?\b|passport|SSN/i.test(t)));
-    assert.deepEqual(guide.suggestions, [...ONBOARDING_STARTER_QUESTIONS]);
   });
 
   it("keeps personal onboarding free of identity-document pressure", () => {
     const guide = buildGideonVaultGuidance("personal");
-    assert.equal(guide.headline, WELCOME_AI_MEMORY_TITLE);
-    assert.match(guide.intro, /stop searching and simply ask Gideon/i);
+    const personal = getVaultTemplate("personal");
+    assert.equal(guide.headline, personal.welcomeTitle);
+    assert.equal(guide.intro, personal.description);
     assert.ok(!guide.suggestions.some((q) => /passport|driver'?s license|SSN/i.test(q)));
+    assert.ok(
+      !guide.suggestedUploads.some((u) =>
+        /passport|driver|license|SSN|social security|tax return/i.test(u)
+      )
+    );
     assert.ok(
       !TRY_GUARDIAN_EXAMPLES.some((e) =>
         /passport|driver|license|SSN|social security|tax return/i.test(e)
@@ -138,7 +144,7 @@ describe("Gideon helpers", () => {
     );
     assert.ok(ORGANIZE_EXAMPLES.some((e) => /if you choose/i.test(e)));
     assert.ok(PRIVACY_CARD_POINTS.length >= 4);
-    assert.equal(EMPTY_VAULT_HEADLINE, "Your vault is empty.");
+    assert.equal(EMPTY_VAULT_HEADLINE, "Add something for Gideon to remember");
     assert.match(EMPTY_VAULT_BODY, /something simple/i);
     assert.equal(gideonChatContextLabel("personal"), "You are chatting with Gideon Personal");
     assert.equal(

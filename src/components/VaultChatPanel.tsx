@@ -98,6 +98,21 @@ import {
 } from "@/lib/vault/assistantMessageText";
 import { documentsHref } from "@/lib/routes";
 import type { WorkProject } from "@/lib/work-memory/types";
+import OnboardingProgressChip from "@/components/OnboardingProgressChip";
+import FirstWinCard from "@/components/FirstWinCard";
+import { useOnboardingProgress } from "@/hooks/useOnboardingProgress";
+import {
+  autoQuestionForUpload,
+  uploadCtaForProfileKind,
+} from "@/lib/onboarding/intent";
+import {
+  buildSampleDocumentFile,
+  pickFirstWinHighlights,
+  readFirstWinSeen,
+  writeFirstWinSeen,
+  type FirstWinHighlight,
+} from "@/lib/onboarding/sampleDocument";
+import { trackOnboardingEvent } from "@/lib/onboarding/events";
 
 function defaultReminderDateTime(timeZone: string = GUARDIAN_TIME_ZONE): {
   date: string;
@@ -483,6 +498,8 @@ export default function VaultChatPanel({
     : searchParams.get("projectId");
   const { active, profiles, loading: profilesLoading, switchProfile, refresh, timeZone, timeZoneLabel } =
     useActiveProfile();
+  const { progress: onboardingProgress, refresh: refreshOnboarding } =
+    useOnboardingProgress();
   const needsSetup = !profilesLoading && profiles.length === 0;
   const bootstrapTried = useRef(false);
   const [chats, setChats] = useState<ChatSummary[]>([]);
@@ -529,6 +546,11 @@ export default function VaultChatPanel({
   const [confirmedReminderIds, setConfirmedReminderIds] = useState<Set<string>>(
     () => new Set()
   );
+  const [firstWin, setFirstWin] = useState<{
+    fileName: string;
+    summary: string | null;
+    highlights: FirstWinHighlight[];
+  } | null>(null);
   const [dismissedVaultScopeIds, setDismissedVaultScopeIds] = useState<
     Set<string>
   >(() => new Set());
@@ -1212,6 +1234,118 @@ export default function VaultChatPanel({
     }
   };
 
+  const maybeShowFirstWin = (args: {
+    wasEmpty: boolean;
+    fileName: string;
+    summary?: string | null;
+    facts?: { label: string; value: string; date: string | null }[];
+  }) => {
+    if (!args.wasEmpty || readFirstWinSeen()) return;
+    const highlights = pickFirstWinHighlights(args.facts ?? [], 3);
+    writeFirstWinSeen(true);
+    trackOnboardingEvent("first_document_uploaded", {
+      profileKind: active?.profile_type ?? null,
+      source: args.fileName.toLowerCase().includes("sample")
+        ? "sample"
+        : "upload",
+    });
+    trackOnboardingEvent("first_win_shown", {
+      profileKind: active?.profile_type ?? null,
+    });
+    setFirstWin({
+      fileName: args.fileName,
+      summary: args.summary ?? null,
+      highlights,
+    });
+  };
+
+  const runSampleDocument = async () => {
+    if (!profileId || !canEditVault || vaultBusy || sending) return;
+    trackOnboardingEvent("sample_started", {
+      profileKind: active?.profile_type ?? null,
+    });
+    const wasEmpty =
+      !onboardingProgress.hasDocument &&
+      (meta?.documentCount ?? 0) + (meta?.photoCount ?? 0) === 0;
+    const file = buildSampleDocumentFile(active?.profile_type);
+    setInput("");
+    clearPendingAttachment();
+
+    const userMsgId = `local-sample-${Date.now()}`;
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: userMsgId,
+        role: "user",
+        content: "Try this sample document",
+        attachment: {
+          documentId: userMsgId,
+          fileName: file.name,
+          kind: "document",
+          previewUrl: null,
+        },
+        created_at: new Date().toISOString(),
+      },
+    ]);
+
+    try {
+      const result = await uploadVaultFile(file);
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === userMsgId && m.attachment
+            ? {
+                ...m,
+                attachment: {
+                  ...m.attachment,
+                  documentId: result.documentId,
+                  fileName: result.fileName,
+                },
+              }
+            : m
+        )
+      );
+
+      if (!result.analyzed) {
+        pushLocalNote(
+          `I added "${result.fileName}" to your vault, but analysis didn't finish${
+            result.analysisError ? `: ${result.analysisError}` : "."
+          }`
+        );
+        void refreshOnboarding();
+        return;
+      }
+
+      maybeShowFirstWin({
+        wasEmpty,
+        fileName: result.fileName,
+        summary: result.summary,
+        facts: result.facts,
+      });
+
+      const finalQuestion = autoQuestionForUpload({
+        kind: active?.profile_type,
+        fileName: result.fileName,
+        isImage: false,
+      });
+      await sendQuestion(finalQuestion, {
+        attachment: {
+          documentId: result.documentId,
+          fileName: result.fileName,
+          kind: "document",
+          previewUrl: null,
+        },
+        userDisplayContent: "Try this sample document",
+        replaceUserMessageId: userMsgId,
+      });
+      void refreshOnboarding();
+    } catch (err) {
+      setMessages((prev) => prev.filter((m) => m.id !== userMsgId));
+      setError(
+        err instanceof Error ? err.message : "Sample upload failed. Please try again."
+      );
+    }
+  };
+
   const openCamera = () => {
     setPlusOpen(false);
     if (
@@ -1817,14 +1951,26 @@ export default function VaultChatPanel({
               result.analysisError ? `: ${result.analysisError}` : "."
             }`
           );
+          void refreshOnboarding();
           return;
         }
 
+        maybeShowFirstWin({
+          wasEmpty:
+            !onboardingProgress.hasDocument &&
+            (meta?.documentCount ?? 0) + (meta?.photoCount ?? 0) === 0,
+          fileName: result.fileName,
+          summary: result.summary,
+          facts: result.facts,
+        });
+
         const finalQuestion =
           question ||
-          (isImageUpload(file)
-            ? "What do you see in this image? Transcribe any lists or notes clearly."
-            : `Summarize what matters in ${result.fileName}.`);
+          autoQuestionForUpload({
+            kind: active?.profile_type,
+            fileName: result.fileName,
+            isImage: isImageUpload(file),
+          });
         await sendQuestion(finalQuestion, {
           attachment: {
             documentId: result.documentId,
@@ -1835,6 +1981,7 @@ export default function VaultChatPanel({
           userDisplayContent: question,
           replaceUserMessageId: userMsgId,
         });
+        void refreshOnboarding();
       } catch (err) {
         setMessages((prev) => prev.filter((m) => m.id !== userMsgId));
         stageVaultFile(file);
@@ -2112,8 +2259,6 @@ export default function VaultChatPanel({
   };
 
   const welcome = !loadingHistory && messages.length === 0 && !sending;
-  const onlyDefaultVault =
-    !profilesLoading && topLevelProfiles(profiles).length <= 1;
   const docCount = meta?.documentCount ?? 0;
   const photoCount = meta?.photoCount ?? 0;
   const logCount = meta?.logCount ?? 0;
@@ -2121,6 +2266,16 @@ export default function VaultChatPanel({
   const emptyVault = fileCount === 0 && logCount === 0;
   const logsOnly = fileCount === 0 && logCount > 0;
   const greetName = meta?.firstName;
+  const showCreateAnotherVault =
+    fileCount > 0 ||
+    onboardingProgress.hasDocument ||
+    topLevelProfiles(profiles).length > 1;
+  const uploadCtaLabel = uploadCtaForProfileKind(active?.profile_type);
+  const exampleUploads = (
+    meta?.guidance?.suggestedUploads?.length
+      ? meta.guidance.suggestedUploads
+      : [...TRY_GUARDIAN_EXAMPLES]
+  ).slice(0, 4);
 
   const countBits: string[] = [];
   if (docCount > 0) {
@@ -2144,7 +2299,8 @@ export default function VaultChatPanel({
   };
 
   const welcomeBlock = welcome && (
-    <div className="mx-auto max-w-xl space-y-4 px-1 py-6">
+    <div className="mx-auto max-w-xl space-y-4 px-1 py-4 sm:py-6">
+      {isPage ? <OnboardingProgressChip /> : null}
       <div className="flex items-start gap-3">
         <GideonAvatar size={44} />
         <div className="min-w-0 space-y-3">
@@ -2234,28 +2390,31 @@ export default function VaultChatPanel({
                 </p>
               </div>
 
-              <div className="space-y-2">
-                <p className="text-xs font-semibold text-foreground">
-                  {FIRST_MEMORY_PROMPT}
-                </p>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                  {FIRST_MEMORY_ACTIONS.map((action) => (
-                    <button
-                      key={action.id}
-                      type="button"
-                      disabled={vaultBusy || sending || !profileId || !canEditVault}
-                      onClick={() => runFirstMemoryAction(action.id)}
-                      className="flex flex-col items-center gap-1.5 rounded-xl border border-stone-200 bg-white px-3 py-3 text-center transition hover:border-brand hover:bg-brand-light/40 disabled:opacity-50"
-                    >
-                      <span className="text-xl" aria-hidden>
-                        {action.emoji}
-                      </span>
-                      <span className="text-xs font-semibold text-foreground">
-                        {action.label}
-                      </span>
-                    </button>
-                  ))}
-                </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={vaultBusy || sending || !profileId || !canEditVault}
+                  onClick={openFilePicker}
+                  className="inline-flex rounded-full bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark disabled:opacity-50"
+                >
+                  📄 {uploadCtaLabel}
+                </button>
+                <button
+                  type="button"
+                  disabled={vaultBusy || sending || !profileId || !canEditVault}
+                  onClick={openCamera}
+                  className="inline-flex rounded-full border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-foreground transition hover:bg-stone-50 disabled:opacity-50"
+                >
+                  📷 Scan with camera
+                </button>
+                <button
+                  type="button"
+                  disabled={vaultBusy || sending || !profileId || !canEditVault}
+                  onClick={() => void runSampleDocument()}
+                  className="inline-flex rounded-full border border-brand/40 bg-brand-light/50 px-4 py-2.5 text-sm font-semibold text-brand-dark transition hover:bg-brand-light disabled:opacity-50"
+                >
+                  ✨ Try with a sample
+                </button>
               </div>
 
               <div className="rounded-xl border border-stone-200 bg-stone-50/80 px-3 py-3">
@@ -2266,7 +2425,7 @@ export default function VaultChatPanel({
                   {TRY_GUARDIAN_SUBTITLE}
                 </p>
                 <ul className="mt-2 grid grid-cols-1 gap-1 sm:grid-cols-2">
-                  {TRY_GUARDIAN_EXAMPLES.map((example) => (
+                  {exampleUploads.map((example) => (
                     <li
                       key={example}
                       className="text-xs leading-relaxed text-ink-muted"
@@ -2277,37 +2436,72 @@ export default function VaultChatPanel({
                 </ul>
               </div>
 
-              <div className="rounded-xl border border-brand/20 bg-brand-light/40 px-3 py-3">
-                <p className="text-xs font-semibold text-foreground">
-                  {PRIVACY_CARD_TITLE}
-                </p>
-                <ul className="mt-2 space-y-1">
-                  {PRIVACY_CARD_POINTS.map((point) => (
-                    <li
-                      key={point}
-                      className="text-xs leading-relaxed text-ink-muted"
-                    >
-                      • {point}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              <p className="text-xs text-ink-muted">
+                Upload something first — then try asking Gideon about it.
+              </p>
 
-              <div className="space-y-1.5">
-                <p className="text-xs font-semibold text-foreground">
-                  {ORGANIZE_INTRO}
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {ORGANIZE_EXAMPLES.map((item) => (
-                    <span
-                      key={item}
-                      className="rounded-full border border-stone-200 bg-stone-50 px-2.5 py-1 text-[11px] font-medium text-ink-muted"
-                    >
-                      {item}
-                    </span>
-                  ))}
+              <details className="rounded-xl border border-stone-200 bg-white px-3 py-2">
+                <summary className="cursor-pointer text-xs font-semibold text-foreground">
+                  Privacy &amp; more ways to start
+                </summary>
+                <div className="mt-3 space-y-3 border-t border-stone-100 pt-3">
+                  <div>
+                    <p className="text-xs font-semibold text-foreground">
+                      {PRIVACY_CARD_TITLE}
+                    </p>
+                    <ul className="mt-1.5 space-y-1">
+                      {PRIVACY_CARD_POINTS.map((point) => (
+                        <li
+                          key={point}
+                          className="text-xs leading-relaxed text-ink-muted"
+                        >
+                          • {point}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-foreground">
+                      {FIRST_MEMORY_PROMPT}
+                    </p>
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                      {FIRST_MEMORY_ACTIONS.map((action) => (
+                        <button
+                          key={action.id}
+                          type="button"
+                          disabled={
+                            vaultBusy || sending || !profileId || !canEditVault
+                          }
+                          onClick={() => runFirstMemoryAction(action.id)}
+                          className="flex flex-col items-center gap-1.5 rounded-xl border border-stone-200 bg-white px-3 py-3 text-center transition hover:border-brand hover:bg-brand-light/40 disabled:opacity-50"
+                        >
+                          <span className="text-xl" aria-hidden>
+                            {action.emoji}
+                          </span>
+                          <span className="text-xs font-semibold text-foreground">
+                            {action.label}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-semibold text-foreground">
+                      {ORGANIZE_INTRO}
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {ORGANIZE_EXAMPLES.map((item) => (
+                        <span
+                          key={item}
+                          className="rounded-full border border-stone-200 bg-stone-50 px-2.5 py-1 text-[11px] font-medium text-ink-muted"
+                        >
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-              </div>
+              </details>
             </>
           ) : (
             <>
@@ -2345,7 +2539,7 @@ export default function VaultChatPanel({
             </>
           )}
 
-          {meta && meta.suggestions.length > 0 ? (
+          {!emptyVault && meta && meta.suggestions.length > 0 ? (
             <div className="space-y-2 pt-0.5">
               <p className="text-xs font-semibold text-foreground">
                 Try asking Gideon
@@ -2366,7 +2560,7 @@ export default function VaultChatPanel({
             </div>
           ) : null}
 
-          {onlyDefaultVault ? (
+          {showCreateAnotherVault ? (
             <div className="rounded-xl border border-stone-200 bg-stone-50/80 px-3 py-3">
               <p className="text-xs font-semibold text-foreground">
                 Create another Vault
@@ -2425,6 +2619,21 @@ export default function VaultChatPanel({
         </p>
       ) : (
         <>
+          {firstWin ? (
+            <FirstWinCard
+              fileName={firstWin.fileName}
+              summary={firstWin.summary}
+              highlights={firstWin.highlights}
+              onAskAnother={() => {
+                setFirstWin(null);
+              }}
+              onAddOwn={() => {
+                setFirstWin(null);
+                openFilePicker();
+              }}
+              onDismiss={() => setFirstWin(null)}
+            />
+          ) : null}
           {welcomeBlock}
           {messages.map((m, index) =>
             m.role === "user" ? (

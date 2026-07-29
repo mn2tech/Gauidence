@@ -29,7 +29,8 @@ export default async function HelpPage() {
             Help &amp; Quick Start
           </h1>
           <p className="mt-2 max-w-xl text-sm leading-relaxed text-ink-muted sm:text-base">
-            Set up your first vault, add something useful, then ask Gideon.
+            Guardian remembers what matters — documents, notes, deadlines — so
+            you can ask instead of search. Add something useful, then ask Gideon.
             Students and teachers: see the school guides below. Come back anytime you need a
             refresher.
           </p>

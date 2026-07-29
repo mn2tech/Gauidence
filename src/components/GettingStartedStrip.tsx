@@ -31,7 +31,7 @@ export default function GettingStartedStrip() {
   if (isOnboardingComplete(progress)) return null;
 
   const next = nextIncompleteStep(progress);
-  if (!next || next.id === "vault") return null;
+  if (!next) return null;
 
   const href = next.href(active?.id ?? null);
 

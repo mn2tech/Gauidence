@@ -25,14 +25,14 @@ export type AwardDefinition = {
 export const AWARDS: AwardDefinition[] = [
   {
     key: "first_vault",
-    title: "Vault creator",
-    description: "Created your first person or space.",
+    title: "Vault ready",
+    description: "Your Guardian vault is set up and ready to use.",
     sortOrder: 10,
   },
   {
     key: "first_document",
-    title: "Document keeper",
-    description: "Added your first document to a vault.",
+    title: "First memory",
+    description: "Added your first document — Gideon can remember it now.",
     sortOrder: 20,
   },
   {

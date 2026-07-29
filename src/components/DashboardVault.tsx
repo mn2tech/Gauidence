@@ -124,7 +124,7 @@ export default function DashboardVault({ userId }: { userId: string }) {
           href="/settings/profiles"
           className="font-medium text-brand hover:text-brand-dark"
         >
-          Manage people &amp; spaces
+          Manage vaults
         </Link>{" "}
         to continue.
       </p>

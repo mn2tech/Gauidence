@@ -684,7 +684,10 @@ export default function DocumentManager({
         }
         setExpandedId(doc.id);
         notifyAlertsUpdated();
+        const isFirstDocument =
+          documents.filter((d) => d.id !== doc.id).length === 0;
         if (
+          !isFirstDocument &&
           body.organizationSuggestion &&
           (body.organizationSuggestion.status === "pending" ||
             body.organizationAutoApplied)
@@ -694,7 +697,11 @@ export default function DocumentManager({
             autoApplied: Boolean(body.organizationAutoApplied),
           });
         }
-        if (body.organizationAutoApplied && body.organizationSuggestion) {
+        if (
+          !isFirstDocument &&
+          body.organizationAutoApplied &&
+          body.organizationSuggestion
+        ) {
           setOrgNotice(
             `Guardian filed this in ${body.organizationSuggestion.profilePath ?? "the suggested vault"}. You can undo from the card.`
           );
