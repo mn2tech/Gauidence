@@ -110,6 +110,7 @@ import {
   pickFirstWinHighlights,
   readFirstWinSeen,
   writeFirstWinSeen,
+  type FirstWinFactInput,
   type FirstWinHighlight,
 } from "@/lib/onboarding/sampleDocument";
 import { trackOnboardingEvent } from "@/lib/onboarding/events";
@@ -1238,7 +1239,7 @@ export default function VaultChatPanel({
     wasEmpty: boolean;
     fileName: string;
     summary?: string | null;
-    facts?: { label: string; value: string; date: string | null }[];
+    facts?: FirstWinFactInput[] | null;
   }) => {
     if (!args.wasEmpty || readFirstWinSeen()) return;
     const highlights = pickFirstWinHighlights(args.facts ?? [], 3);

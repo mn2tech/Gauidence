@@ -6,6 +6,9 @@ import type { Fact } from "@/lib/analysis/types";
 import { buildPastedTextFile } from "@/lib/vault/pastedText";
 import type { SuggestionProfileKind } from "@/lib/vault/gideon";
 
+/** Minimal fact shape for first-win picking (source optional). */
+export type FirstWinFactInput = Pick<Fact, "label" | "value" | "date">;
+
 export const SAMPLE_DOCUMENT_PATH = "/onboarding/sample-camp-flyer.txt";
 
 export const SAMPLE_CAMP_FLYER_BODY = `Riverside Summer Camp — Registration Flyer
@@ -86,7 +89,7 @@ export type FirstWinHighlight = {
 
 /** Pick the most “wow” facts for the first-win card. */
 export function pickFirstWinHighlights(
-  facts: Fact[] | null | undefined,
+  facts: FirstWinFactInput[] | null | undefined,
   max = 3
 ): FirstWinHighlight[] {
   if (!facts?.length) return [];
