@@ -88,6 +88,11 @@ import {
   loadWorkMemoryProjectForGideon,
 } from "@/lib/work-memory/server";
 import { createVaultChatStreamResponse } from "@/lib/vault/vaultChatStream.server";
+import { canAccessGuardianPayroll } from "@/lib/features/payroll";
+import {
+  answerPayrollGideonQuery,
+  wantsPayrollQuery,
+} from "@/lib/payroll/gideonChat";
 
 async function loadLinkedOrgContext(
   supabase: SupabaseClient,
@@ -1293,6 +1298,30 @@ export async function POST(request: Request) {
     answer = buildTodayDateAnswer(userTz);
   } else if (isSimpleCurrentTimeQuestion(question) && !attachmentDocumentId) {
     answer = buildCurrentTimeAnswer(userTz);
+  } else if (
+    !attachmentDocumentId &&
+    canAccessGuardianPayroll({ email: user.email }) &&
+    wantsPayrollQuery(question) &&
+    (canHaveLinkedEmployees(active.profile_type) ||
+      (active.profile_type === "employee" && active.parent_profile_id))
+  ) {
+    const payrollProfileId =
+      active.profile_type === "employee" && active.parent_profile_id
+        ? active.parent_profile_id
+        : active.id;
+    const payrollAnswer = await answerPayrollGideonQuery(supabase, {
+      query: question,
+      profileId: payrollProfileId,
+    });
+    let payrollText = payrollAnswer?.message ?? "Open Payroll for more options.";
+    if (payrollAnswer?.href) {
+      payrollText += `\n\n→ ${payrollAnswer.href}`;
+    }
+    if (payrollAnswer?.requiresConfirmation) {
+      payrollText +=
+        "\n\nI cannot approve or share payroll without your explicit confirmation on the Payroll report page.";
+    }
+    answer = payrollText;
   } else {
   try {
     const showPictures = wantsShowPictures(question);

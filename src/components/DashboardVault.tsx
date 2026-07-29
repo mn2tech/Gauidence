@@ -8,6 +8,8 @@ import DocumentManager from "@/components/DocumentManager";
 import AlertsPanel from "@/components/AlertsPanel";
 import DailyLogPanel from "@/components/DailyLogPanel";
 import LinkedEmployeesPanel from "@/components/LinkedEmployeesPanel";
+import PayrollTimesheetPanel from "@/components/payroll/PayrollTimesheetPanel";
+import EmployeeClockPanel from "@/components/payroll/EmployeeClockPanel";
 import LinkedClientsPanel from "@/components/LinkedClientsPanel";
 import LinkedFamilyPanel from "@/components/LinkedFamilyPanel";
 import LinkedVehiclesPanel from "@/components/LinkedVehiclesPanel";
@@ -174,6 +176,21 @@ export default function DashboardVault({ userId }: { userId: string }) {
           <LinkedEmployeesPanel parent={active} />
         </VaultSection>
       )}
+
+      {canHaveLinkedEmployees(active.profile_type) && (
+        <VaultSection id={`timesheets-${active.id}`} title="Timesheets">
+          <PayrollTimesheetPanel businessProfile={active} />
+        </VaultSection>
+      )}
+
+      {active.profile_type === "employee" && active.parent_profile_id ? (
+        <VaultSection id={`my-hours-${active.id}`} title="My hours">
+          <EmployeeClockPanel
+            employeeProfile={active}
+            businessProfileId={active.parent_profile_id}
+          />
+        </VaultSection>
+      ) : null}
 
       {canHaveLinkedClients(active.profile_type) && (
         <VaultSection id={`clients-${active.id}`} title="Clients">

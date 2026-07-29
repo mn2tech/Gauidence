@@ -452,3 +452,170 @@ export async function sendRecruitReportReadyEmail(
   }
   return true;
 }
+
+// ---------------------------------------------------------------------------
+// Payroll share emails
+// ---------------------------------------------------------------------------
+
+export type PayrollShareEmailArgs = {
+  to: string;
+  recipientName: string;
+  businessName: string;
+  payPeriod: string;
+  shareUrl: string;
+  expiresAt: string;
+  optionalMessage?: string;
+  ownerName: string;
+};
+
+export function renderPayrollShareEmail(args: PayrollShareEmailArgs) {
+  const expires = new Date(args.expiresAt).toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  const subject = `Secure payroll report — ${args.businessName}`;
+  const messageBlock = args.optionalMessage
+    ? `<p style="margin:0 0 16px;font-size:14px;color:#57534e;line-height:1.6;font-style:italic;">"${escapeHtml(args.optionalMessage)}"</p>`
+    : "";
+  const html = `
+  <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#fafaf9;padding:32px 16px;">
+    <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e7e5e4;border-radius:16px;overflow:hidden;">
+      <div style="padding:24px;">
+        <div style="font-size:18px;font-weight:700;color:#1c1917;">Secure Payroll Report powered by Guardian</div>
+        <p style="margin:16px 0 8px;font-size:15px;color:#1c1917;line-height:1.5;">
+          Hi ${escapeHtml(args.recipientName || "there")},
+        </p>
+        <p style="margin:0 0 16px;font-size:14px;color:#57534e;line-height:1.6;">
+          ${escapeHtml(args.ownerName)} shared an approved payroll report for
+          <strong>${escapeHtml(args.businessName)}</strong> covering
+          <strong>${escapeHtml(args.payPeriod)}</strong>.
+        </p>
+        ${messageBlock}
+        <p style="margin:0 0 20px;font-size:14px;color:#57534e;line-height:1.6;">
+          You'll need to verify your email with a one-time code to view the report.
+          This link provides access only to this payroll report — not the full business vault.
+        </p>
+        <a href="${escapeHtml(args.shareUrl)}"
+          style="display:inline-block;padding:12px 20px;border-radius:999px;background:#0f766e;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;">
+          Open secure payroll report
+        </a>
+        <p style="margin:20px 0 0;font-size:12px;color:#78716c;line-height:1.5;">
+          Access expires ${escapeHtml(expires)}. If you didn't expect this email, you can ignore it.
+        </p>
+      </div>
+    </div>
+  </div>`;
+  const text = [
+    `Hi ${args.recipientName || "there"},`,
+    "",
+    `${args.ownerName} shared an approved payroll report for ${args.businessName} (${args.payPeriod}).`,
+    args.optionalMessage ? `"${args.optionalMessage}"` : "",
+    "",
+    `Open the report: ${args.shareUrl}`,
+    "",
+    `Access expires ${expires}.`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+  return { subject, html, text };
+}
+
+export async function sendPayrollShareEmail(args: PayrollShareEmailArgs) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return false;
+  const from =
+    process.env.INVITE_FROM_EMAIL ??
+    process.env.REMINDER_FROM_EMAIL ??
+    "Guardian <onboarding@resend.dev>";
+  const resend = new Resend(apiKey);
+  const { subject, html, text } = renderPayrollShareEmail(args);
+  const { error } = await resend.emails.send({ from, to: args.to, subject, html, text });
+  if (error) {
+    console.error("Payroll share email failed:", args.to, error.message);
+    return false;
+  }
+  return true;
+}
+
+export type PayrollVerificationEmailArgs = {
+  to: string;
+  code: string;
+  businessName: string;
+};
+
+export function renderPayrollVerificationEmail(args: PayrollVerificationEmailArgs) {
+  const subject = `Your verification code — ${args.businessName} payroll`;
+  const html = `
+  <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#fafaf9;padding:32px 16px;">
+    <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e7e5e4;border-radius:16px;overflow:hidden;">
+      <div style="padding:24px;">
+        <div style="font-size:18px;font-weight:700;color:#1c1917;">Guardian Payroll</div>
+        <p style="margin:16px 0 8px;font-size:15px;color:#1c1917;line-height:1.5;">
+          Your verification code:
+        </p>
+        <p style="margin:0 0 16px;font-size:32px;font-weight:700;letter-spacing:8px;color:#0f766e;">${escapeHtml(args.code)}</p>
+        <p style="margin:0;font-size:13px;color:#78716c;line-height:1.5;">
+          This code expires in 10 minutes. Do not share it with anyone.
+        </p>
+      </div>
+    </div>
+  </div>`;
+  const text = `Your verification code: ${args.code}\n\nThis code expires in 10 minutes.`;
+  return { subject, html, text };
+}
+
+export async function sendPayrollVerificationEmail(args: PayrollVerificationEmailArgs) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return false;
+  const from =
+    process.env.INVITE_FROM_EMAIL ??
+    process.env.REMINDER_FROM_EMAIL ??
+    "Guardian <onboarding@resend.dev>";
+  const resend = new Resend(apiKey);
+  const { subject, html, text } = renderPayrollVerificationEmail(args);
+  const { error } = await resend.emails.send({ from, to: args.to, subject, html, text });
+  if (error) {
+    console.error("Payroll verification email failed:", args.to, error.message);
+    return false;
+  }
+  return true;
+}
+
+export type PayrollOwnerNotificationArgs = {
+  to: string;
+  subject: string;
+  message: string;
+};
+
+export async function sendPayrollOwnerNotification(args: PayrollOwnerNotificationArgs) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return false;
+  const from =
+    process.env.INVITE_FROM_EMAIL ??
+    process.env.REMINDER_FROM_EMAIL ??
+    "Guardian <onboarding@resend.dev>";
+  const resend = new Resend(apiKey);
+  const html = `
+  <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#fafaf9;padding:32px 16px;">
+    <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e7e5e4;border-radius:16px;padding:24px;">
+      <div style="font-size:18px;font-weight:700;color:#1c1917;">Guardian Payroll</div>
+      <p style="margin:16px 0 0;font-size:14px;color:#57534e;line-height:1.6;">${escapeHtml(args.message)}</p>
+    </div>
+  </div>`;
+  const { error } = await resend.emails.send({
+    from,
+    to: args.to,
+    subject: args.subject,
+    html,
+    text: args.message,
+  });
+  if (error) {
+    console.error("Payroll owner notification failed:", args.to, error.message);
+    return false;
+  }
+  return true;
+}

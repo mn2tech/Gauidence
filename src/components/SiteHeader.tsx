@@ -150,6 +150,9 @@ export default function SiteHeader() {
                   <Link href="/recruit" className="hover:text-foreground">
                     Recruit
                   </Link>
+                  <Link href="/payroll" className="hover:text-foreground">
+                    Payroll
+                  </Link>
                 </>
               ) : null}
               <Link href={DOCUMENTS_PATH} className="hover:text-foreground">
