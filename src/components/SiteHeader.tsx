@@ -147,6 +147,9 @@ export default function SiteHeader() {
                   <Link href="/experts" className="hover:text-foreground">
                     Experts
                   </Link>
+                  <Link href="/recruit" className="hover:text-foreground">
+                    Recruit
+                  </Link>
                 </>
               ) : null}
               <Link href={DOCUMENTS_PATH} className="hover:text-foreground">
@@ -267,6 +270,9 @@ export default function SiteHeader() {
                     </Link>
                     <Link href="/experts" className={linkClass}>
                       Experts
+                    </Link>
+                    <Link href="/recruit" className={linkClass}>
+                      Recruit
                     </Link>
                   </>
                 ) : null}
