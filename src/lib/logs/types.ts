@@ -106,11 +106,14 @@ export const LOG_CATEGORIES_BY_PROFILE: Record<
   ],
   employee: [
     "Work Update",
+    "Status Report",
     "Project",
     "Task",
     "Achievement",
     "Issue",
     "Training",
+    "Invoice",
+    "Leave",
   ],
   client: [
     "Client",

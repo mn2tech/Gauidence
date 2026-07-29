@@ -19,7 +19,10 @@ type TimeEntryInput = {
   employee_profile_id: string;
   employee_name: string;
   payroll_employee_id: string | null;
-  clock_in_at: string;
+  entry_type?: "punch" | "manual";
+  work_date?: string | null;
+  manual_hours?: number | null;
+  clock_in_at: string | null;
   clock_out_at: string | null;
 };
 
@@ -47,8 +50,14 @@ export function computeEmployeeHours(
     let missingClockOut = false;
 
     for (const e of empEntries) {
-      if (!e.clock_out_at) {
-        missingClockOut = true;
+      if (e.entry_type === "manual" && e.manual_hours != null) {
+        totalHours += e.manual_hours;
+        continue;
+      }
+      if (!e.clock_in_at || !e.clock_out_at) {
+        if (e.clock_in_at && !e.clock_out_at) {
+          missingClockOut = true;
+        }
         continue;
       }
       totalHours += hoursBetween(e.clock_in_at, e.clock_out_at);

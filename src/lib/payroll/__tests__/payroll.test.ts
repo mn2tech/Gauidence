@@ -52,6 +52,23 @@ describe("payroll compute", () => {
     assert.equal(result[0].overtime_hours, 0);
   });
 
+  it("includes manual daily hours", () => {
+    const entries = [
+      {
+        employee_profile_id: "e1",
+        employee_name: "Alex",
+        payroll_employee_id: null,
+        entry_type: "manual" as const,
+        work_date: "2026-07-01",
+        manual_hours: 7.5,
+        clock_in_at: null,
+        clock_out_at: null,
+      },
+    ];
+    const result = computeEmployeeHours(entries, "2026-07-01", "2026-07-07");
+    assert.equal(result[0].total_hours, 7.5);
+  });
+
   it("flags missing clock-outs", () => {
     const entries = [
       {
@@ -99,6 +116,24 @@ describe("payroll gideon", () => {
     assert.equal(result.intent, "prepare_payroll");
     assert.ok(result.payPeriodStart?.includes("07-13"));
     assert.ok(result.payPeriodEnd?.includes("07-26"));
+  });
+
+  it("requires confirmation for clock in unless confirmed", () => {
+    const ask = parsePayrollGideonQuery("Clock me in");
+    assert.equal(ask.intent, "clock_in");
+    assert.equal(ask.requiresConfirmation, true);
+
+    const confirmed = parsePayrollGideonQuery("Yes, clock me in");
+    assert.equal(confirmed.intent, "clock_in");
+    assert.equal(confirmed.requiresConfirmation, false);
+    assert.equal(confirmed.confirmed, true);
+  });
+
+  it("parses clock out for named employee", () => {
+    const result = parsePayrollGideonQuery("Yes, clock out Daniel");
+    assert.equal(result.intent, "clock_out");
+    assert.equal(result.employeeName, "Daniel");
+    assert.equal(result.confirmed, true);
   });
 
   it("requires confirmation for approve and share", () => {

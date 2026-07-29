@@ -106,9 +106,10 @@ export async function listTimeEntriesForPeriod(
     .from("payroll_time_entries")
     .select("*")
     .eq("profile_id", profileId)
-    .gte("clock_in_at", startIso)
-    .lte("clock_in_at", endIso)
-    .order("clock_in_at");
+    .or(
+      `and(clock_in_at.gte.${startIso},clock_in_at.lte.${endIso}),and(work_date.gte.${periodStart},work_date.lte.${periodEnd})`
+    )
+    .order("clock_in_at", { nullsFirst: false });
 
   if (error) {
     console.error("listTimeEntriesForPeriod:", error.message);
@@ -137,6 +138,15 @@ export async function verifyProfileAccess(
   profileId: string,
   userId: string
 ): Promise<boolean> {
+  return canAccessBusinessPayroll(supabase, profileId, userId);
+}
+
+/** Business or nonprofit vault member (owner/editor/viewer). */
+export async function canAccessBusinessPayroll(
+  supabase: SupabaseClient,
+  profileId: string,
+  userId: string
+): Promise<boolean> {
   const { data, error } = await supabase
     .from("guardian_profiles")
     .select("id, profile_type")
@@ -157,6 +167,52 @@ export async function verifyProfileAccess(
     .maybeSingle();
 
   return Boolean(member);
+}
+
+export async function isEmployeeVaultMember(
+  supabase: SupabaseClient,
+  employeeProfileId: string,
+  userId: string
+): Promise<boolean> {
+  const { data } = await supabase
+    .from("guardian_profile_members")
+    .select("role")
+    .eq("profile_id", employeeProfileId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  return Boolean(data);
+}
+
+/** Business admin or employee vault member clocking themselves. */
+export async function canSubmitTimeEntry(
+  supabase: SupabaseClient,
+  profileId: string,
+  employeeProfileId: string,
+  userId: string
+): Promise<boolean> {
+  if (await canAccessBusinessPayroll(supabase, profileId, userId)) {
+    return true;
+  }
+
+  if (!(await isEmployeeVaultMember(supabase, employeeProfileId, userId))) {
+    return false;
+  }
+
+  const { data: emp } = await supabase
+    .from("guardian_profiles")
+    .select("id, parent_profile_id, profile_type")
+    .eq("id", employeeProfileId)
+    .maybeSingle();
+
+  const row = emp as {
+    parent_profile_id: string | null;
+    profile_type: string;
+  } | null;
+
+  return (
+    row?.profile_type === "employee" && row.parent_profile_id === profileId
+  );
 }
 
 export async function logPayrollAudit(
@@ -238,6 +294,15 @@ export async function ensurePayrollEmployees(
         updated_at: new Date().toISOString(),
       },
       { onConflict: "profile_id,employee_profile_id" }
+    );
+
+    await supabase.from("employee_hub_entitlements").upsert(
+      {
+        business_profile_id: profileId,
+        employee_profile_id: emp.id,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "employee_profile_id", ignoreDuplicates: true }
     );
   }
 }

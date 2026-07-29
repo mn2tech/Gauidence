@@ -280,6 +280,7 @@ export type GuardianProfile = {
 /** Leaf vault types that can invite Editor collaborators (exact vault only). */
 export const SHAREABLE_PROFILE_TYPES = [
   "client",
+  "employee",
   "vehicle",
   "home",
   "pet",

@@ -1,12 +1,15 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState, type FormEvent } from "react";
 import { Loader2, Plus, Users } from "lucide-react";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
+  canManageProfileAccess,
   employeesOf,
   type GuardianProfile,
 } from "@/lib/profiles/types";
+import EmployeeEntitlementsPanel from "@/components/employee-hub/EmployeeEntitlementsPanel";
 
 type Props = {
   parent: GuardianProfile;
@@ -178,14 +181,31 @@ export default function LinkedEmployeesPanel({ parent }: Props) {
                     "Employee"}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => void openVault(emp.id)}
-                disabled={openingId === emp.id}
-                className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium hover:bg-stone-50 disabled:opacity-60"
-              >
-                {openingId === emp.id ? "Opening…" : "Open vault"}
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                {canManageProfileAccess(emp) ? (
+                  <Link
+                    href={`/settings/profiles/${emp.id}/collaborators`}
+                    className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium hover:bg-stone-50"
+                  >
+                    Invite
+                  </Link>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => void openVault(emp.id)}
+                  disabled={openingId === emp.id}
+                  className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium hover:bg-stone-50 disabled:opacity-60"
+                >
+                  {openingId === emp.id ? "Opening…" : "Open vault"}
+                </button>
+              </div>
+              {canManageProfileAccess(emp) ? (
+                <EmployeeEntitlementsPanel
+                  employeeProfileId={emp.id}
+                  employeeName={emp.display_name}
+                  initial={null}
+                />
+              ) : null}
             </li>
           ))
         )}

@@ -9,6 +9,7 @@ import AlertsPanel from "@/components/AlertsPanel";
 import DailyLogPanel from "@/components/DailyLogPanel";
 import LinkedEmployeesPanel from "@/components/LinkedEmployeesPanel";
 import PayrollTimesheetPanel from "@/components/payroll/PayrollTimesheetPanel";
+import OwnerLeavePanel from "@/components/employee-hub/OwnerLeavePanel";
 import EmployeeClockPanel from "@/components/payroll/EmployeeClockPanel";
 import LinkedClientsPanel from "@/components/LinkedClientsPanel";
 import LinkedFamilyPanel from "@/components/LinkedFamilyPanel";
@@ -110,6 +111,13 @@ export default function DashboardVault({ userId }: { userId: string }) {
     });
   }, [requestedProfileId, active?.id, loading, profiles, switchProfile]);
 
+  useEffect(() => {
+    if (!active || loading) return;
+    if (active.profile_type === "employee" && active.parent_profile_id) {
+      router.replace("/employee");
+    }
+  }, [active, loading, router]);
+
   if (loading && !active && profiles.length === 0) {
     return (
       <p className="text-sm text-ink-muted">Loading…</p>
@@ -174,6 +182,12 @@ export default function DashboardVault({ userId }: { userId: string }) {
       {canHaveLinkedEmployees(active.profile_type) && (
         <VaultSection id={`employees-${active.id}`} title="Employees">
           <LinkedEmployeesPanel parent={active} />
+        </VaultSection>
+      )}
+
+      {canHaveLinkedEmployees(active.profile_type) && (
+        <VaultSection id={`leave-${active.id}`} title="Leave requests">
+          <OwnerLeavePanel businessProfileId={active.id} />
         </VaultSection>
       )}
 

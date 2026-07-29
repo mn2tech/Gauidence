@@ -73,7 +73,10 @@ export type PayrollTimeEntry = {
   id: string;
   profile_id: string;
   employee_profile_id: string;
-  clock_in_at: string;
+  entry_type: "punch" | "manual";
+  work_date: string | null;
+  manual_hours: number | null;
+  clock_in_at: string | null;
   clock_out_at: string | null;
   notes: string | null;
   created_by: string;

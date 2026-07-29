@@ -11,6 +11,8 @@ export type PayrollGideonIntent =
   | "share_status"
   | "revoke_access"
   | "list_shared"
+  | "clock_in"
+  | "clock_out"
   | "unknown";
 
 export type PayrollGideonParseResult = {
@@ -20,6 +22,7 @@ export type PayrollGideonParseResult = {
   employeeName?: string;
   recipientEmail?: string;
   requiresConfirmation: boolean;
+  confirmed?: boolean;
   confirmationMessage?: string;
 };
 
@@ -46,8 +49,55 @@ function parseDateRange(text: string): { start?: string; end?: string } {
   return {};
 }
 
+function extractClockEmployeeName(query: string): string | undefined {
+  const patterns = [
+    /clock\s+(?:me\s+)?(?:in|out)\s+for\s+(\w+)/i,
+    /clock\s+(?:in|out)\s+(\w+)/i,
+    /punch\s+(?:me\s+)?(?:in|out)\s+(?:for\s+)?(\w+)/i,
+  ];
+  for (const pattern of patterns) {
+    const m = query.match(pattern);
+    const name = m?.[1]?.toLowerCase();
+    if (name && name !== "me" && name !== "in" && name !== "out") {
+      return m![1];
+    }
+  }
+  return undefined;
+}
+
+function hasExplicitConfirmation(q: string): boolean {
+  return /\b(yes|confirm|go ahead|do it|please)\b/i.test(q);
+}
+
 export function parsePayrollGideonQuery(query: string): PayrollGideonParseResult {
   const q = query.trim().toLowerCase();
+  const confirmed = hasExplicitConfirmation(q);
+
+  if (/clock\s*(me\s*)?out|punch\s*(me\s*)?out|end\s*(my\s*)?shift/.test(q)) {
+    const employeeName = extractClockEmployeeName(query);
+    return {
+      intent: "clock_out",
+      employeeName,
+      requiresConfirmation: !confirmed,
+      confirmed,
+      confirmationMessage: employeeName
+        ? `Clock ${employeeName} out now? Reply "yes, clock out" to confirm.`
+        : "Clock out now? Reply \"yes, clock out\" to confirm.",
+    };
+  }
+
+  if (/clock\s*(me\s*)?in|punch\s*(me\s*)?in|start\s*(my\s*)?shift/.test(q)) {
+    const employeeName = extractClockEmployeeName(query);
+    return {
+      intent: "clock_in",
+      employeeName,
+      requiresConfirmation: !confirmed,
+      confirmed,
+      confirmationMessage: employeeName
+        ? `Clock ${employeeName} in now? Reply "yes, clock in" to confirm.`
+        : "Clock in now? Reply \"yes, clock in\" to confirm.",
+    };
+  }
 
   if (/prepare payroll|generate payroll|create payroll/.test(q)) {
     const dates = parseDateRange(q);
