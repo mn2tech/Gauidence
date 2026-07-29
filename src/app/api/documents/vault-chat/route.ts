@@ -571,20 +571,17 @@ async function updateVaultChatRow(
 
 async function loadAskVaultInventory(
   supabase: SupabaseClient,
-  userId: string,
   profileId: string
 ) {
   const [{ data: docs }, { data: logs }] = await Promise.all([
     supabase
       .from("documents")
       .select("id, file_name, mime_type")
-      .eq("user_id", userId)
       .eq("profile_id", profileId)
       .order("created_at", { ascending: false }),
     supabase
       .from("daily_logs")
       .select("title, log_date, content")
-      .eq("owner_user_id", userId)
       .eq("profile_id", profileId)
       .order("log_date", { ascending: false })
       .limit(40),
@@ -681,7 +678,7 @@ export async function GET(request: Request) {
               profileName: scopedProfile.display_name,
             }
           : null,
-        ...(await loadAskVaultInventory(supabase, user.id, chatProfile.id))
+        ...(await loadAskVaultInventory(supabase, chatProfile.id))
           .inventory,
       },
     });
@@ -697,7 +694,6 @@ export async function GET(request: Request) {
   {
     const { docs, inventory } = await loadAskVaultInventory(
       supabase,
-      user.id,
       active.id
     );
 
@@ -712,7 +708,6 @@ export async function GET(request: Request) {
       const { data: extracted } = await supabase
         .from("extracted_data")
         .select("document_id, document_type, guardian_status, title")
-        .eq("user_id", user.id)
         .eq("profile_id", active.id);
       const nameById = new Map(docs.map((d) => [d.id, d.file_name]));
       const hints: VaultDocHint[] = (extracted ?? []).map((row) => ({
@@ -1153,7 +1148,6 @@ export async function POST(request: Request) {
   const { count: logCount } = await supabase
     .from("daily_logs")
     .select("id", { count: "exact", head: true })
-    .eq("owner_user_id", user.id)
     .in("profile_id", allSearchIds);
 
   // Document RAG needs embeddings; empty vault / Daily Log-only / general
@@ -1329,7 +1323,6 @@ export async function POST(request: Request) {
     );
     const formatted = formatRetrievalContext(chunks);
     const dailyLogs = await retrieveRelevantDailyLogs(supabase, {
-      userId: user.id,
       profileId: active.id,
       profileIds: allSearchIds,
       profileNames,

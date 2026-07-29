@@ -9,11 +9,11 @@ import {
 
 /**
  * Retrieve relevant Daily Logs for one profile, or several (container rollup).
+ * Access is enforced by RLS (shared vault members can read owner logs).
  */
 export async function retrieveRelevantDailyLogs(
   supabase: SupabaseClient,
   args: {
-    userId: string;
     profileId: string;
     /** When set, search these profiles instead of only profileId. */
     profileIds?: string[];
@@ -41,7 +41,6 @@ export async function retrieveRelevantDailyLogs(
     .select(
       "id, owner_user_id, profile_id, log_date, title, content, category, tags, source_type, created_at, updated_at"
     )
-    .eq("owner_user_id", args.userId)
     .gte("log_date", windowStart)
     .order("log_date", { ascending: false })
     .limit(Math.min(80 * scopeIds.length, 200));
