@@ -1312,14 +1312,25 @@ export async function POST(request: Request) {
     const payrollAnswer = await answerPayrollGideonQuery(supabase, {
       query: question,
       profileId: payrollProfileId,
+      employeeProfileId:
+        active.profile_type === "employee" ? active.id : undefined,
+      userId: user.id,
     });
     let payrollText = payrollAnswer?.message ?? "Open Payroll for more options.";
     if (payrollAnswer?.href) {
       payrollText += `\n\n→ ${payrollAnswer.href}`;
     }
     if (payrollAnswer?.requiresConfirmation) {
-      payrollText +=
-        "\n\nI cannot approve or share payroll without your explicit confirmation on the Payroll report page.";
+      if (
+        payrollAnswer.intent === "clock_in" ||
+        payrollAnswer.intent === "clock_out"
+      ) {
+        payrollText +=
+          '\n\nReply "yes, clock in" or "yes, clock out" to confirm.';
+      } else {
+        payrollText +=
+          "\n\nI cannot approve or share payroll without your explicit confirmation on the Payroll report page.";
+      }
     }
     answer = payrollText;
   } else {

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { isAuthed, requirePayrollUser } from "@/lib/payroll/auth";
 import { answerPayrollGideonQuery } from "@/lib/payroll/gideonChat";
-import { verifyProfileAccess } from "@/lib/payroll/server";
+import { verifyProfileAccess, canSubmitTimeEntry } from "@/lib/payroll/server";
 
 export const runtime = "nodejs";
 
@@ -10,7 +10,13 @@ export async function POST(request: Request) {
   const auth = await requirePayrollUser();
   if (!isAuthed(auth)) return auth;
 
-  let body: { query?: string; profileId?: string; reportId?: string; confirmed?: boolean };
+  let body: {
+    query?: string;
+    profileId?: string;
+    employeeProfileId?: string;
+    reportId?: string;
+    confirmed?: boolean;
+  };
   try {
     body = await request.json();
   } catch {
@@ -24,13 +30,25 @@ export async function POST(request: Request) {
   }
 
   const allowed = await verifyProfileAccess(auth.supabase, profileId, auth.user.id);
-  if (!allowed) {
+  const employeeProfileId = body.employeeProfileId;
+  const selfAllowed =
+    employeeProfileId &&
+    (await canSubmitTimeEntry(
+      auth.supabase,
+      profileId,
+      employeeProfileId,
+      auth.user.id
+    ));
+
+  if (!allowed && !selfAllowed) {
     return NextResponse.json({ error: "Access denied." }, { status: 403 });
   }
 
   const result = await answerPayrollGideonQuery(auth.supabase, {
     query,
     profileId,
+    employeeProfileId,
+    userId: auth.user.id,
     reportId: body.reportId,
     confirmed: body.confirmed,
   });

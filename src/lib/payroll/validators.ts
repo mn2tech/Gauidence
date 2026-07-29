@@ -47,6 +47,14 @@ export const timeEntrySchema = z.object({
   notes: z.string().max(500).optional(),
 });
 
+export const manualTimeEntrySchema = z.object({
+  profileId: z.string().uuid(),
+  employeeProfileId: z.string().uuid(),
+  workDate: isoDate,
+  hours: z.number().min(0.25).max(24),
+  notes: z.string().max(500).optional(),
+});
+
 export function parsePayPeriodDates(start: string, end: string): { ok: true } | { ok: false; error: string } {
   if (end < start) {
     return { ok: false, error: "Pay period end must be on or after the start date." };

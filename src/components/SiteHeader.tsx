@@ -10,6 +10,8 @@ import { useActiveProfile } from "@/components/ProfileProvider";
 import GlobalVaultSearch from "@/components/GlobalVaultSearch";
 import { DOCUMENTS_PATH } from "@/lib/routes";
 import { useOnboardingProgress } from "@/hooks/useOnboardingProgress";
+import { useEmployeeHubEntitlements } from "@/hooks/useEmployeeHubEntitlements";
+import { employeeShowsPowerNav } from "@/lib/employee-hub/entitlements";
 
 export default function SiteHeader() {
   const pathname = usePathname();
@@ -43,10 +45,27 @@ export default function SiteHeader() {
   }, [pathname]);
 
   const needsSetup = signedIn && !profilesLoading && profiles.length === 0;
+  const isEmployeeVault = active?.profile_type === "employee";
+  const { entitlements: employeeEntitlements } = useEmployeeHubEntitlements(
+    isEmployeeVault ? active?.id : undefined,
+    isEmployeeVault ? active?.parent_profile_id ?? undefined : undefined
+  );
   /** Hide power features until the user has added at least one document. */
-  const showPowerNav =
+  const basePowerNav =
     !needsSetup &&
     (onboardingLoading || onboardingProgress.hasDocument);
+  const showPowerNav =
+    basePowerNav &&
+    (!isEmployeeVault ||
+      (employeeEntitlements && employeeShowsPowerNav(employeeEntitlements)));
+  const showGideon =
+    !needsSetup &&
+    (!isEmployeeVault || employeeEntitlements?.gideon_chat !== false);
+  const showDocuments =
+    !needsSetup &&
+    (!isEmployeeVault || employeeEntitlements?.documents === true);
+  const showEmployeeHub = isEmployeeVault;
+  const ent = employeeEntitlements;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -133,31 +152,50 @@ export default function SiteHeader() {
                   </Link>
                 </>
               ) : null}
-              <Link href={askHref} className="hover:text-foreground">
-                Ask Gideon
-              </Link>
+              {showGideon ? (
+                <Link href={askHref} className="hover:text-foreground">
+                  Ask Gideon
+                </Link>
+              ) : null}
+              {showEmployeeHub ? (
+                <Link href="/employee" className="hover:text-foreground">
+                  Employee Hub
+                </Link>
+              ) : null}
               {showPowerNav ? (
                 <>
-                  <Link href={researchHref} className="hover:text-foreground">
-                    Research
-                  </Link>
-                  <Link href="/work-memory" className="hover:text-foreground">
-                    Work Memory
-                  </Link>
-                  <Link href="/experts" className="hover:text-foreground">
-                    Experts
-                  </Link>
-                  <Link href="/recruit" className="hover:text-foreground">
-                    Recruit
-                  </Link>
-                  <Link href="/payroll" className="hover:text-foreground">
-                    Payroll
-                  </Link>
+                  {(!isEmployeeVault || ent?.research) ? (
+                    <Link href={researchHref} className="hover:text-foreground">
+                      Research
+                    </Link>
+                  ) : null}
+                  {(!isEmployeeVault || ent?.work_memory) ? (
+                    <Link href="/work-memory" className="hover:text-foreground">
+                      Work Memory
+                    </Link>
+                  ) : null}
+                  {(!isEmployeeVault || ent?.experts) ? (
+                    <Link href="/experts" className="hover:text-foreground">
+                      Experts
+                    </Link>
+                  ) : null}
+                  {(!isEmployeeVault || ent?.recruit) ? (
+                    <Link href="/recruit" className="hover:text-foreground">
+                      Recruit
+                    </Link>
+                  ) : null}
+                  {(!isEmployeeVault || ent?.payroll_admin) ? (
+                    <Link href="/payroll" className="hover:text-foreground">
+                      Payroll
+                    </Link>
+                  ) : null}
                 </>
               ) : null}
-              <Link href={DOCUMENTS_PATH} className="hover:text-foreground">
-                Documents
-              </Link>
+              {showDocuments ? (
+                <Link href={DOCUMENTS_PATH} className="hover:text-foreground">
+                  Documents
+                </Link>
+              ) : null}
               <Link
                 href="/settings"
                 className="rounded-full border border-stone-300 bg-white px-4 py-2 font-medium text-foreground transition hover:border-stone-400 hover:bg-stone-50"
@@ -260,28 +298,50 @@ export default function SiteHeader() {
                     </Link>
                   </>
                 ) : null}
-                <Link href={askHref} className={linkClass}>
-                  Ask Gideon
-                </Link>
+                {showGideon ? (
+                  <Link href={askHref} className={linkClass}>
+                    Ask Gideon
+                  </Link>
+                ) : null}
+                {showEmployeeHub ? (
+                  <Link href="/employee" className={linkClass}>
+                    Employee Hub
+                  </Link>
+                ) : null}
                 {showPowerNav ? (
                   <>
-                    <Link href={researchHref} className={linkClass}>
-                      Research
-                    </Link>
-                    <Link href="/work-memory" className={linkClass}>
-                      Work Memory
-                    </Link>
-                    <Link href="/experts" className={linkClass}>
-                      Experts
-                    </Link>
-                    <Link href="/recruit" className={linkClass}>
-                      Recruit
-                    </Link>
+                    {(!isEmployeeVault || ent?.research) ? (
+                      <Link href={researchHref} className={linkClass}>
+                        Research
+                      </Link>
+                    ) : null}
+                    {(!isEmployeeVault || ent?.work_memory) ? (
+                      <Link href="/work-memory" className={linkClass}>
+                        Work Memory
+                      </Link>
+                    ) : null}
+                    {(!isEmployeeVault || ent?.experts) ? (
+                      <Link href="/experts" className={linkClass}>
+                        Experts
+                      </Link>
+                    ) : null}
+                    {(!isEmployeeVault || ent?.recruit) ? (
+                      <Link href="/recruit" className={linkClass}>
+                        Recruit
+                      </Link>
+                    ) : null}
+                    {(!isEmployeeVault || ent?.payroll_admin) ? (
+                      <Link href="/payroll" className={linkClass}>
+                        Payroll
+                      </Link>
+                    ) : null}
                   </>
                 ) : null}
-                <Link href={DOCUMENTS_PATH} className={linkClass}>
-                  Documents
-                </Link>
+                {showDocuments ? (
+                  <Link href={DOCUMENTS_PATH} className={linkClass}>
+                    Documents
+                  </Link>
+                ) : null}
                 <Link href="/settings" className={linkClass}>
                   Settings
                 </Link>

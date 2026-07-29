@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { isAuthed, requirePayrollUser } from "@/lib/payroll/auth";
-import { verifyProfileAccess } from "@/lib/payroll/server";
+import { canSubmitTimeEntry } from "@/lib/payroll/server";
 
 export const runtime = "nodejs";
 
@@ -19,7 +19,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   const { data: entry, error: fetchError } = await auth.supabase
     .from("payroll_time_entries")
-    .select("id, profile_id, clock_out_at")
+    .select("id, profile_id, employee_profile_id, clock_out_at")
     .eq("id", id)
     .maybeSingle();
 
@@ -27,8 +27,18 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Time entry not found." }, { status: 404 });
   }
 
-  const row = entry as { id: string; profile_id: string; clock_out_at: string | null };
-  const allowed = await verifyProfileAccess(auth.supabase, row.profile_id, auth.user.id);
+  const row = entry as {
+    id: string;
+    profile_id: string;
+    employee_profile_id: string;
+    clock_out_at: string | null;
+  };
+  const allowed = await canSubmitTimeEntry(
+    auth.supabase,
+    row.profile_id,
+    row.employee_profile_id,
+    auth.user.id
+  );
   if (!allowed) {
     return NextResponse.json({ error: "Access denied." }, { status: 403 });
   }

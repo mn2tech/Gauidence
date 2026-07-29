@@ -12,6 +12,11 @@ import {
 } from "./ai";
 import { buildDraftFromTimesheets } from "./reportData";
 import {
+  executeClockIn,
+  executeClockOut,
+  findEmployeeProfileId,
+} from "./clockActions";
+import {
   getActiveShare,
   getPayrollReport,
   listPayrollReports,
@@ -19,7 +24,7 @@ import {
 import { formatPayPeriod } from "./compute";
 
 const PAYROLL_KEYWORDS =
-  /\b(payroll|timesheet|clock.?out|overtime|pay period|share.*report|approve.*report)\b/i;
+  /\b(payroll|timesheet|clock.?out|clock.?in|punch.?in|punch.?out|overtime|pay period|share.*report|approve.*report|start.*shift|end.*shift)\b/i;
 
 export function wantsPayrollQuery(question: string): boolean {
   const parsed = parsePayrollGideonQuery(question);
@@ -39,6 +44,8 @@ export async function answerPayrollGideonQuery(
   args: {
     query: string;
     profileId: string;
+    employeeProfileId?: string;
+    userId?: string;
     reportId?: string;
     confirmed?: boolean;
   }
@@ -46,6 +53,71 @@ export async function answerPayrollGideonQuery(
   const parsed = parsePayrollGideonQuery(args.query);
   if (parsed.intent === "unknown" && !PAYROLL_KEYWORDS.test(args.query)) {
     return null;
+  }
+
+  const isConfirmed = args.confirmed || parsed.confirmed;
+
+  if (
+    (parsed.intent === "clock_in" || parsed.intent === "clock_out") &&
+    !isConfirmed
+  ) {
+    return {
+      message:
+        parsed.confirmationMessage ??
+        "Reply with confirmation to clock in or out.",
+      requiresConfirmation: true,
+      intent: parsed.intent,
+      href: args.employeeProfileId ? "/employee" : undefined,
+    };
+  }
+
+  if (
+    (parsed.intent === "clock_in" || parsed.intent === "clock_out") &&
+    isConfirmed &&
+    args.userId
+  ) {
+    let targetEmployeeId = args.employeeProfileId;
+    let targetName = "You";
+
+    if (parsed.employeeName) {
+      const found = await findEmployeeProfileId(
+        supabase,
+        args.profileId,
+        parsed.employeeName
+      );
+      if (!found) {
+        return {
+          message: `I couldn't find an employee named "${parsed.employeeName}".`,
+          href: "/employee",
+        };
+      }
+      targetEmployeeId = found.id;
+      targetName = found.display_name;
+    }
+
+    if (!targetEmployeeId) {
+      return {
+        message: "Which employee should I clock in or out?",
+        href: "/employee",
+      };
+    }
+
+    const result =
+      parsed.intent === "clock_in"
+        ? await executeClockIn(
+            supabase,
+            args.profileId,
+            targetEmployeeId,
+            args.userId
+          )
+        : await executeClockOut(supabase, args.profileId, targetEmployeeId);
+
+    const prefix = targetName === "You" ? "" : `${targetName}: `;
+    return {
+      message: `${prefix}${result.message}`,
+      intent: parsed.intent,
+      href: "/employee",
+    };
   }
 
   if (
