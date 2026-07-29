@@ -5,6 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   assessExtractionQuality,
+  letterRatio,
   scoreExtractionQuality,
 } from "../extract-quality.ts";
 import { parseInvoiceFromText } from "../invoiceText.ts";
@@ -68,6 +69,15 @@ describe("native extraction quality", () => {
       "Invoice #0000016\nSubtotal: $1,628.00\nTotal Due: $1,628.00\nFrank 177 100 1700"
     );
     assert.ok(report.score < 0.7);
+  });
+
+  it("scores Telugu program text as usable without alpha_sparse", () => {
+    const telugu =
+      "ఉపవాస ప్రార్థన సభ\nRev. రాఘవరావు\nPastor సుధాకర్\n11:30 AM రాఘవాపూర్\n" +
+      "సభ్యులు: రమేష్, సుమతి, వెంకటేష్, లక్ష్మి, నాగేంద్ర, ప్రసాద్, అనిత, సురేష్";
+    assert.ok(letterRatio(telugu) >= 0.15);
+    const report = assessExtractionQuality(telugu);
+    assert.ok(!report.issues.includes("alpha_sparse"));
   });
 });
 

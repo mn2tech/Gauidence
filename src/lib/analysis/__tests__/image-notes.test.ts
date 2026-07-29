@@ -50,4 +50,12 @@ describe("wantsTranscription", () => {
     assert.equal(wantsTranscription("What does this note say?"), true);
     assert.equal(wantsTranscription("When is my passport due?"), false);
   });
+
+  it("matches name and participant roster requests", () => {
+    assert.equal(wantsTranscription("give me their names"), true);
+    assert.equal(wantsTranscription("give me the names"), true);
+    assert.equal(wantsTranscription("list all participants"), true);
+    assert.equal(wantsTranscription("who is presiding tonight"), true);
+    assert.equal(wantsTranscription("who are the participants"), true);
+  });
 });

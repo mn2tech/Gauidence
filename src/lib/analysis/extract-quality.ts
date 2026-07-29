@@ -12,6 +12,13 @@ export type ExtractionQualityReport = {
   lineCount: number;
 };
 
+/** Ratio of Unicode letters (any script) to total characters. */
+export function letterRatio(text: string): number {
+  const chars = text.length;
+  if (chars === 0) return 0;
+  return (text.match(/\p{L}/gu)?.length ?? 0) / chars;
+}
+
 /** Count likely invoice table body rows (name + hours + rate + amount pattern). */
 export function countLikelyInvoiceLineRows(text: string): number {
   const lines = text.split(/\r?\n/);
@@ -57,7 +64,7 @@ export function assessExtractionQuality(text: string): ExtractionQualityReport {
   const chars = t.length;
   const lines = t.split(/\r?\n/).filter((l) => l.trim().length > 0);
   const digitRatio = (t.match(/\d/g)?.length ?? 0) / chars;
-  const alphaRatio = (t.match(/[A-Za-z]/g)?.length ?? 0) / chars;
+  const letters = letterRatio(t);
   const hasInvoiceLabels =
     /invoice\s*(#|no\.?|number|id)?/i.test(t) ||
     /total\s*(due|amount)?/i.test(t) ||
@@ -78,14 +85,14 @@ export function assessExtractionQuality(text: string): ExtractionQualityReport {
     issues.push("incomplete_line_items");
   }
   if (digitRatio > 0.55) issues.push("digit_heavy_noise");
-  if (alphaRatio < 0.08 && chars > 40) issues.push("alpha_sparse");
+  if (letters < 0.08 && chars > 40) issues.push("alpha_sparse");
 
   let score = 0;
   if (chars >= 80) score += 0.2;
   if (chars >= 400) score += 0.15;
   if (lines.length >= 5) score += 0.15;
   if (digitRatio >= 0.02 && digitRatio <= 0.45) score += 0.1;
-  if (alphaRatio >= 0.15) score += 0.1;
+  if (letters >= 0.15) score += 0.1;
   if (hasInvoiceLabels) score += 0.15;
   if (hasCurrency) score += 0.1;
   if (estimatedLineRows >= 2) score += 0.1;

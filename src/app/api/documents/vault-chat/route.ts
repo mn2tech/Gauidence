@@ -1378,11 +1378,14 @@ Active vault in the UI: ${active.display_name}. Document search includes all ${r
     const pictureNote = showPictures
       ? `The user wants to see pictures. Prefer naming image file names from the retrieved excerpts (jpg/png/webp/etc.) so the UI can display them. If no image files were retrieved, say so clearly.`
       : "";
+    const reminderAgent = wantsReminderAgent(question);
+    const transcriptionMode = wantsTranscription(question);
+    const attachedTextLimit = transcriptionMode ? 30_000 : 12_000;
     const attachedContext = attachedDoc
       ? [
           `File: ${attachedDoc.fileName}`,
           attachedDoc.sourceText
-            ? `Document text (OCR/native):\n${attachedDoc.sourceText.slice(0, 12000)}`
+            ? `Document text (OCR/native):\n${attachedDoc.sourceText.slice(0, attachedTextLimit)}`
             : "(no extracted text — use the attached image if present)",
         ].join("\n\n")
       : "";
@@ -1395,9 +1398,7 @@ Active vault in the UI: ${active.display_name}. Document search includes all ${r
         ? "No vault excerpts, Daily Logs, upcoming schedule items, or linked profile structure matched this question (or the vault is empty). Do not invent vault facts. Use ## GENERAL KNOWLEDGE for general questions, and ## GIDEON'S SUGGESTION to upload documents when that would help."
         : "";
 
-    const reminderAgent = wantsReminderAgent(question);
     const reminderNote = reminderAgent ? REMINDER_AGENT_SYSTEM_NOTE : "";
-    const transcriptionMode = wantsTranscription(question);
     const transcriptionNote = transcriptionMode ? GIDEON_TRANSCRIPTION_NOTE : "";
     const attachedNote = attachedDoc ? GIDEON_ATTACHED_DOCUMENT_NOTE : "";
 

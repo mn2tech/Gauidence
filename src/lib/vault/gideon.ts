@@ -138,8 +138,30 @@ export function buildCurrentTimeAnswer(
 
 /** User wants a clean transcription or list from a photo/scan in the vault. */
 export function wantsTranscription(question: string): boolean {
-  return /\b(transcri(?:be|ption)|what(?:'s| is) (?:written|on (?:this|the)(?: photo| image| picture| note)?)|what (?:does|do) (?:this|it|the)[^.?]{0,24}(?:say|show|list)|read (?:this|the) (?:note|list|photo|image|picture)|list (?:the |all )?(?:items?|books?|names?)|book names?|items (?:on|in) (?:this|the)|turn this into a list)\b/i.test(
-    question
+  const q = question.trim();
+  if (!q) return false;
+  return (
+    /\btranscri(?:be|ption)\b/i.test(q) ||
+    /\bwhat(?:'s| is) (?:written|on (?:this|the)(?: photo| image| picture| note)?)\b/i.test(
+      q
+    ) ||
+    /\bwhat (?:does|do) (?:this|it|the)[^.?]{0,24}(?:say|show|list)\b/i.test(q) ||
+    /\bread (?:this|the) (?:note|list|photo|image|picture|document|sheet|program)\b/i.test(
+      q
+    ) ||
+    /\blist (?:the |all )?(?:items?|books?|names?|participants?|people|attendees?)\b/i.test(
+      q
+    ) ||
+    /\bgive me (?:the |their |all )?(?:names?|participants?|people|attendees?|roster)\b/i.test(
+      q
+    ) ||
+    /\bbook names?\b/i.test(q) ||
+    /\bitems (?:on|in) (?:this|the)\b/i.test(q) ||
+    /\bturn this into a list\b/i.test(q) ||
+    /\bwho(?:'s| is) (?:presiding|leading)\b/i.test(q) ||
+    /\b(?:who|what) are (?:the )?(?:participants?|people|names?|attendees?)\b/i.test(
+      q
+    )
   );
 }
 
@@ -157,7 +179,9 @@ export const GIDEON_TRANSCRIPTION_NOTE = `Transcription mode:
 - The user wants a readable transcription or list from their vault (often a photo or scan).
 - Lead with a short friendly title if helpful (e.g. "Book names"), then a clean numbered list.
 - Prefer "Document text" excerpts — they are verbatim OCR from photos and scans.
-- Fix obvious spelling and title capitalization when confident; do not invent items.
+- Include every name, title, and line item visible in the excerpts (rosters, program sheets, attendance lists).
+- Preserve non-English text in its original script (Telugu, Hindi, Tamil, etc.); do not romanize, translate, or skip names because of language.
+- Fix obvious spelling and title capitalization in English when confident; do not invent items.
 - Use simple numbered lines (1. 2. 3.). You may exceed the usual brevity limit for lists.
 - If no transcription is in the excerpts, say so and suggest uploading a clearer photo.`;
 
