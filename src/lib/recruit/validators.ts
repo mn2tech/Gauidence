@@ -36,6 +36,10 @@ export function parseJobFields(body: Record<string, unknown>) {
       typeof body.hiring_manager === "string"
         ? body.hiring_manager.trim() || null
         : null,
+    hiring_manager_email:
+      typeof body.hiring_manager_email === "string"
+        ? body.hiring_manager_email.trim().toLowerCase() || null
+        : null,
     job_description:
       typeof body.job_description === "string" ? body.job_description : "",
     required_skills: parseStringArray(body.required_skills),

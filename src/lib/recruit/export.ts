@@ -15,19 +15,12 @@ import type {
   CandidateWithDetails,
   RecruitmentJob,
   RecruitmentJobRequirements,
+  ReportData,
 } from "./types";
-import { RECOMMENDATION_LABELS } from "./types";
-import { effectiveScore } from "./server";
+import { RECOMMENDATION_LABELS, effectiveCandidateScore } from "./types";
 import { RUBRIC_CATEGORIES } from "./rubric";
 
-export type ReportData = {
-  job: RecruitmentJob;
-  rubric: RecruitmentJobRequirements;
-  candidates: CandidateWithDetails[];
-  shortlisted: CandidateWithDetails[];
-  generatedAt: string;
-  recruiterName: string;
-};
+export type { ReportData } from "./types";
 
 export function generateCsvReport(data: ReportData): string {
   const headers = [
@@ -44,7 +37,7 @@ export function generateCsvReport(data: ReportData): string {
   ];
 
   const rows = data.shortlisted.map((c, i) => {
-    const score = effectiveScore(c.score);
+    const score = effectiveCandidateScore(c.score);
     return [
       String(i + 1),
       c.display_name ?? c.extraction?.candidate_name ?? "Unknown",
@@ -85,7 +78,7 @@ export function generateHtmlReport(data: ReportData): string {
 
   const candidateSections = shortlisted
     .map((c, i) => {
-      const score = effectiveScore(c.score);
+      const score = effectiveCandidateScore(c.score);
       const name =
         c.display_name ?? c.extraction?.candidate_name ?? "Unknown Candidate";
       const summary =
@@ -123,7 +116,7 @@ export function generateHtmlReport(data: ReportData): string {
 
   const comparisonRows = shortlisted
     .map((c, i) => {
-      const score = effectiveScore(c.score);
+      const score = effectiveCandidateScore(c.score);
       const name =
         c.display_name ?? c.extraction?.candidate_name ?? "Unknown";
       return `<tr>
@@ -252,7 +245,7 @@ export async function generateDocxReport(data: ReportData): Promise<Buffer> {
   for (const [i, c] of shortlisted.entries()) {
     const name =
       c.display_name ?? c.extraction?.candidate_name ?? "Unknown Candidate";
-    const score = effectiveScore(c.score);
+    const score = effectiveCandidateScore(c.score);
     const summary =
       c.review?.edited_summary ?? c.score?.candidate_summary ?? "";
 

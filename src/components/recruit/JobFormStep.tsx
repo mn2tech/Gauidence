@@ -29,6 +29,7 @@ export default function JobFormStep({ job, onSaved, onNext }: Props) {
     title: job.title,
     department: job.department ?? "",
     hiring_manager: job.hiring_manager ?? "",
+    hiring_manager_email: job.hiring_manager_email ?? "",
     job_description: job.job_description,
     required_skills: job.required_skills.join(", "),
     preferred_skills: job.preferred_skills.join(", "),
@@ -56,6 +57,7 @@ export default function JobFormStep({ job, onSaved, onNext }: Props) {
           title: form.title,
           department: form.department || null,
           hiring_manager: form.hiring_manager || null,
+          hiring_manager_email: form.hiring_manager_email || null,
           job_description: form.job_description,
           required_skills: parseLines(form.required_skills),
           preferred_skills: parseLines(form.preferred_skills),
@@ -131,6 +133,9 @@ export default function JobFormStep({ job, onSaved, onNext }: Props) {
         {field("Job title *", "title")}
         {field("Department", "department")}
         {field("Hiring manager", "hiring_manager")}
+        {field("Hiring manager email", "hiring_manager_email", {
+          type: "email",
+        })}
         {field("Location", "location")}
         <div>
           <label className="text-sm font-medium">Work mode</label>

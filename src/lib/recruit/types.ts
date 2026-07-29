@@ -76,6 +76,7 @@ export type RecruitmentJob = {
   title: string;
   department: string | null;
   hiring_manager: string | null;
+  hiring_manager_email: string | null;
   job_description: string;
   required_skills: string[];
   preferred_skills: string[];
@@ -214,8 +215,24 @@ export type CandidateWithDetails = RecruitmentCandidate & {
   review: RecruitmentReview | null;
 };
 
+export type ReportData = {
+  job: RecruitmentJob;
+  rubric: RecruitmentJobRequirements;
+  candidates: CandidateWithDetails[];
+  shortlisted: CandidateWithDetails[];
+  generatedAt: string;
+  recruiterName: string;
+};
+
+export function effectiveCandidateScore(
+  score: { match_score: number; overridden_score: number | null } | null
+): number | null {
+  if (!score) return null;
+  return score.overridden_score ?? score.match_score;
+}
+
 export const JOB_SELECT =
-  "id, profile_id, owner_user_id, title, department, hiring_manager, job_description, required_skills, preferred_skills, min_years_experience, required_education, required_certifications, location, work_mode, employment_type, work_authorization_requirement, salary_range, shortlist_count, status, current_step, created_at, updated_at";
+  "id, profile_id, owner_user_id, title, department, hiring_manager, hiring_manager_email, job_description, required_skills, preferred_skills, min_years_experience, required_education, required_certifications, location, work_mode, employment_type, work_authorization_requirement, salary_range, shortlist_count, status, current_step, created_at, updated_at";
 
 export const CANDIDATE_SELECT =
   "id, job_id, display_name, email, phone, processing_status, processing_error, manual_rank, review_status, created_at, updated_at";

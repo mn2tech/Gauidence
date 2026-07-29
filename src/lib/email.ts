@@ -371,3 +371,84 @@ export async function sendVaultInviteEmail(args: VaultInviteEmailArgs) {
   }
   return true;
 }
+
+export type RecruitReportReadyEmailArgs = {
+  to: string;
+  hiringManagerName: string;
+  jobTitle: string;
+  applicantCount: number;
+  shortlistCount: number;
+  recruiterName: string;
+  reportUrl: string;
+  expiresInDays: number;
+};
+
+export function renderRecruitReportReadyEmail(args: RecruitReportReadyEmailArgs) {
+  const subject = `Shortlist report ready — ${args.jobTitle}`;
+  const html = `
+  <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#fafaf9;padding:32px 16px;">
+    <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e7e5e4;border-radius:16px;overflow:hidden;">
+      <div style="padding:24px;">
+        <div style="font-size:18px;font-weight:700;color:#1c1917;">Guardian Recruit</div>
+        <p style="margin:16px 0 8px;font-size:15px;color:#1c1917;line-height:1.5;">
+          Hi ${escapeHtml(args.hiringManagerName || "there")},
+        </p>
+        <p style="margin:0 0 16px;font-size:14px;color:#57534e;line-height:1.6;">
+          ${escapeHtml(args.recruiterName)} reviewed <strong>${args.applicantCount}</strong> applicant${args.applicantCount === 1 ? "" : "s"} for the
+          <strong>${escapeHtml(args.jobTitle)}</strong> position and prepared a shortlist of
+          <strong>${args.shortlistCount}</strong> candidate${args.shortlistCount === 1 ? "" : "s"} for your review.
+        </p>
+        <p style="margin:0 0 20px;font-size:14px;color:#57534e;line-height:1.6;">
+          The report includes qualifications, strengths, concerns, and suggested interview questions.
+          View it securely inside Guardian — no attachments required.
+        </p>
+        <a href="${escapeHtml(args.reportUrl)}"
+          style="display:inline-block;padding:12px 20px;border-radius:999px;background:#0f766e;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;">
+          View shortlist report
+        </a>
+        <p style="margin:20px 0 0;font-size:12px;color:#78716c;line-height:1.5;">
+          This link expires in ${args.expiresInDays} days. AI recommendations require human review before any hiring decision.
+          If you didn’t expect this email, you can ignore it.
+        </p>
+      </div>
+    </div>
+  </div>`;
+  const text = [
+    `Hi ${args.hiringManagerName || "there"},`,
+    "",
+    `${args.recruiterName} reviewed ${args.applicantCount} applicants for the ${args.jobTitle} position.`,
+    `${args.shortlistCount} candidates are recommended for your initial review.`,
+    "",
+    `View the report in Guardian: ${args.reportUrl}`,
+    "",
+    `This link expires in ${args.expiresInDays} days.`,
+  ].join("\n");
+  return { subject, html, text };
+}
+
+/** Sends a recruit shortlist report notification. Returns false when Resend isn't configured. */
+export async function sendRecruitReportReadyEmail(
+  args: RecruitReportReadyEmailArgs
+) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return false;
+
+  const from =
+    process.env.INVITE_FROM_EMAIL ??
+    process.env.REMINDER_FROM_EMAIL ??
+    "Guardian <onboarding@resend.dev>";
+  const resend = new Resend(apiKey);
+  const { subject, html, text } = renderRecruitReportReadyEmail(args);
+  const { error } = await resend.emails.send({
+    from,
+    to: args.to,
+    subject,
+    html,
+    text,
+  });
+  if (error) {
+    console.error("Recruit report email failed:", args.to, error.message);
+    return false;
+  }
+  return true;
+}

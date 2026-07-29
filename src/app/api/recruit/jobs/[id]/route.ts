@@ -53,6 +53,8 @@ export async function PATCH(request: Request, context: RouteContext) {
   if (body.department !== undefined) updates.department = fields.department;
   if (body.hiring_manager !== undefined)
     updates.hiring_manager = fields.hiring_manager;
+  if (body.hiring_manager_email !== undefined)
+    updates.hiring_manager_email = fields.hiring_manager_email;
   if (body.job_description !== undefined)
     updates.job_description = fields.job_description;
   if (body.required_skills !== undefined)

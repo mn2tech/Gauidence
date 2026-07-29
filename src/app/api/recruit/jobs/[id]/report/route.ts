@@ -5,15 +5,10 @@ import {
   generateCsvReport,
   generateDocxReport,
   generateHtmlReport,
-  type ReportData,
 } from "@/lib/recruit/export";
-import {
-  effectiveScore,
-  ensureJobRequirements,
-  getRecruitmentJob,
-  listCandidatesWithDetails,
-  logRecruitAudit,
-} from "@/lib/recruit/server";
+import { buildRecruitReportData } from "@/lib/recruit/reportData";
+import { authenticatedReportUrl } from "@/lib/recruit/shareReport";
+import { logRecruitAudit } from "@/lib/recruit/server";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -28,54 +23,24 @@ export async function GET(request: Request, context: RouteContext) {
   const url = new URL(request.url);
   const format = url.searchParams.get("format") ?? "json";
 
-  const job = await getRecruitmentJob(auth.supabase, jobId);
-  if (!job) {
+  const reportData = await buildRecruitReportData(
+    auth.supabase,
+    jobId,
+    auth.user
+  );
+  if (!reportData) {
     return NextResponse.json({ error: "Job not found." }, { status: 404 });
   }
 
-  const rubric = await ensureJobRequirements(auth.supabase, jobId);
-  if (!rubric) {
-    return NextResponse.json({ error: "Rubric not found." }, { status: 404 });
-  }
-
-  const candidates = await listCandidatesWithDetails(auth.supabase, jobId);
-  const analyzed = candidates.filter((c) => c.score);
-
-  const sorted = [...analyzed].sort((a, b) => {
-    const rankA = a.manual_rank ?? 9999;
-    const rankB = b.manual_rank ?? 9999;
-    if (rankA !== rankB) return rankA - rankB;
-    return (effectiveScore(b.score) ?? 0) - (effectiveScore(a.score) ?? 0);
-  });
-
-  const shortlisted = sorted
-    .filter((c) => c.review_status === "shortlisted" || c.review_status === "hm_review")
-    .slice(0, job.shortlist_count);
-
-  const fallbackShortlist =
-    shortlisted.length > 0
-      ? shortlisted
-      : sorted.slice(0, job.shortlist_count);
-
-  const recruiterName =
-    auth.user.user_metadata?.full_name ??
-    auth.user.email?.split("@")[0] ??
-    "Recruiter";
-
-  const reportData: ReportData = {
-    job,
-    rubric,
-    candidates: analyzed,
-    shortlisted: fallbackShortlist,
-    generatedAt: new Date().toISOString(),
-    recruiterName,
-  };
+  const recruiterName = reportData.recruiterName;
+  const reportUrl = authenticatedReportUrl(jobId);
 
   const emailDraft = buildEmailDraft({
-    jobTitle: job.title,
-    hiringManager: job.hiring_manager ?? "",
-    applicantCount: analyzed.length,
+    jobTitle: reportData.job.title,
+    hiringManager: reportData.job.hiring_manager ?? "",
+    applicantCount: reportData.candidates.length,
     recruiterName,
+    reportUrl,
   });
 
   if (format === "csv") {
@@ -83,7 +48,7 @@ export async function GET(request: Request, context: RouteContext) {
     return new NextResponse(csv, {
       headers: {
         "Content-Type": "text/csv",
-        "Content-Disposition": `attachment; filename="shortlist-${job.title.replace(/[^\w]/g, "-")}.csv"`,
+        "Content-Disposition": `attachment; filename="shortlist-${reportData.job.title.replace(/[^\w]/g, "-")}.csv"`,
       },
     });
   }
@@ -93,7 +58,7 @@ export async function GET(request: Request, context: RouteContext) {
     return new NextResponse(html, {
       headers: {
         "Content-Type": "text/html",
-        "Content-Disposition": `inline; filename="report-${job.title.replace(/[^\w]/g, "-")}.html"`,
+        "Content-Disposition": `inline; filename="report-${reportData.job.title.replace(/[^\w]/g, "-")}.html"`,
       },
     });
   }
@@ -104,7 +69,7 @@ export async function GET(request: Request, context: RouteContext) {
       headers: {
         "Content-Type":
           "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "Content-Disposition": `attachment; filename="report-${job.title.replace(/[^\w]/g, "-")}.docx"`,
+        "Content-Disposition": `attachment; filename="report-${reportData.job.title.replace(/[^\w]/g, "-")}.docx"`,
       },
     });
   }
@@ -134,10 +99,12 @@ export async function GET(request: Request, context: RouteContext) {
   return NextResponse.json({
     report: reportData,
     emailDraft,
+    reportUrl,
     exportUrls: {
       csv: `/api/recruit/jobs/${jobId}/report?format=csv`,
       html: `/api/recruit/jobs/${jobId}/report?format=html`,
       docx: `/api/recruit/jobs/${jobId}/report?format=docx`,
+      inApp: `/recruit/${jobId}/report`,
     },
   });
 }

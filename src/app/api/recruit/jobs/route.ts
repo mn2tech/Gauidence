@@ -75,6 +75,7 @@ export async function POST(request: Request) {
       title: fields.title,
       department: fields.department,
       hiring_manager: fields.hiring_manager,
+      hiring_manager_email: fields.hiring_manager_email,
       job_description: fields.job_description,
       required_skills: fields.required_skills,
       preferred_skills: fields.preferred_skills,

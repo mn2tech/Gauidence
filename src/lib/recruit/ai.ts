@@ -298,7 +298,12 @@ export function buildEmailDraft(args: {
   hiringManager: string;
   applicantCount: number;
   recruiterName: string;
+  reportUrl?: string;
 }): string {
+  const linkLine = args.reportUrl
+    ? `\nView the report in Guardian: ${args.reportUrl}\n`
+    : "\n[Report link will be included when sent from Guardian]\n";
+
   return `Subject: Shortlisted Candidates – ${args.jobTitle}
 
 Hi ${args.hiringManager || "[Hiring Manager]"},
@@ -306,7 +311,7 @@ Hi ${args.hiringManager || "[Hiring Manager]"},
 I reviewed ${args.applicantCount} applicants for the ${args.jobTitle} position. Based on the required experience, skills, and preferred qualifications, I recommend the attached candidates for initial review.
 
 The report includes each candidate's qualifications, strengths, concerns, and suggested interview questions.
-
+${linkLine}
 Please let me know which candidates you would like to move forward with.
 
 Thank you,

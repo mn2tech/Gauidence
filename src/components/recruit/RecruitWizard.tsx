@@ -152,7 +152,12 @@ export default function RecruitWizard({
         ) : null}
 
         {step === "export" ? (
-          <ExportStep jobId={job.id} jobTitle={job.title} />
+          <ExportStep
+            jobId={job.id}
+            jobTitle={job.title}
+            hiringManagerName={job.hiring_manager}
+            hiringManagerEmail={job.hiring_manager_email}
+          />
         ) : null}
       </div>
 

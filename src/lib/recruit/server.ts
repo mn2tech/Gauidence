@@ -9,6 +9,7 @@ import {
   type RecruitmentJob,
   type RecruitmentJobRequirements,
 } from "./types";
+import { effectiveCandidateScore } from "./types";
 import { DEFAULT_RUBRIC } from "./rubric";
 
 export async function listRecruitmentJobs(
@@ -190,6 +191,5 @@ export async function logRecruitAudit(
 export function effectiveScore(
   score: { match_score: number; overridden_score: number | null } | null
 ): number | null {
-  if (!score) return null;
-  return score.overridden_score ?? score.match_score;
+  return effectiveCandidateScore(score);
 }
