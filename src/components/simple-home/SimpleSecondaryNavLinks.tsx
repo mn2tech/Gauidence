@@ -68,13 +68,7 @@ export default function SimpleSecondaryNavLinks({
             ? [{ href: "/payroll", label: "Payroll" }]
             : []),
         ]
-      : [
-          { href: "/research", label: "Research" },
-          { href: "/work-memory", label: "Work Memory" },
-          { href: "/experts", label: "Experts" },
-          { href: "/recruit", label: "Recruit" },
-          { href: "/payroll", label: "Payroll" },
-        ];
+      : [];
 
   if (isEmployeeVault && !showEmployeeTools) return null;
   if (links.length === 0) return null;

@@ -268,13 +268,34 @@ export default function SiteHeader() {
           ) : null}
           <button
             type="button"
-            className="inline-flex items-center justify-center rounded-full p-2 text-foreground hover:bg-stone-100"
+            className={
+              showSimpleNav
+                ? "inline-flex items-center gap-1.5 rounded-full border border-stone-200 px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-stone-100"
+                : "inline-flex items-center justify-center rounded-full p-2 text-foreground hover:bg-stone-100"
+            }
             aria-expanded={menuOpen}
             aria-controls="mobile-nav"
-            aria-label={menuOpen ? "Close menu" : "Open menu"}
+            aria-label={
+              showSimpleNav
+                ? menuOpen
+                  ? "Close account and tools menu"
+                  : "Open account and tools menu"
+                : menuOpen
+                  ? "Close menu"
+                  : "Open menu"
+            }
             onClick={() => setMenuOpen((o) => !o)}
           >
-            {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            {menuOpen ? (
+              <X className="h-5 w-5" />
+            ) : showSimpleNav ? (
+              <>
+                <Menu className="h-4 w-4" />
+                <span>Account &amp; tools</span>
+              </>
+            ) : (
+              <Menu className="h-5 w-5" />
+            )}
           </button>
         </div>
       </div>

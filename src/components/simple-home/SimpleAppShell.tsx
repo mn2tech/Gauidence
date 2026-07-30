@@ -84,11 +84,18 @@ export default function SimpleAppShell({
               type="button"
               aria-expanded={menuOpen}
               aria-controls="simple-profile-menu"
-              aria-label={menuOpen ? "Close menu" : "Open menu"}
+              aria-label={menuOpen ? "Close account and tools menu" : "Open account and tools menu"}
               onClick={() => setMenuOpen((open) => !open)}
-              className="rounded-full p-2 text-foreground hover:bg-stone-100"
+              className="inline-flex items-center gap-1.5 rounded-full border border-stone-200 px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-stone-100"
             >
-              {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              {menuOpen ? (
+                <X className="h-4 w-4" />
+              ) : (
+                <>
+                  <Menu className="h-4 w-4" />
+                  <span>Account &amp; tools</span>
+                </>
+              )}
             </button>
           </div>
         </div>
