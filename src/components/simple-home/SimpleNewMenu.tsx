@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FileUp, NotebookPen, MessageCircle, FolderPlus, X } from "lucide-react";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import { dailyLogHref, REQUESTS_PATH } from "@/lib/routes";
+import { clientBusinessLabel } from "@/lib/client-requests/helpers";
 import { vaultCreateHref, VAULT_CREATE_CARDS } from "@/lib/profiles/types";
 
 type SimpleNewMenuProps = {
@@ -12,9 +13,11 @@ type SimpleNewMenuProps = {
 };
 
 export default function SimpleNewMenu({ open, onClose }: SimpleNewMenuProps) {
-  const { active } = useActiveProfile();
+  const { active, profiles } = useActiveProfile();
 
   if (!open) return null;
+
+  const businessLabel = clientBusinessLabel(profiles, active);
 
   const uploadHref = active
     ? `/dashboard?camera=1#documents-${active.id}`
@@ -44,7 +47,7 @@ export default function SimpleNewMenu({ open, onClose }: SimpleNewMenuProps) {
       label: "Request something",
       description:
         active?.profile_type === "client"
-          ? "Submit a request to your company"
+          ? `Submit a request to ${businessLabel}`
           : "Ask Gideon to help with a request",
       icon: MessageCircle,
     },

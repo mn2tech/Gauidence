@@ -21,6 +21,7 @@ import {
   type ClientRequestStatus,
 } from "@/lib/client-requests/types";
 import { isOrgStyleProfile } from "@/lib/profiles/types";
+import { clientBusinessLabel } from "@/lib/client-requests/helpers";
 import { documentsHref } from "@/lib/routes";
 import {
   uploadAndAnalyzeToVault,
@@ -54,7 +55,7 @@ function formatWhen(iso: string) {
 export default function ClientRequestsScreen() {
   const searchParams = useSearchParams();
   const selectedId = searchParams.get("id");
-  const { active } = useActiveProfile();
+  const { active, profiles } = useActiveProfile();
 
   const isBusinessView =
     active != null &&
@@ -62,6 +63,7 @@ export default function ClientRequestsScreen() {
     active.profile_type !== "client";
   const isClientVault = active?.profile_type === "client";
   const canUseRequests = isClientVault || isBusinessView;
+  const businessLabel = clientBusinessLabel(profiles, active);
 
   const [requests, setRequests] = useState<RequestWithMeta[]>([]);
   const [comments, setComments] = useState<CommentWithMeta[]>([]);
@@ -429,7 +431,7 @@ export default function ClientRequestsScreen() {
           <p className="mt-1 text-sm text-ink-muted">
             {isBusinessView
               ? "Open requests from your client vaults — no more lost texts or emails."
-              : "Send requirements and questions to your company in one thread."}
+              : `Send requirements and questions to ${businessLabel} in one thread.`}
           </p>
         </div>
         {isClientVault ? (
@@ -526,7 +528,7 @@ export default function ClientRequestsScreen() {
           <p className="mt-3 text-sm font-medium text-foreground">No requests yet</p>
           <p className="mt-1 text-sm text-ink-muted">
             {isClientVault
-              ? "Create a request when you need something from your company."
+              ? `Create a request when you need something from ${businessLabel}.`
               : "When clients submit requests, they'll appear here."}
           </p>
         </div>

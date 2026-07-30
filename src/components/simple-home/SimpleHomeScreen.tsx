@@ -27,6 +27,7 @@ import {
 import { VAULTS_PATH } from "@/lib/simple-home/routing";
 import { documentsHref, dailyLogHref, REQUESTS_PATH } from "@/lib/routes";
 import { profileTypeLabel } from "@/lib/profiles/types";
+import { clientBusinessLabel } from "@/lib/client-requests/helpers";
 
 function Section({
   title,
@@ -69,6 +70,7 @@ export default function SimpleHomeScreen() {
   const greeting = timeOfDayGreeting();
   const name = greetingName(accountName, active?.display_name);
   const category = data.category;
+  const businessLabel = clientBusinessLabel(profiles, active);
   const showToday =
     data.pendingCount > 0 ||
     data.openRequestCount > 0 ||
@@ -119,7 +121,7 @@ export default function SimpleHomeScreen() {
           },
           {
             href: `${REQUESTS_PATH}?new=1`,
-            label: "Contact company",
+            label: `Contact ${businessLabel}`,
             icon: MessageCircle,
           },
         ];
