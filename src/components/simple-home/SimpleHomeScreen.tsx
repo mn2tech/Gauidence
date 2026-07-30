@@ -11,6 +11,7 @@ import {
   FolderOpen,
   MessageCircle,
   NotebookPen,
+  Sparkles,
   UserPlus,
   Users,
 } from "lucide-react";
@@ -35,8 +36,10 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-stone-200 bg-white p-4 sm:p-5">
-      <h2 className="text-sm font-semibold text-foreground">{title}</h2>
+    <section className="simple-home-card p-4 sm:p-5">
+      <h2 className="text-sm font-semibold tracking-tight text-foreground">
+        {title}
+      </h2>
       <div className="mt-3">{children}</div>
     </section>
   );
@@ -65,13 +68,14 @@ export default function SimpleHomeScreen() {
 
   const greeting = timeOfDayGreeting();
   const name = greetingName(accountName, active?.display_name);
+  const category = data.category;
   const showToday =
     data.pendingCount > 0 ||
     data.todayDocuments.length > 0 ||
     data.todayAlerts.length > 0;
 
   const categoryQuickLinks = (() => {
-    switch (data.category) {
+    switch (category) {
       case "business":
         return [
           {
@@ -142,6 +146,13 @@ export default function SimpleHomeScreen() {
     }
   })();
 
+  const chipClass =
+    category === "business"
+      ? "simple-chip-business"
+      : category === "family"
+        ? "simple-chip-warm"
+        : "bg-surface border-border-subtle";
+
   function handleAskSubmit(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = question.trim();
@@ -153,32 +164,47 @@ export default function SimpleHomeScreen() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-5 px-4 py-6 pb-28 sm:py-8">
-      <header>
-        <p className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+    <div className="simple-home-page mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-6 pb-28 sm:gap-7 sm:py-8">
+      <header className="welcome-strip">
+        <p className="text-2xl font-semibold tracking-tight text-foreground sm:text-[1.75rem] sm:leading-tight">
           {greeting}, {name}.
         </p>
-        <p className="mt-1 text-sm text-ink-muted">
+        <p className="mt-1.5 text-sm text-ink-muted">
           {active ? `${profileTypeLabel(active.profile_type)} vault` : "Guardian"}
         </p>
       </header>
 
-      <form onSubmit={handleAskSubmit} className="rounded-2xl border border-brand/30 bg-brand-light/30 p-4 sm:p-5">
+      <form
+        onSubmit={handleAskSubmit}
+        className="simple-gideon-hero welcome-strip p-5 sm:p-6"
+        style={{ animationDelay: "0.05s" }}
+      >
+        <div className="mb-4 flex items-center gap-2">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand text-white shadow-sm">
+            <Sparkles className="h-4 w-4" aria-hidden />
+          </span>
+          <div>
+            <p className="text-sm font-semibold text-foreground">Ask Gideon</p>
+            <p className="text-xs text-ink-muted">
+              Your guide to everything in your vault
+            </p>
+          </div>
+        </div>
         <label htmlFor="home-ask-gideon" className="sr-only">
           Ask Gideon
         </label>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
           <input
             id="home-ask-gideon"
             type="text"
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             placeholder="What do you need help with?"
-            className="min-w-0 flex-1 rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-foreground placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+            className="min-w-0 flex-1 rounded-xl border border-border-subtle bg-white px-4 py-3.5 text-sm text-foreground shadow-sm placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/25"
           />
           <button
             type="submit"
-            className="inline-flex shrink-0 items-center justify-center rounded-full bg-brand px-5 py-3 text-sm font-semibold text-white transition hover:bg-brand-dark"
+            className="inline-flex shrink-0 items-center justify-center rounded-xl bg-brand px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-dark"
           >
             Ask Gideon
           </button>
@@ -186,14 +212,17 @@ export default function SimpleHomeScreen() {
       </form>
 
       {categoryQuickLinks.length > 0 ? (
-        <div className="flex flex-wrap gap-2">
+        <div
+          className="flex flex-wrap gap-2 welcome-strip"
+          style={{ animationDelay: "0.1s" }}
+        >
           {categoryQuickLinks.map((link) => {
             const Icon = link.icon;
             return (
               <Link
                 key={link.label}
                 href={link.href}
-                className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white px-3.5 py-2 text-sm font-medium text-foreground transition hover:border-stone-300 hover:bg-stone-50"
+                className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-sm font-medium text-foreground shadow-sm transition hover:shadow-card ${chipClass}`}
               >
                 <Icon className="h-4 w-4 text-brand" aria-hidden />
                 {link.label}
@@ -208,14 +237,16 @@ export default function SimpleHomeScreen() {
           {loading ? (
             <p className="text-sm text-ink-muted">Loading…</p>
           ) : (
-            <ul className="space-y-2">
+            <ul className="space-y-1">
               {data.todayAlerts.map((alert) => (
                 <li key={alert.id}>
                   <Link
                     href={documentsHref(active?.id)}
-                    className="flex items-start gap-2 rounded-xl px-2 py-2 text-sm transition hover:bg-stone-50"
+                    className="flex items-start gap-3 rounded-xl px-2 py-2.5 text-sm transition hover:bg-brand-light/40"
                   >
-                    <BellRing className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                    <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-100">
+                      <BellRing className="h-3.5 w-3.5 text-amber-700" />
+                    </span>
                     <span>
                       <span className="font-medium text-foreground">
                         {alert.title}
@@ -231,9 +262,11 @@ export default function SimpleHomeScreen() {
                 <li key={doc.id}>
                   <Link
                     href={`${documentsHref(active?.id)}&documentId=${doc.id}`}
-                    className="flex items-start gap-2 rounded-xl px-2 py-2 text-sm transition hover:bg-stone-50"
+                    className="flex items-start gap-3 rounded-xl px-2 py-2.5 text-sm transition hover:bg-brand-light/40"
                   >
-                    <FileText className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
+                    <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-light">
+                      <FileText className="h-3.5 w-3.5 text-brand" />
+                    </span>
                     <span>
                       <span className="font-medium text-foreground">
                         Recent document
@@ -261,7 +294,7 @@ export default function SimpleHomeScreen() {
                     void switchProfile(vault.id);
                     router.push(documentsHref(vault.id));
                   }}
-                  className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left text-sm transition hover:bg-stone-50"
+                  className="flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left text-sm transition hover:bg-brand-light/35"
                 >
                   <ProfileAvatar profile={vault} size="sm" />
                   <span className="min-w-0 flex-1">
@@ -272,14 +305,14 @@ export default function SimpleHomeScreen() {
                       {profileTypeLabel(vault.profile_type)}
                     </span>
                   </span>
-                  <FolderOpen className="h-4 w-4 shrink-0 text-ink-muted" />
+                  <FolderOpen className="h-4 w-4 shrink-0 text-brand/70" />
                 </button>
               </li>
             ))}
           </ul>
           <Link
             href={VAULTS_PATH}
-            className="mt-3 inline-block text-sm font-medium text-brand-dark hover:underline"
+            className="mt-3 inline-block text-sm font-semibold text-brand-dark hover:underline"
           >
             View all
           </Link>
@@ -293,7 +326,7 @@ export default function SimpleHomeScreen() {
               <li key={item.id}>
                 <Link
                   href={item.href}
-                  className="flex items-start justify-between gap-3 rounded-xl px-2 py-2 text-sm transition hover:bg-stone-50"
+                  className="flex items-start justify-between gap-3 rounded-xl px-2 py-2.5 text-sm transition hover:bg-brand-light/35"
                 >
                   <span className="min-w-0 font-medium text-foreground">
                     {item.title}

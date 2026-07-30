@@ -73,10 +73,12 @@ export default function SimpleSecondaryNavLinks({
   if (isEmployeeVault && !showEmployeeTools) return null;
   if (links.length === 0) return null;
 
+  const panelClass = showDivider ? "simple-tools-panel mb-2 p-2" : "";
+
   return (
-    <div className={className}>
+    <div className={`${panelClass} ${className ?? ""}`.trim()}>
       {showDivider ? (
-        <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
+        <p className="px-2 pb-1.5 pt-1 text-[11px] font-semibold uppercase tracking-wide text-brand-dark">
           Tools
         </p>
       ) : null}

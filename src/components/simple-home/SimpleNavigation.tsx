@@ -28,11 +28,8 @@ export default function SimpleNavigation({ onNewClick }: SimpleNavigationProps) 
   const pathname = usePathname();
 
   return (
-    <nav
-      aria-label="Primary"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-stone-200 bg-white/95 backdrop-blur"
-    >
-      <div className="mx-auto flex h-16 max-w-2xl items-stretch justify-around px-2">
+    <nav aria-label="Primary" className="simple-nav-bar fixed inset-x-0 bottom-0 z-40">
+      <div className="mx-auto flex h-[4.25rem] max-w-2xl items-stretch justify-around px-3 pb-[env(safe-area-inset-bottom)]">
         {ITEMS.map((item) => {
           const active = isActive(pathname, item.href, item.exact);
           const Icon = item.icon;
@@ -40,24 +37,30 @@ export default function SimpleNavigation({ onNewClick }: SimpleNavigationProps) 
             <Link
               key={item.href}
               href={item.href}
-              className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-[11px] font-medium transition ${
+              className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 transition ${
                 active ? "text-brand" : "text-ink-muted hover:text-foreground"
               }`}
             >
-              <Icon className="h-5 w-5" aria-hidden />
-              <span className="truncate">{item.label}</span>
+              <span
+                className={`flex h-8 w-14 items-center justify-center rounded-2xl transition ${
+                  active ? "bg-brand-light" : ""
+                }`}
+              >
+                <Icon className="h-5 w-5" aria-hidden />
+              </span>
+              <span className="truncate text-[10px] font-semibold">{item.label}</span>
             </Link>
           );
         })}
         <button
           type="button"
           onClick={onNewClick}
-          className="flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-[11px] font-medium text-ink-muted transition hover:text-foreground"
+          className="flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 text-ink-muted transition hover:text-foreground"
         >
-          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand text-white">
-            <Plus className="h-3.5 w-3.5" aria-hidden />
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand text-white shadow-sm ring-4 ring-brand-light/80">
+            <Plus className="h-4 w-4" aria-hidden />
           </span>
-          <span>New</span>
+          <span className="truncate text-[10px] font-semibold">New</span>
         </button>
       </div>
     </nav>

@@ -31,10 +31,12 @@ export default function SimpleVaultsScreen() {
   const topLevel = topLevelProfiles(profiles);
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-6 pb-28">
-      <header className="mb-5">
-        <h1 className="text-2xl font-semibold tracking-tight">Vaults</h1>
-        <p className="mt-1 text-sm text-ink-muted">
+    <div className="simple-home-page mx-auto max-w-2xl px-4 py-6 pb-28 sm:py-8">
+      <header className="mb-6">
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+          Vaults
+        </h1>
+        <p className="mt-1.5 text-sm text-ink-muted">
           Your profiles and vaults in Guardian.
         </p>
       </header>
@@ -43,17 +45,14 @@ export default function SimpleVaultsScreen() {
         {topLevel.map((vault) => {
           const children = nestedUnder(profiles, vault);
           return (
-            <li
-              key={vault.id}
-              className="rounded-2xl border border-stone-200 bg-white"
-            >
+            <li key={vault.id} className="simple-home-card overflow-hidden">
               <button
                 type="button"
                 onClick={() => {
                   void switchProfile(vault.id);
                   router.push(documentsHref(vault.id));
                 }}
-                className="flex w-full items-center gap-3 px-4 py-4 text-left"
+                className="flex w-full items-center gap-3 px-4 py-4 text-left transition hover:bg-brand-light/30"
               >
                 <ProfileAvatar profile={vault} size="md" />
                 <span className="min-w-0 flex-1">
@@ -66,7 +65,7 @@ export default function SimpleVaultsScreen() {
                 </span>
               </button>
               {children.length > 0 ? (
-                <ul className="border-t border-stone-100 px-2 pb-2">
+                <ul className="border-t border-border-subtle px-2 pb-2">
                   {children.map((child) => (
                     <li key={child.id}>
                       <button
@@ -75,7 +74,7 @@ export default function SimpleVaultsScreen() {
                           void switchProfile(child.id);
                           router.push(documentsHref(child.id));
                         }}
-                        className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm hover:bg-stone-50"
+                        className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition hover:bg-brand-light/35"
                       >
                         <ProfileAvatar profile={child} size="sm" />
                         <span className="min-w-0 flex-1">
@@ -98,7 +97,7 @@ export default function SimpleVaultsScreen() {
 
       <Link
         href="/settings/profiles"
-        className="mt-5 inline-block text-sm font-medium text-brand-dark hover:underline"
+        className="mt-5 inline-block text-sm font-semibold text-brand-dark hover:underline"
       >
         Manage vaults
       </Link>

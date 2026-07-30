@@ -48,13 +48,19 @@ export default function SimpleAppShell({
 
   return (
     <>
-      <header className="sticky top-0 z-40 border-b border-stone-200 bg-white/80 backdrop-blur">
+      <header
+        className={`sticky top-0 z-40 border-b backdrop-blur-md transition-colors ${
+          menuOpen
+            ? "border-brand/15 bg-brand-light/50"
+            : "border-border-subtle bg-surface/90"
+        }`}
+      >
         <div className="mx-auto flex h-14 max-w-2xl items-center justify-between gap-3 px-4">
           <Link
             href={SIMPLE_HOME_PATH}
             className="flex shrink-0 items-center gap-2 font-semibold tracking-tight"
           >
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand text-white">
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand text-white shadow-sm">
               <ShieldCheck className="h-5 w-5" />
             </span>
             Guardian
@@ -67,14 +73,14 @@ export default function SimpleAppShell({
                   type="button"
                   onClick={() => setSearchOpen(true)}
                   aria-label="Search vaults"
-                  className="rounded-full p-2 text-brand hover:bg-brand-light"
+                  className="rounded-full p-2 text-brand transition hover:bg-brand-light"
                 >
                   <Search className="h-5 w-5" />
                 </button>
                 <Link
                   href={cameraHref}
                   aria-label="Scan with camera"
-                  className="rounded-full p-2 text-brand hover:bg-brand-light"
+                  className="rounded-full p-2 text-brand transition hover:bg-brand-light"
                 >
                   <Camera className="h-5 w-5" />
                 </Link>
@@ -84,9 +90,17 @@ export default function SimpleAppShell({
               type="button"
               aria-expanded={menuOpen}
               aria-controls="simple-profile-menu"
-              aria-label={menuOpen ? "Close account and tools menu" : "Open account and tools menu"}
+              aria-label={
+                menuOpen
+                  ? "Close account and tools menu"
+                  : "Open account and tools menu"
+              }
               onClick={() => setMenuOpen((open) => !open)}
-              className="inline-flex items-center gap-1.5 rounded-full border border-stone-200 px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-stone-100"
+              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-semibold transition ${
+                menuOpen
+                  ? "border-brand/30 bg-brand text-white"
+                  : "border-border-subtle bg-surface text-foreground hover:bg-brand-light/50"
+              }`}
             >
               {menuOpen ? (
                 <X className="h-4 w-4" />
@@ -103,39 +117,39 @@ export default function SimpleAppShell({
         {menuOpen ? (
           <div
             id="simple-profile-menu"
-            className="border-t border-stone-200 bg-white px-4 py-3"
+            className="border-t border-brand/10 bg-surface px-4 py-4 shadow-card"
           >
-            <div className="mb-3">
+            <div className="mb-3 rounded-xl border border-border-subtle bg-background p-3">
               <ProfileSwitcher />
             </div>
-            <nav className="flex flex-col gap-1">
+            <nav className="flex flex-col gap-0.5">
               <SimpleSecondaryNavLinks onNavigate={() => setMenuOpen(false)} />
               <Link
                 href="/settings"
                 onClick={() => setMenuOpen(false)}
-                className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground hover:bg-stone-100"
+                className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground transition hover:bg-brand-light/50"
               >
-                <Settings className="h-4 w-4" />
+                <Settings className="h-4 w-4 text-brand" />
                 Settings
               </Link>
               <Link
                 href="/help"
                 onClick={() => setMenuOpen(false)}
-                className="rounded-lg px-3 py-2.5 text-sm font-medium text-foreground hover:bg-stone-100"
+                className="rounded-lg px-3 py-2.5 text-sm font-medium text-foreground transition hover:bg-brand-light/50"
               >
                 Help
               </Link>
               <Link
                 href="/dashboard?docs=1"
                 onClick={() => setMenuOpen(false)}
-                className="rounded-lg px-3 py-2.5 text-sm font-medium text-foreground hover:bg-stone-100"
+                className="rounded-lg px-3 py-2.5 text-sm font-medium text-foreground transition hover:bg-brand-light/50"
               >
                 Classic dashboard
               </Link>
               <button
                 type="button"
                 onClick={() => void handleSignOut()}
-                className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-foreground hover:bg-stone-100"
+                className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-foreground transition hover:bg-brand-light/50"
               >
                 <LogOut className="h-4 w-4" />
                 Sign out

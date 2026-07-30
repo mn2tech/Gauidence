@@ -6,7 +6,16 @@
   --brand: #0f766e;
   --brand-dark: #115e59;
   --brand-light: #f0fdfa;
+  --brand-glow: #ccfbf1;
   --ink-muted: #57534e;
+  --surface: #ffffff;
+  --surface-elevated: #ffffff;
+  --border-subtle: #e7e5e4;
+  --accent-warm: #fffbeb;
+  --accent-warm-border: #fde68a;
+  --shadow-card: 0 1px 3px 0 rgb(28 25 23 / 0.06), 0 1px 2px -1px rgb(28 25 23 / 0.05);
+  --shadow-card-hover: 0 4px 12px -2px rgb(28 25 23 / 0.08), 0 2px 4px -2px rgb(28 25 23 / 0.04);
+  --shadow-nav: 0 -4px 24px -6px rgb(28 25 23 / 0.1);
 }
 
 @theme inline {
@@ -15,8 +24,16 @@
   --color-brand: var(--brand);
   --color-brand-dark: var(--brand-dark);
   --color-brand-light: var(--brand-light);
+  --color-brand-glow: var(--brand-glow);
   --color-ink-muted: var(--ink-muted);
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-border-subtle: var(--border-subtle);
+  --color-accent-warm: var(--accent-warm);
+  --color-accent-warm-border: var(--accent-warm-border);
   --font-sans: var(--font-geist-sans);
+  --shadow-card: var(--shadow-card);
+  --shadow-nav: var(--shadow-nav);
 }
 
 body {
@@ -26,6 +43,57 @@ body {
 
 html {
   scroll-behavior: smooth;
+}
+
+/* Simple home presentation layer */
+.simple-home-page {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--brand-light) 55%, var(--background)) 0%,
+    var(--background) 14rem
+  );
+}
+
+.simple-home-card {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 1rem;
+  box-shadow: var(--shadow-card);
+}
+
+.simple-gideon-hero {
+  background: linear-gradient(
+    135deg,
+    var(--brand-glow) 0%,
+    var(--brand-light) 45%,
+    var(--surface) 100%
+  );
+  border: 1px solid color-mix(in srgb, var(--brand) 22%, transparent);
+  border-radius: 1.25rem;
+  box-shadow: var(--shadow-card);
+}
+
+.simple-nav-bar {
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  border-top: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-nav);
+  backdrop-filter: blur(12px);
+}
+
+.simple-tools-panel {
+  background: color-mix(in srgb, var(--brand-light) 65%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--brand) 15%, transparent);
+  border-radius: 0.75rem;
+}
+
+.simple-chip-business {
+  background: color-mix(in srgb, var(--brand-light) 80%, var(--surface));
+  border-color: color-mix(in srgb, var(--brand) 18%, transparent);
+}
+
+.simple-chip-warm {
+  background: var(--accent-warm);
+  border-color: var(--accent-warm-border);
 }
 
 @keyframes welcome-fade-up {
