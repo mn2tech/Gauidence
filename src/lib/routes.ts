@@ -1,5 +1,6 @@
 /** Opens the Documents vault (not the post-login default). */
 export const DOCUMENTS_PATH = "/dashboard?docs=1";
+export const REQUESTS_PATH = "/requests";
 
 export function documentsHref(profileId?: string | null): string {
   if (!profileId) return DOCUMENTS_PATH;

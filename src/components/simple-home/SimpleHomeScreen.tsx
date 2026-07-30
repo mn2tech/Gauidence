@@ -25,7 +25,7 @@ import {
   timeOfDayGreeting,
 } from "@/lib/simple-home/helpers";
 import { VAULTS_PATH } from "@/lib/simple-home/routing";
-import { documentsHref, dailyLogHref } from "@/lib/routes";
+import { documentsHref, dailyLogHref, REQUESTS_PATH } from "@/lib/routes";
 import { profileTypeLabel } from "@/lib/profiles/types";
 
 function Section({
@@ -71,6 +71,7 @@ export default function SimpleHomeScreen() {
   const category = data.category;
   const showToday =
     data.pendingCount > 0 ||
+    data.openRequestCount > 0 ||
     data.todayDocuments.length > 0 ||
     data.todayAlerts.length > 0;
 
@@ -87,6 +88,11 @@ export default function SimpleHomeScreen() {
             href: VAULTS_PATH,
             label: "Clients",
             icon: Users,
+          },
+          {
+            href: REQUESTS_PATH,
+            label: "Client requests",
+            icon: MessageCircle,
           },
           {
             href: "/work-memory",
@@ -107,12 +113,12 @@ export default function SimpleHomeScreen() {
             icon: FileText,
           },
           {
-            href: `/ask?draft=${encodeURIComponent("I need to request something from the company.")}`,
+            href: REQUESTS_PATH,
             label: "My requests",
             icon: MessageCircle,
           },
           {
-            href: "/ask",
+            href: `${REQUESTS_PATH}?new=1`,
             label: "Contact company",
             icon: MessageCircle,
           },
@@ -238,6 +244,34 @@ export default function SimpleHomeScreen() {
             <p className="text-sm text-ink-muted">Loading…</p>
           ) : (
             <ul className="space-y-1">
+              {data.openRequestCount > 0 ? (
+                <li>
+                  <Link
+                    href={REQUESTS_PATH}
+                    className="flex items-start gap-3 rounded-xl px-2 py-2.5 text-sm transition hover:bg-brand-light/40"
+                  >
+                    <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-light">
+                      <MessageCircle className="h-3.5 w-3.5 text-brand" />
+                    </span>
+                    <span>
+                      <span className="font-medium text-foreground">
+                        {data.openRequestCount === 1
+                          ? category === "business"
+                            ? "1 open client request"
+                            : "1 open request"
+                          : category === "business"
+                            ? `${data.openRequestCount} open client requests`
+                            : `${data.openRequestCount} open requests`}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-ink-muted">
+                        {category === "business"
+                          ? "Review and reply in Requests"
+                          : "View your conversation"}
+                      </span>
+                    </span>
+                  </Link>
+                </li>
+              ) : null}
               {data.todayAlerts.map((alert) => (
                 <li key={alert.id}>
                   <Link

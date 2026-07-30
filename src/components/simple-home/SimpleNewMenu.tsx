@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FileUp, NotebookPen, MessageCircle, FolderPlus, X } from "lucide-react";
 import { useActiveProfile } from "@/components/ProfileProvider";
-import { dailyLogHref } from "@/lib/routes";
+import { dailyLogHref, REQUESTS_PATH } from "@/lib/routes";
 import { vaultCreateHref, VAULT_CREATE_CARDS } from "@/lib/profiles/types";
 
 type SimpleNewMenuProps = {
@@ -20,7 +20,10 @@ export default function SimpleNewMenu({ open, onClose }: SimpleNewMenuProps) {
     ? `/dashboard?camera=1#documents-${active.id}`
     : "/dashboard?camera=1";
   const noteHref = dailyLogHref(active?.id);
-  const requestHref = `/ask?draft=${encodeURIComponent("I need to request something.")}`;
+  const requestHref =
+    active?.profile_type === "client"
+      ? `${REQUESTS_PATH}?new=1`
+      : `/ask?draft=${encodeURIComponent("I need to request something.")}`;
   const addVaultHref = vaultCreateHref(VAULT_CREATE_CARDS[0], "/home");
 
   const options = [
@@ -39,7 +42,10 @@ export default function SimpleNewMenu({ open, onClose }: SimpleNewMenuProps) {
     {
       href: requestHref,
       label: "Request something",
-      description: "Ask Gideon to help with a request",
+      description:
+        active?.profile_type === "client"
+          ? "Submit a request to your company"
+          : "Ask Gideon to help with a request",
       icon: MessageCircle,
     },
     {

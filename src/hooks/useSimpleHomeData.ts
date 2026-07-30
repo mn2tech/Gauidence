@@ -18,6 +18,7 @@ import {
 } from "@/lib/routes";
 import {
   topLevelProfiles,
+  isOrgStyleProfile,
   type GuardianProfile,
 } from "@/lib/profiles/types";
 
@@ -33,10 +34,18 @@ type TodayDocument = {
   createdAt: string;
 };
 
+type TodayRequest = {
+  id: string;
+  title: string;
+  profileName?: string | null;
+};
+
 export type SimpleHomeData = {
   category: SimpleHomeProfileCategory;
   todayAlerts: TodayAlert[];
   todayDocuments: TodayDocument[];
+  openRequestCount: number;
+  openRequests: TodayRequest[];
   recentVaults: GuardianProfile[];
   recentActivity: SimpleHomeActivityItem[];
   pendingCount: number;
@@ -46,6 +55,8 @@ const EMPTY: SimpleHomeData = {
   category: "personal",
   todayAlerts: [],
   todayDocuments: [],
+  openRequestCount: 0,
+  openRequests: [],
   recentVaults: [],
   recentActivity: [],
   pendingCount: 0,
@@ -76,7 +87,30 @@ export function useSimpleHomeData() {
     const today = calendarDateInUserZone(new Date(), timeZone);
     const profileId = active.id;
 
-    const [alertsRes, docsRes, logsRes, chatsRes, profilesRes] =
+    const clientProfileIds =
+      isOrgStyleProfile(active.profile_type) && active.profile_type !== "client"
+        ? profiles
+            .filter(
+              (p) =>
+                p.parent_profile_id === active.id && p.profile_type === "client"
+            )
+            .map((p) => p.id)
+        : active.profile_type === "client"
+          ? [active.id]
+          : [];
+
+    const requestsQuery =
+      clientProfileIds.length > 0
+        ? supabase
+            .from("client_requests")
+            .select("id, title, profile_id, status, updated_at")
+            .in("profile_id", clientProfileIds)
+            .in("status", ["open", "in_progress"])
+            .order("updated_at", { ascending: false })
+            .limit(5)
+        : null;
+
+    const [alertsRes, docsRes, logsRes, chatsRes, profilesRes, requestsRes] =
       await Promise.all([
         supabase
           .from("alerts")
@@ -109,6 +143,7 @@ export function useSimpleHomeData() {
           .select("id, display_name, profile_type, updated_at")
           .order("updated_at", { ascending: false })
           .limit(3),
+        requestsQuery ?? Promise.resolve({ data: null, error: null }),
       ]);
 
     const todayAlerts =
@@ -174,6 +209,36 @@ export function useSimpleHomeData() {
       });
     }
 
+    const openRequests =
+      (
+        requestsRes.data as
+          | {
+              id: string;
+              title: string;
+              profile_id: string;
+              status: string;
+              updated_at: string;
+            }[]
+          | null
+      )?.map((row) => ({
+        id: row.id,
+        title: row.title,
+        profileName:
+          profiles.find((p) => p.id === row.profile_id)?.display_name ?? null,
+      })) ?? [];
+
+    const openRequestCount = openRequests.length;
+
+    for (const row of requestsRes.data ?? []) {
+      activity.push({
+        id: `request-${row.id}`,
+        kind: "note",
+        title: `Request: ${row.title}`,
+        occurredAt: row.updated_at,
+        href: `/requests?id=${row.id}`,
+      });
+    }
+
     activity.sort(
       (a, b) =>
         new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime()
@@ -202,6 +267,8 @@ export function useSimpleHomeData() {
       category,
       todayAlerts,
       todayDocuments,
+      openRequestCount,
+      openRequests,
       recentVaults: recentVaults.slice(0, 5),
       recentActivity: activity.slice(0, 6),
       pendingCount: todayAlerts.length,
