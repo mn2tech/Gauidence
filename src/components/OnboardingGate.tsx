@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import OnboardingIntentScreen from "@/components/OnboardingIntentScreen";
+import { postLoginPathForProfile } from "@/lib/employee-hub/routing";
 
 /** Public / auth paths where the intent gate must not block. */
 const SKIP_PATH_PREFIXES = [
@@ -98,8 +99,20 @@ export default function OnboardingGate({
           if (activeProfileId) {
             await switchProfile(activeProfileId);
           }
-          if (pathname !== "/ask") {
-            router.replace("/ask");
+          let landing = "/ask";
+          try {
+            const res = await fetch("/api/profiles");
+            const body = (await res.json().catch(() => ({}))) as {
+              active?: { profile_type: string; parent_profile_id: string | null };
+            };
+            if (res.ok && body.active) {
+              landing = postLoginPathForProfile(body.active);
+            }
+          } catch {
+            // Keep default /ask.
+          }
+          if (pathname !== landing) {
+            router.replace(landing);
           } else {
             router.refresh();
           }

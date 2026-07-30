@@ -36,6 +36,7 @@ import {
   vaultLabel,
   type GuardianProfileType,
 } from "@/lib/profiles/types";
+import { EMPLOYEE_HUB_PATH } from "@/lib/employee-hub/routing";
 
 function DocumentsSection({
   userId,
@@ -114,7 +115,7 @@ export default function DashboardVault({ userId }: { userId: string }) {
   useEffect(() => {
     if (!active || loading) return;
     if (active.profile_type === "employee" && active.parent_profile_id) {
-      router.replace("/employee");
+      router.replace(EMPLOYEE_HUB_PATH);
     }
   }, [active, loading, router]);
 

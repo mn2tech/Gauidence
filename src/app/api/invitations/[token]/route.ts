@@ -172,6 +172,16 @@ export async function POST(_request: Request, ctx: Ctx) {
 
   await setActiveGuardianProfile(supabase, user.id, invite.profile_id);
 
+  const { data: profile } = await admin
+    .from("guardian_profiles")
+    .select("profile_type, parent_profile_id")
+    .eq("id", invite.profile_id)
+    .maybeSingle();
+
+  const profileType = profile?.profile_type ?? "business";
+  const isEmployeeHub =
+    profileType === "employee" && Boolean(profile?.parent_profile_id);
+
   // Invited collaborators shouldn't hit first-run intent capture.
   const now = new Date().toISOString();
   await supabase
@@ -187,5 +197,7 @@ export async function POST(_request: Request, ctx: Ctx) {
   return NextResponse.json({
     ok: true,
     profileId: invite.profile_id,
+    profileType,
+    redirectTo: isEmployeeHub ? "/employee" : "/dashboard",
   });
 }

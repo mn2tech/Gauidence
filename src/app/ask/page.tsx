@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveGuardianProfile } from "@/lib/profiles/server";
+import { isEmployeeHubProfile } from "@/lib/employee-hub/routing";
 import SiteHeader from "@/components/SiteHeader";
 import VaultChatPanel from "@/components/VaultChatPanel";
 
@@ -21,7 +22,10 @@ export default async function AskGideonPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  await getActiveGuardianProfile(supabase, user);
+  const active = await getActiveGuardianProfile(supabase, user);
+  if (isEmployeeHubProfile(active)) {
+    redirect("/employee");
+  }
 
   return (
     <div className="flex h-[100dvh] flex-col overflow-hidden">

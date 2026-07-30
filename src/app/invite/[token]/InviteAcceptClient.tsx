@@ -12,6 +12,7 @@ type Peek = {
   vaultName: string;
   role: string;
   expiresAt: string;
+  profileType?: string;
 };
 
 export default function InviteAcceptClient({ token }: { token: string }) {
@@ -71,17 +72,20 @@ export default function InviteAcceptClient({ token }: { token: string }) {
       const body = (await res.json().catch(() => ({}))) as {
         error?: string;
         profileId?: string;
+        profileType?: string;
+        redirectTo?: string;
         code?: string;
       };
       if (!res.ok) {
         setError(body.error ?? "Couldn't accept this invitation.");
         return;
       }
-      router.push(
-        body.profileId
+      const destination =
+        body.redirectTo ??
+        (body.profileId
           ? `/dashboard?profileId=${encodeURIComponent(body.profileId)}`
-          : "/dashboard"
-      );
+          : "/dashboard");
+      router.push(destination);
       router.refresh();
     } finally {
       setAccepting(false);
@@ -179,7 +183,7 @@ export default function InviteAcceptClient({ token }: { token: string }) {
           className="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50"
         >
           {accepting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          Accept &amp; open vault
+          Accept &amp; open {peek?.profileType === "employee" ? "employee hub" : "vault"}
         </button>
       )}
     </div>

@@ -14,6 +14,7 @@ import {
   getActiveGuardianProfile,
   listGuardianProfiles,
 } from "@/lib/profiles/server";
+import { isEmployeeHubProfile } from "@/lib/employee-hub/routing";
 
 export const metadata: Metadata = {
   title: "Documents — Guardian",
@@ -33,8 +34,14 @@ export default async function DashboardPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  await getActiveGuardianProfile(supabase, user);
+  const active = await getActiveGuardianProfile(supabase, user);
   const profiles = await listGuardianProfiles(supabase, user.id);
+  if (
+    isEmployeeHubProfile(active) &&
+    !hasDocumentsIntent(params)
+  ) {
+    redirect("/employee");
+  }
   if (profiles.length === 0 || !hasDocumentsIntent(params)) {
     redirect("/ask");
   }
