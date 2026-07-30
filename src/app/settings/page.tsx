@@ -7,7 +7,12 @@ import SiteFooter from "@/components/SiteFooter";
 import SettingsForm from "@/components/SettingsForm";
 import NotificationSettings from "@/components/NotificationSettings";
 import BillingSection from "@/components/BillingSection";
+import ShareGuardianCard from "@/components/ShareGuardianCard";
 import { isPlatformAdmin } from "@/lib/admin";
+import {
+  guardianReferralCode,
+  guardianTryUrl,
+} from "@/lib/share/guardian";
 
 export const metadata: Metadata = {
   title: "Settings — Guardian",
@@ -67,7 +72,7 @@ export default async function SettingsPage() {
               </p>
             </>
           ) : null}
-          <div className="mt-8">
+          <div className="mt-8 space-y-8">
             <Suspense
               fallback={
                 <div className="rounded-2xl border border-stone-200 bg-white p-6 text-sm text-ink-muted">
@@ -77,6 +82,9 @@ export default async function SettingsPage() {
             >
               <BillingSection />
             </Suspense>
+            <ShareGuardianCard
+              shareUrl={guardianTryUrl(guardianReferralCode(user.id))}
+            />
           </div>
           <SettingsForm
             userId={user.id}
