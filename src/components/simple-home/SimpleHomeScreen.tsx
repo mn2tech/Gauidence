@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
   BellRing,
+  Brain,
   Building2,
   FileText,
   FolderOpen,
   MessageCircle,
   NotebookPen,
+  UserPlus,
   Users,
 } from "lucide-react";
 import ProfileAvatar from "@/components/ProfileAvatar";
@@ -81,6 +83,16 @@ export default function SimpleHomeScreen() {
             href: VAULTS_PATH,
             label: "Clients",
             icon: Users,
+          },
+          {
+            href: "/work-memory",
+            label: "Work Memory",
+            icon: Brain,
+          },
+          {
+            href: "/recruit",
+            label: "Recruit",
+            icon: UserPlus,
           },
         ];
       case "client":

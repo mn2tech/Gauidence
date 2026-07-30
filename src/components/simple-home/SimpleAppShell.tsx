@@ -17,6 +17,7 @@ import ProfileSwitcher from "@/components/ProfileSwitcher";
 import GlobalVaultSearch from "@/components/GlobalVaultSearch";
 import SimpleNavigation from "@/components/simple-home/SimpleNavigation";
 import SimpleNewMenu from "@/components/simple-home/SimpleNewMenu";
+import SimpleSecondaryNavLinks from "@/components/simple-home/SimpleSecondaryNavLinks";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import { SIMPLE_HOME_PATH } from "@/lib/simple-home/routing";
 
@@ -101,6 +102,7 @@ export default function SimpleAppShell({
               <ProfileSwitcher />
             </div>
             <nav className="flex flex-col gap-1">
+              <SimpleSecondaryNavLinks onNavigate={() => setMenuOpen(false)} />
               <Link
                 href="/settings"
                 onClick={() => setMenuOpen(false)}

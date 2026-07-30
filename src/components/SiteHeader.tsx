@@ -14,6 +14,7 @@ import { useEmployeeHubEntitlements } from "@/hooks/useEmployeeHubEntitlements";
 import { useSimpleHomeEnabled } from "@/hooks/useSimpleHomeEnabled";
 import SimpleNavigation from "@/components/simple-home/SimpleNavigation";
 import SimpleNewMenu from "@/components/simple-home/SimpleNewMenu";
+import SimpleSecondaryNavLinks from "@/components/simple-home/SimpleSecondaryNavLinks";
 import { employeeShowsPowerNav } from "@/lib/employee-hub/entitlements";
 import { SIMPLE_HOME_PATH } from "@/lib/simple-home/routing";
 
@@ -202,6 +203,12 @@ export default function SiteHeader() {
                     </Link>
                   ) : null}
                 </>
+              ) : showSimpleNav ? (
+                <SimpleSecondaryNavLinks
+                  linkClassName="hover:text-foreground"
+                  showDivider={false}
+                  className="flex items-center gap-6"
+                />
               ) : null}
               {showDocuments ? (
                 <Link href={DOCUMENTS_PATH} className="hover:text-foreground">
@@ -348,6 +355,11 @@ export default function SiteHeader() {
                       </Link>
                     ) : null}
                   </>
+                ) : null}
+                {showSimpleNav ? (
+                  <SimpleSecondaryNavLinks
+                    onNavigate={() => setMenuOpen(false)}
+                  />
                 ) : null}
                 {showDocuments ? (
                   <Link href={DOCUMENTS_PATH} className={linkClass}>
