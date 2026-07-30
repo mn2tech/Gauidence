@@ -12,9 +12,11 @@ import {
 
 type Props = {
   parent: GuardianProfile;
+  /** Nested inside another card (e.g. simple home vaults). */
+  embedded?: boolean;
 };
 
-export default function LinkedClientsPanel({ parent }: Props) {
+export default function LinkedClientsPanel({ parent, embedded = false }: Props) {
   const { profiles, refresh, switchProfile } = useActiveProfile();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -73,7 +75,13 @@ export default function LinkedClientsPanel({ parent }: Props) {
   };
 
   return (
-    <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+    <div
+      className={
+        embedded
+          ? "pt-2"
+          : "rounded-2xl border border-stone-200 bg-white p-5 shadow-sm"
+      }
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-brand-light text-brand">
