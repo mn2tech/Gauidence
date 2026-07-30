@@ -75,6 +75,7 @@ export default function ClientRequestsScreen() {
   const [description, setDescription] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [creating, setCreating] = useState(false);
+  const [createStatus, setCreateStatus] = useState<string | null>(null);
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
   const [statusBusy, setStatusBusy] = useState(false);
@@ -167,18 +168,26 @@ export default function ClientRequestsScreen() {
 
     setCreating(true);
     setError(null);
+    setCreateStatus(null);
     try {
       let documentId: string | null = null;
-      if (file && userId) {
+      if (file) {
+        if (!userId) {
+          setError("Still signing you in — wait a moment and try again.");
+          return;
+        }
+        setCreateStatus("Uploading attachment…");
         const uploaded = await uploadAndAnalyzeToVault({
           userId,
           profileId: active.id,
           ownerUserId: active.owner_user_id,
           file,
+          analyze: false,
         });
         documentId = uploaded.documentId;
       }
 
+      setCreateStatus("Creating request…");
       const res = await fetch("/api/client-requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -210,6 +219,7 @@ export default function ClientRequestsScreen() {
       setError(e instanceof Error ? e.message : "Couldn't create request.");
     } finally {
       setCreating(false);
+      setCreateStatus(null);
     }
   };
 
@@ -491,7 +501,7 @@ export default function ClientRequestsScreen() {
                 className="mt-1 block w-full text-sm text-ink-muted file:mr-3 file:rounded-lg file:border-0 file:bg-brand-light file:px-3 file:py-2 file:text-sm file:font-medium file:text-brand-dark"
               />
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 disabled={creating}
@@ -501,7 +511,7 @@ export default function ClientRequestsScreen() {
                 {creating ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : null}
-                Submit request
+                {creating && createStatus ? createStatus : "Submit request"}
               </button>
               <button
                 type="button"

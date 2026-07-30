@@ -46,6 +46,8 @@ export async function uploadAndAnalyzeToVault(args: {
   ownerUserId?: string;
   file: File;
   onStatus?: (label: string) => void;
+  /** When false, save to the vault without waiting for Gideon analysis (e.g. request attachments). */
+  analyze?: boolean;
 }): Promise<VaultUploadResult> {
   const supabase = createClient();
   if (!supabase) {
@@ -116,6 +118,14 @@ export async function uploadAndAnalyzeToVault(args: {
     kind: "document",
     documentId: inserted.id,
   });
+
+  if (args.analyze === false) {
+    return {
+      documentId: inserted.id,
+      fileName: inserted.file_name,
+      analyzed: false,
+    };
+  }
 
   args.onStatus?.("Reading the document…");
   try {
