@@ -15,6 +15,8 @@ import {
   listGuardianProfiles,
 } from "@/lib/profiles/server";
 import { isEmployeeHubProfile } from "@/lib/employee-hub/routing";
+import { canAccessSimpleHome } from "@/lib/features/simple-home";
+import { SIMPLE_HOME_PATH } from "@/lib/simple-home/routing";
 
 export const metadata: Metadata = {
   title: "Documents — Guardian",
@@ -43,6 +45,9 @@ export default async function DashboardPage({
     redirect("/employee");
   }
   if (profiles.length === 0 || !hasDocumentsIntent(params)) {
+    if (canAccessSimpleHome({ email: user.email })) {
+      redirect(SIMPLE_HOME_PATH);
+    }
     redirect("/ask");
   }
 

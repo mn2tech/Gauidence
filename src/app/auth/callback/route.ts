@@ -6,7 +6,8 @@ import {
   supabaseAnonKey,
   supabaseUrl,
 } from "@/lib/supabase/config";
-import { ensureDefaultGuardianProfile } from "@/lib/profiles/server";
+import { ensureDefaultGuardianProfile, getActiveGuardianProfile } from "@/lib/profiles/server";
+import { signedInLandingPath } from "@/lib/simple-home/routing";
 
 /**
  * OAuth / email-confirmation / password-recovery callback.
@@ -20,9 +21,13 @@ import { ensureDefaultGuardianProfile } from "@/lib/profiles/server";
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/ask";
+  const explicitNext = searchParams.get("next");
   const safeNext =
-    next.startsWith("/") && !next.startsWith("//") ? next : "/ask";
+    explicitNext &&
+    explicitNext.startsWith("/") &&
+    !explicitNext.startsWith("//")
+      ? explicitNext
+      : "/ask";
 
   const providerError = searchParams.get("error");
   if (providerError) {
@@ -40,7 +45,8 @@ export async function GET(request: Request) {
   }
 
   // Build redirect first so Set-Cookie lands on the response the browser receives.
-  const response = NextResponse.redirect(`${origin}${safeNext}`);
+  let redirectPath = safeNext;
+  const response = NextResponse.redirect(`${origin}${redirectPath}`);
   const cookieStore = await cookies();
 
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
@@ -85,6 +91,10 @@ export async function GET(request: Request) {
       { onConflict: "id", ignoreDuplicates: true }
     );
     await ensureDefaultGuardianProfile(supabase, user);
+    if (!explicitNext) {
+      const active = await getActiveGuardianProfile(supabase, user);
+      redirectPath = signedInLandingPath(active, { email: user.email });
+    }
     void import("@/lib/retention/run").then(({ trySendWelcomeEmail }) =>
       trySendWelcomeEmail(user.id).catch((err) => {
         console.error(
@@ -93,6 +103,12 @@ export async function GET(request: Request) {
         );
       })
     );
+  }
+
+  if (redirectPath !== safeNext) {
+    return NextResponse.redirect(`${origin}${redirectPath}`, {
+      headers: response.headers,
+    });
   }
 
   return response;

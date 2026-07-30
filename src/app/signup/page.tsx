@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getActiveGuardianProfile } from "@/lib/profiles/server";
+import { signedInLandingPath } from "@/lib/simple-home/routing";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 import AuthForm from "@/components/AuthForm";
@@ -15,14 +17,25 @@ export default async function SignupPage({
 }: {
   searchParams: Promise<{ next?: string }>;
 }) {
+  const supabase = await createClient();
+  let defaultNext = "/ask";
+  if (supabase) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user) {
+      const active = await getActiveGuardianProfile(supabase, user);
+      defaultNext = signedInLandingPath(active, { email: user.email });
+    }
+  }
+
   const params = await searchParams;
   const rawNext = params.next;
   const safeNext =
     rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//")
       ? rawNext
-      : "/ask";
+      : defaultNext;
 
-  const supabase = await createClient();
   if (supabase) {
     const {
       data: { user },

@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import type { GuardianProfile } from "@/lib/profiles/types";
+import { recordVaultAccess } from "@/lib/simple-home/helpers";
 import {
   GUARDIAN_TIME_ZONE,
   detectBrowserTimeZone,
@@ -138,6 +139,9 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     setActive(body.active ?? null);
     if (body.accountName?.trim()) {
       setAccountName(body.accountName.trim());
+    }
+    if (body.active?.id) {
+      recordVaultAccess(body.active.id);
     }
     window.dispatchEvent(
       new CustomEvent("guardian:profile-changed", {

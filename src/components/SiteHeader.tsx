@@ -11,7 +11,11 @@ import GlobalVaultSearch from "@/components/GlobalVaultSearch";
 import { DOCUMENTS_PATH } from "@/lib/routes";
 import { useOnboardingProgress } from "@/hooks/useOnboardingProgress";
 import { useEmployeeHubEntitlements } from "@/hooks/useEmployeeHubEntitlements";
+import { useSimpleHomeEnabled } from "@/hooks/useSimpleHomeEnabled";
+import SimpleNavigation from "@/components/simple-home/SimpleNavigation";
+import SimpleNewMenu from "@/components/simple-home/SimpleNewMenu";
 import { employeeShowsPowerNav } from "@/lib/employee-hub/entitlements";
+import { SIMPLE_HOME_PATH } from "@/lib/simple-home/routing";
 
 export default function SiteHeader() {
   const pathname = usePathname();
@@ -22,6 +26,8 @@ export default function SiteHeader() {
   const [signedIn, setSignedIn] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [newOpen, setNewOpen] = useState(false);
+  const { enabled: simpleHomeEnabled } = useSimpleHomeEnabled();
 
   useEffect(() => {
     const supabase = createClient();
@@ -87,6 +93,8 @@ export default function SiteHeader() {
     router.refresh();
   }
 
+  const showSimpleNav = signedIn && simpleHomeEnabled && !needsSetup && !isEmployeeVault;
+  const homeHref = simpleHomeEnabled ? SIMPLE_HOME_PATH : "/ask";
   const cameraHref = needsSetup
     ? "/ask"
     : active
@@ -103,7 +111,7 @@ export default function SiteHeader() {
       <header className="sticky top-0 z-40 border-b border-stone-200 bg-white/80 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 sm:h-16 sm:px-6">
         <Link
-          href={signedIn ? "/ask" : "/"}
+          href={signedIn ? homeHref : "/"}
           className="flex shrink-0 items-center gap-2 font-semibold tracking-tight"
         >
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand text-white">
@@ -114,6 +122,8 @@ export default function SiteHeader() {
 
         {/* Desktop nav */}
         <nav className="hidden items-center gap-6 text-sm text-ink-muted sm:flex">
+          {!showSimpleNav ? (
+            <>
           <Link href="/pricing" className="hover:text-foreground">
             Pricing
           </Link>
@@ -123,6 +133,8 @@ export default function SiteHeader() {
           <Link href="/help" className="hover:text-foreground">
             Help
           </Link>
+            </>
+          ) : null}
           {signedIn ? (
             <>
               <ProfileSwitcher />
@@ -162,7 +174,7 @@ export default function SiteHeader() {
                   Employee Hub
                 </Link>
               ) : null}
-              {showPowerNav ? (
+              {showPowerNav && !showSimpleNav ? (
                 <>
                   {(!isEmployeeVault || ent?.research) ? (
                     <Link href={researchHref} className="hover:text-foreground">
@@ -308,7 +320,7 @@ export default function SiteHeader() {
                     Employee Hub
                   </Link>
                 ) : null}
-                {showPowerNav ? (
+                {showPowerNav && !showSimpleNav ? (
                   <>
                     {(!isEmployeeVault || ent?.research) ? (
                       <Link href={researchHref} className={linkClass}>
@@ -376,6 +388,12 @@ export default function SiteHeader() {
           open={searchOpen}
           onClose={() => setSearchOpen(false)}
         />
+      ) : null}
+      {showSimpleNav ? (
+        <>
+          <SimpleNavigation onNewClick={() => setNewOpen(true)} />
+          <SimpleNewMenu open={newOpen} onClose={() => setNewOpen(false)} />
+        </>
       ) : null}
     </>
   );

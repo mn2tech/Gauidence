@@ -497,6 +497,7 @@ export default function VaultChatPanel({
   const requestedWorkProjectId = isScopedPanel
     ? null
     : searchParams.get("projectId");
+  const requestedDraft = isScopedPanel ? null : searchParams.get("draft");
   const { active, profiles, loading: profilesLoading, switchProfile, refresh, timeZone, timeZoneLabel } =
     useActiveProfile();
   const { progress: onboardingProgress, refresh: refreshOnboarding } =
@@ -574,9 +575,15 @@ export default function VaultChatPanel({
   const profileSwitchRef = useRef(false);
   const deepLinkChatConsumed = useRef<string | null>(null);
   const requestedChatIdRef = useRef<string | null>(requestedChatId);
+  const draftAppliedRef = useRef(false);
   useEffect(() => {
     if (requestedChatId) requestedChatIdRef.current = requestedChatId;
   }, [requestedChatId]);
+  useEffect(() => {
+    if (draftAppliedRef.current || !requestedDraft?.trim() || isScopedPanel) return;
+    draftAppliedRef.current = true;
+    setInput(requestedDraft.trim());
+  }, [requestedDraft, isScopedPanel]);
   const bootstrapGeneration = useRef(0);
   const bootstrappedVaultRef = useRef<string | null>(null);
   const messagesRef = useRef(messages);

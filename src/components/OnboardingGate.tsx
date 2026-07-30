@@ -4,7 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import OnboardingIntentScreen from "@/components/OnboardingIntentScreen";
-import { postLoginPathForProfile } from "@/lib/employee-hub/routing";
+import {
+  isEmployeeHubProfile,
+  postLoginPathForProfile,
+} from "@/lib/employee-hub/routing";
+import { SIMPLE_HOME_PATH } from "@/lib/simple-home/routing";
+import type { GuardianProfile } from "@/lib/profiles/types";
 
 /** Public / auth paths where the intent gate must not block. */
 const SKIP_PATH_PREFIXES = [
@@ -101,12 +106,27 @@ export default function OnboardingGate({
           }
           let landing = "/ask";
           try {
-            const res = await fetch("/api/profiles");
-            const body = (await res.json().catch(() => ({}))) as {
-              active?: { profile_type: string; parent_profile_id: string | null };
+            const [profilesRes, flagRes] = await Promise.all([
+              fetch("/api/profiles"),
+              fetch("/api/features/simple-home"),
+            ]);
+            const body = (await profilesRes.json().catch(() => ({}))) as {
+              active?: Pick<
+                GuardianProfile,
+                "profile_type" | "parent_profile_id"
+              >;
             };
-            if (res.ok && body.active) {
-              landing = postLoginPathForProfile(body.active);
+            const flagBody = (await flagRes.json().catch(() => ({}))) as {
+              enabled?: boolean;
+            };
+            if (profilesRes.ok && body.active) {
+              if (flagBody.enabled && !isEmployeeHubProfile(body.active)) {
+                landing = SIMPLE_HOME_PATH;
+              } else {
+                landing = postLoginPathForProfile(body.active);
+              }
+            } else if (flagBody.enabled) {
+              landing = SIMPLE_HOME_PATH;
             }
           } catch {
             // Keep default /ask.
