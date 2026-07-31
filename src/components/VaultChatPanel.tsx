@@ -101,6 +101,7 @@ import type { WorkProject } from "@/lib/work-memory/types";
 import OnboardingProgressChip from "@/components/OnboardingProgressChip";
 import FirstWinCard from "@/components/FirstWinCard";
 import { useOnboardingProgress } from "@/hooks/useOnboardingProgress";
+import { useSimpleHomeEnabled } from "@/hooks/useSimpleHomeEnabled";
 import {
   autoQuestionForUpload,
   uploadCtaForProfileKind,
@@ -502,7 +503,13 @@ export default function VaultChatPanel({
     useActiveProfile();
   const { progress: onboardingProgress, refresh: refreshOnboarding } =
     useOnboardingProgress();
+  const { enabled: simpleHomeEnabled } = useSimpleHomeEnabled();
   const needsSetup = !profilesLoading && profiles.length === 0;
+  const reserveSimpleNav =
+    isPage &&
+    simpleHomeEnabled &&
+    !needsSetup &&
+    active?.profile_type !== "employee";
   const bootstrapTried = useRef(false);
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
@@ -2751,7 +2758,9 @@ export default function VaultChatPanel({
       onPaste={handleComposerPaste}
       className={
         isPage || isDrawer
-          ? "shrink-0 border-t border-stone-200 bg-white px-4 py-3 sm:px-8"
+          ? `shrink-0 border-t border-stone-200 bg-white px-4 pt-3 sm:px-8 ${
+              reserveSimpleNav ? "pb-simple-nav" : "pb-3"
+            }`
           : "mt-3"
       }
     >

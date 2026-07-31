@@ -80,6 +80,15 @@ html {
   backdrop-filter: blur(12px);
 }
 
+/* Clearance for fixed simple-home bottom nav (matches SimpleNavigation height). */
+.pb-simple-nav {
+  padding-bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));
+}
+
+.pb-simple-nav-page {
+  padding-bottom: calc(7rem + env(safe-area-inset-bottom, 0px));
+}
+
 .simple-tools-panel {
   background: color-mix(in srgb, var(--brand-light) 65%, var(--surface));
   border: 1px solid color-mix(in srgb, var(--brand) 15%, transparent);
