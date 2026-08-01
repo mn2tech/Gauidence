@@ -50,6 +50,50 @@ function logLabel(row: AskVaultLogRow): string {
   return row.log_date;
 }
 
+export type VaultFileInventoryRow = {
+  file_name: string;
+  mime_type?: string | null;
+  profile_id: string;
+};
+
+/** File list for Ask Gideon — answers "what's uploaded" without relying on RAG excerpts. */
+export function formatVaultFileListForGideon(
+  files: VaultFileInventoryRow[],
+  profileNames: Record<string, string>
+): string {
+  if (files.length === 0) {
+    return "(no documents or photos uploaded in the active vault scope)";
+  }
+
+  const byProfile = new Map<string, VaultFileInventoryRow[]>();
+  for (const file of files) {
+    const bucket = byProfile.get(file.profile_id) ?? [];
+    bucket.push(file);
+    byProfile.set(file.profile_id, bucket);
+  }
+
+  const blocks: string[] = [];
+  for (const [profileId, rows] of byProfile) {
+    const vaultName = profileNames[profileId]?.trim() || "Vault";
+    const photos = rows.filter(isPhoto);
+    const documents = rows.filter((row) => !isPhoto(row));
+    const lines: string[] = [];
+    if (documents.length > 0) {
+      lines.push(
+        `Documents (${documents.length}): ${documents.map((d) => d.file_name).join(", ")}`
+      );
+    }
+    if (photos.length > 0) {
+      lines.push(
+        `Photos (${photos.length}): ${photos.map((p) => p.file_name).join(", ")}`
+      );
+    }
+    blocks.push(`${vaultName}:\n${lines.join("\n")}`);
+  }
+
+  return blocks.join("\n\n");
+}
+
 /** Split vault files into documents vs photos and preview names for Ask welcome. */
 export function buildAskVaultInventory(
   files: AskVaultFileRow[],

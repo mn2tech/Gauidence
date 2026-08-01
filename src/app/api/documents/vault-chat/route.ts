@@ -14,7 +14,7 @@ import {
   VAULT_CHAT_SYSTEM,
 } from "@/lib/vault/indexDocument";
 import { wantsShowPictures } from "@/lib/vault/images";
-import { buildAskVaultInventory } from "@/lib/vault/askInventory";
+import { buildAskVaultInventory, formatVaultFileListForGideon } from "@/lib/vault/askInventory";
 import { ensureUserVaultIndexed } from "@/lib/vault/ensureIndexed";
 import { retrieveAllAccessibleVaultChunks } from "@/lib/vault/rollup";
 import {
@@ -1373,6 +1373,16 @@ export async function POST(request: Request) {
       limit: retrievalScopes.length > 1 ? 6 : 4,
     });
     const logContext = formatDailyLogsForGideon(dailyLogs, profileNames);
+    const { data: vaultFileRows } = await supabase
+      .from("documents")
+      .select("file_name, mime_type, profile_id")
+      .in("profile_id", allSearchIds)
+      .order("created_at", { ascending: false })
+      .limit(250);
+    const fileInventoryContext = formatVaultFileListForGideon(
+      vaultFileRows ?? [],
+      profileNames
+    );
     const upcomingAlerts = await retrieveUpcomingAlertsForGideon(supabase, {
       profileIds: allSearchIds,
       profileNames,
@@ -1430,7 +1440,8 @@ Active vault in the UI: ${active.display_name}. Document search includes all ${r
       !attachedContext.trim() &&
       !logContext.trim() &&
       !scheduleContext.trim() &&
-      !linkedContext.trim()
+      !linkedContext.trim() &&
+      fileInventoryContext.startsWith("(no documents")
         ? "No vault excerpts, Daily Logs, upcoming schedule items, or linked profile structure matched this question (or the vault is empty). Do not invent vault facts. Use ## GENERAL KNOWLEDGE for general questions, and ## GIDEON'S SUGGESTION to upload documents when that would help."
         : "";
 
@@ -1453,6 +1464,10 @@ ${attachedNote}
 --- RETRIEVED EXCERPTS ---
 ${formatted.context.trim() || "(none)"}
 --- END EXCERPTS ---
+
+--- VAULT FILE INVENTORY (complete list of uploaded files in scope; use for "what's uploaded" questions) ---
+${fileInventoryContext}
+--- END VAULT FILE INVENTORY ---
 
 --- ATTACHED DOCUMENT (user sent with this message) ---
 ${attachedContext.trim() || "(none)"}
