@@ -93,10 +93,10 @@ export default function CollaboratorsPanel({
   }, [load]);
 
   useEffect(() => {
-    if (profile.profile_type === "client") {
+    if (profile?.profile_type === "client") {
       setInviteRole("viewer");
     }
-  }, [profile.profile_type]);
+  }, [profile?.profile_type]);
 
   if (!profile || !canManageProfileAccess(profile)) {
     return (

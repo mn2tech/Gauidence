@@ -149,16 +149,14 @@ function recordDeepSeekUsage(
   captureOpenAiCompatibleUsage(model, usage, "deepseek");
 }
 
-function deepSeekRequestBody(
-  args: ChatArgs,
-  stream: boolean
-): OpenAI.Chat.ChatCompletionCreateParams {
+function deepSeekRequestBase(
+  args: ChatArgs
+): Omit<OpenAI.Chat.ChatCompletionCreateParams, "stream"> {
   return {
     model: DEEPSEEK_CHAT_MODEL,
     messages: buildOpenAiMessages(args),
     max_tokens: args.maxTokens ?? 2048,
     temperature: 0,
-    stream,
   };
 }
 
@@ -166,9 +164,10 @@ function deepSeekRequestBody(
 export async function runDeepSeekChatCompletion(args: ChatArgs): Promise<string> {
   try {
     const client = createDeepSeekClient();
-    const response = await client.chat.completions.create(
-      deepSeekRequestBody(args, false)
-    );
+    const response = await client.chat.completions.create({
+      ...deepSeekRequestBase(args),
+      stream: false,
+    });
     recordDeepSeekUsage(DEEPSEEK_CHAT_MODEL, response.usage);
     return response.choices[0]?.message?.content?.trim() ?? "";
   } catch (err) {
@@ -182,9 +181,10 @@ export async function runDeepSeekChatCompletionStream(
 ): Promise<string> {
   try {
     const client = createDeepSeekClient();
-    const stream = await client.chat.completions.create(
-      deepSeekRequestBody(args, true)
-    );
+    const stream = await client.chat.completions.create({
+      ...deepSeekRequestBase(args),
+      stream: true,
+    });
 
     let answer = "";
     let usage: OpenAI.Completions.CompletionUsage | undefined;
