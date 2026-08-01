@@ -24,6 +24,7 @@ import {
   type GuardianProfileCollaboratorRole,
 } from "@/lib/profiles/types";
 import { collaboratorDisplayName } from "@/lib/profiles/collaboratorDisplay";
+import ClientSharingPanel from "@/components/ClientSharingPanel";
 
 type Member = {
   userId: string;
@@ -90,6 +91,12 @@ export default function CollaboratorsPanel({
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (profile.profile_type === "client") {
+      setInviteRole("viewer");
+    }
+  }, [profile.profile_type]);
 
   if (!profile || !canManageProfileAccess(profile)) {
     return (
@@ -244,9 +251,11 @@ export default function CollaboratorsPanel({
               {profileTypeLabel(vaultKind).toLowerCase()} vault
             </span>{" "}
             <span className="font-medium text-foreground">{vaultName}</span>.
-            Choose view or edit access. Editors can add documents and Daily
-            Logs; viewers can read and ask Gideon. Gideon chats stay private.
-            Parent business vaults and other clients are not shared.
+            Choose view or edit access. Invite clients as{" "}
+            <strong>View</strong> (read-only). Editors can add documents and
+            Daily Logs. Use <strong>What clients can see</strong> below to
+            choose which files viewers can access — other documents stay
+            internal. Parent business vaults and other clients are not shared.
           </p>
         </div>
         <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-light text-brand">
@@ -414,6 +423,8 @@ export default function CollaboratorsPanel({
           </ul>
         </section>
       ) : null}
+
+      <ClientSharingPanel profileId={profileId} vaultName={vaultName} />
 
       <button
         type="button"
