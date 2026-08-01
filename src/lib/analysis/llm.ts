@@ -7,6 +7,8 @@ import type { ExtractionResult, PageImage } from "./extract";
 import type { ParsedInvoiceAnchors } from "./invoiceText";
 import type { AnalysisInputMode } from "./inputMode";
 import { captureAnthropicUsage } from "@/lib/usage/record";
+import { AnalysisLlmError } from "@/lib/analysis/llmErrors";
+import { isAnthropicConfigured } from "@/lib/analysis/chatProvider";
 
 /** Claude model for text-heavy docs. Override with CLAUDE_MODEL or ANTHROPIC_MODEL. */
 export const ANALYSIS_MODEL =
@@ -50,17 +52,7 @@ export type UserContext = {
   timeZone?: string | null;
 };
 
-export class AnalysisLlmError extends Error {
-  status: number;
-  code: string;
-
-  constructor(message: string, status = 502, code = "llm_error") {
-    super(message);
-    this.name = "AnalysisLlmError";
-    this.status = status;
-    this.code = code;
-  }
-}
+export { AnalysisLlmError } from "@/lib/analysis/llmErrors";
 
 export function createLlmClient(): LlmClient {
   const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
@@ -217,7 +209,12 @@ export function modelForInputMode(mode: AnalysisInputMode | undefined): string {
 }
 
 function mapAnthropicError(err: unknown): never {
-  if (err instanceof AnalysisLlmError) throw err;
+  throw mapAnthropicErrorToLlmError(err);
+}
+
+/** Map Anthropic errors without throwing (for fallback checks). */
+function mapAnthropicErrorToLlmError(err: unknown): AnalysisLlmError {
+  if (err instanceof AnalysisLlmError) return err;
   if (err instanceof Anthropic.APIError) {
     // Safe operational diagnostics only: never log prompts or document data.
     console.error("Anthropic analysis request failed", {
@@ -227,28 +224,28 @@ function mapAnthropicError(err: unknown): never {
       message: (err.message || "").slice(0, 240),
     });
     if (err.status === 401 || err.status === 403) {
-      throw new AnalysisLlmError(
+      return new AnalysisLlmError(
         "Claude rejected the API key. Check ANTHROPIC_API_KEY in Vercel.",
         502,
         "auth"
       );
     }
     if (err.status === 429) {
-      throw new AnalysisLlmError(
+      return new AnalysisLlmError(
         "Claude rate limit reached. Please try again in a minute.",
         429,
         "rate_limit"
       );
     }
     if (err.status === 500 || err.status === 529) {
-      throw new AnalysisLlmError(
+      return new AnalysisLlmError(
         "Claude is temporarily busy. Please try this document again in a moment.",
         503,
         "overloaded"
       );
     }
     if (err.status === 413) {
-      throw new AnalysisLlmError(
+      return new AnalysisLlmError(
         "This file is too large for Claude to process. Try a smaller PDF or a clearer scan.",
         413,
         "payload_too_large"
@@ -256,19 +253,19 @@ function mapAnthropicError(err: unknown): never {
     }
     if (err.status === 400) {
       const detail = (err.message || "").slice(0, 200);
-      throw new AnalysisLlmError(
+      return new AnalysisLlmError(
         `Claude could not process this analysis request.${detail ? ` (${detail})` : ""}`,
         502,
         "bad_request"
       );
     }
-    throw new AnalysisLlmError(
+    return new AnalysisLlmError(
       "The Claude service couldn't analyze this document. Please try again.",
       502,
       "api_error"
     );
   }
-  throw new AnalysisLlmError(
+  return new AnalysisLlmError(
     "The AI service couldn't analyze this document. Please try again.",
     502,
     "unknown"
@@ -451,7 +448,7 @@ function buildChatMessages(
 
 /** Multi-turn chat for Ask-your-document (text-only messages). */
 export async function runChatCompletion(
-  client: LlmClient,
+  client: LlmClient | null,
   args: {
     system: string;
     messages: { role: "user" | "assistant"; content: string }[];
@@ -461,10 +458,16 @@ export async function runChatCompletion(
     attachedImage?: { mimeType: string; base64: string; fileName: string };
   }
 ): Promise<string> {
+  if (!isAnthropicConfigured()) {
+    const { runDeepSeekChatCompletion } = await import("@/lib/analysis/deepseek");
+    return runDeepSeekChatCompletion(args);
+  }
+
   try {
+    const anthropic = client ?? createLlmClient();
     const model = args.model ?? ANALYSIS_MODEL;
     const messages = buildChatMessages(args.messages, args.attachedImage);
-    const response = await client.messages.create({
+    const response = await anthropic.messages.create({
       model,
       max_tokens: args.maxTokens ?? 2048,
       temperature: 0,
@@ -475,13 +478,19 @@ export async function runChatCompletion(
     const textBlock = response.content.find((b) => b.type === "text");
     return textBlock && textBlock.type === "text" ? textBlock.text.trim() : "";
   } catch (err) {
+    const { runDeepSeekChatCompletion, shouldFallbackToDeepSeek } =
+      await import("@/lib/analysis/deepseek");
+    if (shouldFallbackToDeepSeek(mapAnthropicErrorToLlmError(err))) {
+      console.warn("Anthropic chat failed; falling back to DeepSeek");
+      return runDeepSeekChatCompletion(args);
+    }
     mapAnthropicError(err);
   }
 }
 
 /** Streaming variant — invokes onDelta for each text chunk. */
 export async function runChatCompletionStream(
-  client: LlmClient,
+  client: LlmClient | null,
   args: {
     system: string;
     messages: { role: "user" | "assistant"; content: string }[];
@@ -491,10 +500,17 @@ export async function runChatCompletionStream(
     onDelta: (text: string) => void;
   }
 ): Promise<string> {
+  if (!isAnthropicConfigured()) {
+    const { runDeepSeekChatCompletionStream } =
+      await import("@/lib/analysis/deepseek");
+    return runDeepSeekChatCompletionStream(args);
+  }
+
   try {
+    const anthropic = client ?? createLlmClient();
     const model = args.model ?? ANALYSIS_MODEL;
     const messages = buildChatMessages(args.messages, args.attachedImage);
-    const stream = client.messages.stream({
+    const stream = anthropic.messages.stream({
       model,
       max_tokens: args.maxTokens ?? 2048,
       temperature: 0,
@@ -517,6 +533,12 @@ export async function runChatCompletionStream(
     const textBlock = finalMessage.content.find((b) => b.type === "text");
     return textBlock && textBlock.type === "text" ? textBlock.text.trim() : "";
   } catch (err) {
+    const { runDeepSeekChatCompletionStream, shouldFallbackToDeepSeek } =
+      await import("@/lib/analysis/deepseek");
+    if (shouldFallbackToDeepSeek(mapAnthropicErrorToLlmError(err))) {
+      console.warn("Anthropic chat stream failed; falling back to DeepSeek");
+      return runDeepSeekChatCompletionStream(args);
+    }
     mapAnthropicError(err);
   }
 }

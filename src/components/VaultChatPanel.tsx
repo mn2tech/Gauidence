@@ -1853,7 +1853,7 @@ export default function VaultChatPanel({
             applyVaultChatTurn(event);
             setStreamingAssistantId(null);
           },
-          onError: (message) => {
+          onError: (message, code) => {
             setStreamingAssistantId(null);
             setMessages((prev) =>
               prev.filter(
@@ -1871,7 +1871,7 @@ export default function VaultChatPanel({
               });
             }
             setInput(question);
-            setError(message);
+            setError(message, code);
           },
         });
         return;

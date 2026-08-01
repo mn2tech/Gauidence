@@ -7,6 +7,7 @@ import {
   createLlmClient,
   runChatCompletion,
 } from "@/lib/analysis/llm";
+import { isAnthropicConfigured, isChatLlmConfigured } from "@/lib/analysis/chatProvider";
 import {
   buildDocumentChatContext,
   DOCUMENT_CHAT_SYSTEM,
@@ -113,11 +114,12 @@ export async function POST(request: Request) {
 
   const { supabase, user } = auth;
 
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!isChatLlmConfigured()) {
     return NextResponse.json(
       {
         error:
-          "AI chat isn't set up yet on this deployment. The site owner needs to add an Anthropic (Claude) API key.",
+          "AI chat isn't set up yet. Add ANTHROPIC_API_KEY or DEEPSEEK_API_KEY on this deployment.",
+        code: "missing_api_key",
       },
       { status: 503 }
     );
@@ -271,7 +273,7 @@ ${contextResult.context}
 
   let answer: string;
   try {
-    const client = createLlmClient();
+    const client = isAnthropicConfigured() ? createLlmClient() : null;
     answer = await withLlmUsage(
       { userId: user.id, feature: "document_chat" },
       () =>

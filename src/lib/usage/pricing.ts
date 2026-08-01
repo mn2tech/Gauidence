@@ -19,6 +19,8 @@ const MODEL_RATES: { match: RegExp; rate: ModelRate }[] = [
   { match: /opus/i, rate: { inputPerMTok: 15, outputPerMTok: 75 } },
   // Haiku family
   { match: /haiku/i, rate: { inputPerMTok: 1, outputPerMTok: 5 } },
+  // DeepSeek chat (approx list rates)
+  { match: /deepseek/i, rate: { inputPerMTok: 0.27, outputPerMTok: 1.1 } },
   // Sonnet (incl. sonnet-4-5, claude-sonnet-*)
   { match: /sonnet/i, rate: { inputPerMTok: 3, outputPerMTok: 15 } },
 ];

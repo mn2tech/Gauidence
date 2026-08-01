@@ -88,6 +88,8 @@ import {
   loadWorkMemoryProjectForGideon,
 } from "@/lib/work-memory/server";
 import { createVaultChatStreamResponse } from "@/lib/vault/vaultChatStream.server";
+import { formatVaultChatError } from "@/lib/vault/vaultChatErrors";
+import { isChatLlmConfigured } from "@/lib/analysis/chatProvider";
 import { canAccessGuardianPayroll } from "@/lib/features/payroll";
 import {
   answerPayrollGideonQuery,
@@ -949,11 +951,12 @@ export async function POST(request: Request) {
   if (!isAuthed(auth)) return auth;
   const { supabase, user } = auth;
 
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!isChatLlmConfigured()) {
     return NextResponse.json(
       {
         error:
-          "I couldn't complete that request right now. Please try again.",
+          "AI chat isn't set up yet. Add ANTHROPIC_API_KEY or DEEPSEEK_API_KEY on this deployment.",
+        code: "missing_api_key",
       },
       { status: 503 }
     );
@@ -1494,20 +1497,9 @@ ${workMemoryContext.trim() || "(none — user has no active work projects)"}
       updateVaultChatRow,
     });
   } catch (err) {
-    if (err && typeof err === "object" && "status" in err && "message" in err) {
-      return NextResponse.json(
-        { error: "I couldn't complete that request right now. Please try again." },
-        { status: Number((err as { status: number }).status) || 502 }
-      );
-    }
-    console.error(
-      "Vault chat failed:",
-      err instanceof Error ? err.name : "error"
-    );
-    return NextResponse.json(
-      { error: "I couldn't complete that request right now. Please try again." },
-      { status: 502 }
-    );
+    const { error, code, status } = formatVaultChatError(err);
+    console.error("Vault chat failed:", error);
+    return NextResponse.json({ error, code }, { status });
   }
   }
 

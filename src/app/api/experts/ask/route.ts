@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
+import { isAnthropicConfigured } from "@/lib/analysis/chatProvider";
 import {
   CHAT_MODEL,
   createLlmClient,
@@ -101,7 +102,7 @@ export async function POST(request: Request) {
   const answer = await withLlmUsage(
     { userId: auth.user.id, feature: "other" },
     async () => {
-      const client = createLlmClient();
+      const client = isAnthropicConfigured() ? createLlmClient() : null;
       return runChatCompletion(client, {
         system: prompt.system,
         messages: prompt.messages,

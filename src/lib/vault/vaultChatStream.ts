@@ -43,7 +43,7 @@ export type VaultChatStreamEvent =
   | { type: "meta"; chatId: string; userMsg: VaultChatStreamMessage }
   | { type: "delta"; text: string }
   | VaultChatStreamDone
-  | { type: "error"; error: string };
+  | { type: "error"; error: string; code?: string };
 
 export function isVaultChatStreamResponse(response: Response): boolean {
   const type = response.headers.get("content-type") ?? "";
@@ -67,7 +67,7 @@ export async function consumeVaultChatStream(
     onMeta?: (event: Extract<VaultChatStreamEvent, { type: "meta" }>) => void;
     onDelta?: (text: string) => void;
     onDone?: (event: VaultChatStreamDone) => void;
-    onError?: (error: string) => void;
+    onError?: (error: string, code?: string) => void;
   }
 ): Promise<VaultChatStreamDone | null> {
   if (!response.body) {
@@ -98,7 +98,7 @@ export async function consumeVaultChatStream(
         doneEvent = event;
         handlers.onDone?.(event);
       } else if (event.type === "error") {
-        handlers.onError?.(event.error);
+        handlers.onError?.(event.error, event.code);
         return null;
       }
     }
@@ -110,7 +110,7 @@ export async function consumeVaultChatStream(
       doneEvent = event;
       handlers.onDone?.(event);
     } else if (event?.type === "error") {
-      handlers.onError?.(event.error);
+      handlers.onError?.(event.error, event.code);
       return null;
     }
   }

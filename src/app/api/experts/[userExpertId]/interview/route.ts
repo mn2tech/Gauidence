@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isAnthropicConfigured } from "@/lib/analysis/chatProvider";
 import {
   CHAT_MODEL,
   createLlmClient,
@@ -145,7 +146,7 @@ export async function POST(request: Request, context: RouteContext) {
   const feedback = await withLlmUsage(
     { userId: auth.user.id, feature: "other" },
     async () => {
-      const client = createLlmClient();
+      const client = isAnthropicConfigured() ? createLlmClient() : null;
       return runChatCompletion(client, {
         system: prompt.system,
         messages: prompt.messages,

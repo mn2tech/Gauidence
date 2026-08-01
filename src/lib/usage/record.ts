@@ -87,3 +87,24 @@ export function captureAnthropicUsage(
     outputTokens: usage.output_tokens ?? 0,
   });
 }
+
+/** Capture OpenAI-compatible chat usage (DeepSeek, etc.). */
+export function captureOpenAiCompatibleUsage(
+  model: string,
+  usage:
+    | { prompt_tokens?: number; completion_tokens?: number }
+    | null
+    | undefined,
+  provider = "openai"
+): void {
+  const ctx = getLlmUsageContext();
+  if (!ctx || !usage) return;
+  recordLlmUsage({
+    userId: ctx.userId,
+    feature: ctx.feature,
+    provider,
+    model,
+    inputTokens: usage.prompt_tokens ?? 0,
+    outputTokens: usage.completion_tokens ?? 0,
+  });
+}

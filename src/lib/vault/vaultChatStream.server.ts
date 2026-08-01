@@ -6,6 +6,7 @@ import {
   createLlmClient,
   runChatCompletionStream,
 } from "@/lib/analysis/llm";
+import { isAnthropicConfigured } from "@/lib/analysis/chatProvider";
 import { generateVaultChatTitle } from "@/lib/chat/generateVaultChatTitle";
 import { shouldGenerateVaultChatTitle } from "@/lib/chat/vaultChatTitle";
 import {
@@ -32,6 +33,7 @@ import {
 import { parseProposedReminder } from "@/lib/reminders/propose";
 import { withLlmUsage } from "@/lib/usage/record";
 import { refreshUserAwards } from "@/lib/awards/grant";
+import { formatVaultChatError } from "@/lib/vault/vaultChatErrors";
 
 export type VaultChatStreamArgs = {
   supabase: SupabaseClient;
@@ -86,7 +88,7 @@ export function createVaultChatStreamResponse(
           userMsg: args.userMsg,
         });
 
-        const client = createLlmClient();
+        const client = isAnthropicConfigured() ? createLlmClient() : null;
         let answer = "";
 
         await withLlmUsage(
@@ -268,15 +270,9 @@ export function createVaultChatStreamResponse(
           chatScopedProfile: persistedChatScopedProfile,
         });
       } catch (err) {
-        console.error(
-          "Vault chat stream failed:",
-          err instanceof Error ? err.name : "error"
-        );
-        write({
-          type: "error",
-          error:
-            "I couldn't complete that request right now. Please try again.",
-        });
+        const { error, code } = formatVaultChatError(err);
+        console.error("Vault chat stream failed:", error);
+        write({ type: "error", error, code });
       } finally {
         controller.close();
       }

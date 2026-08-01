@@ -7,6 +7,7 @@ import {
   createLlmClient,
   runChatCompletion,
 } from "@/lib/analysis/llm";
+import { isAnthropicConfigured, isChatLlmConfigured } from "@/lib/analysis/chatProvider";
 import {
   formatWebResultsForPrompt,
   isWebSearchConfigured,
@@ -57,11 +58,12 @@ export async function POST(request: Request) {
   if (!isAuthed(auth)) return auth;
   const { supabase, user } = auth;
 
-  if (!process.env.ANTHROPIC_API_KEY?.trim()) {
+  if (!isChatLlmConfigured()) {
     return NextResponse.json(
       {
         error:
-          "AI research isn't set up yet. The site owner needs to add an Anthropic API key.",
+          "AI research isn't set up yet. Add ANTHROPIC_API_KEY or DEEPSEEK_API_KEY on this deployment.",
+        code: "missing_api_key",
       },
       { status: 503 }
     );
@@ -167,7 +169,7 @@ ${formatWebResultsForPrompt(web.results)}
 ${vaultContext.trim() || "(none matching this query in the active vault)"}
 --- END GUARDIAN VAULT CONTEXT ---`;
 
-    const client = createLlmClient();
+    const client = isAnthropicConfigured() ? createLlmClient() : null;
     const brief = await withLlmUsage(
       { userId: user.id, feature: "research" },
       () =>
