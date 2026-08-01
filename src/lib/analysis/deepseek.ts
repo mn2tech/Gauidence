@@ -5,10 +5,13 @@ import { AnalysisLlmError } from "@/lib/analysis/llmErrors";
 import { captureOpenAiCompatibleUsage } from "@/lib/usage/record";
 
 export const DEEPSEEK_CHAT_MODEL =
-  process.env.DEEPSEEK_CHAT_MODEL?.trim() || "deepseek-chat";
+  process.env.DEEPSEEK_CHAT_MODEL?.trim() || "deepseek-v4-flash";
 
 const DEEPSEEK_BASE_URL =
-  process.env.DEEPSEEK_BASE_URL?.trim() || "https://api.deepseek.com";
+  process.env.DEEPSEEK_BASE_URL?.trim() || "https://api.deepseek.com/v1";
+
+/** DeepSeek rejects very large prompts; cap system context for backup chat. */
+const DEEPSEEK_SYSTEM_MAX_CHARS = 120_000;
 
 export { isDeepSeekConfigured } from "@/lib/analysis/chatProvider";
 
@@ -46,15 +49,23 @@ function createDeepSeekClient(): OpenAI {
 function mapDeepSeekError(err: unknown): never {
   if (err instanceof AnalysisLlmError) throw err;
   if (err instanceof OpenAI.APIError) {
+    const detail = (err.message || "").trim().slice(0, 240);
     console.error("DeepSeek chat request failed", {
       status: err.status,
-      message: (err.message || "").slice(0, 240),
+      message: detail,
     });
     if (err.status === 401 || err.status === 403) {
       throw new AnalysisLlmError(
         "DeepSeek rejected the API key. Check DEEPSEEK_API_KEY in Vercel.",
         502,
         "auth"
+      );
+    }
+    if (err.status === 402 || /insufficient balance/i.test(detail)) {
+      throw new AnalysisLlmError(
+        "DeepSeek account has insufficient balance. Add credits at platform.deepseek.com.",
+        402,
+        "insufficient_balance"
       );
     }
     if (err.status === 429) {
@@ -71,11 +82,21 @@ function mapDeepSeekError(err: unknown): never {
         "overloaded"
       );
     }
+    if (detail) {
+      throw new AnalysisLlmError(
+        `DeepSeek could not complete this request (${err.status ?? "error"}): ${detail}`,
+        err.status ?? 502,
+        "api_error"
+      );
+    }
     throw new AnalysisLlmError(
       "The backup AI service couldn't complete this request. Please try again.",
       502,
       "api_error"
     );
+  }
+  if (err instanceof Error && err.message.trim()) {
+    throw new AnalysisLlmError(err.message.trim(), 502, "unknown");
   }
   throw new AnalysisLlmError(
     "The backup AI service couldn't complete this request. Please try again.",
@@ -92,8 +113,13 @@ type ChatArgs = {
 };
 
 function buildOpenAiMessages(args: ChatArgs): OpenAI.Chat.ChatCompletionMessageParam[] {
+  const system =
+    args.system.length > DEEPSEEK_SYSTEM_MAX_CHARS
+      ? `${args.system.slice(0, DEEPSEEK_SYSTEM_MAX_CHARS)}\n\n[Context truncated for backup AI.]`
+      : args.system;
+
   const rows: OpenAI.Chat.ChatCompletionMessageParam[] = [
-    { role: "system", content: args.system },
+    { role: "system", content: system },
   ];
 
   for (let i = 0; i < args.messages.length; i++) {
@@ -123,16 +149,26 @@ function recordDeepSeekUsage(
   captureOpenAiCompatibleUsage(model, usage, "deepseek");
 }
 
+function deepSeekRequestBody(
+  args: ChatArgs,
+  stream: boolean
+): OpenAI.Chat.ChatCompletionCreateParams {
+  return {
+    model: DEEPSEEK_CHAT_MODEL,
+    messages: buildOpenAiMessages(args),
+    max_tokens: args.maxTokens ?? 2048,
+    temperature: 0,
+    stream,
+  };
+}
+
 /** DeepSeek chat completion (OpenAI-compatible API). */
 export async function runDeepSeekChatCompletion(args: ChatArgs): Promise<string> {
   try {
     const client = createDeepSeekClient();
-    const response = await client.chat.completions.create({
-      model: DEEPSEEK_CHAT_MODEL,
-      messages: buildOpenAiMessages(args),
-      max_tokens: args.maxTokens ?? 2048,
-      temperature: 0,
-    });
+    const response = await client.chat.completions.create(
+      deepSeekRequestBody(args, false)
+    );
     recordDeepSeekUsage(DEEPSEEK_CHAT_MODEL, response.usage);
     return response.choices[0]?.message?.content?.trim() ?? "";
   } catch (err) {
@@ -146,14 +182,9 @@ export async function runDeepSeekChatCompletionStream(
 ): Promise<string> {
   try {
     const client = createDeepSeekClient();
-    const stream = await client.chat.completions.create({
-      model: DEEPSEEK_CHAT_MODEL,
-      messages: buildOpenAiMessages(args),
-      max_tokens: args.maxTokens ?? 2048,
-      temperature: 0,
-      stream: true,
-      stream_options: { include_usage: true },
-    });
+    const stream = await client.chat.completions.create(
+      deepSeekRequestBody(args, true)
+    );
 
     let answer = "";
     let usage: OpenAI.Completions.CompletionUsage | undefined;
