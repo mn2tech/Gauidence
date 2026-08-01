@@ -1673,11 +1673,33 @@ export default function VaultChatPanel({
         });
 
       const readErrorBody = async (response: Response) => {
-        if (isVaultChatStreamResponse(response)) return {};
-        return (await response.json().catch(() => ({}))) as {
-          error?: string;
-          code?: string;
+        const fallbackForStatus = (status: number) => {
+          if (status === 429) {
+            return {
+              error:
+                "Rate limit reached. Wait about a minute, or set DEEPSEEK_CHAT_PRIMARY=true on Vercel to use DeepSeek for chat.",
+              code: "rate_limit",
+            };
+          }
+          if (status === 503) {
+            return {
+              error: "AI chat is temporarily unavailable. Please try again.",
+              code: "overloaded",
+            };
+          }
+          return {};
         };
+
+        try {
+          const body = (await response.clone().json()) as {
+            error?: string;
+            code?: string;
+          };
+          if (body.error) return body;
+        } catch {
+          /* not JSON */
+        }
+        return fallbackForStatus(response.status);
       };
 
       const rollbackOptimistic = () => {
@@ -1888,7 +1910,7 @@ export default function VaultChatPanel({
         writeProfile?: { profileId: string; profileName: string };
       };
       applyVaultChatTurn(body);
-    } catch {
+    } catch (err) {
       if (options?.replaceUserMessageId) {
         setMessages((prev) =>
           prev.filter((m) => m.id !== options.replaceUserMessageId)
@@ -1897,7 +1919,11 @@ export default function VaultChatPanel({
         setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
       }
       setInput(question);
-      setError("I couldn't complete that request right now. Please try again.");
+      setError(
+        err instanceof Error && err.message.trim()
+          ? err.message
+          : "I couldn't complete that request right now. Please try again."
+      );
     } finally {
       setSending(false);
       setStreamingAssistantId(null);

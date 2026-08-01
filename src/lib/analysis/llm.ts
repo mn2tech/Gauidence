@@ -8,7 +8,11 @@ import type { ParsedInvoiceAnchors } from "./invoiceText";
 import type { AnalysisInputMode } from "./inputMode";
 import { captureAnthropicUsage } from "@/lib/usage/record";
 import { AnalysisLlmError } from "@/lib/analysis/llmErrors";
-import { isAnthropicConfigured } from "@/lib/analysis/chatProvider";
+import {
+  isAnthropicConfigured,
+  isDeepSeekChatPrimary,
+  isDeepSeekConfigured,
+} from "@/lib/analysis/chatProvider";
 
 /** Claude model for text-heavy docs. Override with CLAUDE_MODEL or ANTHROPIC_MODEL. */
 export const ANALYSIS_MODEL =
@@ -458,9 +462,12 @@ export async function runChatCompletion(
     attachedImage?: { mimeType: string; base64: string; fileName: string };
   }
 ): Promise<string> {
-  if (!isAnthropicConfigured()) {
-    const { runDeepSeekChatCompletion } = await import("@/lib/analysis/deepseek");
-    return runDeepSeekChatCompletion(args);
+  const deepseek = await import("@/lib/analysis/deepseek");
+  if (
+    isDeepSeekChatPrimary() ||
+    (!isAnthropicConfigured() && isDeepSeekConfigured())
+  ) {
+    return deepseek.runDeepSeekChatCompletion(args);
   }
 
   try {
@@ -478,11 +485,12 @@ export async function runChatCompletion(
     const textBlock = response.content.find((b) => b.type === "text");
     return textBlock && textBlock.type === "text" ? textBlock.text.trim() : "";
   } catch (err) {
-    const { runDeepSeekChatCompletion, shouldFallbackToDeepSeek } =
-      await import("@/lib/analysis/deepseek");
-    if (shouldFallbackToDeepSeek(mapAnthropicErrorToLlmError(err))) {
+    if (
+      isDeepSeekConfigured() &&
+      deepseek.shouldFallbackToDeepSeek(mapAnthropicErrorToLlmError(err))
+    ) {
       console.warn("Anthropic chat failed; falling back to DeepSeek");
-      return runDeepSeekChatCompletion(args);
+      return deepseek.runDeepSeekChatCompletion(args);
     }
     mapAnthropicError(err);
   }
@@ -500,10 +508,12 @@ export async function runChatCompletionStream(
     onDelta: (text: string) => void;
   }
 ): Promise<string> {
-  if (!isAnthropicConfigured()) {
-    const { runDeepSeekChatCompletionStream } =
-      await import("@/lib/analysis/deepseek");
-    return runDeepSeekChatCompletionStream(args);
+  const deepseek = await import("@/lib/analysis/deepseek");
+  if (
+    isDeepSeekChatPrimary() ||
+    (!isAnthropicConfigured() && isDeepSeekConfigured())
+  ) {
+    return deepseek.runDeepSeekChatCompletionStream(args);
   }
 
   try {
@@ -533,11 +543,12 @@ export async function runChatCompletionStream(
     const textBlock = finalMessage.content.find((b) => b.type === "text");
     return textBlock && textBlock.type === "text" ? textBlock.text.trim() : "";
   } catch (err) {
-    const { runDeepSeekChatCompletionStream, shouldFallbackToDeepSeek } =
-      await import("@/lib/analysis/deepseek");
-    if (shouldFallbackToDeepSeek(mapAnthropicErrorToLlmError(err))) {
+    if (
+      isDeepSeekConfigured() &&
+      deepseek.shouldFallbackToDeepSeek(mapAnthropicErrorToLlmError(err))
+    ) {
       console.warn("Anthropic chat stream failed; falling back to DeepSeek");
-      return runDeepSeekChatCompletionStream(args);
+      return deepseek.runDeepSeekChatCompletionStream(args);
     }
     mapAnthropicError(err);
   }

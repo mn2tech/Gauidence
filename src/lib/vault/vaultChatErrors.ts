@@ -1,4 +1,6 @@
 import { AnalysisLlmError } from "@/lib/analysis/llmErrors";
+import OpenAI from "openai";
+import Anthropic from "@anthropic-ai/sdk";
 
 const GENERIC_VAULT_CHAT_ERROR =
   "I couldn't complete that request right now. Please try again.";
@@ -14,6 +16,36 @@ export function formatVaultChatError(err: unknown): {
       code: err.code,
       status: err.status,
     };
+  }
+
+  if (err instanceof Anthropic.APIError) {
+    const mapped =
+      err.status === 429
+        ? "Claude rate limit reached. Please try again in a minute."
+        : (err.message || "").trim() ||
+          "The Claude service couldn't complete this request.";
+    return {
+      error: mapped,
+      code: err.status === 429 ? "rate_limit" : "api_error",
+      status: err.status ?? 502,
+    };
+  }
+
+  if (err instanceof OpenAI.APIError) {
+    const mapped =
+      err.status === 429
+        ? "OpenAI rate limit reached during vault search. Retrying without document search may help."
+        : (err.message || "").trim() ||
+          "The embedding service couldn't complete this request.";
+    return {
+      error: mapped,
+      code: err.status === 429 ? "rate_limit" : "api_error",
+      status: err.status ?? 502,
+    };
+  }
+
+  if (err instanceof Error && err.message.trim()) {
+    return { error: err.message.trim(), status: 502 };
   }
 
   if (err && typeof err === "object") {

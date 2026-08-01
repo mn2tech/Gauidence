@@ -12,3 +12,9 @@ export function isDeepSeekConfigured(): boolean {
 export function isChatLlmConfigured(): boolean {
   return isAnthropicConfigured() || isDeepSeekConfigured();
 }
+
+/** When true, chat uses DeepSeek first (set DEEPSEEK_CHAT_PRIMARY=true on Vercel). */
+export function isDeepSeekChatPrimary(): boolean {
+  const flag = process.env.DEEPSEEK_CHAT_PRIMARY?.trim().toLowerCase();
+  return flag === "1" || flag === "true" || flag === "yes";
+}

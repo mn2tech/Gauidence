@@ -32,6 +32,7 @@ import {
 } from "@/lib/vault/vaultChatStream";
 import { parseProposedReminder } from "@/lib/reminders/propose";
 import { withLlmUsage } from "@/lib/usage/record";
+import { recordChatEvent } from "@/lib/billing/quota";
 import { refreshUserAwards } from "@/lib/awards/grant";
 import { formatVaultChatError } from "@/lib/vault/vaultChatErrors";
 
@@ -187,6 +188,8 @@ export function createVaultChatStreamResponse(
           controller.close();
           return;
         }
+
+        await recordChatEvent(args.supabase, args.userId, "chat");
 
         const chatUpdates: {
           updated_at: string;

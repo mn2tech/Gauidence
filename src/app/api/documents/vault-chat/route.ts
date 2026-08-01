@@ -1002,14 +1002,6 @@ export async function POST(request: Request) {
   const quota = await assertBillingQuota(supabase, user.id, "chat", user.email);
   if (!quota.ok) return quota.response;
 
-  const { error: eventError } = await recordChatEvent(supabase, user.id, "chat");
-  if (eventError) {
-    return NextResponse.json(
-      { error: "We couldn't start vault chat. Please try again." },
-      { status: 502 }
-    );
-  }
-
   const profileIdOverride =
     typeof profileIdRaw === "string" && profileIdRaw.trim()
       ? profileIdRaw.trim()
@@ -1350,7 +1342,15 @@ export async function POST(request: Request) {
     attachedFileName = attachedDoc?.fileName;
 
     const queryEmbedding =
-      (chunkCount ?? 0) > 0 ? await embedQuery(question) : null;
+      (chunkCount ?? 0) > 0
+        ? await embedQuery(question).catch((embedErr) => {
+            console.warn(
+              "Vault chat embedding failed; continuing without document search:",
+              embedErr instanceof Error ? embedErr.message : "error"
+            );
+            return null;
+          })
+        : null;
     const matchCount = showPictures ? 10 : 8;
     const retrievedChunks = queryEmbedding
       ? await retrieveAllAccessibleVaultChunks(
@@ -1521,6 +1521,8 @@ ${workMemoryContext.trim() || "(none — user has no active work projects)"}
       { status: 500 }
     );
   }
+
+  await recordChatEvent(supabase, user.id, "chat");
 
   const chatUpdates: {
     updated_at: string;

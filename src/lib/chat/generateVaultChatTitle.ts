@@ -5,6 +5,7 @@ import {
   createLlmClient,
   runChatCompletion,
 } from "@/lib/analysis/llm";
+import { isAnthropicConfigured } from "@/lib/analysis/chatProvider";
 import { sanitizeGeneratedChatTitle } from "./vaultChatTitle";
 
 export type GenerateVaultChatTitleArgs = {
@@ -19,7 +20,7 @@ export type GenerateVaultChatTitleArgs = {
 export async function generateVaultChatTitle(
   args: GenerateVaultChatTitleArgs
 ): Promise<string | null> {
-  const client = createLlmClient();
+  const client = isAnthropicConfigured() ? createLlmClient() : null;
   const attachmentNote = args.attachmentFileName?.trim()
     ? `\nAttached file: ${args.attachmentFileName.trim()}`
     : "";
