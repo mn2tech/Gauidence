@@ -1,3 +1,5 @@
+import "server-only";
+
 import type { User, SupabaseClient } from "@supabase/supabase-js";
 import type { RetrievedChunk } from "@/lib/vault/retrieve";
 import { formatRetrievalContext } from "@/lib/vault/indexDocument";
@@ -27,6 +29,8 @@ import {
 } from "@/lib/vault/gideon";
 import { wantsReminderAgent } from "@/lib/reminders/propose";
 import type { AttachedVaultDocument } from "@/lib/vault/attachedDocument";
+import type { GuardianProfileType } from "@/lib/profiles/types";
+import type { LinkedVaultProfile } from "@/lib/vault/rollup";
 import { loadLinkedOrgContext } from "./linkedProfiles";
 import type { WorkspaceContextData, WorkspaceContextMeta } from "./types";
 
@@ -79,11 +83,18 @@ export async function loadWorkspaceContext(
       : null;
 
   const matchCount = showPictures ? 10 : 8;
+  const rollupScopes: LinkedVaultProfile[] = retrievalScopes.map((scope) => ({
+    id: scope.id,
+    display_name: scope.display_name,
+    profile_type:
+      scope.profile_type ??
+      (activeProfile.profile_type as GuardianProfileType),
+  }));
   const retrievedChunks = queryEmbedding
     ? await retrieveAllAccessibleVaultChunks(
         supabase,
         queryEmbedding,
-        retrievalScopes,
+        rollupScopes,
         matchCount
       )
     : [];
@@ -130,11 +141,12 @@ export async function loadWorkspaceContext(
     activeProfile
   );
 
-  const vaultMapOwnerLabel = firstNameFrom(
-    user.user_metadata?.full_name ??
-      user.user_metadata?.name ??
-      user.email
-  );
+  const vaultMapOwnerLabel =
+    firstNameFrom(
+      user.user_metadata?.full_name ??
+        user.user_metadata?.name ??
+        user.email
+    ) ?? "You";
   const vaultMapContext = formatVaultMapForGideon(
     meta.accessibleProfiles,
     vaultMapOwnerLabel,

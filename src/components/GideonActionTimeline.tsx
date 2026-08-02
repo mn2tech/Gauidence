@@ -1,6 +1,6 @@
 "use client";
 
-import type { ActionEventPhase } from "@/lib/actions/types";
+import type { ActionEventPhase } from "@/lib/actions/client";
 
 export type ActionTimelineItem = {
   id: string;

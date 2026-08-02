@@ -85,12 +85,12 @@ import { uploadAndAnalyzeToVault, type VaultUploadResult } from "@/lib/vault/cli
 import SmartUploadSuggestionCard from "@/components/SmartUploadSuggestionCard";
 import WorkspaceContextBar from "@/components/WorkspaceContextBar";
 import GlobalVaultSearch from "@/components/GlobalVaultSearch";
-import { buildWorkingInDisplay } from "@/lib/workspace-context";
+import { buildWorkingInDisplay } from "@/lib/workspace-context/client";
 import {
   buildSmartUploadPresentation,
   shouldPromptSmartUpload,
-  recordClientActionEvent,
-} from "@/lib/actions";
+} from "@/lib/actions/client";
+import { recordClientActionEvent } from "@/lib/actions/client";
 import ProfileSetupHub from "@/components/ProfileSetupHub";
 import AskGideonSidebar from "@/components/AskGideonSidebar";
 import { todayLogDate } from "@/lib/logs/types";

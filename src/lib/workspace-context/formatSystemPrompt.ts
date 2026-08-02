@@ -1,3 +1,5 @@
+import "server-only";
+
 import {
   buildGideonTodayNote,
   GIDEON_ATTACHED_DOCUMENT_NOTE,

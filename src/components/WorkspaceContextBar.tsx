@@ -3,7 +3,7 @@
 import { ArrowLeft, ChevronDown, Search } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import ProfileAvatar from "@/components/ProfileAvatar";
-import type { WorkingInDisplay } from "@/lib/workspace-context/searchScope";
+import type { WorkingInDisplay } from "@/lib/workspace-context/client";
 import type { GuardianProfile } from "@/lib/profiles/types";
 import { nestedUnder, topLevelProfiles } from "@/lib/profiles/types";
 

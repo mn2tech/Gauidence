@@ -1,5 +1,7 @@
 export const VAULT_CHAT_STREAM_CONTENT_TYPE = "application/x-ndjson";
 
+import type { ActionEventPhase } from "@/lib/actions/client";
+
 export type VaultChatCitation = {
   documentId: string;
   fileName: string;
@@ -31,7 +33,7 @@ export type ActionTimelineItem = {
   id: string;
   actionId: string;
   label: string;
-  phase: string;
+  phase: ActionEventPhase;
   message: string | null;
   createdAt: string;
 };

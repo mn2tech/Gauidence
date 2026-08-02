@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Check, FolderInput, Loader2, Sparkles } from "lucide-react";
-import type { SmartUploadPresentation } from "@/lib/actions/smartUpload";
+import type { SmartUploadPresentation } from "@/lib/actions/client";
 import { saveDocument } from "@/lib/organization/saveDocument";
 
 type Props = {

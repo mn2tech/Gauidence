@@ -30,7 +30,7 @@ import {
 import {
   searchScopeLabel,
   type SearchScopeMode,
-} from "@/lib/workspace-context/searchScope";
+} from "@/lib/workspace-context/client";
 
 const KIND_META: Record<
   SearchResultKind,
