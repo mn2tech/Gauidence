@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useActiveProfile } from "@/components/ProfileProvider";
-import OnboardingIntentScreen from "@/components/OnboardingIntentScreen";
+import GuardianCoachScreen from "@/components/GuardianCoachScreen";
 import {
   isEmployeeHubProfile,
   postLoginPathForProfile,
@@ -97,7 +97,7 @@ export default function OnboardingGate({
 
   if (signedIn && needsOnboarding) {
     return (
-      <OnboardingIntentScreen
+      <GuardianCoachScreen
         onComplete={async ({ activeProfileId }) => {
           setNeedsOnboarding(false);
           await refresh();

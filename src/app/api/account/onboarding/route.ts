@@ -127,7 +127,7 @@ export async function GET() {
 
 /**
  * Complete or skip first-run intent.
- * Body: { skip: true } | { intent, schoolIntent? }
+ * Body: { skip: true } | { intent, schoolIntent?, workspaceName? }
  */
 export async function PATCH(request: Request) {
   const auth = await requireUser();
@@ -144,6 +144,10 @@ export async function PATCH(request: Request) {
   const skip = body.skip === true;
   let intent: OnboardingIntent | null = null;
   let schoolIntent: SchoolIntent | null = null;
+  const workspaceName =
+    typeof body.workspaceName === "string"
+      ? body.workspaceName.trim().slice(0, 80) || null
+      : null;
 
   if (!skip) {
     if (!isOnboardingIntent(body.intent)) {
@@ -208,7 +212,7 @@ export async function PATCH(request: Request) {
         const row = {
           owner_user_id: user.id,
           profile_type: action.profileType,
-          display_name: action.displayName,
+          display_name: workspaceName || action.displayName,
           relationship:
             action.relationship ?? option?.relationship ?? null,
           parent_profile_id: null,

@@ -5,6 +5,7 @@
 export const ONBOARDING_EVENT_NAMES = [
   "intent_completed",
   "intent_skipped",
+  "coach_completed",
   "sample_started",
   "first_document_uploaded",
   "first_win_shown",
