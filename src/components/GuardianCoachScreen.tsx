@@ -55,18 +55,19 @@ export default function GuardianCoachScreen({ onComplete }: Props) {
     setSaving(true);
     setError(null);
     try {
+      const payload =
+        "skip" in args
+          ? { skip: true as const }
+          : {
+              intent: args.intent,
+              schoolIntent: args.schoolIntent,
+              workspaceName: args.workspaceName ?? undefined,
+            };
+
       const res = await fetch("/api/account/onboarding", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          "skip" in args && args.skip
-            ? { skip: true }
-            : {
-                intent: args.intent,
-                schoolIntent: args.schoolIntent,
-                workspaceName: args.workspaceName ?? undefined,
-              }
-        ),
+        body: JSON.stringify(payload),
       });
       const body = (await res.json().catch(() => ({}))) as {
         error?: string;
@@ -77,7 +78,7 @@ export default function GuardianCoachScreen({ onComplete }: Props) {
         setError(body.error ?? "Couldn't save your setup. Try again.");
         return;
       }
-      if ("skip" in args && args.skip) {
+      if ("skip" in args) {
         trackOnboardingEvent("intent_skipped");
       } else {
         trackOnboardingEvent("intent_completed", { intent: args.intent });
@@ -85,7 +86,7 @@ export default function GuardianCoachScreen({ onComplete }: Props) {
       }
       await onComplete({
         activeProfileId: body.activeProfileId ?? null,
-        skipped: Boolean(body.skipped ?? ("skip" in args && args.skip)),
+        skipped: Boolean(body.skipped ?? "skip" in args),
       });
     } catch {
       setError("Couldn't save your setup. Check your connection.");
