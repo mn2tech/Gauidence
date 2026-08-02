@@ -1,5 +1,6 @@
 import type { GuardianProfileType } from "@/lib/profiles/types";
 import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
+import { profileMentionedInQuestion } from "@/lib/vault/detectVaultScope";
 
 export type DailyLog = {
   id: string;
@@ -221,11 +222,20 @@ export function formatLogDayHeading(
   return label;
 }
 
+export type LogRelevanceContext = {
+  authorName?: string | null;
+  vaultName?: string | null;
+};
+
+const AUTHOR_INTENT =
+  /\b(added|created|wrote|posted|submitted|logged|authored|entered)\b/i;
+
 /** Score a log against a query for Gideon retrieval (higher = better). */
 export function scoreLogRelevance(
   log: Pick<DailyLog, "content" | "title" | "category" | "tags" | "log_date">,
   question: string,
-  today = todayLogDate()
+  today = todayLogDate(),
+  context?: LogRelevanceContext
 ): number {
   const q = question.toLowerCase();
   const tokens = q
@@ -239,6 +249,8 @@ export function scoreLogRelevance(
     log.title ?? "",
     log.category ?? "",
     ...(log.tags ?? []),
+    context?.authorName ?? "",
+    context?.vaultName ?? "",
   ]
     .join(" ")
     .toLowerCase();
@@ -247,6 +259,18 @@ export function scoreLogRelevance(
   for (const t of tokens) {
     if (hay.includes(t)) score += 2;
   }
+
+  const authorName = context?.authorName?.trim();
+  if (authorName && profileMentionedInQuestion(question, authorName)) {
+    score += 8;
+    if (AUTHOR_INTENT.test(question)) score += 6;
+  }
+
+  const vaultName = context?.vaultName?.trim();
+  if (vaultName && profileMentionedInQuestion(question, vaultName)) {
+    score += 6;
+  }
+
   if (/today|yesterday|recent|this week|follow.?up|happened/i.test(q)) {
     const age =
       (Date.parse(`${today}T12:00:00Z`) - Date.parse(`${log.log_date}T12:00:00Z`)) /

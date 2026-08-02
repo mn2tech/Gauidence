@@ -9,6 +9,10 @@ import { retrieveAllAccessibleVaultChunks } from "@/lib/vault/rollup";
 import { mergePinnedChunks } from "@/lib/vault/retrieve";
 import { embedQuery } from "@/lib/vault/embeddings";
 import {
+  formatClientRequestsForGideon,
+  retrieveRelevantClientRequests,
+} from "@/lib/client-requests/retrieve";
+import {
   formatDailyLogsForGideon,
   retrieveRelevantDailyLogs,
 } from "@/lib/logs/retrieve";
@@ -102,14 +106,37 @@ export async function loadWorkspaceContext(
   const chunks = mergePinnedChunks(attachedDoc?.chunks ?? [], retrievedChunks);
   const formatted = formatRetrievalContext(chunks);
 
-  const dailyLogs = await retrieveRelevantDailyLogs(supabase, {
-    profileId: activeProfile.id,
-    profileIds: searchProfileIds,
+  const { logs: dailyLogs, authorNames } = await retrieveRelevantDailyLogs(
+    supabase,
+    {
+      profileId: activeProfile.id,
+      profileIds: searchProfileIds,
+      profileNames,
+      question,
+      limit: retrievalScopes.length > 1 ? 6 : 4,
+    }
+  );
+  const logContext = formatDailyLogsForGideon(
+    dailyLogs,
     profileNames,
-    question,
-    limit: retrievalScopes.length > 1 ? 6 : 4,
-  });
-  const logContext = formatDailyLogsForGideon(dailyLogs, profileNames);
+    authorNames
+  );
+
+  const clientProfileIds = retrievalScopes
+    .filter((scope) => scope.profile_type === "client")
+    .map((scope) => scope.id);
+  const { requests: clientRequests, authorNames: requestAuthorNames } =
+    await retrieveRelevantClientRequests(supabase, {
+      clientProfileIds,
+      profileNames,
+      question,
+      limit: retrievalScopes.length > 1 ? 6 : 4,
+    });
+  const clientRequestContext = formatClientRequestsForGideon(
+    clientRequests,
+    profileNames,
+    requestAuthorNames
+  );
 
   const { data: vaultFileRows } = await supabase
     .from("documents")
@@ -172,7 +199,7 @@ export async function loadWorkspaceContext(
       ? `${GIDEON_CROSS_VAULT_NOTE}
 
 Active vault in the UI: ${activeProfile.display_name}. Document search includes all ${retrievalScopes.length} vaults you can access (${retrievalScopes.map((s) => s.display_name).join(", ")}).`
-      : "Search this vault's documents, Daily Logs, and upcoming schedule; use GENERAL KNOWLEDGE when the vault does not contain the answer.";
+      : "Search this vault's documents, Daily Logs, client requests, and upcoming schedule; use GENERAL KNOWLEDGE when the vault does not contain the answer.";
 
   const attachedTextLimit = transcriptionMode ? 30_000 : 12_000;
   const attachedContext = attachedDoc
@@ -188,11 +215,12 @@ Active vault in the UI: ${activeProfile.display_name}. Document search includes 
     !formatted.context.trim() &&
     !attachedContext.trim() &&
     !logContext.trim() &&
+    !clientRequestContext.trim() &&
     !scheduleContext.trim() &&
     !linkedContext.trim() &&
     vaultMapContext.startsWith("(no vault") &&
     fileInventoryContext.startsWith("(no documents")
-      ? "No vault excerpts, Daily Logs, upcoming schedule items, or linked profile structure matched this question (or the vault is empty). Do not invent vault facts. Use ## GENERAL KNOWLEDGE for general questions, and ## GIDEON'S SUGGESTION to upload documents when that would help."
+      ? "No vault excerpts, Daily Logs, client requests, upcoming schedule items, or linked profile structure matched this question (or the vault is empty). Do not invent vault facts. Use ## GENERAL KNOWLEDGE for general questions, and ## GIDEON'S SUGGESTION to upload documents when that would help."
       : "";
 
   const context: WorkspaceContextData = {
@@ -202,6 +230,7 @@ Active vault in the UI: ${activeProfile.display_name}. Document search includes 
       fileInventory: fileInventoryContext,
       attachedDocument: attachedContext.trim() || "(none)",
       dailyLogs: logContext.trim() || "(none)",
+      clientRequests: clientRequestContext.trim() || "(none)",
       schedule: scheduleContext.trim() || "(none)",
       linkedProfiles: linkedContext.trim() || "(none)",
       vaultMap: vaultMapContext,

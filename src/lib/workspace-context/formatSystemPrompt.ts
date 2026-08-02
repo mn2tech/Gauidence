@@ -67,6 +67,10 @@ ${blocks.attachedDocument}
 ${blocks.dailyLogs}
 --- END DAILY LOGS ---
 
+--- CLIENT REQUESTS (structured issues/requirements from client vaults; includes recent replies) ---
+${blocks.clientRequests}
+--- END CLIENT REQUESTS ---
+
 --- UPCOMING SCHEDULE (saved reminders and document deadlines; vault owner labeled when linked) ---
 ${blocks.schedule}
 --- END UPCOMING SCHEDULE ---

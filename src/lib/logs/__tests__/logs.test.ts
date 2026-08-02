@@ -1,10 +1,12 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { formatDailyLogsForGideon } from "../retrieve.ts";
 import {
   formatLogDayHeading,
   isValidLogDate,
   scoreLogRelevance,
   todayLogDate,
+  type DailyLog,
 } from "../types.ts";
 
 describe("daily log helpers", () => {
@@ -31,5 +33,68 @@ describe("daily log helpers", () => {
     const hit = scoreLogRelevance(log, "What happened with Invoice #16?");
     const miss = scoreLogRelevance(log, "What is the weather like?");
     assert.ok(hit > miss);
+  });
+
+  it("boosts logs when the question names the author", () => {
+    const log = {
+      content: "Client needs updated W-9 before payroll.",
+      title: null,
+      category: "Client",
+      tags: [],
+      log_date: todayLogDate(),
+    };
+    const byAuthor = scoreLogRelevance(
+      log,
+      "show the daily log that Aaron added",
+      todayLogDate(),
+      { authorName: "Aaron Miller", vaultName: "crossroadconnect" }
+    );
+    const withoutAuthor = scoreLogRelevance(
+      log,
+      "show the daily log that Aaron added"
+    );
+    assert.ok(byAuthor > withoutAuthor);
+  });
+
+  it("boosts logs when the question names the vault", () => {
+    const log = {
+      content: "Payroll note for this week.",
+      title: null,
+      category: "Client",
+      tags: [],
+      log_date: todayLogDate(),
+    };
+    const byVault = scoreLogRelevance(
+      log,
+      "show crossroadconnect daily log",
+      todayLogDate(),
+      { vaultName: "crossroadconnect" }
+    );
+    const withoutVault = scoreLogRelevance(log, "show crossroadconnect daily log");
+    assert.ok(byVault > withoutVault);
+  });
+
+  it("formats daily logs with vault and author labels", () => {
+    const log: DailyLog = {
+      id: "log-1",
+      owner_user_id: "user-aaron",
+      profile_id: "profile-client",
+      log_date: "2026-08-02",
+      title: null,
+      content: "Uploaded signed agreement.",
+      category: "Client",
+      tags: [],
+      source_type: "user_entered",
+      created_at: "2026-08-02T12:00:00.000Z",
+      updated_at: "2026-08-02T12:00:00.000Z",
+    };
+    const formatted = formatDailyLogsForGideon(
+      [log],
+      { "profile-client": "crossroadconnect" },
+      { "user-aaron": "Aaron Miller" }
+    );
+    assert.match(formatted, /vault: crossroadconnect/);
+    assert.match(formatted, /added by: Aaron Miller/);
+    assert.match(formatted, /Uploaded signed agreement\./);
   });
 });
