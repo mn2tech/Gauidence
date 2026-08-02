@@ -15,6 +15,7 @@ import {
   type SchoolIntent,
 } from "@/lib/onboarding/intent";
 import { trackOnboardingEvent } from "@/lib/onboarding/events";
+import { renderGideonText } from "@/components/gideonText";
 
 type Props = {
   onComplete: (result: {
@@ -212,7 +213,7 @@ export default function GuardianCoachScreen({ onComplete }: Props) {
                     : "border border-stone-200 bg-white text-foreground"
                 }`}
               >
-                {msg.content}
+                {renderGideonText(msg.content)}
               </div>
             </div>
           ))}

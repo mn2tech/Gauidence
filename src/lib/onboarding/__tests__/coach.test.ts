@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   GUARDIAN_COACH_SETUP_MARKER,
+  buildGuardianCoachSystemPrompt,
   parseCoachAssistantMessage,
 } from "../coach.ts";
 
@@ -37,5 +38,11 @@ ${GUARDIAN_COACH_SETUP_MARKER}
     const result = parseCoachAssistantMessage(raw);
     assert.equal(result.setup?.intent, "school");
     assert.equal(result.setup?.schoolIntent, "teacher");
+  });
+
+  it("includes CRM guidance in system prompt", () => {
+    const prompt = buildGuardianCoachSystemPrompt();
+    assert.match(prompt, /CRM/i);
+    assert.match(prompt, /do NOT say Guardian "doesn't do CRM"/i);
   });
 });
