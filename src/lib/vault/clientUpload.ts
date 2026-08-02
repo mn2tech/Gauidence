@@ -33,6 +33,9 @@ export type VaultUploadResult = {
   summary?: string | null;
   title?: string | null;
   facts?: Fact[];
+  documentType?: string | null;
+  classificationConfidence?: number | null;
+  overallConfidence?: number | null;
 };
 
 /**
@@ -166,6 +169,9 @@ export async function uploadAndAnalyzeToVault(args: {
       summary?: string;
       title?: string;
       facts?: Fact[];
+      documentType?: string;
+      classificationConfidence?: number;
+      overallConfidence?: number;
     };
 
     return {
@@ -177,6 +183,9 @@ export async function uploadAndAnalyzeToVault(args: {
       summary: body.summary ?? null,
       title: body.title ?? null,
       facts: Array.isArray(body.facts) ? body.facts : [],
+      documentType: body.documentType ?? null,
+      classificationConfidence: body.classificationConfidence ?? null,
+      overallConfidence: body.overallConfidence ?? null,
     };
   } catch (err) {
     const timedOut = err instanceof DOMException && err.name === "AbortError";

@@ -27,6 +27,10 @@ import {
   type SearchResultKind,
   withSearchTerm,
 } from "@/lib/search";
+import {
+  searchScopeLabel,
+  type SearchScopeMode,
+} from "@/lib/workspace-context/searchScope";
 
 const KIND_META: Record<
   SearchResultKind,
@@ -55,6 +59,7 @@ export default function GlobalVaultSearch({ open, onClose }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const [navigating, setNavigating] = useState(false);
+  const [searchScope, setSearchScope] = useState<SearchScopeMode>("workspace");
 
   useEffect(() => {
     setMounted(true);
@@ -66,6 +71,7 @@ export default function GlobalVaultSearch({ open, onClose }: Props) {
     setResults([]);
     setError(null);
     setActiveIndex(0);
+    setSearchScope("workspace");
     // Prefer immediate focus so iOS still treats it as part of the tap gesture.
     inputRef.current?.focus({ preventScroll: true });
     const t = window.setTimeout(() => {
@@ -109,9 +115,14 @@ export default function GlobalVaultSearch({ open, onClose }: Props) {
     setError(null);
     const handle = window.setTimeout(async () => {
       try {
-        const res = await fetch(
-          `/api/vault/search?q=${encodeURIComponent(q)}`
-        );
+        const params = new URLSearchParams({
+          q,
+          scope: searchScope,
+        });
+        if (active?.id && searchScope === "workspace") {
+          params.set("profileId", active.id);
+        }
+        const res = await fetch(`/api/vault/search?${params.toString()}`);
         const body = (await res.json().catch(() => ({}))) as {
           error?: string;
           results?: SearchResult[];
@@ -137,7 +148,7 @@ export default function GlobalVaultSearch({ open, onClose }: Props) {
       cancelled = true;
       window.clearTimeout(handle);
     };
-  }, [query, open]);
+  }, [query, open, searchScope, active?.id]);
 
   const flat = results;
   const grouped = useMemo(() => groupSearchResults(flat), [flat]);
@@ -233,6 +244,23 @@ export default function GlobalVaultSearch({ open, onClose }: Props) {
           </button>
         </div>
 
+        <div className="flex shrink-0 gap-1 border-b border-stone-100 px-3 py-2 sm:px-4">
+          {(["workspace", "global"] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => setSearchScope(mode)}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                searchScope === mode
+                  ? "bg-brand text-white"
+                  : "bg-stone-100 text-ink-muted hover:bg-stone-200"
+              }`}
+            >
+              {searchScopeLabel(mode)}
+            </button>
+          ))}
+        </div>
+
         <div
           id={listId}
           role="listbox"
@@ -301,6 +329,11 @@ export default function GlobalVaultSearch({ open, onClose }: Props) {
                           </span>
                           <span className="truncate text-[11px] text-ink-muted">
                             {item.profilePath}
+                            {typeof item.confidence === "number" ? (
+                              <span className="ml-2 text-brand">
+                                {item.confidence}% match
+                              </span>
+                            ) : null}
                           </span>
                           {item.snippet ? (
                             <span className="mt-0.5 line-clamp-2 text-xs text-ink-muted">

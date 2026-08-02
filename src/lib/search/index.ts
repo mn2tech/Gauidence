@@ -16,6 +16,8 @@ export type SearchResult = {
   occurredAt: string | null;
   href: string;
   score: number;
+  /** Normalized match strength (0–100) for display. */
+  confidence?: number;
 };
 
 export const SEARCH_MIN_QUERY_LENGTH = 2;

@@ -220,18 +220,21 @@ export async function POST(request: Request) {
 
   void import("@/lib/knowledge/trigger-knowledge-engine").then(
     ({ triggerKnowledgeEngine }) =>
-      triggerKnowledgeEngine({
-        sourceType: "daily_log",
-        sourceId: data.id,
-        profileId: data.profile_id,
-        vaultId: data.profile_id,
-        content: data.content,
-        metadata: {
-          title: data.title,
-          logDate: data.log_date,
-          category: data.category,
+      triggerKnowledgeEngine(
+        {
+          sourceType: "daily_log",
+          sourceId: data.id,
+          profileId: data.profile_id,
+          vaultId: data.profile_id,
+          content: data.content,
+          metadata: {
+            title: data.title,
+            logDate: data.log_date,
+            category: data.category,
+          },
         },
-      })
+        { userId: user.id, supabase }
+      )
   );
 
   void import("@/lib/vault/notifyActivity").then(({ notifyVaultActivity }) =>

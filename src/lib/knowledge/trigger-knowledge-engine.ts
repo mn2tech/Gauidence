@@ -1,15 +1,25 @@
 import "server-only";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { isKnowledgeEngineEnabled } from "@/lib/features/knowledge-engine";
 import { KnowledgeEngine } from "./knowledge-engine";
+import { persistKnowledgePreview } from "./persist";
 import type { KnowledgeInput } from "./types";
+
+export type KnowledgePersistOptions = {
+  userId: string;
+  supabase: SupabaseClient;
+  /** Profile display names for workspace recommendation dedup. */
+  profileNames?: string[];
+};
 
 /**
  * Fire-and-forget Knowledge Engine entry point for API routes.
  * Never throws — parent document/log saves must not be affected.
  */
 export async function triggerKnowledgeEngine(
-  input: KnowledgeInput
+  input: KnowledgeInput,
+  persist?: KnowledgePersistOptions
 ): Promise<void> {
   if (!isKnowledgeEngineEnabled()) {
     console.info("[knowledge-engine] knowledge_engine_skipped", {
@@ -41,6 +51,22 @@ export async function triggerKnowledgeEngine(
       timelineCount: preview.suggestedTimelineEvents.length,
       relationshipCount: preview.suggestedRelationships.length,
     });
+
+    if (persist) {
+      const saved = await persistKnowledgePreview(
+        persist.supabase,
+        persist.userId,
+        input,
+        preview,
+        { profileNames: persist.profileNames }
+      );
+      console.info("[knowledge-engine] knowledge_engine_persisted", {
+        sourceType: input.sourceType,
+        sourceId: input.sourceId,
+        profileId: input.profileId,
+        ...saved,
+      });
+    }
   } catch (err) {
     console.error("[knowledge-engine] knowledge_engine_failed", {
       sourceType: input.sourceType,

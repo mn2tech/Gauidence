@@ -35,6 +35,16 @@ import { withLlmUsage } from "@/lib/usage/record";
 import { recordChatEvent } from "@/lib/billing/quota";
 import { refreshUserAwards } from "@/lib/awards/grant";
 import { formatVaultChatError } from "@/lib/vault/vaultChatErrors";
+import {
+  listActionTimeline,
+  recordActionEvent,
+  startOfUtcDay,
+  type ActionTimelineEntry,
+} from "@/lib/actions/events";
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 export type VaultChatStreamArgs = {
   supabase: SupabaseClient;
@@ -69,6 +79,8 @@ export type VaultChatStreamArgs = {
       scoped_profile_id?: string | null;
     }
   ) => Promise<void>;
+  thinkingSteps?: string[];
+  detectedActions?: { id: string; label: string }[];
 };
 
 export function createVaultChatStreamResponse(
@@ -83,11 +95,38 @@ export function createVaultChatStreamResponse(
       };
 
       try {
+        const thinkingSteps = args.thinkingSteps ?? [];
         write({
           type: "meta",
           chatId: args.chatId,
           userMsg: args.userMsg,
+          thinkingSteps,
         });
+
+        if (thinkingSteps.length > 0) {
+          for (let i = 0; i < thinkingSteps.length; i++) {
+            write({ type: "thinking", steps: thinkingSteps, activeIndex: i });
+            if (i < thinkingSteps.length - 1) {
+              await sleep(180);
+            }
+          }
+        }
+
+        if (args.detectedActions?.length) {
+          await Promise.all(
+            args.detectedActions.map((action) =>
+              recordActionEvent(args.supabase, {
+                userId: args.userId,
+                profileId: args.active.id,
+                chatId: args.chatId,
+                actionId: action.id,
+                label: action.label,
+                phase: "detected",
+                message: args.question.slice(0, 500),
+              })
+            )
+          );
+        }
 
         const client = isAnthropicConfigured() ? createLlmClient() : null;
         let answer = "";
@@ -255,6 +294,33 @@ export function createVaultChatStreamResponse(
           chatHomeProfileId: args.chatHomeProfileId,
         });
 
+        if (args.detectedActions?.length) {
+          await Promise.all(
+            args.detectedActions.map((action) =>
+              recordActionEvent(args.supabase, {
+                userId: args.userId,
+                profileId: args.active.id,
+                chatId: args.chatId,
+                actionId: action.id,
+                label: action.label,
+                phase: "executed",
+                message: answer.slice(0, 500),
+              })
+            )
+          );
+        }
+
+        let actionTimeline: ActionTimelineEntry[] = [];
+        try {
+          actionTimeline = await listActionTimeline(args.supabase, args.userId, {
+            since: startOfUtcDay(),
+            limit: 12,
+            profileId: args.active.id,
+          });
+        } catch {
+          /* timeline is optional */
+        }
+
         write({
           type: "done",
           chatId: args.chatId,
@@ -271,6 +337,7 @@ export function createVaultChatStreamResponse(
             profileName: resolvedWriteVault.display_name,
           },
           chatScopedProfile: persistedChatScopedProfile,
+          actionTimeline,
         });
       } catch (err) {
         const { error, code } = formatVaultChatError(err);

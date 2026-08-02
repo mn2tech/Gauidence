@@ -5,6 +5,7 @@ import { useActiveProfile } from "@/components/ProfileProvider";
 import { useEmployeeHubEntitlements } from "@/hooks/useEmployeeHubEntitlements";
 import { employeeShowsPowerNav } from "@/lib/employee-hub/entitlements";
 import { isOrgStyleProfile } from "@/lib/profiles/types";
+import { COMMAND_CENTER_PATH } from "@/lib/simple-home/routing";
 
 type SimpleSecondaryNavLinksProps = {
   onNavigate?: () => void;
@@ -49,6 +50,8 @@ export default function SimpleSecondaryNavLinks({
 
   if (needsSetup) return null;
 
+  const universalLinks = [{ href: COMMAND_CENTER_PATH, label: "Command Center" }];
+
   const ent = employeeEntitlements;
   const links = isBusinessVault
     ? [
@@ -70,8 +73,24 @@ export default function SimpleSecondaryNavLinks({
         ]
       : [];
 
+  if (isEmployeeVault && !showEmployeeTools && links.length === 0) {
+    return (
+      <div className={`${showDivider ? "simple-tools-panel mb-2 p-2" : ""} ${className ?? ""}`.trim()}>
+        {universalLinks.map((link) => (
+          <Link
+            key={link.href}
+            href={link.href}
+            onClick={onNavigate}
+            className={linkClassName}
+          >
+            {link.label}
+          </Link>
+        ))}
+      </div>
+    );
+  }
   if (isEmployeeVault && !showEmployeeTools) return null;
-  if (links.length === 0) return null;
+  if (links.length === 0 && universalLinks.length === 0) return null;
 
   const panelClass = showDivider ? "simple-tools-panel mb-2 p-2" : "";
 
@@ -82,6 +101,16 @@ export default function SimpleSecondaryNavLinks({
           Tools
         </p>
       ) : null}
+      {universalLinks.map((link) => (
+        <Link
+          key={link.href}
+          href={link.href}
+          onClick={onNavigate}
+          className={linkClassName}
+        >
+          {link.label}
+        </Link>
+      ))}
       {links.map((link) => (
         <Link
           key={link.href}

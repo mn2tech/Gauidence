@@ -33,6 +33,16 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import GideonAvatar from "@/components/GideonAvatar";
+import GideonThinkingPanel from "@/components/GideonThinkingPanel";
+import GideonActionTimeline, {
+  type ActionTimelineItem,
+} from "@/components/GideonActionTimeline";
+import GideonProactiveSuggestions, {
+  type ProactiveSuggestionItem,
+} from "@/components/GideonProactiveSuggestions";
+import GideonWorkspaceTimeline, {
+  type WorkspaceTimelineItem,
+} from "@/components/GideonWorkspaceTimeline";
 import CameraCaptureModal from "@/components/CameraCaptureModal";
 import VaultChatDrawer from "@/components/VaultChatDrawer";
 import ImminentReminderBanner from "@/components/ImminentReminderBanner";
@@ -62,7 +72,6 @@ import {
   TRY_GUARDIAN_EXAMPLES,
   TRY_GUARDIAN_SUBTITLE,
   TRY_GUARDIAN_TITLE,
-  VAULT_SCOPE_NOTE,
   WELCOME_AI_MEMORY_BODY,
   WELCOME_AI_MEMORY_TITLE,
   parseGideonSections,
@@ -72,7 +81,16 @@ import { isImageFileName } from "@/lib/vault/images";
 import { renderPdfThumbnailFromFile, renderPdfThumbnailFromUrl } from "@/lib/vault/pdfThumbnail";
 import { renderGideonText } from "@/components/gideonText";
 import { clipboardImageToFile } from "@/lib/vault/clipboardImage";
-import { uploadAndAnalyzeToVault } from "@/lib/vault/clientUpload";
+import { uploadAndAnalyzeToVault, type VaultUploadResult } from "@/lib/vault/clientUpload";
+import SmartUploadSuggestionCard from "@/components/SmartUploadSuggestionCard";
+import WorkspaceContextBar from "@/components/WorkspaceContextBar";
+import GlobalVaultSearch from "@/components/GlobalVaultSearch";
+import { buildWorkingInDisplay } from "@/lib/workspace-context";
+import {
+  buildSmartUploadPresentation,
+  shouldPromptSmartUpload,
+  recordClientActionEvent,
+} from "@/lib/actions";
 import ProfileSetupHub from "@/components/ProfileSetupHub";
 import AskGideonSidebar from "@/components/AskGideonSidebar";
 import { todayLogDate } from "@/lib/logs/types";
@@ -92,6 +110,8 @@ import {
 import { useGideonVoiceInput } from "@/hooks/useGideonVoiceInput";
 import { useGideonSpeechOutput } from "@/hooks/useGideonSpeechOutput";
 import GideonAssistantActions from "@/components/GideonAssistantActions";
+import AgentModeToggle from "@/components/AgentModeToggle";
+import { useAgentMode } from "@/hooks/useAgentMode";
 import {
   formatAssistantMessagePlainText,
   formatAssistantMessageSpeechText,
@@ -373,6 +393,9 @@ type Meta = {
     label?: string;
     suggestedUploads?: string[];
   } | null;
+  actionTimeline?: ActionTimelineItem[];
+  proactiveSuggestions?: ProactiveSuggestionItem[];
+  workspaceTimeline?: WorkspaceTimelineItem[];
 };
 
 function NameList({
@@ -521,6 +544,8 @@ export default function VaultChatPanel({
   const [streamingAssistantId, setStreamingAssistantId] = useState<string | null>(
     null
   );
+  const [thinkingSteps, setThinkingSteps] = useState<string[]>([]);
+  const [thinkingActiveIndex, setThinkingActiveIndex] = useState(0);
   const [loadingLabel, setLoadingLabel] = useState<string>(
     GIDEON_LOADING_STATES[0]
   );
@@ -574,7 +599,18 @@ export default function VaultChatPanel({
   const [vaultStatus, setVaultStatus] = useState<string | null>(null);
   const [pendingAttachment, setPendingAttachment] =
     useState<PendingVaultAttachment | null>(null);
+  const [pendingSmartUpload, setPendingSmartUpload] = useState<{
+    result: VaultUploadResult;
+    file: File;
+    attachmentPreview?: string | null;
+    userMsgId?: string;
+    question?: string;
+    userDisplayContent?: string;
+    wasEmpty: boolean;
+  } | null>(null);
   const [workProject, setWorkProject] = useState<WorkProject | null>(null);
+  const [vaultSearchOpen, setVaultSearchOpen] = useState(false);
+  const { enabled: agentModeEnabled } = useAgentMode();
   const bottomRef = useRef<HTMLDivElement>(null);
   const plusRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1249,6 +1285,75 @@ export default function VaultChatPanel({
     }
   };
 
+  const continueUploadChat = async (args: {
+    result: VaultUploadResult;
+    file: File;
+    attachmentPreview?: string | null;
+    userMsgId?: string;
+    question?: string;
+    userDisplayContent?: string;
+  }) => {
+    const finalQuestion =
+      args.question?.trim() ||
+      autoQuestionForUpload({
+        kind: active?.profile_type,
+        fileName: args.result.fileName,
+        isImage: isImageUpload(args.file),
+      });
+    await sendQuestion(finalQuestion, {
+      attachment: {
+        documentId: args.result.documentId,
+        fileName: args.result.fileName,
+        kind: isImageUpload(args.file) ? "image" : "document",
+        previewUrl: args.attachmentPreview ?? null,
+      },
+      userDisplayContent: args.userDisplayContent,
+      replaceUserMessageId: args.userMsgId,
+    });
+  };
+
+  const handleAnalyzedUpload = async (args: {
+    result: VaultUploadResult;
+    file: File;
+    attachmentPreview?: string | null;
+    userMsgId?: string;
+    question?: string;
+    userDisplayContent?: string;
+    wasEmpty: boolean;
+  }) => {
+    void recordClientActionEvent({
+      actionId: "upload_document",
+      label: "Uploaded document",
+      phase: "executed",
+      profileId,
+      message: args.result.fileName,
+    });
+
+    maybeShowFirstWin({
+      wasEmpty: args.wasEmpty,
+      fileName: args.result.fileName,
+      summary: args.result.summary,
+      facts: args.result.facts,
+    });
+
+    if (
+      args.result.organizationAutoApplied &&
+      args.result.organizationSuggestion?.profilePath
+    ) {
+      pushLocalNote(
+        `Guardian filed "${args.result.fileName}" in ${args.result.organizationSuggestion.profilePath}.`
+      );
+    }
+
+    if (profileId && shouldPromptSmartUpload(args.result, profileId)) {
+      setPendingSmartUpload(args);
+      return;
+    }
+
+    await continueUploadChat(args);
+    void refreshOnboarding();
+  };
+
   const maybeShowFirstWin = (args: {
     wasEmpty: boolean;
     fileName: string;
@@ -1330,29 +1435,14 @@ export default function VaultChatPanel({
         return;
       }
 
-      maybeShowFirstWin({
-        wasEmpty,
-        fileName: result.fileName,
-        summary: result.summary,
-        facts: result.facts,
-      });
-
-      const finalQuestion = autoQuestionForUpload({
-        kind: active?.profile_type,
-        fileName: result.fileName,
-        isImage: false,
-      });
-      await sendQuestion(finalQuestion, {
-        attachment: {
-          documentId: result.documentId,
-          fileName: result.fileName,
-          kind: "document",
-          previewUrl: null,
-        },
+      await handleAnalyzedUpload({
+        result,
+        file,
+        attachmentPreview: null,
+        userMsgId,
         userDisplayContent: "Try this sample document",
-        replaceUserMessageId: userMsgId,
+        wasEmpty,
       });
-      void refreshOnboarding();
     } catch (err) {
       setMessages((prev) => prev.filter((m) => m.id !== userMsgId));
       setError(
@@ -1417,6 +1507,36 @@ export default function VaultChatPanel({
       );
     } catch {
       /* non-blocking */
+    }
+  };
+
+  const clearChatScopedProfile = async () => {
+    if (!activeChatId) {
+      setMeta((prev) =>
+        prev ? { ...prev, chatScopedProfile: null } : prev
+      );
+      return;
+    }
+    try {
+      await fetch("/api/documents/vault-chat", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          withVaultChatProfileId(
+            {
+              chatId: activeChatId,
+              clearScopedProfile: true,
+            },
+            vaultProfileId
+          )
+        ),
+      });
+      setMeta((prev) =>
+        prev ? { ...prev, chatScopedProfile: null } : prev
+      );
+      void loadThread(activeChatId, { refresh: true, silent: true });
+    } catch {
+      setError("Couldn't return to your workspace. Try again.");
     }
   };
 
@@ -1627,6 +1747,8 @@ export default function VaultChatPanel({
     setSending(true);
     setError(null);
     setInput("");
+    setThinkingSteps([]);
+    setThinkingActiveIndex(0);
 
     const isRegenerate = Boolean(options?.regenerateAssistantId);
     const optimisticId = `local-${Date.now()}`;
@@ -1661,6 +1783,7 @@ export default function VaultChatPanel({
           ...(requestedWorkProjectId
             ? { workProjectId: requestedWorkProjectId }
             : {}),
+          ...(agentModeEnabled ? { agentMode: true } : {}),
         },
         vaultProfileId ?? profileId
       );
@@ -1720,6 +1843,7 @@ export default function VaultChatPanel({
         chats?: ChatSummary[];
         chatScopedProfile?: Meta["chatScopedProfile"];
         writeProfile?: { profileId: string; profileName: string };
+        actionTimeline?: ActionTimelineItem[];
       }) => {
         if (body.chats) setChats(body.chats);
         const resolvedChatId = body.chatId ?? activeChatIdRef.current;
@@ -1737,6 +1861,13 @@ export default function VaultChatPanel({
         }
         if (body.writeProfile?.profileId) {
           lastWriteProfileIdRef.current = body.writeProfile.profileId;
+        }
+        if (body.actionTimeline) {
+          setMeta((prev) =>
+            prev
+              ? { ...prev, actionTimeline: body.actionTimeline }
+              : prev
+          );
         }
         const turn = body.messages ?? [];
         const optimisticAttachment = options?.attachment;
@@ -1817,6 +1948,10 @@ export default function VaultChatPanel({
         await consumeVaultChatStream(res, {
           onMeta: (event) => {
             setStreamingAssistantId(streamId);
+            if (event.thinkingSteps?.length) {
+              setThinkingSteps(event.thinkingSteps);
+              setThinkingActiveIndex(0);
+            }
             if (event.chatId) {
               setActiveChatId(event.chatId);
               syncAskUrlRef.current(event.chatId);
@@ -1862,7 +1997,13 @@ export default function VaultChatPanel({
               ];
             });
           },
+          onThinking: (event) => {
+            setThinkingSteps(event.steps);
+            setThinkingActiveIndex(event.activeIndex);
+          },
           onDelta: (text) => {
+            setThinkingSteps([]);
+            setThinkingActiveIndex(0);
             setMessages((prev) =>
               prev.map((m) =>
                 m.id === streamId
@@ -1874,9 +2015,13 @@ export default function VaultChatPanel({
           onDone: (event) => {
             applyVaultChatTurn(event);
             setStreamingAssistantId(null);
+            setThinkingSteps([]);
+            setThinkingActiveIndex(0);
           },
           onError: (message, code) => {
             setStreamingAssistantId(null);
+            setThinkingSteps([]);
+            setThinkingActiveIndex(0);
             setMessages((prev) =>
               prev.filter(
                 (m) =>
@@ -1927,6 +2072,8 @@ export default function VaultChatPanel({
     } finally {
       setSending(false);
       setStreamingAssistantId(null);
+      setThinkingSteps([]);
+      setThinkingActiveIndex(0);
     }
   };
   sendQuestionRef.current = sendQuestion;
@@ -1996,33 +2143,17 @@ export default function VaultChatPanel({
           return;
         }
 
-        maybeShowFirstWin({
+        await handleAnalyzedUpload({
+          result,
+          file,
+          attachmentPreview,
+          userMsgId,
+          question,
+          userDisplayContent: question,
           wasEmpty:
             !onboardingProgress.hasDocument &&
             (meta?.documentCount ?? 0) + (meta?.photoCount ?? 0) === 0,
-          fileName: result.fileName,
-          summary: result.summary,
-          facts: result.facts,
         });
-
-        const finalQuestion =
-          question ||
-          autoQuestionForUpload({
-            kind: active?.profile_type,
-            fileName: result.fileName,
-            isImage: isImageUpload(file),
-          });
-        await sendQuestion(finalQuestion, {
-          attachment: {
-            documentId: result.documentId,
-            fileName: result.fileName,
-            kind: isImageUpload(file) ? "image" : "document",
-            previewUrl: attachmentPreview,
-          },
-          userDisplayContent: question,
-          replaceUserMessageId: userMsgId,
-        });
-        void refreshOnboarding();
       } catch (err) {
         setMessages((prev) => prev.filter((m) => m.id !== userMsgId));
         stageVaultFile(file);
@@ -2342,6 +2473,15 @@ export default function VaultChatPanel({
   const welcomeBlock = welcome && (
     <div className="mx-auto max-w-xl space-y-4 px-1 py-4 sm:py-6">
       {isPage ? <OnboardingProgressChip /> : null}
+      {meta?.actionTimeline && meta.actionTimeline.length > 0 ? (
+        <GideonActionTimeline events={meta.actionTimeline} />
+      ) : null}
+      {meta?.proactiveSuggestions && meta.proactiveSuggestions.length > 0 ? (
+        <GideonProactiveSuggestions suggestions={meta.proactiveSuggestions} />
+      ) : null}
+      {meta?.workspaceTimeline && meta.workspaceTimeline.length > 0 ? (
+        <GideonWorkspaceTimeline events={meta.workspaceTimeline} />
+      ) : null}
       <div className="flex items-start gap-3">
         <GideonAvatar size={44} />
         <div className="min-w-0 space-y-3">
@@ -2697,6 +2837,10 @@ export default function VaultChatPanel({
               </div>
             ) : (
               <div key={m.id} className="flex items-start gap-2.5">
+                {streamingAssistantId === m.id &&
+                thinkingSteps.length > 0 &&
+                !m.content.trim() ? null : (
+                  <>
                 <GideonAvatar size={40} variant="portrait" />
                 {renderAssistantContent(m, {
                   hideCitationPreviews:
@@ -2713,9 +2857,49 @@ export default function VaultChatPanel({
                       : undefined,
                   isStreaming: streamingAssistantId === m.id,
                 })}
+                  </>
+                )}
               </div>
             )
           )}
+          {pendingSmartUpload && profileId
+            ? (() => {
+                const presentation = buildSmartUploadPresentation(
+                  pendingSmartUpload.result,
+                  active?.display_name ?? meta?.profileName ?? "your vault"
+                );
+                if (!presentation) return null;
+                return (
+                  <SmartUploadSuggestionCard
+                    presentation={presentation}
+                    onSaved={async ({ profilePath }) => {
+                      void recordClientActionEvent({
+                        actionId: "save_document",
+                        label: "Saved document",
+                        phase: "executed",
+                        profileId,
+                        message: profilePath ?? pendingSmartUpload.result.fileName,
+                      });
+                      const pending = pendingSmartUpload;
+                      setPendingSmartUpload(null);
+                      await loadMetaAndChats().catch(() => undefined);
+                      if (profilePath) {
+                        pushLocalNote(`Saved to ${profilePath}.`);
+                      }
+                      await continueUploadChat(pending);
+                      void refreshOnboarding();
+                    }}
+                    onKeepHere={async () => {
+                      const pending = pendingSmartUpload;
+                      setPendingSmartUpload(null);
+                      await continueUploadChat(pending);
+                      void refreshOnboarding();
+                    }}
+                    onError={(message) => setError(message)}
+                  />
+                );
+              })()
+            : null}
           {(sending || vaultBusy || savingLog) && !streamingAssistantId && (
             <div className="flex items-center gap-2 text-xs text-ink-muted">
               <GideonAvatar size={40} variant="portrait" pulse />
@@ -2726,6 +2910,14 @@ export default function VaultChatPanel({
                   : loadingLabel}
             </div>
           )}
+          {thinkingSteps.length > 0 &&
+          streamingAssistantId &&
+          !messages.find((m) => m.id === streamingAssistantId)?.content ? (
+            <GideonThinkingPanel
+              steps={thinkingSteps}
+              activeIndex={thinkingActiveIndex}
+            />
+          ) : null}
         </>
       )}
       <div ref={bottomRef} />
@@ -2757,26 +2949,41 @@ export default function VaultChatPanel({
     </div>
   ) : null;
 
-  const contextStrip =
-    meta?.chatContextLabel || meta?.templateLabel ? (
-      <div
-        className={
-          isPage || isDrawer
-            ? "shrink-0 border-t border-stone-100 px-4 pt-2 sm:px-8"
-            : "mt-2 px-0.5"
-        }
-      >
-        <div className={isPage ? "mx-auto max-w-3xl" : undefined}>
-          <p className="text-[11px] font-medium text-foreground">
-            {meta.chatContextLabel ??
-              `You are chatting with Gideon ${meta.templateLabel}`}
-          </p>
-          <p className="text-[11px] text-ink-muted">
-            {meta.vaultScopeNote ?? VAULT_SCOPE_NOTE}
-          </p>
-        </div>
+  const workingInDisplay = effectiveProfile
+    ? buildWorkingInDisplay({
+        workspaceProfile: effectiveProfile,
+        scopedProfile: scopedProfile ?? undefined,
+        chatScopedProfile: meta?.chatScopedProfile ?? null,
+        vaultScopeNote: meta?.vaultScopeNote ?? null,
+      })
+    : null;
+
+  const workspaceContextBar = workingInDisplay ? (
+    <div
+      className={
+        isPage || isDrawer
+          ? "shrink-0 border-b border-stone-100 px-4 py-2 sm:px-8"
+          : "mb-2 px-0.5"
+      }
+    >
+      <div className={isPage ? "mx-auto max-w-3xl" : undefined}>
+        <WorkspaceContextBar
+          display={workingInDisplay}
+          profiles={profiles}
+          activeProfileId={effectiveProfile?.id ?? profileId ?? ""}
+          onSwitchWorkspace={(id) => void switchProfile(id)}
+          onReturnToWorkspace={
+            workingInDisplay.mode === "searching"
+              ? () => void clearChatScopedProfile()
+              : undefined
+          }
+          onOpenSearch={
+            isPage ? () => setVaultSearchOpen(true) : undefined
+          }
+        />
       </div>
-    ) : null;
+    </div>
+  ) : null;
 
   const composer = (
     <form
@@ -2910,6 +3117,7 @@ export default function VaultChatPanel({
             </div>
 
             <div className="flex items-center gap-1">
+              <AgentModeToggle compact className="sm:hidden" />
               {voiceSupported ? (
                 <button
                   type="button"
@@ -3199,7 +3407,7 @@ export default function VaultChatPanel({
           />
         )}
         <ImminentReminderBanner profileId={profileId} />
-        {contextStrip}
+        {workspaceContextBar}
         {composer}
         {vaultOverlays}
       </div>
@@ -3237,7 +3445,7 @@ export default function VaultChatPanel({
         )}
         <ImminentReminderBanner profileId={profileId} />
         {workMemoryBanner}
-        {contextStrip}
+        {workspaceContextBar}
         {composer}
         {vaultOverlays}
       </div>
@@ -3310,6 +3518,7 @@ export default function VaultChatPanel({
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+            <AgentModeToggle compact className="hidden sm:inline-flex" />
             <Link
               href={docsHref}
               aria-label="Documents"
@@ -3340,6 +3549,8 @@ export default function VaultChatPanel({
           </div>
         )}
 
+        {workspaceContextBar}
+
         {messageList}
 
         {error && (
@@ -3352,10 +3563,13 @@ export default function VaultChatPanel({
 
         <ImminentReminderBanner profileId={profileId} />
         {workMemoryBanner}
-        {contextStrip}
         {composer}
       </div>
     </div>
+    <GlobalVaultSearch
+      open={vaultSearchOpen}
+      onClose={() => setVaultSearchOpen(false)}
+    />
     {vaultOverlays}
     {sideVault ? (
       <VaultChatDrawer

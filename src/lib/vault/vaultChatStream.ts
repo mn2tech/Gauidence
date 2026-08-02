@@ -27,6 +27,15 @@ export type VaultChatStreamChatSummary = {
   created_at: string;
 };
 
+export type ActionTimelineItem = {
+  id: string;
+  actionId: string;
+  label: string;
+  phase: string;
+  message: string | null;
+  createdAt: string;
+};
+
 export type VaultChatStreamDone = {
   type: "done";
   chatId: string;
@@ -37,10 +46,17 @@ export type VaultChatStreamDone = {
   vaultScope?: VaultChatStreamMessage["vaultScope"];
   writeProfile?: { profileId: string; profileName: string };
   chatScopedProfile?: { profileId: string; profileName: string } | null;
+  actionTimeline?: ActionTimelineItem[];
 };
 
 export type VaultChatStreamEvent =
-  | { type: "meta"; chatId: string; userMsg: VaultChatStreamMessage }
+  | {
+      type: "meta";
+      chatId: string;
+      userMsg: VaultChatStreamMessage;
+      thinkingSteps?: string[];
+    }
+  | { type: "thinking"; steps: string[]; activeIndex: number }
   | { type: "delta"; text: string }
   | VaultChatStreamDone
   | { type: "error"; error: string; code?: string };
@@ -65,6 +81,9 @@ export async function consumeVaultChatStream(
   response: Response,
   handlers: {
     onMeta?: (event: Extract<VaultChatStreamEvent, { type: "meta" }>) => void;
+    onThinking?: (
+      event: Extract<VaultChatStreamEvent, { type: "thinking" }>
+    ) => void;
     onDelta?: (text: string) => void;
     onDone?: (event: VaultChatStreamDone) => void;
     onError?: (error: string, code?: string) => void;
@@ -92,6 +111,8 @@ export async function consumeVaultChatStream(
       if (!event) continue;
       if (event.type === "meta") {
         handlers.onMeta?.(event);
+      } else if (event.type === "thinking") {
+        handlers.onThinking?.(event);
       } else if (event.type === "delta") {
         handlers.onDelta?.(event.text);
       } else if (event.type === "done") {

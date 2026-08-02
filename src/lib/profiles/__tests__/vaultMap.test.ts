@@ -1,6 +1,10 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { buildVaultMapTree } from "../vaultMap.ts";
+import {
+  buildVaultMapTree,
+  formatVaultMapForGideon,
+  vaultMapPathToProfile,
+} from "../vaultMap.ts";
 import type { GuardianProfile } from "../types.ts";
 
 function sample(
@@ -140,5 +144,55 @@ describe("vault map tree", () => {
 
   it("returns null when there are no profiles", () => {
     assert.equal(buildVaultMapTree([], "Danny"), null);
+  });
+
+  it("formats vault map for Gideon with active vault marked", () => {
+    const familyId = "fam-1";
+    const businessId = "biz-1";
+    const profiles = [
+      sample({
+        id: businessId,
+        display_name: "Acme Co",
+        profile_type: "business",
+      }),
+      sample({
+        id: familyId,
+        display_name: "Our Family",
+        profile_type: "family",
+      }),
+      sample({
+        id: "cl1",
+        display_name: "Big Client",
+        profile_type: "client",
+        parent_profile_id: businessId,
+      }),
+    ];
+
+    const text = formatVaultMapForGideon(profiles, "Danny", "cl1");
+    assert.match(text, /Active vault path: Danny → Acme Co → Big Client/);
+    assert.match(text, /Big Client \(Client\) ← active vault/);
+    assert.match(text, /Clients:/);
+    assert.match(text, /Acme Co \(Business\)/);
+  });
+
+  it("builds breadcrumb path for nested client vault", () => {
+    const businessId = "biz-1";
+    const profiles = [
+      sample({
+        id: businessId,
+        display_name: "NM2TECH",
+        profile_type: "business",
+      }),
+      sample({
+        id: "cl1",
+        display_name: "Crossroads Connect",
+        profile_type: "client",
+        parent_profile_id: businessId,
+      }),
+    ];
+    assert.equal(
+      vaultMapPathToProfile(profiles, "Danny", "cl1"),
+      "Danny → NM2TECH → Crossroads Connect"
+    );
   });
 });

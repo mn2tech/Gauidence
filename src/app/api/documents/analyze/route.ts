@@ -278,20 +278,36 @@ export async function POST(request: Request) {
     void Promise.all([
       import("@/lib/knowledge/trigger-knowledge-engine"),
       import("@/lib/knowledge/document-analysis-context"),
-    ]).then(([{ triggerKnowledgeEngine }, { buildDocumentAnalysisContext }]) =>
-      triggerKnowledgeEngine({
-        sourceType: "document",
-        sourceId: doc.id,
-        profileId,
-        vaultId: profileId,
-        content: sourceText?.trim() || analysis.summary?.trim() || "",
-        metadata: {
-          fileName: doc.file_name,
-          documentType: analysis.document_type,
-          title: analysis.title,
-        },
-        analysisContext: buildDocumentAnalysisContext(analysis),
-      })
+      import("@/lib/profiles/server"),
+    ]).then(
+      ([
+        { triggerKnowledgeEngine },
+        { buildDocumentAnalysisContext },
+        { listGuardianProfiles },
+      ]) =>
+        listGuardianProfiles(supabase, user.id).then((profiles) =>
+          triggerKnowledgeEngine(
+            {
+              sourceType: "document",
+              sourceId: doc.id,
+              profileId,
+              vaultId: profileId,
+              content:
+                sourceText?.trim() || analysis.summary?.trim() || "",
+              metadata: {
+                fileName: doc.file_name,
+                documentType: analysis.document_type,
+                title: analysis.title,
+              },
+              analysisContext: buildDocumentAnalysisContext(analysis),
+            },
+            {
+              userId: user.id,
+              supabase,
+              profileNames: profiles.map((p) => p.display_name),
+            }
+          )
+        )
     );
 
     return NextResponse.json({

@@ -12,6 +12,8 @@ import {
   type SearchResult,
 } from "@/lib/search";
 import { listGuardianProfiles } from "@/lib/profiles/server";
+import { resolveWorkspaceScopes } from "@/lib/workspace-context/scopes";
+import type { SearchScopeMode } from "@/lib/workspace-context/searchScope";
 
 export const runtime = "nodejs";
 
@@ -71,14 +73,32 @@ export async function GET(request: Request) {
     );
   }
 
+  const scopeParam = url.searchParams.get("scope");
+  const scope: SearchScopeMode =
+    scopeParam === "global" ? "global" : "workspace";
+  const profileIdParam = url.searchParams.get("profileId");
+
   const pattern = buildIlikePattern(query);
   const lower = query.toLowerCase();
 
   const accessible = await listGuardianProfiles(supabase, user.id);
   if (accessible.length === 0) {
-    return NextResponse.json({ results: [], query });
+    return NextResponse.json({ results: [], query, scope });
   }
   const accessibleIds = accessible.map((p) => p.id);
+
+  let searchProfileIds = accessibleIds;
+  if (scope === "workspace" && profileIdParam) {
+    const anchor = accessible.find((p) => p.id === profileIdParam);
+    if (anchor) {
+      const workspaceMeta = resolveWorkspaceScopes({
+        accessibleProfiles: accessible,
+        activeProfile: anchor,
+        chatHomeProfileId: anchor.id,
+      });
+      searchProfileIds = workspaceMeta.searchProfileIds;
+    }
+  }
 
   const { data: allProfiles, error: profilesError } = await supabase
     .from("guardian_profiles")
@@ -97,6 +117,7 @@ export async function GET(request: Request) {
 
   const profiles = (allProfiles ?? []) as ProfileRow[];
   const pathFor = (profileId: string) => buildProfilePath(profiles, profileId);
+  const scopedProfileSet = new Set(searchProfileIds);
 
   const [
     logsRes,
@@ -110,7 +131,7 @@ export async function GET(request: Request) {
       .select(
         "id, profile_id, log_date, title, content, category, tags, updated_at"
       )
-      .in("profile_id", accessibleIds)
+      .in("profile_id", searchProfileIds)
       .or(
         `title.ilike.${pattern},content.ilike.${pattern},category.ilike.${pattern}`
       )
@@ -121,7 +142,7 @@ export async function GET(request: Request) {
       .select(
         "id, profile_id, file_name, category, analysis_status, created_at"
       )
-      .in("profile_id", accessibleIds)
+      .in("profile_id", searchProfileIds)
       .or(`file_name.ilike.${pattern},category.ilike.${pattern}`)
       .order("created_at", { ascending: false })
       .limit(40),
@@ -130,7 +151,7 @@ export async function GET(request: Request) {
       .select(
         "document_id, profile_id, title, summary, document_type, facts, updated_at"
       )
-      .in("profile_id", accessibleIds)
+      .in("profile_id", searchProfileIds)
       .or(`title.ilike.${pattern},summary.ilike.${pattern}`)
       .order("updated_at", { ascending: false })
       .limit(40),
@@ -138,7 +159,7 @@ export async function GET(request: Request) {
       .from("vault_chats")
       .select("id, profile_id, title, updated_at")
       .eq("user_id", user.id)
-      .in("profile_id", accessibleIds)
+      .in("profile_id", searchProfileIds)
       .ilike("title", pattern)
       .order("updated_at", { ascending: false })
       .limit(40),
@@ -155,6 +176,7 @@ export async function GET(request: Request) {
 
   // Profiles (filter in memory — all owned profiles already loaded)
   for (const p of profiles) {
+    if (scope === "workspace" && !scopedProfileSet.has(p.id)) continue;
     const hay = [
       p.display_name,
       p.relationship,
@@ -218,7 +240,7 @@ export async function GET(request: Request) {
       .select(
         "id, profile_id, log_date, title, content, category, tags, updated_at"
       )
-      .in("profile_id", accessibleIds)
+      .in("profile_id", searchProfileIds)
       .contains("tags", [query])
       .limit(20);
     const seen = new Set(results.filter((r) => r.kind === "daily_log").map((r) => r.id));
@@ -378,6 +400,7 @@ export async function GET(request: Request) {
   for (const msg of messagesRes.data ?? []) {
     const chat = chatById.get(msg.chat_id);
     if (!chat) continue;
+    if (scope === "workspace" && !scopedProfileSet.has(chat.profile_id)) continue;
     if (seenChats.has(chat.id)) {
       // Prefer keeping title match; optionally bump score if message is strong
       continue;
@@ -405,10 +428,14 @@ export async function GET(request: Request) {
     });
   }
 
-  const capped = sortAndCapResults(results);
+  const capped = sortAndCapResults(results).map((r) => ({
+    ...r,
+    confidence: Math.min(100, Math.max(0, r.score)),
+  }));
 
   return NextResponse.json({
     query,
+    scope,
     results: capped,
     counts: {
       profiles: capped.filter((r) => r.kind === "profile").length,

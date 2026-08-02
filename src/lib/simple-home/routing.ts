@@ -8,6 +8,7 @@ import {
 export const SIMPLE_HOME_PATH = "/home";
 export const ASK_GIDEON_PATH = "/ask";
 export const VAULTS_PATH = "/vaults";
+export const COMMAND_CENTER_PATH = "/command-center";
 
 /** Default signed-in landing page when simple home is enabled. */
 export function signedInLandingPath(

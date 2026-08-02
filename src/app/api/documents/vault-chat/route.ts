@@ -8,291 +8,59 @@ import {
 } from "@/lib/chat/context";
 import { generateVaultChatTitle } from "@/lib/chat/generateVaultChatTitle";
 import { shouldGenerateVaultChatTitle } from "@/lib/chat/vaultChatTitle";
-import { embedQuery, isVaultEmbeddingConfigured } from "@/lib/vault/embeddings";
-import {
-  formatRetrievalContext,
-  VAULT_CHAT_SYSTEM,
-} from "@/lib/vault/indexDocument";
-import { wantsShowPictures } from "@/lib/vault/images";
-import { buildAskVaultInventory, formatVaultFileListForGideon } from "@/lib/vault/askInventory";
+import { isVaultEmbeddingConfigured } from "@/lib/vault/embeddings";
+import { buildAskVaultInventory } from "@/lib/vault/askInventory";
 import { ensureUserVaultIndexed } from "@/lib/vault/ensureIndexed";
-import { retrieveAllAccessibleVaultChunks } from "@/lib/vault/rollup";
 import {
   buildGideonSuggestions,
   buildGideonLogSuggestions,
   buildGideonVaultGuidance,
-  buildGideonTodayNote,
   buildCurrentTimeAnswer,
   buildTodayDateAnswer,
   isSimpleCurrentTimeQuestion,
   isSimpleTodayDateQuestion,
-  firstNameFrom,
   getVaultTemplate,
-  gideonChatContextLabel,
-  GIDEON_ATTACHED_DOCUMENT_NOTE,
-  GIDEON_CROSS_VAULT_NOTE,
-  GIDEON_TRANSCRIPTION_NOTE,
-  buildVaultScopeNote,
-  wantsTranscription,
-  withVaultPersonality,
-  type SuggestionProfileKind,
+  firstNameFrom,
   type VaultDocHint,
 } from "@/lib/vault/gideon";
-import {
-  loadAttachedVaultDocument,
-} from "@/lib/vault/attachedDocument";
-import { mergePinnedChunks } from "@/lib/vault/retrieve";
-import {
-  buildVaultChatRetrievalScopes,
-  chatScopedProfilePayload,
-} from "@/lib/vault/detectVaultScope";
+import { loadAttachedVaultDocument } from "@/lib/vault/attachedDocument";
+import { chatScopedProfilePayload } from "@/lib/vault/detectVaultScope";
 import {
   listGuardianProfiles,
   getActiveGuardianProfile,
   requireAccessibleGuardianProfile,
 } from "@/lib/profiles/server";
 import type { GuardianProfile } from "@/lib/profiles/types";
-import {
-  askGideonContextLabel,
-  canHaveLinkedEmployees,
-  canHaveLinkedFamilyMembers,
-  canHaveLinkedHobbies,
-  canHaveLinkedHomes,
-  canHaveLinkedVehicles,
-  formatLinkedClientsForGideon,
-  formatLinkedEmployeesForGideon,
-  formatLinkedFamilyForGideon,
-  formatLinkedHobbiesForGideon,
-  formatLinkedVehiclesForGideon,
-  type GuardianProfileType,
-} from "@/lib/profiles/types";
-import {
-  formatDailyLogsForGideon,
-  retrieveRelevantDailyLogs,
-} from "@/lib/logs/retrieve";
-import {
-  formatAlertsForGideon,
-  retrieveUpcomingAlertsForGideon,
-} from "@/lib/reminders/retrieve";
-import {
-  parseProposedReminder,
-  wantsReminderAgent,
-  REMINDER_AGENT_SYSTEM_NOTE,
-} from "@/lib/reminders/propose";
+import { askGideonContextLabel } from "@/lib/profiles/types";
+import { parseProposedReminder } from "@/lib/reminders/propose";
 import { withLlmUsage } from "@/lib/usage/record";
 import { assertBillingQuota, recordChatEvent } from "@/lib/billing/quota";
 import { refreshUserAwards } from "@/lib/awards/grant";
-import { formatWorkMemoryForGideon } from "@/lib/work-memory/context";
-import {
-  loadWorkMemoryForGideon,
-  loadWorkMemoryProjectForGideon,
-} from "@/lib/work-memory/server";
 import { createVaultChatStreamResponse } from "@/lib/vault/vaultChatStream.server";
 import { formatVaultChatError } from "@/lib/vault/vaultChatErrors";
 import { isChatLlmConfigured } from "@/lib/analysis/chatProvider";
-import { canAccessGuardianPayroll } from "@/lib/features/payroll";
+import { runDirectAction } from "@/lib/actions/runner.server";
+import { getMatchingActions } from "@/lib/actions/registry";
+import { buildGideonThinkingSteps } from "@/lib/actions/thinkingSteps";
 import {
-  answerPayrollGideonQuery,
-  wantsPayrollQuery,
-} from "@/lib/payroll/gideonChat";
-
-async function loadLinkedOrgContext(
-  supabase: SupabaseClient,
-  userId: string,
-  active: { id: string; display_name: string; profile_type: GuardianProfileType }
-): Promise<string> {
-  if (canHaveLinkedEmployees(active.profile_type)) {
-    const [{ data: employees }, { data: clients }, { data: homes }] =
-      await Promise.all([
-        supabase
-          .from("guardian_profiles")
-          .select("display_name, job_title, department, description")
-          .eq("owner_user_id", userId)
-          .eq("parent_profile_id", active.id)
-          .eq("profile_type", "employee")
-          .order("display_name", { ascending: true }),
-        supabase
-          .from("guardian_profiles")
-          .select("display_name, job_title, department, description")
-          .eq("owner_user_id", userId)
-          .eq("parent_profile_id", active.id)
-          .eq("profile_type", "client")
-          .order("display_name", { ascending: true }),
-        canHaveLinkedHomes(active.profile_type)
-          ? supabase
-              .from("guardian_profiles")
-              .select("display_name")
-              .eq("owner_user_id", userId)
-              .eq("parent_profile_id", active.id)
-              .eq("profile_type", "home")
-              .order("display_name", { ascending: true })
-          : Promise.resolve({ data: [] as { display_name: string }[] }),
-      ]);
-    const parts = [
-      formatLinkedEmployeesForGideon(active.display_name, employees ?? []),
-      formatLinkedClientsForGideon(active.display_name, clients ?? []),
-    ];
-    if ((homes ?? []).length > 0) {
-      parts.push(
-        `Linked homes under this organization: ${(homes ?? [])
-          .map((h) => h.display_name)
-          .join(", ")}`
-      );
-    }
-    if (canHaveLinkedVehicles(active.profile_type)) {
-      const { data: vehicles } = await supabase
-        .from("guardian_profiles")
-        .select("display_name, description")
-        .eq("owner_user_id", userId)
-        .eq("parent_profile_id", active.id)
-        .eq("profile_type", "vehicle")
-        .order("display_name", { ascending: true });
-      if ((vehicles ?? []).length > 0) {
-        parts.push(
-          formatLinkedVehiclesForGideon(active.display_name, vehicles ?? [])
-        );
-      }
-    }
-    return parts.join("\n\n");
-  }
-
-  if (canHaveLinkedFamilyMembers(active.profile_type)) {
-    const types = [
-      "child",
-      "spouse_partner",
-      "parent",
-      "family_member",
-      "student",
-      "pet",
-      "vehicle",
-      "hobby",
-      ...(canHaveLinkedHomes(active.profile_type) ? (["home"] as const) : []),
-    ];
-    const { data: members } = await supabase
-      .from("guardian_profiles")
-      .select("display_name, profile_type, relationship, description")
-      .eq("owner_user_id", userId)
-      .eq("parent_profile_id", active.id)
-      .in("profile_type", types)
-      .order("display_name", { ascending: true });
-    const people = (members ?? []).filter(
-      (m) =>
-        m.profile_type !== "home" &&
-        m.profile_type !== "pet" &&
-        m.profile_type !== "vehicle" &&
-        m.profile_type !== "hobby" &&
-        m.profile_type !== "student"
-    );
-    const students = (members ?? []).filter((m) => m.profile_type === "student");
-    const pets = (members ?? []).filter((m) => m.profile_type === "pet");
-    const hobbies = (members ?? []).filter((m) => m.profile_type === "hobby");
-    const homes = (members ?? []).filter((m) => m.profile_type === "home");
-    const vehicles = (members ?? []).filter((m) => m.profile_type === "vehicle");
-    const parts = [formatLinkedFamilyForGideon(active.display_name, people)];
-    if (students.length > 0) {
-      parts.push(
-        `Linked student profiles under this family: ${students
-          .map((s) => s.display_name)
-          .join(", ")}`
-      );
-    }
-    if (pets.length > 0) {
-      parts.push(
-        `Linked pets under this family: ${pets
-          .map((p) => p.display_name)
-          .join(", ")}`
-      );
-    }
-    if (hobbies.length > 0) {
-      parts.push(
-        formatLinkedHobbiesForGideon(
-          active.display_name,
-          hobbies.map((h) => ({
-            display_name: h.display_name,
-            description: h.description ?? null,
-          }))
-        )
-      );
-    }
-    if (homes.length > 0) {
-      parts.push(
-        `Linked homes under this family: ${homes
-          .map((h) => h.display_name)
-          .join(", ")}`
-      );
-    }
-    if (vehicles.length > 0) {
-      parts.push(
-        formatLinkedVehiclesForGideon(
-          active.display_name,
-          vehicles.map((v) => ({
-            display_name: v.display_name,
-            description: v.description ?? null,
-          }))
-        )
-      );
-    }
-    return parts.join("\n\n");
-  }
-
-  if (
-    canHaveLinkedHobbies(active.profile_type) &&
-    active.profile_type !== "family"
-  ) {
-    const { data: hobbies } = await supabase
-      .from("guardian_profiles")
-      .select("display_name, description")
-      .eq("owner_user_id", userId)
-      .eq("parent_profile_id", active.id)
-      .eq("profile_type", "hobby")
-      .order("display_name", { ascending: true });
-    if ((hobbies ?? []).length === 0) return "";
-    return formatLinkedHobbiesForGideon(active.display_name, hobbies ?? []);
-  }
-
-  if (active.profile_type === "vehicles") {
-    const { data: vehicles } = await supabase
-      .from("guardian_profiles")
-      .select("display_name, description")
-      .eq("owner_user_id", userId)
-      .eq("parent_profile_id", active.id)
-      .eq("profile_type", "vehicle")
-      .order("display_name", { ascending: true });
-    return formatLinkedVehiclesForGideon(active.display_name, vehicles ?? []);
-  }
-
-  return "";
-}
-
-function suggestionKindFrom(
-  type: GuardianProfileType
-): SuggestionProfileKind {
-  if (type === "child" || type === "student") return type;
-  if (type === "teacher") return type;
-  if (
-    type === "business" ||
-    type === "non_profit" ||
-    type === "employee" ||
-    type === "client"
-  ) {
-    return type === "non_profit" ? "non_profit" : type;
-  }
-  if (type === "vehicle" || type === "home" || type === "pet" || type === "hobby") {
-    return type;
-  }
-  if (
-    type === "spouse_partner" ||
-    type === "parent" ||
-    type === "family_member"
-  ) {
-    return "family";
-  }
-  if (type === "family" || type === "vehicles") {
-    return type === "family" ? "family" : "other";
-  }
-  if (type === "personal") return "personal";
-  return "other";
-}
+  listActionTimeline,
+  recordActionEvent,
+  startOfUtcDay,
+} from "@/lib/actions/events";
+import type { ActionContext } from "@/lib/actions/types";
+import { isKnowledgeEngineEnabled } from "@/lib/features/knowledge-engine";
+import {
+  listProactiveSuggestions,
+  listWorkspaceTimeline,
+} from "@/lib/knowledge/queries";
+import {
+  askGideonScopeMeta,
+  buildGideonSystemPrompt,
+  gideonMaxTokens,
+  loadWorkspaceContext,
+  resolveWorkspaceScopes,
+  suggestionKindFrom,
+} from "@/lib/workspace-context";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -384,45 +152,6 @@ function vaultProfileNotFoundResponse(profileIdOverride?: string | null) {
     },
     { status: 400 }
   );
-}
-
-async function askGideonScopeMeta(
-  supabase: SupabaseClient,
-  userId: string,
-  active: { id: string; display_name: string; profile_type: GuardianProfileType },
-  options?: {
-    chatHomeProfileId?: string;
-    chatScopedProfileId?: string | null;
-  }
-) {
-  const profileKind = suggestionKindFrom(active.profile_type);
-  const accessibleProfiles = await listGuardianProfiles(supabase, userId);
-  const chatHomeProfileId = options?.chatHomeProfileId ?? active.id;
-  const retrievalScopes = buildVaultChatRetrievalScopes({
-    accessibleProfiles: accessibleProfiles.map((p) => ({
-      id: p.id,
-      display_name: p.display_name,
-      profile_type: p.profile_type,
-    })),
-    chatHomeProfileId,
-    scopedProfileId: options?.chatScopedProfileId,
-  });
-  const scopedProfile =
-    typeof options?.chatScopedProfileId === "string"
-      ? accessibleProfiles.find((p) => p.id === options.chatScopedProfileId) ??
-        null
-      : null;
-  return {
-    profileKind,
-    chatContextLabel: gideonChatContextLabel(profileKind, active.display_name),
-    vaultScopeNote: buildVaultScopeNote({
-      displayName: active.display_name,
-      profileKind,
-      allVaultNames: accessibleProfiles.map((p) => p.display_name),
-      searchVaultNames: retrievalScopes.map((p) => p.display_name),
-      chatScopedProfileName: scopedProfile?.display_name,
-    }),
-  };
 }
 
 function titleFromQuestion(question: string): string {
@@ -762,6 +491,26 @@ export async function GET(request: Request) {
 
     const scopeMeta = await askGideonScopeMeta(supabase, user.id, active);
 
+    const actionTimeline = await listActionTimeline(supabase, user.id, {
+      since: startOfUtcDay(),
+      limit: 12,
+      profileId: active.id,
+    });
+
+    const intelligenceEnabled = isKnowledgeEngineEnabled();
+    const [proactiveSuggestions, workspaceTimeline] = intelligenceEnabled
+      ? await Promise.all([
+          listProactiveSuggestions(supabase, user.id, {
+            profileId: active.id,
+            limit: 5,
+          }),
+          listWorkspaceTimeline(supabase, user.id, {
+            profileId: active.id,
+            limit: 6,
+          }),
+        ])
+      : [[], []];
+
     const { data: account } = await supabase
       .from("profiles")
       .select("full_name")
@@ -797,6 +546,9 @@ export async function GET(request: Request) {
         vaultScopeNote: scopeMeta.vaultScopeNote,
         templateLabel: template.label,
         templateBadge: template.badge,
+        actionTimeline,
+        proactiveSuggestions: intelligenceEnabled ? proactiveSuggestions : undefined,
+        workspaceTimeline: intelligenceEnabled ? workspaceTimeline : undefined,
       },
     });
   }
@@ -970,6 +722,7 @@ export async function POST(request: Request) {
   let clearScopedProfile = false;
   let setScopedProfileRaw: unknown;
   let profileIdRaw: unknown;
+  let agentMode = false;
   try {
     const body = await request.json();
     questionRaw = body.question;
@@ -980,6 +733,7 @@ export async function POST(request: Request) {
     clearScopedProfile = body.clearScopedProfile === true;
     setScopedProfileRaw = body.setScopedProfile;
     profileIdRaw = body.profileId;
+    agentMode = body.agentMode === true;
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
@@ -1110,20 +864,15 @@ export async function POST(request: Request) {
     chatScopedProfileId = scopedMatch.id;
   }
 
-  const retrievalScopes = buildVaultChatRetrievalScopes({
-    accessibleProfiles: accessibleProfiles.map((p) => ({
-      id: p.id,
-      display_name: p.display_name,
-      profile_type: p.profile_type,
-    })),
+  const workspaceMeta = resolveWorkspaceScopes({
+    accessibleProfiles,
+    activeProfile: active,
     chatHomeProfileId,
-    scopedProfileId: chatScopedProfileId,
+    chatScopedProfileId,
   });
+  const { retrievalScopes, searchProfileIds: allSearchIds, profileNames } =
+    workspaceMeta;
   const accessibleProfileIds = accessibleProfiles.map((p) => p.id);
-  const profileNames = Object.fromEntries(
-    retrievalScopes.map((s) => [s.id, s.display_name])
-  );
-  const allSearchIds = retrievalScopes.map((s) => s.id);
 
   try {
     await Promise.all(
@@ -1276,7 +1025,7 @@ export async function POST(request: Request) {
     profileName?: string;
     isImage?: boolean;
   }[] = [];
-  let answer: string;
+  let answer: string | undefined;
   let attachedFileName: string | undefined;
   let responseVaultScope: ChatMessageRow["vaultScope"] = null;
   let writeProfile = {
@@ -1289,233 +1038,109 @@ export async function POST(request: Request) {
       ? attachmentDocumentIdRaw.trim()
       : "";
 
+  const actionCtx: ActionContext = {
+    question,
+    userId: user.id,
+    userEmail: user.email,
+    activeProfile: {
+      id: active.id,
+      display_name: active.display_name,
+      profile_type: active.profile_type,
+      parent_profile_id: active.parent_profile_id,
+    },
+    supabase,
+  };
+
   if (isSimpleTodayDateQuestion(question) && !attachmentDocumentId) {
     answer = buildTodayDateAnswer(userTz);
   } else if (isSimpleCurrentTimeQuestion(question) && !attachmentDocumentId) {
     answer = buildCurrentTimeAnswer(userTz);
-  } else if (
-    !attachmentDocumentId &&
-    canAccessGuardianPayroll({ email: user.email }) &&
-    wantsPayrollQuery(question) &&
-    (canHaveLinkedEmployees(active.profile_type) ||
-      (active.profile_type === "employee" && active.parent_profile_id))
-  ) {
-    const payrollProfileId =
-      active.profile_type === "employee" && active.parent_profile_id
-        ? active.parent_profile_id
-        : active.id;
-    const payrollAnswer = await answerPayrollGideonQuery(supabase, {
-      query: question,
-      profileId: payrollProfileId,
-      employeeProfileId:
-        active.profile_type === "employee" ? active.id : undefined,
-      userId: user.id,
-    });
-    let payrollText = payrollAnswer?.message ?? "Open Payroll for more options.";
-    if (payrollAnswer?.href) {
-      payrollText += `\n\n→ ${payrollAnswer.href}`;
-    }
-    if (payrollAnswer?.requiresConfirmation) {
-      if (
-        payrollAnswer.intent === "clock_in" ||
-        payrollAnswer.intent === "clock_out"
-      ) {
-        payrollText +=
-          '\n\nReply "yes, clock in" or "yes, clock out" to confirm.';
-      } else {
-        payrollText +=
-          "\n\nI cannot approve or share payroll without your explicit confirmation on the Payroll report page.";
+  } else if (!attachmentDocumentId) {
+    const directAnswer = await runDirectAction(actionCtx);
+    if (directAnswer) {
+      answer = directAnswer.message;
+      const matched = getMatchingActions(actionCtx);
+      for (const action of matched) {
+        await recordActionEvent(supabase, {
+          userId: user.id,
+          profileId: active.id,
+          chatId,
+          actionId: action.id,
+          label: action.label,
+          phase: "executed",
+          message: directAnswer.message.slice(0, 500),
+        });
       }
     }
-    answer = payrollText;
-  } else {
-  try {
-    const showPictures = wantsShowPictures(question);
-    const attachedDoc = attachmentDocumentId
-      ? await loadAttachedVaultDocument(supabase, {
-          userId: user.id,
-          documentId: attachmentDocumentId,
-          allowedProfileIds: accessibleProfileIds,
-          profileNames,
-        })
-      : null;
-    attachedFileName = attachedDoc?.fileName;
+  }
 
-    const queryEmbedding =
-      (chunkCount ?? 0) > 0
-        ? await embedQuery(question).catch((embedErr) => {
-            console.warn(
-              "Vault chat embedding failed; continuing without document search:",
-              embedErr instanceof Error ? embedErr.message : "error"
-            );
-            return null;
+  if (!answer) {
+    try {
+      const workProjectId =
+        typeof workProjectIdRaw === "string" ? workProjectIdRaw.trim() : "";
+      const attachedDoc = attachmentDocumentId
+        ? await loadAttachedVaultDocument(supabase, {
+            userId: user.id,
+            documentId: attachmentDocumentId,
+            allowedProfileIds: accessibleProfileIds,
+            profileNames,
           })
         : null;
-    const matchCount = showPictures ? 10 : 8;
-    const retrievedChunks = queryEmbedding
-      ? await retrieveAllAccessibleVaultChunks(
-          supabase,
-          queryEmbedding,
-          retrievalScopes,
-          matchCount
-        )
-      : [];
-    const chunks = mergePinnedChunks(
-      attachedDoc?.chunks ?? [],
-      retrievedChunks
-    );
-    const formatted = formatRetrievalContext(chunks);
-    const dailyLogs = await retrieveRelevantDailyLogs(supabase, {
-      profileId: active.id,
-      profileIds: allSearchIds,
-      profileNames,
-      question,
-      limit: retrievalScopes.length > 1 ? 6 : 4,
-    });
-    const logContext = formatDailyLogsForGideon(dailyLogs, profileNames);
-    const { data: vaultFileRows } = await supabase
-      .from("documents")
-      .select("file_name, mime_type, profile_id")
-      .in("profile_id", allSearchIds)
-      .order("created_at", { ascending: false })
-      .limit(250);
-    const fileInventoryContext = formatVaultFileListForGideon(
-      vaultFileRows ?? [],
-      profileNames
-    );
-    const upcomingAlerts = await retrieveUpcomingAlertsForGideon(supabase, {
-      profileIds: allSearchIds,
-      profileNames,
-      question,
-      timeZone: userTz,
-      limit: retrievalScopes.length > 1 ? 12 : 10,
-    });
-    const scheduleContext = formatAlertsForGideon(upcomingAlerts, {
-      profileNames,
-      timeZone: userTz,
-    });
-    const linkedContext = await loadLinkedOrgContext(
-      supabase,
-      user.id,
-      active
-    );
-    const workProjectId =
-      typeof workProjectIdRaw === "string" ? workProjectIdRaw.trim() : "";
-    const focusedWorkMemory = workProjectId
-      ? await loadWorkMemoryProjectForGideon(supabase, user.id, workProjectId)
-      : null;
-    const workMemoryBundle =
-      focusedWorkMemory ??
-      (await loadWorkMemoryForGideon(supabase, user.id));
-    const workMemoryBody = formatWorkMemoryForGideon(
-      workMemoryBundle.projects,
-      workMemoryBundle.sessionsByProject
-    );
-    const workMemoryContext = focusedWorkMemory
-      ? `The user clicked "Continue with Gideon" to resume this project. Prioritize this project's mission, step, blockers, and recent sessions.\n\n${workMemoryBody}`
-      : workMemoryBody;
+      attachedFileName = attachedDoc?.fileName;
 
-    const allVaultsNote =
-      retrievalScopes.length > 1
-        ? `${GIDEON_CROSS_VAULT_NOTE}
+      const { chunks, context: workspaceContext } = await loadWorkspaceContext({
+        supabase,
+        user,
+        meta: workspaceMeta,
+        question,
+        timeZone: userTz,
+        workProjectId,
+        attachedDoc,
+        chunkCount: chunkCount ?? 0,
+      });
 
-Active vault in the UI: ${active.display_name}. Document search includes all ${retrievalScopes.length} vaults you can access (${retrievalScopes.map((s) => s.display_name).join(", ")}).`
-        : "Search this vault's documents, Daily Logs, and upcoming schedule; use GENERAL KNOWLEDGE when the vault does not contain the answer.";
-    const pictureNote = showPictures
-      ? `The user wants to see pictures. Prefer naming image file names from the retrieved excerpts (jpg/png/webp/etc.) so the UI can display them. If no image files were retrieved, say so clearly.`
-      : "";
-    const reminderAgent = wantsReminderAgent(question);
-    const transcriptionMode = wantsTranscription(question);
-    const attachedTextLimit = transcriptionMode ? 30_000 : 12_000;
-    const attachedContext = attachedDoc
-      ? [
-          `File: ${attachedDoc.fileName}`,
-          attachedDoc.sourceText
-            ? `Document text (OCR/native):\n${attachedDoc.sourceText.slice(0, attachedTextLimit)}`
-            : "(no extracted text — use the attached image if present)",
-        ].join("\n\n")
-      : "";
-    const vaultEmptyNote =
-      !formatted.context.trim() &&
-      !attachedContext.trim() &&
-      !logContext.trim() &&
-      !scheduleContext.trim() &&
-      !linkedContext.trim() &&
-      fileInventoryContext.startsWith("(no documents")
-        ? "No vault excerpts, Daily Logs, upcoming schedule items, or linked profile structure matched this question (or the vault is empty). Do not invent vault facts. Use ## GENERAL KNOWLEDGE for general questions, and ## GIDEON'S SUGGESTION to upload documents when that would help."
-        : "";
+      workspaceContext.promptOptions.agentMode = agentMode;
 
-    const reminderNote = reminderAgent ? REMINDER_AGENT_SYSTEM_NOTE : "";
-    const transcriptionNote = transcriptionMode ? GIDEON_TRANSCRIPTION_NOTE : "";
-    const attachedNote = attachedDoc ? GIDEON_ATTACHED_DOCUMENT_NOTE : "";
+      const system = buildGideonSystemPrompt(workspaceContext, actionCtx);
+      const showPictures = workspaceContext.promptOptions.showPictures;
+      const thinkingSteps = buildGideonThinkingSteps({
+        actionCtx,
+        meta: workspaceMeta,
+      });
+      const detectedActions = getMatchingActions(actionCtx).map((action) => ({
+        id: action.id,
+        label: action.label,
+      }));
 
-    const profileKind = suggestionKindFrom(active.profile_type);
-    const system = `${withVaultPersonality(VAULT_CHAT_SYSTEM, profileKind)}
-
-Active profile: ${active.display_name} (${active.profile_type}).
-${buildGideonTodayNote(new Date(), userTz)}
-${allVaultsNote}
-${pictureNote}
-${vaultEmptyNote}
-${reminderNote}
-${transcriptionNote}
-${attachedNote}
-
---- RETRIEVED EXCERPTS ---
-${formatted.context.trim() || "(none)"}
---- END EXCERPTS ---
-
---- VAULT FILE INVENTORY (complete list of uploaded files in scope; use for "what's uploaded" questions) ---
-${fileInventoryContext}
---- END VAULT FILE INVENTORY ---
-
---- ATTACHED DOCUMENT (user sent with this message) ---
-${attachedContext.trim() || "(none)"}
---- END ATTACHED DOCUMENT ---
-
---- RETRIEVED DAILY LOGS (user-entered notes; vault owner labeled when linked) ---
-${logContext.trim() || "(none)"}
---- END DAILY LOGS ---
-
---- UPCOMING SCHEDULE (saved reminders and document deadlines; vault owner labeled when linked) ---
-${scheduleContext.trim() || "(none)"}
---- END UPCOMING SCHEDULE ---
-
---- LINKED PROFILE STRUCTURE ---
-${linkedContext.trim() || "(none)"}
---- END LINKED PROFILE STRUCTURE ---
-
---- WORK MEMORY (user's active projects and recent sessions) ---
-${workMemoryContext.trim() || "(none — user has no active work projects)"}
---- END WORK MEMORY ---`;
-
-    return createVaultChatStreamResponse({
-      supabase,
-      userId: user.id,
-      chatId,
-      active: { id: active.id, display_name: active.display_name },
-      chatHomeProfileId,
-      chatScopedProfileId,
-      userMsg: userMsg as ChatMessageRow,
-      question,
-      history,
-      system,
-      maxTokens: reminderAgent ? 1100 : transcriptionMode ? 1200 : 900,
-      chunks,
-      attachedDoc,
-      showPictures,
-      accessibleProfiles: scopeCandidates,
-      isFirstExchange,
-      attachedFileName,
-      userTz,
-      listChats,
-      updateVaultChatRow,
-    });
-  } catch (err) {
-    const { error, code, status } = formatVaultChatError(err);
-    console.error("Vault chat failed:", error);
-    return NextResponse.json({ error, code }, { status });
-  }
+      return createVaultChatStreamResponse({
+        supabase,
+        userId: user.id,
+        chatId,
+        active: { id: active.id, display_name: active.display_name },
+        chatHomeProfileId,
+        chatScopedProfileId,
+        userMsg: userMsg as ChatMessageRow,
+        question,
+        history,
+        system,
+        maxTokens: gideonMaxTokens(workspaceContext),
+        chunks,
+        attachedDoc,
+        showPictures,
+        accessibleProfiles: scopeCandidates,
+        isFirstExchange,
+        attachedFileName,
+        userTz,
+        listChats,
+        updateVaultChatRow,
+        thinkingSteps,
+        detectedActions,
+      });
+    } catch (err) {
+      const { error, code, status } = formatVaultChatError(err);
+      console.error("Vault chat failed:", error);
+      return NextResponse.json({ error, code }, { status });
+    }
   }
 
   const { data: assistantMsg, error: assistantError } = await supabase

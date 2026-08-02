@@ -8,6 +8,7 @@ import {
   otherSpacesOf,
   petsOf,
   hobbiesOf,
+  profileTypeLabel,
   studentsOf,
   topLevelProfiles,
   vehiclesOf,
@@ -140,4 +141,118 @@ export function buildVaultMapRoots(profiles: GuardianProfile[]): VaultMapRoot[] 
     profile,
     children: nestedUnder(profiles, profile),
   }));
+}
+
+function indent(depth: number): string {
+  return "  ".repeat(depth);
+}
+
+function profileMapLine(
+  profile: GuardianProfile,
+  activeProfileId: string | null | undefined,
+  depth: number
+): string {
+  const type = profileTypeLabel(profile.profile_type);
+  const active =
+    activeProfileId && profile.id === activeProfileId ? " ← active vault" : "";
+  return `${indent(depth)}- ${profile.display_name} (${type})${active}`;
+}
+
+function formatMemberGroup(
+  group: VaultMapMemberGroup,
+  activeProfileId: string | null | undefined,
+  depth: number
+): string[] {
+  if (group.members.length === 0) return [];
+  const lines = [`${indent(depth)}${group.label}:`];
+  for (const member of group.members) {
+    lines.push(profileMapLine(member, activeProfileId, depth + 1));
+  }
+  return lines;
+}
+
+function formatBranchLines(
+  branch: VaultMapBranch,
+  activeProfileId: string | null | undefined,
+  depth: number
+): string[] {
+  const lines = [profileMapLine(branch.profile, activeProfileId, depth)];
+  for (const group of branch.groups) {
+    lines.push(...formatMemberGroup(group, activeProfileId, depth + 1));
+  }
+  if (branch.members.length > 0) {
+    for (const member of branch.members) {
+      lines.push(profileMapLine(member, activeProfileId, depth + 1));
+    }
+  }
+  return lines;
+}
+
+/** Breadcrumb path from account root to a profile (for leaf vaults). */
+export function vaultMapPathToProfile(
+  profiles: GuardianProfile[],
+  ownerLabel: string,
+  profileId: string
+): string | null {
+  const byId = new Map(profiles.map((p) => [p.id, p]));
+  const target = byId.get(profileId);
+  if (!target) return null;
+
+  const names: string[] = [target.display_name];
+  let parentId = target.parent_profile_id;
+  const seen = new Set<string>([profileId]);
+
+  while (parentId && !seen.has(parentId)) {
+    seen.add(parentId);
+    const parent = byId.get(parentId);
+    if (!parent) break;
+    names.unshift(parent.display_name);
+    parentId = parent.parent_profile_id;
+  }
+
+  const root = ownerLabel.trim() || "You";
+  if (names[0] !== root && !byId.has(names[0] ?? "")) {
+    names.unshift(root);
+  }
+
+  return names.join(" → ");
+}
+
+/**
+ * Text vault map for Gideon — mirrors Settings → Profiles vault map.
+ * Marks the active vault and includes a breadcrumb when chatting from a leaf vault.
+ */
+export function formatVaultMapForGideon(
+  profiles: GuardianProfile[],
+  ownerLabel: string,
+  activeProfileId?: string | null
+): string {
+  const tree = buildVaultMapTree(profiles, ownerLabel);
+  if (!tree) {
+    return "(no vault structure — create a person or space in Guardian first)";
+  }
+
+  const lines: string[] = [
+    "This is Guardian's vault hierarchy (same structure as Settings → Vault map).",
+    `Account root: ${tree.ownerLabel}`,
+  ];
+
+  if (activeProfileId) {
+    const path = vaultMapPathToProfile(profiles, tree.ownerLabel, activeProfileId);
+    if (path) {
+      lines.push(`Active vault path: ${path}`);
+    }
+  }
+
+  lines.push("", "Tree:");
+
+  if (tree.personalProfile) {
+    lines.push(profileMapLine(tree.personalProfile, activeProfileId, 0));
+  }
+
+  for (const branch of tree.branches) {
+    lines.push(...formatBranchLines(branch, activeProfileId, 0));
+  }
+
+  return lines.join("\n");
 }
