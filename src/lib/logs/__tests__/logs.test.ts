@@ -35,6 +35,30 @@ describe("daily log helpers", () => {
     assert.ok(hit > miss);
   });
 
+  it("boosts logs when content mentions a person named in the question", () => {
+    const log = {
+      content: "Aaron asked to remove John Marshall Bank from payroll.",
+      title: null,
+      category: "Client",
+      tags: [],
+      log_date: todayLogDate(),
+    };
+    const hit = scoreLogRelevance(
+      log,
+      "show the daily log that Aaron added",
+      todayLogDate()
+    );
+    const miss = scoreLogRelevance(
+      {
+        ...log,
+        content: "Payroll note for this week.",
+      },
+      "show the daily log that Aaron added",
+      todayLogDate()
+    );
+    assert.ok(hit > miss);
+  });
+
   it("boosts logs when the question names the author", () => {
     const log = {
       content: "Client needs updated W-9 before payroll.",

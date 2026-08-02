@@ -26,6 +26,7 @@ export function buildGideonSystemPrompt(
     allVaultsNote,
     vaultEmptyNote,
     agentMode,
+    fullLogQuote,
   } = promptOptions;
 
   const pictureNote = showPictures
@@ -38,6 +39,9 @@ export function buildGideonSystemPrompt(
   const agentNote = agentMode ? `\n${AGENT_MODE_SYSTEM_NOTE}\n` : "";
   const transcriptionNote = transcriptionMode ? GIDEON_TRANSCRIPTION_NOTE : "";
   const attachedNote = hasAttachedDocument ? GIDEON_ATTACHED_DOCUMENT_NOTE : "";
+  const fullLogNote = fullLogQuote
+    ? `The user asked for the full Daily Log or client request text. Quote the complete matching entry verbatim from RETRIEVED DAILY LOGS or CLIENT REQUESTS below. Do not paraphrase, shorten, or invent log content. If no matching entry is present in those blocks, say so clearly.`
+    : "";
 
   return `${withVaultPersonality(VAULT_CHAT_SYSTEM, profileKind)}
 
@@ -46,6 +50,7 @@ ${buildGideonTodayNote(new Date(), timeZone)}
 ${allVaultsNote}
 ${pictureNote}
 ${vaultEmptyNote}
+${fullLogNote}
 ${actionNotes}
 ${agentNote}
 ${transcriptionNote}
@@ -90,8 +95,9 @@ ${blocks.workMemory}
 
 /** Suggested max tokens based on prompt options. */
 export function gideonMaxTokens(context: WorkspaceContextData): number {
-  const { reminderAgent, transcriptionMode, agentMode } = context.promptOptions;
-  if (agentMode) return 1400;
+  const { reminderAgent, transcriptionMode, agentMode, fullLogQuote } =
+    context.promptOptions;
+  if (agentMode || fullLogQuote) return 1400;
   if (reminderAgent) return 1100;
   if (transcriptionMode) return 1200;
   return 900;

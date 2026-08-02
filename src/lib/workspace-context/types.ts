@@ -50,6 +50,7 @@ export type WorkspacePromptOptions = {
   vaultEmptyNote: string;
   focusedWorkMemory: boolean;
   agentMode: boolean;
+  fullLogQuote: boolean;
 };
 
 export type WorkspaceContextData = WorkspaceContextMeta & {

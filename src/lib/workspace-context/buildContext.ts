@@ -31,6 +31,11 @@ import {
   GIDEON_CROSS_VAULT_NOTE,
   wantsTranscription,
 } from "@/lib/vault/gideon";
+import {
+  expandRetrievalQuestion,
+  wantsFullDailyLogQuote,
+  type ChatTurn,
+} from "@/lib/vault/expandRetrievalQuestion";
 import { wantsReminderAgent } from "@/lib/reminders/propose";
 import type { AttachedVaultDocument } from "@/lib/vault/attachedDocument";
 import type { GuardianProfileType } from "@/lib/profiles/types";
@@ -47,6 +52,7 @@ export type LoadWorkspaceContextArgs = {
   workProjectId?: string;
   attachedDoc?: AttachedVaultDocument | null;
   chunkCount?: number;
+  chatHistory?: ChatTurn[];
 };
 
 export type WorkspaceContextResult = {
@@ -67,8 +73,11 @@ export async function loadWorkspaceContext(
     workProjectId = "",
     attachedDoc = null,
     chunkCount = 0,
+    chatHistory = [],
   } = args;
 
+  const retrievalQuestion = expandRetrievalQuestion(question, chatHistory);
+  const fullLogQuote = wantsFullDailyLogQuote(question);
   const { activeProfile, retrievalScopes, searchProfileIds, profileNames } =
     meta;
   const showPictures = wantsShowPictures(question);
@@ -77,7 +86,7 @@ export async function loadWorkspaceContext(
 
   const queryEmbedding =
     chunkCount > 0
-      ? await embedQuery(question).catch((embedErr) => {
+      ? await embedQuery(retrievalQuestion).catch((embedErr) => {
           console.warn(
             "Vault chat embedding failed; continuing without document search:",
             embedErr instanceof Error ? embedErr.message : "error"
@@ -112,8 +121,9 @@ export async function loadWorkspaceContext(
       profileId: activeProfile.id,
       profileIds: searchProfileIds,
       profileNames,
-      question,
-      limit: retrievalScopes.length > 1 ? 6 : 4,
+      question: retrievalQuestion,
+      limit:
+        retrievalScopes.length > 1 ? (fullLogQuote ? 8 : 6) : fullLogQuote ? 6 : 4,
     }
   );
   const logContext = formatDailyLogsForGideon(
@@ -129,7 +139,7 @@ export async function loadWorkspaceContext(
     await retrieveRelevantClientRequests(supabase, {
       clientProfileIds,
       profileNames,
-      question,
+      question: retrievalQuestion,
       limit: retrievalScopes.length > 1 ? 6 : 4,
     });
   const clientRequestContext = formatClientRequestsForGideon(
@@ -153,7 +163,7 @@ export async function loadWorkspaceContext(
   const upcomingAlerts = await retrieveUpcomingAlertsForGideon(supabase, {
     profileIds: searchProfileIds,
     profileNames,
-    question,
+    question: retrievalQuestion,
     timeZone,
     limit: retrievalScopes.length > 1 ? 12 : 10,
   });
@@ -248,6 +258,7 @@ Active vault in the UI: ${activeProfile.display_name}. Document search includes 
       vaultEmptyNote,
       focusedWorkMemory: Boolean(focusedWorkMemory),
       agentMode: false,
+      fullLogQuote,
     },
   };
 

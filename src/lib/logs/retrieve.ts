@@ -38,6 +38,30 @@ function mentionedVaultProfileIds(
   });
 }
 
+function mergeWithMentionedVaultLogs(
+  selected: DailyLog[],
+  allLogs: DailyLog[],
+  mentionedVaultIds: string[],
+  limit: number
+): DailyLog[] {
+  if (mentionedVaultIds.length === 0) return selected.slice(0, limit);
+
+  const seen = new Set(selected.map((log) => log.id));
+  const merged = [...selected];
+
+  for (const vaultId of mentionedVaultIds) {
+    for (const log of allLogs) {
+      if (log.profile_id !== vaultId || seen.has(log.id)) continue;
+      merged.push(log);
+      seen.add(log.id);
+      const vaultCount = merged.filter((row) => row.profile_id === vaultId).length;
+      if (vaultCount >= 2) break;
+    }
+  }
+
+  return merged.slice(0, limit);
+}
+
 /**
  * Retrieve relevant Daily Logs for one profile, or several (container rollup).
  * Access is enforced by RLS (shared vault members can read owner logs).
@@ -120,7 +144,12 @@ export async function retrieveRelevantDailyLogs(
 
   if (scored.length > 0) {
     return {
-      logs: scored.slice(0, limit).map((r) => r.log),
+      logs: mergeWithMentionedVaultLogs(
+        scored.map((r) => r.log),
+        logs,
+        mentionedVaultIds,
+        limit
+      ),
       authorNames,
     };
   }

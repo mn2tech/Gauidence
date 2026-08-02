@@ -266,6 +266,18 @@ export function scoreLogRelevance(
     if (AUTHOR_INTENT.test(question)) score += 6;
   }
 
+  const contentHay = [log.content, log.title ?? ""].join(" ").toLowerCase();
+  for (const token of tokens) {
+    if (
+      token.length >= 3 &&
+      profileMentionedInQuestion(question, token) &&
+      contentHay.includes(token)
+    ) {
+      score += 10;
+      if (AUTHOR_INTENT.test(question)) score += 4;
+    }
+  }
+
   const vaultName = context?.vaultName?.trim();
   if (vaultName && profileMentionedInQuestion(question, vaultName)) {
     score += 6;

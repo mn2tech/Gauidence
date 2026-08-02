@@ -1097,6 +1097,7 @@ export async function POST(request: Request) {
         workProjectId,
         attachedDoc,
         chunkCount: chunkCount ?? 0,
+        chatHistory: history,
       });
 
       workspaceContext.promptOptions.agentMode = agentMode;
