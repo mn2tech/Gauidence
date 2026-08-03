@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import ProfileSwitcher from "@/components/ProfileSwitcher";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import GlobalVaultSearch from "@/components/GlobalVaultSearch";
-import { DOCUMENTS_PATH } from "@/lib/routes";
+import { documentsHref } from "@/lib/routes";
 import { useOnboardingProgress } from "@/hooks/useOnboardingProgress";
 import { useEmployeeHubEntitlements } from "@/hooks/useEmployeeHubEntitlements";
 import { useSimpleHomeEnabled } from "@/hooks/useSimpleHomeEnabled";
@@ -101,6 +101,7 @@ export default function SiteHeader() {
     : active
       ? `/dashboard?camera=1#documents-${active.id}`
       : "/dashboard?camera=1";
+  const documentsNavHref = documentsHref(active?.id);
   const askHref = "/ask";
   const researchHref = needsSetup ? "/ask" : "/research";
 
@@ -211,7 +212,7 @@ export default function SiteHeader() {
                 />
               ) : null}
               {showDocuments ? (
-                <Link href={DOCUMENTS_PATH} className="hover:text-foreground">
+                <Link href={documentsNavHref} className="hover:text-foreground">
                   Documents
                 </Link>
               ) : null}
@@ -383,7 +384,7 @@ export default function SiteHeader() {
                   />
                 ) : null}
                 {showDocuments ? (
-                  <Link href={DOCUMENTS_PATH} className={linkClass}>
+                  <Link href={documentsNavHref} className={linkClass}>
                     Documents
                   </Link>
                 ) : null}
