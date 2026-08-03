@@ -12,7 +12,7 @@ import {
 } from "./types";
 
 const REQUEST_SELECT =
-  "id, profile_id, created_by, title, description, status, document_id, created_at, updated_at, resolved_at";
+  "id, profile_id, created_by, title, description, status, document_id, assigned_to_user_id, created_at, updated_at, resolved_at";
 
 const COMMENT_SELECT =
   "id, request_id, author_user_id, content, created_at";
@@ -190,10 +190,71 @@ export async function retrieveRelevantClientRequests(
   return { requests: requestsWithComments, authorNames };
 }
 
+/** Open / in-progress requests for Gideon context (business monitoring). */
+export async function loadActiveClientRequestsForGideon(
+  supabase: SupabaseClient,
+  clientProfileIds: string[],
+  limit = 8
+): Promise<ClientRequestWithComments[]> {
+  const ids = [...new Set(clientProfileIds.filter(Boolean))];
+  if (ids.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("client_requests")
+    .select(REQUEST_SELECT)
+    .in("profile_id", ids)
+    .in("status", ["open", "in_progress"])
+    .order("updated_at", { ascending: false })
+    .limit(limit);
+
+  if (error || !data?.length) return [];
+
+  const requests = data as ClientRequest[];
+  const requestIds = requests.map((r) => r.id);
+  const { data: commentRows } = await supabase
+    .from("client_request_comments")
+    .select(COMMENT_SELECT)
+    .in("request_id", requestIds)
+    .order("created_at", { ascending: true });
+
+  const commentsByRequest = new Map<string, ClientRequestComment[]>();
+  for (const row of commentRows ?? []) {
+    const requestId = String(row.request_id);
+    const list = commentsByRequest.get(requestId) ?? [];
+    list.push(row as ClientRequestComment);
+    commentsByRequest.set(requestId, list);
+  }
+
+  return requests.map((request) => ({
+    ...request,
+    comments: (commentsByRequest.get(request.id) ?? []).slice(-5),
+  }));
+}
+
+/** Merge active open requests with relevance-scored picks (dedupe by id). */
+export function mergeClientRequestsForGideon(
+  primary: ClientRequestWithComments[],
+  supplemental: ClientRequestWithComments[],
+  limit = 8
+): ClientRequestWithComments[] {
+  const seen = new Set<string>();
+  const out: ClientRequestWithComments[] = [];
+  for (const list of [primary, supplemental]) {
+    for (const request of list) {
+      if (seen.has(request.id)) continue;
+      seen.add(request.id);
+      out.push(request);
+      if (out.length >= limit) return out;
+    }
+  }
+  return out;
+}
+
 export function formatClientRequestsForGideon(
   requests: ClientRequestWithComments[],
   profileNames?: Record<string, string>,
-  authorNames?: Record<string, string>
+  authorNames?: Record<string, string>,
+  assigneeNames?: Record<string, string>
 ): string {
   if (requests.length === 0) return "";
   return requests
@@ -204,7 +265,12 @@ export function formatClientRequestsForGideon(
       const vault = vaultLabel ? ` | vault: ${vaultLabel}` : "";
       const author = authorNames?.[request.created_by]?.trim();
       const submittedBy = author ? ` | submitted by: ${author}` : "";
+      const assignee = request.assigned_to_user_id
+        ? assigneeNames?.[request.assigned_to_user_id]?.trim() || "assigned teammate"
+        : null;
+      const assignedLine = assignee ? ` | assigned to: ${assignee}` : "";
       const status = CLIENT_REQUEST_STATUS_LABELS[request.status];
+      const idLine = ` | id: ${request.id}`;
       const commentBlock =
         request.comments.length > 0
           ? `\nRecent replies:\n${request.comments
@@ -216,7 +282,7 @@ export function formatClientRequestsForGideon(
               })
               .join("\n")}`
           : "";
-      return `[Client Request${vault}${submittedBy} | status: ${status} | updated: ${request.updated_at.slice(0, 10)}]\nTitle: ${request.title}\nDescription: ${request.description}${commentBlock}`;
+      return `[Client Request${vault}${submittedBy}${assignedLine}${idLine} | status: ${status} | updated: ${request.updated_at.slice(0, 10)}]\nTitle: ${request.title}\nDescription: ${request.description}${commentBlock}`;
     })
     .join("\n\n---\n\n");
 }

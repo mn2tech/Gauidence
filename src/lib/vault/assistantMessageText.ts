@@ -2,11 +2,14 @@ import { stripProposedReminderSection } from "@/lib/reminders/propose";
 import {
   stripProposedWorkMemoryUpdateSection,
 } from "@/lib/work-memory/propose";
+import { stripProposedClientRequestReplySection } from "@/lib/client-requests/propose";
 import { parseGideonSections } from "@/lib/vault/gideon";
 
 function stripAssistantProposalSections(content: string): string {
-  return stripProposedWorkMemoryUpdateSection(
-    stripProposedReminderSection(content)
+  return stripProposedClientRequestReplySection(
+    stripProposedWorkMemoryUpdateSection(
+      stripProposedReminderSection(content)
+    )
   );
 }
 

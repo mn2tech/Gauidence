@@ -22,6 +22,7 @@ import {
   Info,
   Loader2,
   Menu,
+  MessageCircle,
   MessageSquarePlus,
   Mic,
   NotebookPen,
@@ -113,6 +114,12 @@ import {
   stripProposedWorkMemoryUpdateSection,
   type ProposedWorkMemoryUpdate,
 } from "@/lib/work-memory/propose";
+import {
+  parseProposedClientRequestReply,
+  proposedClientRequestReplySummary,
+  stripProposedClientRequestReplySection,
+  type ProposedClientRequestReply,
+} from "@/lib/client-requests/propose";
 import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
 import { dispatchAwardsFromResponse } from "@/lib/awards/client";
 import {
@@ -533,6 +540,9 @@ export default function VaultChatPanel({
   const requestedWorkProjectId = isScopedPanel
     ? null
     : searchParams.get("projectId");
+  const requestedRequestId = isScopedPanel
+    ? null
+    : searchParams.get("requestId");
   const requestedDraft = isScopedPanel ? null : searchParams.get("draft");
   const { active, profiles, loading: profilesLoading, switchProfile, refresh, timeZone, timeZoneLabel } =
     useActiveProfile();
@@ -600,6 +610,13 @@ export default function VaultChatPanel({
     Set<string>
   >(() => new Set());
   const [savingWorkMemory, setSavingWorkMemory] = useState(false);
+  const [confirmingClientRequestId, setConfirmingClientRequestId] = useState<
+    string | null
+  >(null);
+  const [confirmedClientRequestIds, setConfirmedClientRequestIds] = useState<
+    Set<string>
+  >(() => new Set());
+  const [savingClientRequestReply, setSavingClientRequestReply] = useState(false);
   const [firstWin, setFirstWin] = useState<{
     fileName: string;
     summary: string | null;
@@ -1787,6 +1804,74 @@ export default function VaultChatPanel({
     }
   };
 
+  const confirmProposedClientRequestReply = async (
+    messageId: string,
+    proposal: ProposedClientRequestReply,
+    requestTitle?: string | null
+  ) => {
+    if (
+      confirmingClientRequestId ||
+      savingClientRequestReply ||
+      vaultBusy ||
+      sending
+    ) {
+      return;
+    }
+    setConfirmingClientRequestId(messageId);
+    setError(null);
+    try {
+      const commentRes = await fetch(
+        `/api/client-requests/${encodeURIComponent(proposal.requestId)}/comments`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: proposal.content }),
+        }
+      );
+      const commentBody = (await commentRes.json().catch(() => ({}))) as {
+        error?: string;
+      };
+      if (!commentRes.ok) {
+        setError(commentBody.error ?? "Couldn't post reply on request.");
+        return;
+      }
+
+      if (proposal.status) {
+        const statusRes = await fetch(
+          `/api/client-requests/${encodeURIComponent(proposal.requestId)}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: proposal.status }),
+          }
+        );
+        const statusBody = (await statusRes.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        if (!statusRes.ok) {
+          setError(
+            statusBody.error ?? "Reply posted but status couldn't be updated."
+          );
+          return;
+        }
+      }
+
+      setConfirmedClientRequestIds((prev) => new Set(prev).add(messageId));
+      pushLocalNote(
+        `Reply posted on client request: ${proposedClientRequestReplySummary(
+          proposal,
+          requestTitle
+        )}`
+      );
+    } catch {
+      setError(
+        "Couldn't post reply. Check your connection and try again."
+      );
+    } finally {
+      setConfirmingClientRequestId(null);
+    }
+  };
+
   const saveInlineLog = async (e: FormEvent) => {
     e.preventDefault();
     const saveProfileId = profileId ?? lastWriteProfileIdRef.current;
@@ -2305,11 +2390,20 @@ export default function VaultChatPanel({
       m.content,
       requestedWorkProjectId ?? workProject?.id
     );
-    const displayContent = stripProposedWorkMemoryUpdateSection(
-      stripProposedReminderSection(m.content)
+    const proposedClientRequest = parseProposedClientRequestReply(
+      m.content,
+      requestedRequestId
+    );
+    const displayContent = stripProposedClientRequestReplySection(
+      stripProposedWorkMemoryUpdateSection(
+        stripProposedReminderSection(m.content)
+      )
     );
     const sections = parseGideonSections(
-      displayContent || (proposedReminder || proposedWorkMemory ? "" : m.content)
+      displayContent ||
+        (proposedReminder || proposedWorkMemory || proposedClientRequest
+          ? ""
+          : m.content)
     );
     const citations = Array.isArray(m.citations) ? m.citations : [];
     const uniqueCitations = [
@@ -2333,6 +2427,8 @@ export default function VaultChatPanel({
     const confirmingReminder = confirmingReminderId === m.id;
     const alreadySetWorkMemory = confirmedWorkMemoryIds.has(m.id);
     const confirmingWorkMemory = confirmingWorkMemoryId === m.id;
+    const alreadyPostedClientRequest = confirmedClientRequestIds.has(m.id);
+    const confirmingClientRequest = confirmingClientRequestId === m.id;
     const vaultScope = m.vaultScope;
     const showVaultScopeCard =
       vaultScope &&
@@ -2480,6 +2576,56 @@ export default function VaultChatPanel({
                   className="inline-flex items-center rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50"
                 >
                   Open in Work Memory
+                </Link>
+              </div>
+            )}
+          </div>
+        ) : null}
+        {proposedClientRequest ? (
+          <div className="rounded-xl border border-teal-200 bg-teal-50/90 px-3 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-teal-900/70">
+              Proposed client request reply
+            </p>
+            <p className="mt-1 text-sm text-foreground">
+              {proposedClientRequestReplySummary(proposedClientRequest)}
+            </p>
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
+              {proposedClientRequest.content}
+            </p>
+            {alreadyPostedClientRequest ? (
+              <p className="mt-2 text-xs font-medium text-emerald-800">
+                Reply posted on the request thread.
+              </p>
+            ) : (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={
+                    confirmingClientRequest ||
+                    savingClientRequestReply ||
+                    sending ||
+                    vaultBusy
+                  }
+                  onClick={() =>
+                    void confirmProposedClientRequestReply(
+                      m.id,
+                      proposedClientRequest
+                    )
+                  }
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand/90 disabled:opacity-60"
+                >
+                  {confirmingClientRequest ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <MessageCircle className="h-3.5 w-3.5" />
+                  )}
+                  Post reply
+                </button>
+                <Link
+                  href={`/requests?id=${proposedClientRequest.requestId}`}
+                  className="inline-flex items-center rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50"
+                >
+                  Open request
                 </Link>
               </div>
             )}

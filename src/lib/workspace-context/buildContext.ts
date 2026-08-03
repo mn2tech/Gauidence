@@ -10,6 +10,8 @@ import { mergePinnedChunks } from "@/lib/vault/retrieve";
 import { embedQuery } from "@/lib/vault/embeddings";
 import {
   formatClientRequestsForGideon,
+  loadActiveClientRequestsForGideon,
+  mergeClientRequestsForGideon,
   retrieveRelevantClientRequests,
 } from "@/lib/client-requests/retrieve";
 import {
@@ -38,8 +40,11 @@ import {
 } from "@/lib/vault/expandRetrievalQuestion";
 import { wantsReminderAgent } from "@/lib/reminders/propose";
 import { wantsWorkMemoryUpdate } from "@/lib/work-memory/propose";
+import { wantsClientRequestReply } from "@/lib/client-requests/propose";
 import type { AttachedVaultDocument } from "@/lib/vault/attachedDocument";
-import type { GuardianProfileType } from "@/lib/profiles/types";
+import { isOrgStyleProfile, type GuardianProfileType } from "@/lib/profiles/types";
+import { collaboratorDisplayName } from "@/lib/profiles/collaboratorDisplay";
+import { loadCollaboratorMemberAccounts } from "@/lib/profiles/collaboratorMembers";
 import type { LinkedVaultProfile } from "@/lib/vault/rollup";
 import { loadLinkedOrgContext } from "./linkedProfiles";
 import type { WorkspaceContextData, WorkspaceContextMeta } from "./types";
@@ -87,6 +92,7 @@ export async function loadWorkspaceContext(
   const workMemoryUpdateAgent = wantsWorkMemoryUpdate(question, {
     focusedWorkProject: Boolean(workProjectId),
   });
+  const clientRequestReplyAgent = wantsClientRequestReply(question);
 
   const queryEmbedding =
     chunkCount > 0
@@ -146,10 +152,45 @@ export async function loadWorkspaceContext(
       question: retrievalQuestion,
       limit: retrievalScopes.length > 1 ? 6 : 4,
     });
-  const clientRequestContext = formatClientRequestsForGideon(
+  const includeActiveRequests =
+    clientProfileIds.length > 0 &&
+    (clientRequestReplyAgent ||
+      isOrgStyleProfile(activeProfile.profile_type) ||
+      /\b(request|requests|ticket|client)\b/i.test(retrievalQuestion));
+  const activeRequests = includeActiveRequests
+    ? await loadActiveClientRequestsForGideon(
+        supabase,
+        clientProfileIds,
+        retrievalScopes.length > 1 ? 8 : 6
+      )
+    : [];
+  const mergedRequests = mergeClientRequestsForGideon(
     clientRequests,
+    activeRequests,
+    retrievalScopes.length > 1 ? 8 : 6
+  );
+  const assigneeIds = [
+    ...new Set(
+      mergedRequests
+        .map((r) => r.assigned_to_user_id)
+        .filter((id): id is string => Boolean(id))
+    ),
+  ];
+  const requestAssigneeAccounts =
+    assigneeIds.length > 0
+      ? await loadCollaboratorMemberAccounts(assigneeIds)
+      : new Map();
+  const requestAssigneeNames = Object.fromEntries(
+    assigneeIds.map((id) => [
+      id,
+      collaboratorDisplayName(requestAssigneeAccounts.get(id)),
+    ])
+  );
+  const clientRequestContext = formatClientRequestsForGideon(
+    mergedRequests,
     profileNames,
-    requestAuthorNames
+    requestAuthorNames,
+    requestAssigneeNames
   );
 
   const { data: vaultFileRows } = await supabase
@@ -257,6 +298,7 @@ Active vault in the UI: ${activeProfile.display_name}. Document search includes 
       showPictures,
       reminderAgent,
       workMemoryUpdateAgent,
+      clientRequestReplyAgent,
       transcriptionMode,
       hasAttachedDocument: Boolean(attachedDoc),
       allVaultsNote,

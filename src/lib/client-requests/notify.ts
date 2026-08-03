@@ -18,6 +18,8 @@ export type ClientRequestNotifyPayload = {
   requestTitle: string;
   preview?: string | null;
   kind: ClientRequestEmailKind;
+  /** When set, only these users receive email (e.g. assignee). */
+  notifyUserIds?: string[];
 };
 
 export async function notifyClientRequestActivity(
@@ -46,7 +48,10 @@ export async function notifyClientRequestActivity(
   ]);
 
   const memberIds = (members ?? []).map((m) => String(m.user_id));
-  const recipientIds = pickVaultActivityRecipients(memberIds, actorUserId);
+  const recipientIds =
+    payload.notifyUserIds?.length
+      ? payload.notifyUserIds.filter((id) => id !== actorUserId)
+      : pickVaultActivityRecipients(memberIds, actorUserId);
   if (recipientIds.length === 0) {
     return { sent: 0, skipped: true };
   }

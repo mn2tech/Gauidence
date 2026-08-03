@@ -16,6 +16,7 @@ export type ClientRequest = {
   description: string;
   status: ClientRequestStatus;
   document_id: string | null;
+  assigned_to_user_id: string | null;
   created_at: string;
   updated_at: string;
   resolved_at: string | null;
@@ -32,6 +33,7 @@ export type ClientRequestComment = {
 export type ClientRequestWithMeta = ClientRequest & {
   profile_name?: string;
   comment_count?: number;
+  assigned_to_name?: string | null;
 };
 
 export const CLIENT_REQUEST_STATUS_LABELS: Record<ClientRequestStatus, string> = {

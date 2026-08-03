@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import type { User, SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
-import { requireAccessibleGuardianProfile } from "@/lib/profiles/server";
+import {
+  requireAccessibleGuardianProfile,
+  requireEditableGuardianProfile,
+} from "@/lib/profiles/server";
+import {
+  isValidClientRequestAssignee,
+} from "@/lib/client-requests/assignees";
 import { notifyClientRequestActivity } from "@/lib/client-requests/notify";
 import { isClientRequestStatus } from "@/lib/client-requests/types";
 
@@ -10,7 +16,7 @@ export const runtime = "nodejs";
 type Authed = { supabase: SupabaseClient; user: User };
 
 const REQUEST_SELECT =
-  "id, profile_id, created_by, title, description, status, document_id, created_at, updated_at, resolved_at";
+  "id, profile_id, created_by, title, description, status, document_id, assigned_to_user_id, created_at, updated_at, resolved_at";
 
 async function requireUser(): Promise<Authed | NextResponse> {
   const supabase = await createClient();
@@ -60,6 +66,10 @@ export async function GET(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Request not found." }, { status: 404 });
   }
 
+  if (data.assigned_to_user_id === auth.user.id) {
+    return NextResponse.json({ request: data });
+  }
+
   const profile = await requireAccessibleGuardianProfile(
     supabase,
     auth.user.id,
@@ -78,7 +88,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   const { supabase, user } = auth;
   const { id } = await context.params;
 
-  let body: { status?: string };
+  let body: { status?: string; assignedToUserId?: string | null };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -95,23 +105,52 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Request not found." }, { status: 404 });
   }
 
-  const profile = await requireAccessibleGuardianProfile(
+  const profile = await requireEditableGuardianProfile(
     supabase,
     user.id,
     String(existing.profile_id)
   );
   if (!profile) {
-    return NextResponse.json({ error: "Request not found." }, { status: 404 });
+    return NextResponse.json(
+      { error: "You can't update this request." },
+      { status: 403 }
+    );
   }
 
+  const updates: Record<string, unknown> = {};
   const status = body.status?.trim();
-  if (!status || !isClientRequestStatus(status)) {
-    return NextResponse.json({ error: "Invalid status." }, { status: 400 });
+  if (status) {
+    if (!isClientRequestStatus(status)) {
+      return NextResponse.json({ error: "Invalid status." }, { status: 400 });
+    }
+    updates.status = status;
+  }
+
+  if (body.assignedToUserId !== undefined) {
+    const assignee = body.assignedToUserId?.trim() || null;
+    if (assignee) {
+      const valid = await isValidClientRequestAssignee(
+        supabase,
+        String(existing.profile_id),
+        assignee
+      );
+      if (!valid) {
+        return NextResponse.json(
+          { error: "Assignee must be an employee of this business." },
+          { status: 400 }
+        );
+      }
+    }
+    updates.assigned_to_user_id = assignee;
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json({ error: "No updates provided." }, { status: 400 });
   }
 
   const { data, error } = await supabase
     .from("client_requests")
-    .update({ status })
+    .update(updates)
     .eq("id", id)
     .select(REQUEST_SELECT)
     .single();
@@ -123,14 +162,31 @@ export async function PATCH(request: Request, context: RouteContext) {
     );
   }
 
-  if (existing.status !== status) {
+  const profileId = String(existing.profile_id);
+  const requestTitle = String(existing.title);
+
+  if (existing.status !== data.status) {
     void notifyClientRequestActivity(supabase, {
-      profileId: String(existing.profile_id),
+      profileId,
       actorUserId: user.id,
       requestId: id,
-      requestTitle: String(existing.title),
-      preview: `Status changed to ${status.replace("_", " ")}.`,
+      requestTitle,
+      preview: `Status changed to ${String(data.status).replace("_", " ")}.`,
       kind: "status",
+    });
+  }
+
+  const prevAssignee = existing.assigned_to_user_id as string | null | undefined;
+  const nextAssignee = data.assigned_to_user_id as string | null | undefined;
+  if (prevAssignee !== nextAssignee && nextAssignee) {
+    void notifyClientRequestActivity(supabase, {
+      profileId,
+      actorUserId: user.id,
+      requestId: id,
+      requestTitle,
+      preview: "You were assigned this request.",
+      kind: "assigned",
+      notifyUserIds: [nextAssignee],
     });
   }
 

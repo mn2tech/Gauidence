@@ -45,6 +45,7 @@ export type WorkspacePromptOptions = {
   showPictures: boolean;
   reminderAgent: boolean;
   workMemoryUpdateAgent: boolean;
+  clientRequestReplyAgent: boolean;
   transcriptionMode: boolean;
   hasAttachedDocument: boolean;
   allVaultsNote: string;

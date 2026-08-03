@@ -20,7 +20,11 @@ import {
   type ClientRequestComment,
   type ClientRequestStatus,
 } from "@/lib/client-requests/types";
-import { isOrgStyleProfile } from "@/lib/profiles/types";
+import {
+  canEditGuardianProfile,
+  employeesOf,
+  isOrgStyleProfile,
+} from "@/lib/profiles/types";
 import { clientBusinessLabel } from "@/lib/client-requests/helpers";
 import { documentsHref } from "@/lib/routes";
 import {
@@ -29,7 +33,12 @@ import {
 } from "@/lib/vault/clientUpload";
 import { createClient } from "@/lib/supabase/client";
 
-type RequestWithMeta = ClientRequest & { profile_name?: string | null };
+type RequestWithMeta = ClientRequest & {
+  profile_name?: string | null;
+  assigned_to_name?: string | null;
+};
+
+type AssigneeOption = { userId: string; name: string };
 
 type CommentWithMeta = ClientRequestComment & { author_name?: string };
 
@@ -62,8 +71,18 @@ export default function ClientRequestsScreen() {
     isOrgStyleProfile(active.profile_type) &&
     active.profile_type !== "client";
   const isClientVault = active?.profile_type === "client";
-  const canUseRequests = isClientVault || isBusinessView;
+  const isEmployeeView =
+    active?.profile_type === "employee" && Boolean(active.parent_profile_id);
+  const canUseRequests = isClientVault || isBusinessView || isEmployeeView;
+  const canManageRequests =
+    isBusinessView ||
+    (active != null && canEditGuardianProfile(active) && isClientVault);
   const businessLabel = clientBusinessLabel(profiles, active);
+  const businessProfileId = isBusinessView
+    ? active?.id
+    : isEmployeeView
+      ? active?.parent_profile_id
+      : active?.parent_profile_id ?? null;
 
   const [requests, setRequests] = useState<RequestWithMeta[]>([]);
   const [comments, setComments] = useState<CommentWithMeta[]>([]);
@@ -79,6 +98,8 @@ export default function ClientRequestsScreen() {
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
   const [statusBusy, setStatusBusy] = useState(false);
+  const [assignBusy, setAssignBusy] = useState(false);
+  const [assignees, setAssignees] = useState<AssigneeOption[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
 
   const selected = useMemo(
@@ -86,9 +107,43 @@ export default function ClientRequestsScreen() {
     [requests, selectedId]
   );
 
-  const listUrl = isBusinessView
-    ? "/api/client-requests?scope=clients"
-    : "/api/client-requests";
+  const listUrl = isEmployeeView
+    ? "/api/client-requests?assignedTo=me"
+    : isBusinessView
+      ? "/api/client-requests?scope=clients"
+      : "/api/client-requests";
+
+  useEffect(() => {
+    if (!canManageRequests || !businessProfileId) {
+      setAssignees([]);
+      return;
+    }
+    void fetch(
+      `/api/client-requests/assignees?profileId=${encodeURIComponent(
+        businessProfileId
+      )}`
+    )
+      .then((res) => res.json())
+      .then((body: { assignees?: AssigneeOption[] }) => {
+        setAssignees(
+          (body.assignees ?? []).map((a) => ({
+            userId: a.userId,
+            name: a.name,
+          }))
+        );
+      })
+      .catch(() => setAssignees([]));
+  }, [canManageRequests, businessProfileId]);
+
+  // Fallback assignees from loaded profiles when API empty
+  const assigneeOptions = useMemo(() => {
+    if (assignees.length > 0) return assignees;
+    if (!businessProfileId) return [];
+    return employeesOf(profiles, businessProfileId).map((e) => ({
+      userId: e.owner_user_id,
+      name: e.display_name,
+    }));
+  }, [assignees, businessProfileId, profiles]);
 
   useEffect(() => {
     if (searchParams.get("new") === "1" && isClientVault) {
@@ -276,6 +331,35 @@ export default function ClientRequestsScreen() {
     }
   };
 
+  const updateAssignee = async (assignedToUserId: string | null) => {
+    if (!selectedId) return;
+    setAssignBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/client-requests/${selectedId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assignedToUserId }),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        request?: RequestWithMeta;
+      };
+      if (!res.ok) {
+        setError(body.error ?? "Couldn't assign request.");
+        return;
+      }
+      if (body.request) {
+        setRequests((prev) =>
+          prev.map((r) => (r.id === body.request!.id ? { ...r, ...body.request } : r))
+        );
+      }
+      await refreshList();
+    } finally {
+      setAssignBusy(false);
+    }
+  };
+
   if (!canUseRequests) {
     return (
       <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
@@ -328,23 +412,65 @@ export default function ClientRequestsScreen() {
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              {(["open", "in_progress", "resolved"] as const).map((status) => (
-                <button
-                  key={status}
-                  type="button"
-                  disabled={statusBusy || selected.status === status}
-                  onClick={() => void updateStatus(status)}
-                  className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
-                    selected.status === status
-                      ? "border-brand bg-brand-light text-brand-dark"
-                      : "border-stone-300 bg-white text-foreground hover:bg-stone-50"
-                  }`}
-                >
-                  {CLIENT_REQUEST_STATUS_LABELS[status]}
-                </button>
-              ))}
+              {canManageRequests
+                ? (["open", "in_progress", "resolved"] as const).map((status) => (
+                    <button
+                      key={status}
+                      type="button"
+                      disabled={statusBusy || selected.status === status}
+                      onClick={() => void updateStatus(status)}
+                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                        selected.status === status
+                          ? "border-brand bg-brand-light text-brand-dark"
+                          : "border-stone-300 bg-white text-foreground hover:bg-stone-50"
+                      }`}
+                    >
+                      {CLIENT_REQUEST_STATUS_LABELS[status]}
+                    </button>
+                  ))
+                : null}
             </div>
           </div>
+
+          {canManageRequests && assigneeOptions.length > 0 ? (
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <label
+                htmlFor="request-assignee"
+                className="text-xs font-medium text-ink-muted"
+              >
+                Assigned to
+              </label>
+              <select
+                id="request-assignee"
+                disabled={assignBusy}
+                value={selected.assigned_to_user_id ?? ""}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  void updateAssignee(v ? v : null);
+                }}
+                className="rounded-lg border border-border-subtle bg-white px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/25"
+              >
+                <option value="">Unassigned</option>
+                {assigneeOptions.map((a) => (
+                  <option key={a.userId} value={a.userId}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+              {selected.assigned_to_name ? (
+                <span className="text-xs text-ink-muted">
+                  Currently {selected.assigned_to_name}
+                </span>
+              ) : null}
+            </div>
+          ) : selected.assigned_to_name ? (
+            <p className="mt-3 text-sm text-ink-muted">
+              Assigned to{" "}
+              <span className="font-medium text-foreground">
+                {selected.assigned_to_name}
+              </span>
+            </p>
+          ) : null}
 
           <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-foreground">
             {selected.description}
@@ -357,6 +483,16 @@ export default function ClientRequestsScreen() {
             >
               <Paperclip className="h-4 w-4" />
               View attached document
+            </Link>
+          ) : null}
+
+          {!isClientVault ? (
+            <Link
+              href={`/ask?requestId=${selected.id}`}
+              className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-brand-dark hover:underline"
+            >
+              <MessageCircle className="h-4 w-4" />
+              Ask Gideon about this request
             </Link>
           ) : null}
         </div>
@@ -436,12 +572,18 @@ export default function ClientRequestsScreen() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold tracking-tight text-foreground">
-            {isBusinessView ? "Client requests" : "My requests"}
+            {isBusinessView
+              ? "Client requests"
+              : isEmployeeView
+                ? "Assigned requests"
+                : "My requests"}
           </h1>
           <p className="mt-1 text-sm text-ink-muted">
             {isBusinessView
-              ? "Open requests from your client vaults — no more lost texts or emails."
-              : `Send requirements and questions to ${businessLabel} in one thread.`}
+              ? "Open requests from your client vaults — assign teammates and track replies."
+              : isEmployeeView
+                ? "Client requests assigned to you — reply in the thread to keep everyone aligned."
+                : `Send requirements and questions to ${businessLabel} in one thread.`}
           </p>
         </div>
         {isClientVault ? (
@@ -558,6 +700,9 @@ export default function ClientRequestsScreen() {
                   <span className="mt-0.5 block text-xs text-ink-muted">
                     {CLIENT_REQUEST_STATUS_LABELS[request.status]}
                     {request.profile_name ? ` · ${request.profile_name}` : ""}
+                    {request.assigned_to_name
+                      ? ` · ${request.assigned_to_name}`
+                      : ""}
                     {" · "}
                     {formatWhen(request.updated_at)}
                   </span>

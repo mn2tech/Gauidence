@@ -4,18 +4,19 @@ import { createClient } from "@/lib/supabase/server";
 import {
   getActiveGuardianProfile,
   requireAccessibleGuardianProfile,
-  requireEditableGuardianProfile,
 } from "@/lib/profiles/server";
 import { isOrgStyleProfile } from "@/lib/profiles/types";
 import { notifyClientRequestActivity } from "@/lib/client-requests/notify";
 import { isClientRequestStatus } from "@/lib/client-requests/types";
+import { collaboratorDisplayName } from "@/lib/profiles/collaboratorDisplay";
+import { loadCollaboratorMemberAccounts } from "@/lib/profiles/collaboratorMembers";
 
 export const runtime = "nodejs";
 
 type Authed = { supabase: SupabaseClient; user: User };
 
 const REQUEST_SELECT =
-  "id, profile_id, created_by, title, description, status, document_id, created_at, updated_at, resolved_at";
+  "id, profile_id, created_by, title, description, status, document_id, assigned_to_user_id, created_at, updated_at, resolved_at";
 
 async function requireUser(): Promise<Authed | NextResponse> {
   const supabase = await createClient();
@@ -53,6 +54,49 @@ async function clientVaultIdsForBusiness(
   return (data ?? []).map((row) => String(row.id));
 }
 
+async function enrichRequests(
+  supabase: SupabaseClient,
+  rows: Record<string, unknown>[]
+) {
+  const profileIdsInResults = [
+    ...new Set(rows.map((row) => String(row.profile_id))),
+  ];
+  const profileNames = new Map<string, string>();
+  if (profileIdsInResults.length > 0) {
+    const { data: profiles } = await supabase
+      .from("guardian_profiles")
+      .select("id, display_name")
+      .in("id", profileIdsInResults);
+    for (const row of profiles ?? []) {
+      profileNames.set(String(row.id), String(row.display_name ?? "Client"));
+    }
+  }
+
+  const assigneeIds = [
+    ...new Set(
+      rows
+        .map((row) => row.assigned_to_user_id as string | null | undefined)
+        .filter((id): id is string => Boolean(id))
+    ),
+  ];
+  const assigneeAccounts = await loadCollaboratorMemberAccounts(assigneeIds);
+  const assigneeNames = new Map<string, string>();
+  for (const id of assigneeIds) {
+    assigneeNames.set(id, collaboratorDisplayName(assigneeAccounts.get(id)));
+  }
+
+  return rows.map((row) => {
+    const assignedId = row.assigned_to_user_id as string | null | undefined;
+    return {
+      ...row,
+      profile_name: profileNames.get(String(row.profile_id)) ?? null,
+      assigned_to_name: assignedId
+        ? (assigneeNames.get(assignedId) ?? null)
+        : null,
+    };
+  });
+}
+
 /** List or create client requests for the active (or specified) vault. */
 export async function GET(request: Request) {
   const auth = await requireUser();
@@ -63,6 +107,7 @@ export async function GET(request: Request) {
   let profileId = url.searchParams.get("profileId");
   const status = url.searchParams.get("status")?.trim();
   const scope = url.searchParams.get("scope")?.trim();
+  const assignedTo = url.searchParams.get("assignedTo")?.trim();
 
   let profile = null;
   if (profileId) {
@@ -85,12 +130,60 @@ export async function GET(request: Request) {
     profileId = profile.id;
   }
 
+  if (assignedTo === "me") {
+    let businessId: string | null = null;
+    if (
+      isOrgStyleProfile(profile.profile_type) &&
+      profile.profile_type !== "client"
+    ) {
+      businessId = profile.id;
+    } else if (
+      profile.profile_type === "employee" &&
+      profile.parent_profile_id
+    ) {
+      businessId = profile.parent_profile_id;
+    }
+    if (!businessId) {
+      return NextResponse.json({ requests: [] });
+    }
+    const profileIds = await clientVaultIdsForBusiness(supabase, businessId);
+    if (profileIds.length === 0) {
+      return NextResponse.json({ requests: [] });
+    }
+    let query = supabase
+      .from("client_requests")
+      .select(REQUEST_SELECT)
+      .in("profile_id", profileIds)
+      .eq("assigned_to_user_id", user.id)
+      .order("updated_at", { ascending: false })
+      .limit(100);
+    if (status && isClientRequestStatus(status)) {
+      query = query.eq("status", status);
+    }
+    const { data, error } = await query;
+    if (error) {
+      console.error("client_requests assigned list failed:", error.message);
+      return NextResponse.json(
+        { error: "Couldn't load requests." },
+        { status: 502 }
+      );
+    }
+    const requests = await enrichRequests(supabase, data ?? []);
+    return NextResponse.json({ requests });
+  }
+
   let profileIds: string[] = [profileId];
   if (
     scope === "clients" ||
     (isOrgStyleProfile(profile.profile_type) && profile.profile_type !== "client")
   ) {
     const clientIds = await clientVaultIdsForBusiness(supabase, profile.id);
+    profileIds = clientIds.length > 0 ? clientIds : [];
+  } else if (profile.profile_type === "employee" && profile.parent_profile_id) {
+    const clientIds = await clientVaultIdsForBusiness(
+      supabase,
+      profile.parent_profile_id
+    );
     profileIds = clientIds.length > 0 ? clientIds : [];
   } else if (profile.profile_type !== "client") {
     return NextResponse.json({ requests: [] });
@@ -120,25 +213,7 @@ export async function GET(request: Request) {
     );
   }
 
-  const profileIdsInResults = [
-    ...new Set((data ?? []).map((row) => String(row.profile_id))),
-  ];
-  const profileNames = new Map<string, string>();
-  if (profileIdsInResults.length > 0) {
-    const { data: profiles } = await supabase
-      .from("guardian_profiles")
-      .select("id, display_name")
-      .in("id", profileIdsInResults);
-    for (const row of profiles ?? []) {
-      profileNames.set(String(row.id), String(row.display_name ?? "Client"));
-    }
-  }
-
-  const requests = (data ?? []).map((row) => ({
-    ...row,
-    profile_name: profileNames.get(String(row.profile_id)) ?? null,
-  }));
-
+  const requests = await enrichRequests(supabase, data ?? []);
   return NextResponse.json({ requests });
 }
 
@@ -180,7 +255,7 @@ export async function POST(request: Request) {
     profileId = active.id;
   }
 
-  const profile = await requireEditableGuardianProfile(
+  const profile = await requireAccessibleGuardianProfile(
     supabase,
     user.id,
     profileId

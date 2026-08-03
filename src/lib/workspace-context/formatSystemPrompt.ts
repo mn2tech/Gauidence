@@ -95,10 +95,10 @@ ${blocks.workMemory}
 
 /** Suggested max tokens based on prompt options. */
 export function gideonMaxTokens(context: WorkspaceContextData): number {
-  const { reminderAgent, workMemoryUpdateAgent, transcriptionMode, agentMode, fullLogQuote } =
+  const { reminderAgent, workMemoryUpdateAgent, clientRequestReplyAgent, transcriptionMode, agentMode, fullLogQuote } =
     context.promptOptions;
   if (agentMode || fullLogQuote) return 1400;
-  if (reminderAgent || workMemoryUpdateAgent) return 1100;
+  if (reminderAgent || workMemoryUpdateAgent || clientRequestReplyAgent) return 1100;
   if (transcriptionMode) return 1200;
   return 900;
 }

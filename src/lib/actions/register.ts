@@ -7,6 +7,7 @@ import {
 } from "./actions/uploadDocument";
 import { registerWorkspaceActions } from "./actions/workspace";
 import { registerWorkMemoryActions } from "./actions/workMemory";
+import { registerClientRequestActions } from "./actions/clientRequest";
 
 let allRegistered = false;
 
@@ -16,6 +17,7 @@ export function registerAllActions(): void {
   registerCoreActions();
   registerWorkspaceActions();
   registerWorkMemoryActions();
+  registerClientRequestActions();
   if (!getAction("payroll_clock")) registerAction(payrollClockAction);
   if (!getAction("upload_document")) registerAction(uploadDocumentAction);
   if (!getAction("save_document")) registerAction(saveDocumentAction);

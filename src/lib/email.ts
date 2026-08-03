@@ -272,7 +272,7 @@ export async function sendVaultActivityEmail(args: VaultActivityEmailArgs) {
   return true;
 }
 
-export type ClientRequestEmailKind = "created" | "comment" | "status";
+export type ClientRequestEmailKind = "created" | "comment" | "status" | "assigned";
 
 export type ClientRequestEmailArgs = {
   to: string;
@@ -290,7 +290,9 @@ export function renderClientRequestEmail(args: ClientRequestEmailArgs) {
       ? "opened a new request"
       : args.kind === "comment"
         ? "replied to a request"
-        : "updated a request";
+        : args.kind === "assigned"
+          ? "assigned you a request"
+          : "updated a request";
   const subject = `${args.actorName} ${action}: ${args.requestTitle}`;
   const preview = args.preview?.trim();
   const previewBlock = preview
