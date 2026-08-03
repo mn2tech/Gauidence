@@ -563,7 +563,7 @@ export default function VaultChatPanel({
     else setErrorState(code ? { message, code } : { message });
   };
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [gideonWelcomeSeen, setGideonWelcomeSeen] = useState(false);
+  const [gideonWelcomeSeen, setGideonWelcomeSeen] = useState(readGideonWelcomeSeen);
   const [whyOpen, setWhyOpen] = useState(false);
   const [plusOpen, setPlusOpen] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -2465,7 +2465,8 @@ export default function VaultChatPanel({
   const logCount = meta?.logCount ?? 0;
   const fileCount = docCount + photoCount;
   const emptyVault = fileCount === 0 && logCount === 0;
-  const showExpandedWelcome = !gideonWelcomeSeen || emptyVault;
+  const showExpandedWelcome = emptyVault && !gideonWelcomeSeen;
+  const showMinimalWelcome = !showExpandedWelcome;
   const logsOnly = fileCount === 0 && logCount > 0;
   const greetName = meta?.firstName;
   const showCreateAnotherVault =
@@ -2501,20 +2502,53 @@ export default function VaultChatPanel({
   };
 
   const welcomeBlock = welcome && (
-    <div className="mx-auto max-w-xl space-y-4 px-1 py-4 sm:py-6">
-      {isPage ? <OnboardingProgressChip /> : null}
-      {meta?.actionTimeline && meta.actionTimeline.length > 0 ? (
+    <div
+      className={
+        showMinimalWelcome && !emptyVault
+          ? "mx-auto max-w-xl px-1 py-2"
+          : "mx-auto max-w-xl space-y-4 px-1 py-4 sm:py-6"
+      }
+    >
+      {!showMinimalWelcome && isPage ? <OnboardingProgressChip /> : null}
+      {!showMinimalWelcome && meta?.actionTimeline && meta.actionTimeline.length > 0 ? (
         <GideonActionTimeline events={meta.actionTimeline} />
       ) : null}
-      {meta?.proactiveSuggestions && meta.proactiveSuggestions.length > 0 ? (
+      {!showMinimalWelcome &&
+      meta?.proactiveSuggestions &&
+      meta.proactiveSuggestions.length > 0 ? (
         <GideonProactiveSuggestions suggestions={meta.proactiveSuggestions} />
       ) : null}
-      {meta?.workspaceTimeline && meta.workspaceTimeline.length > 0 ? (
+      {!showMinimalWelcome &&
+      meta?.workspaceTimeline &&
+      meta.workspaceTimeline.length > 0 ? (
         <GideonWorkspaceTimeline events={meta.workspaceTimeline} />
       ) : null}
       <div className="flex items-start gap-3">
-        <GideonAvatar size={44} />
+        <GideonAvatar size={showMinimalWelcome && !emptyVault ? 40 : 44} />
         <div className="min-w-0 space-y-3">
+          {showMinimalWelcome && !emptyVault ? (
+            <>
+              <p className="text-sm leading-relaxed text-ink-muted">
+                {GIDEON_RETURNING_PROMPT}
+              </p>
+              {!emptyVault && meta && meta.suggestions.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {meta.suggestions.map((q) => (
+                    <button
+                      key={q}
+                      type="button"
+                      disabled={sending || loadingHistory}
+                      onClick={() => void sendQuestion(q)}
+                      className="rounded-full border border-stone-300 bg-white px-3 py-1.5 text-left text-xs font-medium text-foreground transition hover:border-brand hover:bg-brand-light/40 disabled:opacity-50"
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <>
           <p className="text-base font-semibold text-foreground">
             Hi{greetName ? ` ${greetName}` : ""}, I&apos;m Gideon.
           </p>
@@ -2546,7 +2580,7 @@ export default function VaultChatPanel({
             </p>
           )}
 
-          {!emptyVault && countBits.length > 0 ? (
+          {!showMinimalWelcome && !emptyVault && countBits.length > 0 ? (
             <details className="rounded-xl border border-stone-200 bg-stone-50/80 px-3 py-2.5">
               <summary className="cursor-pointer text-xs font-semibold text-foreground">
                 In this vault: {countBits.join(" · ")}
@@ -2758,7 +2792,10 @@ export default function VaultChatPanel({
             </>
           ) : null}
 
-          {!emptyVault && meta && meta.suggestions.length > 0 ? (
+          {!showMinimalWelcome &&
+          !emptyVault &&
+          meta &&
+          meta.suggestions.length > 0 ? (
             <div className="space-y-2 pt-0.5">
               <p className="text-xs font-semibold text-foreground">
                 Try asking Gideon
@@ -2804,6 +2841,8 @@ export default function VaultChatPanel({
               </div>
             </div>
           ) : null}
+            </>
+          )}
         </div>
       </div>
     </div>
