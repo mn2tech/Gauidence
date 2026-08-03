@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import ProfileSwitcher from "@/components/ProfileSwitcher";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import GlobalVaultSearch from "@/components/GlobalVaultSearch";
-import { documentsHref, VAULT_NAV_LABEL } from "@/lib/routes";
+import { documentsHref, REQUESTS_PATH, VAULT_NAV_LABEL } from "@/lib/routes";
 import { useOnboardingProgress } from "@/hooks/useOnboardingProgress";
 import { useEmployeeHubEntitlements } from "@/hooks/useEmployeeHubEntitlements";
 import { useSimpleHomeEnabled } from "@/hooks/useSimpleHomeEnabled";
@@ -72,6 +72,7 @@ export default function SiteHeader() {
     !needsSetup &&
     (!isEmployeeVault || employeeEntitlements?.documents === true);
   const showEmployeeHub = isEmployeeVault;
+  const isClientVault = active?.profile_type === "client";
   const ent = employeeEntitlements;
 
   useEffect(() => {
@@ -214,6 +215,11 @@ export default function SiteHeader() {
               {showDocuments ? (
                 <Link href={documentsNavHref} className="hover:text-foreground">
                   {VAULT_NAV_LABEL}
+                </Link>
+              ) : null}
+              {isClientVault ? (
+                <Link href={REQUESTS_PATH} className="hover:text-foreground">
+                  Requests
                 </Link>
               ) : null}
               <Link
@@ -386,6 +392,11 @@ export default function SiteHeader() {
                 {showDocuments ? (
                   <Link href={documentsNavHref} className={linkClass}>
                     {VAULT_NAV_LABEL}
+                  </Link>
+                ) : null}
+                {isClientVault ? (
+                  <Link href={REQUESTS_PATH} className={linkClass}>
+                    Requests
                   </Link>
                 ) : null}
                 <Link href="/settings" className={linkClass}>

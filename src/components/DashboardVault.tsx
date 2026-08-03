@@ -39,6 +39,7 @@ import {
 } from "@/lib/profiles/types";
 import { EMPLOYEE_HUB_PATH } from "@/lib/employee-hub/routing";
 import { REQUESTS_PATH } from "@/lib/routes";
+import { clientBusinessLabel } from "@/lib/client-requests/helpers";
 
 function DocumentsSection({
   userId,
@@ -168,6 +169,14 @@ export default function DashboardVault({ userId }: { userId: string }) {
 
         <div className="sticky top-14 z-30 -mx-4 flex items-center justify-end gap-1.5 border-b border-stone-200 bg-background/95 px-4 py-2.5 backdrop-blur sm:top-16 sm:mx-0 sm:rounded-xl sm:border sm:bg-white/95 sm:px-3 sm:shadow-sm">
           <Link
+            href={REQUESTS_PATH}
+            aria-label="My requests"
+            title="View and create requests"
+            className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50 sm:px-3"
+          >
+            Requests
+          </Link>
+          <Link
             href="/ask"
             aria-label="Ask Gideon"
             title={askGideonContextLabel(active)}
@@ -218,15 +227,36 @@ export default function DashboardVault({ userId }: { userId: string }) {
           {vaultLabel(active)}
         </p>
         <div className="flex shrink-0 items-center gap-1.5">
-          <Link
-            href="/research"
-            aria-label="Research"
-            title="Research a company or person"
-            className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50 sm:px-3"
-          >
-            <Search className="h-3.5 w-3.5 text-brand" aria-hidden />
-            Research
-          </Link>
+          {active.profile_type === "client" ? (
+            <>
+              <Link
+                href={REQUESTS_PATH}
+                aria-label="My requests"
+                title="View your requests"
+                className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50 sm:px-3"
+              >
+                Requests
+              </Link>
+              <Link
+                href={`${REQUESTS_PATH}?new=1`}
+                aria-label="New request"
+                title={`New request for ${clientBusinessLabel(profiles, active)}`}
+                className="inline-flex items-center gap-1.5 rounded-full border border-brand/30 bg-brand/5 px-2.5 py-1.5 text-xs font-semibold text-brand transition hover:bg-brand/10 sm:px-3"
+              >
+                New request
+              </Link>
+            </>
+          ) : (
+            <Link
+              href="/research"
+              aria-label="Research"
+              title="Research a company or person"
+              className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50 sm:px-3"
+            >
+              <Search className="h-3.5 w-3.5 text-brand" aria-hidden />
+              Research
+            </Link>
+          )}
           <Link
             href="/ask"
             aria-label="Ask Gideon"
