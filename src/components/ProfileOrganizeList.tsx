@@ -21,6 +21,10 @@ import {
 } from "lucide-react";
 import ProfileAvatar from "@/components/ProfileAvatar";
 import {
+  ACTIVE_CLIENTS_GROUP_LABEL,
+  INACTIVE_CLIENTS_GROUP_LABEL,
+  activeClientsOf,
+  inactiveClientsOf,
   canAttachChildToParent,
   canHaveLinkedClients,
   canHaveLinkedEmployees,
@@ -32,7 +36,6 @@ import {
   canHaveLinkedStudents,
   canHaveLinkedVehicles,
   canManageProfileAccess,
-  clientsOf,
   employeesOf,
   familyMembersOf,
   hobbiesOf,
@@ -57,7 +60,12 @@ const COLLAPSE_KEY = "guardian.profileCollapsed";
 const SECTION_COLLAPSE_KEY = "guardian.profileSectionCollapsed";
 
 function defaultSectionCollapsed(label: string) {
-  return label === "Employees" || label === "Clients";
+  return (
+    label === "Employees" ||
+    label === "Clients" ||
+    label === ACTIVE_CLIENTS_GROUP_LABEL ||
+    label === INACTIVE_CLIENTS_GROUP_LABEL
+  );
 }
 
 function nestedSectionKey(parentId: string, label: string) {
@@ -795,8 +803,11 @@ export default function ProfileOrganizeList({
           const nestedEmployees = canHaveLinkedEmployees(p.profile_type)
             ? employeesOf(profiles, p.id)
             : [];
-          const nestedClients = canHaveLinkedClients(p.profile_type)
-            ? clientsOf(profiles, p.id)
+          const nestedActiveClients = canHaveLinkedClients(p.profile_type)
+            ? activeClientsOf(profiles, p.id)
+            : [];
+          const nestedInactiveClients = canHaveLinkedClients(p.profile_type)
+            ? inactiveClientsOf(profiles, p.id)
             : [];
           const nestedFamily = canHaveLinkedFamilyMembers(p.profile_type)
             ? familyMembersOf(profiles, p.id)
@@ -821,7 +832,8 @@ export default function ProfileOrganizeList({
             : [];
           const nested = [
             ...nestedEmployees,
-            ...nestedClients,
+            ...nestedActiveClients,
+            ...nestedInactiveClients,
             ...nestedFamily,
             ...nestedStudents,
             ...nestedPets,
@@ -950,7 +962,16 @@ export default function ProfileOrganizeList({
               {nested.length > 0 && !isCollapsed ? (
                 <ul className="mt-3 space-y-2 border-t border-stone-100 pt-3">
                   {renderNestedSection(p.id, "Employees", nestedEmployees)}
-                  {renderNestedSection(p.id, "Clients", nestedClients)}
+                  {renderNestedSection(
+                    p.id,
+                    ACTIVE_CLIENTS_GROUP_LABEL,
+                    nestedActiveClients
+                  )}
+                  {renderNestedSection(
+                    p.id,
+                    INACTIVE_CLIENTS_GROUP_LABEL,
+                    nestedInactiveClients
+                  )}
                   {renderNestedSection(p.id, "Family members", nestedFamily)}
                   {renderNestedSection(p.id, "Students", nestedStudents)}
                   {renderNestedSection(p.id, "Pets", nestedPets)}

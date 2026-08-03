@@ -31,7 +31,7 @@ export async function loadLinkedOrgContext(
           .order("display_name", { ascending: true }),
         supabase
           .from("guardian_profiles")
-          .select("display_name, job_title, department, description")
+          .select("display_name, job_title, department, description, client_status")
           .eq("owner_user_id", userId)
           .eq("parent_profile_id", active.id)
           .eq("profile_type", "client")

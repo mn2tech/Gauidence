@@ -135,7 +135,7 @@ describe("vault map tree", () => {
       business.groups[0]?.members.map((m) => m.display_name),
       ["Alex"]
     );
-    assert.equal(business.groups[1]?.label, "Clients");
+    assert.equal(business.groups[1]?.label, "Active clients");
     assert.deepEqual(
       business.groups[1]?.members.map((m) => m.display_name),
       ["Big Client"]
@@ -171,7 +171,7 @@ describe("vault map tree", () => {
     const text = formatVaultMapForGideon(profiles, "Danny", "cl1");
     assert.match(text, /Active vault path: Danny → Acme Co → Big Client/);
     assert.match(text, /Big Client \(Client\) ← active vault/);
-    assert.match(text, /Clients:/);
+    assert.match(text, /Active clients:/);
     assert.match(text, /Acme Co \(Business\)/);
   });
 

@@ -237,6 +237,7 @@ export async function POST(request: Request) {
     organization_name: organizationName,
     parent_profile_id: parentId,
     is_default: false,
+    ...(profileType === "client" ? { client_status: "active" } : {}),
   };
 
   const existing = await listGuardianProfiles(supabase, user.id);
@@ -245,7 +246,7 @@ export async function POST(request: Request) {
   }
 
   const profileSelect =
-    "id, owner_user_id, profile_type, display_name, relationship, avatar_url, date_of_birth, school_name, grade_level, business_legal_name, industry, website, description, job_title, department, organization_name, parent_profile_id, is_default, created_at, updated_at";
+    "id, owner_user_id, profile_type, display_name, relationship, avatar_url, date_of_birth, school_name, grade_level, business_legal_name, industry, website, description, job_title, department, organization_name, parent_profile_id, is_default, created_at, updated_at, client_status";
 
   const admin = createAdminClient();
   // Prefer service-role insert so shared-vault RLS/trigger edge cases can't block owners.

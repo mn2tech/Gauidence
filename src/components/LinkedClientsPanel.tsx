@@ -5,8 +5,11 @@ import Link from "next/link";
 import { Briefcase, Loader2, Plus, Users } from "lucide-react";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
+  ACTIVE_CLIENTS_GROUP_LABEL,
+  INACTIVE_CLIENTS_GROUP_LABEL,
+  activeClientsOf,
   canManageProfileAccess,
-  clientsOf,
+  inactiveClientsOf,
   type GuardianProfile,
 } from "@/lib/profiles/types";
 
@@ -16,6 +19,72 @@ type Props = {
   embedded?: boolean;
 };
 
+function ClientRow({
+  cli,
+  openingId,
+  statusBusyId,
+  onOpenVault,
+  onSetStatus,
+}: {
+  cli: GuardianProfile;
+  openingId: string | null;
+  statusBusyId: string | null;
+  onOpenVault: (id: string) => void;
+  onSetStatus: (id: string, status: "active" | "inactive") => void;
+}) {
+  const isInactive = cli.client_status === "inactive";
+
+  return (
+    <li
+      className={`flex flex-wrap items-center justify-between gap-2 py-3 ${
+        isInactive ? "opacity-80" : ""
+      }`}
+    >
+      <div>
+        <p className="text-sm font-medium">{cli.display_name}</p>
+        <p className="text-xs text-ink-muted">
+          {cli.description?.trim() || "Client"}
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {canManageProfileAccess(cli) ? (
+          <Link
+            href={`/settings/profiles/${cli.id}/collaborators`}
+            className="inline-flex items-center gap-1 rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium hover:bg-stone-50"
+          >
+            <Users className="h-3.5 w-3.5" />
+            Client access
+          </Link>
+        ) : null}
+        {canManageProfileAccess(cli) ? (
+          <button
+            type="button"
+            onClick={() =>
+              void onSetStatus(cli.id, isInactive ? "active" : "inactive")
+            }
+            disabled={statusBusyId === cli.id}
+            className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium hover:bg-stone-50 disabled:opacity-60"
+          >
+            {statusBusyId === cli.id
+              ? "Saving…"
+              : isInactive
+                ? "Mark active"
+                : "Mark inactive"}
+          </button>
+        ) : null}
+        <button
+          type="button"
+          onClick={() => void onOpenVault(cli.id)}
+          disabled={openingId === cli.id}
+          className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium hover:bg-stone-50 disabled:opacity-60"
+        >
+          {openingId === cli.id ? "Opening…" : "Open vault"}
+        </button>
+      </div>
+    </li>
+  );
+}
+
 export default function LinkedClientsPanel({ parent, embedded = false }: Props) {
   const { profiles, refresh, switchProfile } = useActiveProfile();
   const [open, setOpen] = useState(false);
@@ -24,9 +93,14 @@ export default function LinkedClientsPanel({ parent, embedded = false }: Props) 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [openingId, setOpeningId] = useState<string | null>(null);
+  const [statusBusyId, setStatusBusyId] = useState<string | null>(null);
 
-  const clients = useMemo(
-    () => clientsOf(profiles, parent.id),
+  const activeClients = useMemo(
+    () => activeClientsOf(profiles, parent.id),
+    [profiles, parent.id]
+  );
+  const inactiveClients = useMemo(
+    () => inactiveClientsOf(profiles, parent.id),
     [profiles, parent.id]
   );
 
@@ -73,6 +147,28 @@ export default function LinkedClientsPanel({ parent, embedded = false }: Props) 
       setOpeningId(null);
     }
   };
+
+  const setClientStatus = async (id: string, status: "active" | "inactive") => {
+    setStatusBusyId(id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/profiles/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientStatus: status }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setError(body.error ?? "Couldn't update client status.");
+        return;
+      }
+      await refresh();
+    } finally {
+      setStatusBusyId(null);
+    }
+  };
+
+  const empty = activeClients.length === 0 && inactiveClients.length === 0;
 
   return (
     <div
@@ -159,47 +255,64 @@ export default function LinkedClientsPanel({ parent, embedded = false }: Props) 
         </form>
       )}
 
-      <ul className="mt-4 divide-y divide-stone-100">
-        {clients.length === 0 ? (
-          <li className="py-3 text-sm text-ink-muted">
-            No clients yet. Add one to keep their contracts, invoices, and logs
-            in a separate vault under this organization.
-          </li>
-        ) : (
-          clients.map((cli) => (
-            <li
-              key={cli.id}
-              className="flex flex-wrap items-center justify-between gap-2 py-3"
-            >
-              <div>
-                <p className="text-sm font-medium">{cli.display_name}</p>
-                <p className="text-xs text-ink-muted">
-                  {cli.description?.trim() || "Client"}
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {canManageProfileAccess(cli) ? (
-                  <Link
-                    href={`/settings/profiles/${cli.id}/collaborators`}
-                    className="inline-flex items-center gap-1 rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium hover:bg-stone-50"
-                  >
-                    <Users className="h-3.5 w-3.5" />
-                    Client access
-                  </Link>
-                ) : null}
-                <button
-                  type="button"
-                  onClick={() => void openVault(cli.id)}
-                  disabled={openingId === cli.id}
-                  className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium hover:bg-stone-50 disabled:opacity-60"
-                >
-                  {openingId === cli.id ? "Opening…" : "Open vault"}
-                </button>
-              </div>
-            </li>
-          ))
-        )}
-      </ul>
+      {empty ? (
+        <p className="mt-4 py-3 text-sm text-ink-muted">
+          No clients yet. Add one to keep their contracts, invoices, and logs in
+          a separate vault under this organization.
+        </p>
+      ) : (
+        <div className="mt-4 space-y-5">
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
+              {ACTIVE_CLIENTS_GROUP_LABEL}
+            </h3>
+            <ul className="mt-2 divide-y divide-stone-100">
+              {activeClients.length === 0 ? (
+                <li className="py-3 text-sm text-ink-muted">
+                  No active clients. Mark inactive clients as active to move
+                  them here.
+                </li>
+              ) : (
+                activeClients.map((cli) => (
+                  <ClientRow
+                    key={cli.id}
+                    cli={cli}
+                    openingId={openingId}
+                    statusBusyId={statusBusyId}
+                    onOpenVault={openVault}
+                    onSetStatus={setClientStatus}
+                  />
+                ))
+              )}
+            </ul>
+          </div>
+
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
+              {INACTIVE_CLIENTS_GROUP_LABEL}
+            </h3>
+            <ul className="mt-2 divide-y divide-stone-100">
+              {inactiveClients.length === 0 ? (
+                <li className="py-3 text-sm text-ink-muted">
+                  No inactive clients. Mark a client inactive when the
+                  relationship didn&apos;t work out.
+                </li>
+              ) : (
+                inactiveClients.map((cli) => (
+                  <ClientRow
+                    key={cli.id}
+                    cli={cli}
+                    openingId={openingId}
+                    statusBusyId={statusBusyId}
+                    onOpenVault={openVault}
+                    onSetStatus={setClientStatus}
+                  />
+                ))
+              )}
+            </ul>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

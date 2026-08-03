@@ -9,6 +9,7 @@ import {
 } from "@/lib/profiles/server";
 import {
   canAttachChildToParent,
+  isClientStatus,
   isGroupStyleProfile,
   isGuardianProfileType,
 } from "@/lib/profiles/types";
@@ -74,7 +75,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
       .eq("id", id)
       .eq("owner_user_id", user.id)
       .select(
-        "id, owner_user_id, profile_type, display_name, relationship, avatar_url, date_of_birth, school_name, grade_level, business_legal_name, industry, website, description, job_title, department, organization_name, parent_profile_id, is_default, created_at, updated_at"
+        "id, owner_user_id, profile_type, display_name, relationship, avatar_url, date_of_birth, school_name, grade_level, business_legal_name, industry, website, description, job_title, department, organization_name, parent_profile_id, is_default, created_at, updated_at, client_status"
       )
       .single();
     if (error || !data) {
@@ -140,6 +141,24 @@ export async function PATCH(request: Request, ctx: Ctx) {
     patch.avatar_url =
       typeof body.avatarUrl === "string" ? body.avatarUrl.trim() || null : null;
   }
+  if (body.clientStatus !== undefined) {
+    if (owned.profile_type !== "client") {
+      return NextResponse.json(
+        { error: "Only client profiles can have a client status." },
+        { status: 400 }
+      );
+    }
+    if (body.clientStatus === null) {
+      patch.client_status = "active";
+    } else if (isClientStatus(body.clientStatus)) {
+      patch.client_status = body.clientStatus;
+    } else {
+      return NextResponse.json(
+        { error: "clientStatus must be active or inactive." },
+        { status: 400 }
+      );
+    }
+  }
 
   if (body.parentProfileId !== undefined) {
     if (body.parentProfileId === null || body.parentProfileId === "") {
@@ -200,7 +219,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
     .eq("id", id)
     .eq("owner_user_id", user.id)
     .select(
-      "id, owner_user_id, profile_type, display_name, relationship, avatar_url, date_of_birth, school_name, grade_level, business_legal_name, industry, website, description, job_title, department, organization_name, parent_profile_id, is_default, created_at, updated_at"
+      "id, owner_user_id, profile_type, display_name, relationship, avatar_url, date_of_birth, school_name, grade_level, business_legal_name, industry, website, description, job_title, department, organization_name, parent_profile_id, is_default, created_at, updated_at, client_status"
     )
     .single();
 

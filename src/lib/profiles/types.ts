@@ -279,9 +279,29 @@ export type GuardianProfile = {
   is_default: boolean;
   created_at: string;
   updated_at: string;
+  /** For client vaults: active (current) or inactive. */
+  client_status?: ClientStatus | null;
   /** Present when loaded for the current user (owned or shared). */
   access_role?: GuardianProfileAccessRole;
 };
+
+export const CLIENT_STATUSES = ["active", "inactive"] as const;
+export type ClientStatus = (typeof CLIENT_STATUSES)[number];
+
+export function isClientStatus(v: unknown): v is ClientStatus {
+  return v === "active" || v === "inactive";
+}
+
+/** Client lifecycle; non-client profiles are always treated as active. */
+export function effectiveClientStatus(
+  profile: Pick<GuardianProfile, "profile_type" | "client_status">
+): ClientStatus {
+  if (profile.profile_type !== "client") return "active";
+  return profile.client_status === "inactive" ? "inactive" : "active";
+}
+
+export const ACTIVE_CLIENTS_GROUP_LABEL = "Active clients";
+export const INACTIVE_CLIENTS_GROUP_LABEL = "Inactive clients";
 
 /** Leaf vault types that can invite Editor collaborators (exact vault only). */
 export const SHAREABLE_PROFILE_TYPES = [
@@ -659,6 +679,24 @@ export function clientsOf(
   );
 }
 
+export function activeClientsOf(
+  profiles: GuardianProfile[],
+  parentId: string
+): GuardianProfile[] {
+  return clientsOf(profiles, parentId).filter(
+    (p) => effectiveClientStatus(p) === "active"
+  );
+}
+
+export function inactiveClientsOf(
+  profiles: GuardianProfile[],
+  parentId: string
+): GuardianProfile[] {
+  return clientsOf(profiles, parentId).filter(
+    (p) => effectiveClientStatus(p) === "inactive"
+  );
+}
+
 export function familyMembersOf(
   profiles: GuardianProfile[],
   parentId: string
@@ -777,8 +815,20 @@ export function nestedGroupsUnder(
     if (items.length > 0) groups.push({ label: "Employees", profiles: items });
   }
   if (canHaveLinkedClients(parent.profile_type)) {
-    const items = clientsOf(profiles, parent.id);
-    if (items.length > 0) groups.push({ label: "Clients", profiles: items });
+    const active = activeClientsOf(profiles, parent.id);
+    const inactive = inactiveClientsOf(profiles, parent.id);
+    if (active.length > 0) {
+      groups.push({
+        label: ACTIVE_CLIENTS_GROUP_LABEL,
+        profiles: active,
+      });
+    }
+    if (inactive.length > 0) {
+      groups.push({
+        label: INACTIVE_CLIENTS_GROUP_LABEL,
+        profiles: inactive,
+      });
+    }
   }
   if (canHaveLinkedFamilyMembers(parent.profile_type)) {
     const items = familyMembersOf(profiles, parent.id);
@@ -846,6 +896,7 @@ export type LinkedPersonSummary = {
   job_title: string | null;
   department: string | null;
   description?: string | null;
+  client_status?: ClientStatus | null;
 };
 
 /** @deprecated Use LinkedPersonSummary */
@@ -891,7 +942,9 @@ export function formatLinkedClientsForGideon(
   }
   const lines = clients.map((c, i) => {
     const note = c.description?.trim() || c.job_title?.trim();
-    return `${i + 1}. ${c.display_name}${note ? ` — ${note}` : ""}`;
+    const status =
+      c.client_status === "inactive" ? " (inactive)" : "";
+    return `${i + 1}. ${c.display_name}${status}${note ? ` — ${note}` : ""}`;
   });
   return `${header}\n${lines.join("\n")}\n(This is Guardian's linked client roster under this organization.)`;
 }

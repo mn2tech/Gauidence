@@ -11,7 +11,9 @@ import {
   canHaveLinkedVehicles,
   canAttachChildToParent,
   subVaultCreateOptions,
+  activeClientsOf,
   clientsOf,
+  inactiveClientsOf,
   employeesOf,
   familyMembersOf,
   formatLinkedClientsForGideon,
@@ -191,6 +193,21 @@ describe("guardian profiles helpers", () => {
     const linkedClients = clientsOf(list, parentId);
     assert.equal(linkedClients.length, 1);
     assert.equal(linkedClients[0]?.display_name, "Northside Clinic");
+    assert.equal(activeClientsOf(list, parentId).length, 1);
+    assert.equal(inactiveClientsOf(list, parentId).length, 0);
+
+    const inactiveList = [
+      ...list,
+      sample({
+        id: "c2",
+        profile_type: "client",
+        display_name: "Lost Lead",
+        parent_profile_id: parentId,
+        client_status: "inactive",
+      }),
+    ];
+    assert.equal(activeClientsOf(inactiveList, parentId).length, 1);
+    assert.equal(inactiveClientsOf(inactiveList, parentId).length, 1);
 
     const roster = formatLinkedEmployeesForGideon("Acme", [
       { display_name: "Jordan", job_title: "Ops", department: null },

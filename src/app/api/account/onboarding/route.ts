@@ -46,7 +46,7 @@ function isAuthed(v: Authed | NextResponse): v is Authed {
 }
 
 const PROFILE_SELECT =
-  "id, owner_user_id, profile_type, display_name, relationship, avatar_url, date_of_birth, school_name, grade_level, business_legal_name, industry, website, description, job_title, department, organization_name, parent_profile_id, is_default, created_at, updated_at";
+  "id, owner_user_id, profile_type, display_name, relationship, avatar_url, date_of_birth, school_name, grade_level, business_legal_name, industry, website, description, job_title, department, organization_name, parent_profile_id, is_default, created_at, updated_at, client_status";
 
 type OnboardingRow = {
   onboarding_intent: string | null;

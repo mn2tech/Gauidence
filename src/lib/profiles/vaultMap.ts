@@ -1,5 +1,8 @@
 import {
-  clientsOf,
+  ACTIVE_CLIENTS_GROUP_LABEL,
+  INACTIVE_CLIENTS_GROUP_LABEL,
+  activeClientsOf,
+  inactiveClientsOf,
   employeesOf,
   familyMembersOf,
   homesOf,
@@ -61,7 +64,18 @@ function branchForProfile(
       profile,
       groups: [
         { label: "Employees", members: employeesOf(profiles, profile.id) },
-        { label: "Clients", members: clientsOf(profiles, profile.id) },
+        {
+          label: ACTIVE_CLIENTS_GROUP_LABEL,
+          members: activeClientsOf(profiles, profile.id),
+        },
+        ...(inactiveClientsOf(profiles, profile.id).length > 0
+          ? [
+              {
+                label: INACTIVE_CLIENTS_GROUP_LABEL,
+                members: inactiveClientsOf(profiles, profile.id),
+              },
+            ]
+          : []),
         ...(others.length > 0
           ? [{ label: "Other", members: others }]
           : []),

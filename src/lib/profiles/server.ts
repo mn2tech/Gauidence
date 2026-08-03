@@ -6,12 +6,13 @@ import {
   canEditGuardianProfile,
   isGuardianProfileAccessRole,
   isGuardianProfileType,
+  isClientStatus,
   type GuardianProfile,
   type GuardianProfileAccessRole,
 } from "./types";
 
 const PROFILE_SELECT =
-  "id, owner_user_id, profile_type, display_name, relationship, avatar_url, date_of_birth, school_name, grade_level, business_legal_name, industry, website, description, job_title, department, organization_name, parent_profile_id, is_default, created_at, updated_at";
+  "id, owner_user_id, profile_type, display_name, relationship, avatar_url, date_of_birth, school_name, grade_level, business_legal_name, industry, website, description, job_title, department, organization_name, parent_profile_id, is_default, created_at, updated_at, client_status";
 
 function asProfile(
   row: Record<string, unknown>,
@@ -41,6 +42,7 @@ function asProfile(
     is_default: Boolean(row.is_default),
     created_at: String(row.created_at ?? ""),
     updated_at: String(row.updated_at ?? ""),
+    client_status: isClientStatus(row.client_status) ? row.client_status : null,
     access_role: accessRole,
   };
 }

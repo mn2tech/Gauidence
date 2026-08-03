@@ -6,6 +6,8 @@ import { Check, ChevronDown, Plus } from "lucide-react";
 import ProfileAvatar from "@/components/ProfileAvatar";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
+  ACTIVE_CLIENTS_GROUP_LABEL,
+  INACTIVE_CLIENTS_GROUP_LABEL,
   nestedGroupsUnder,
   profileSubtitle,
   profileTypeLabel,
@@ -20,7 +22,12 @@ function nestedGroupKey(parentId: string, label: string) {
 }
 
 function defaultNestedGroupCollapsed(label: string) {
-  return label === "Employees" || label === "Clients";
+  return (
+    label === "Employees" ||
+    label === "Clients" ||
+    label === ACTIVE_CLIENTS_GROUP_LABEL ||
+    label === INACTIVE_CLIENTS_GROUP_LABEL
+  );
 }
 
 function NestedGroupHeader({
