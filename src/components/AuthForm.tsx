@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import GoogleIcon from "@/components/GoogleIcon";
+import { campaignSignupWelcome } from "@/lib/campaigns/olney-nno";
 
 const ERROR_MESSAGES: Record<string, string> = {
   access_denied:
@@ -45,6 +46,13 @@ export default function AuthForm({ mode }: { mode: Mode }) {
     rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//")
       ? rawNext
       : "/ask";
+  const signupRef = searchParams.get("ref")?.trim() || null;
+  const campaignWelcome = campaignSignupWelcome(signupRef);
+  const authQuery = searchParams.toString();
+
+  function authHref(path: string): string {
+    return authQuery ? `${path}?${authQuery}` : path;
+  }
 
   async function handleGoogle() {
     if (!supabase) {
@@ -66,10 +74,13 @@ export default function AuthForm({ mode }: { mode: Mode }) {
         return;
       }
 
+      const callbackParams = new URLSearchParams({ next: safeNext });
+      if (signupRef) callbackParams.set("ref", signupRef);
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(safeNext)}`,
+          redirectTo: `${window.location.origin}/auth/callback?${callbackParams.toString()}`,
         },
       });
       if (error) {
@@ -100,8 +111,11 @@ export default function AuthForm({ mode }: { mode: Mode }) {
           email,
           password,
           options: {
-            data: { full_name: fullName },
-            emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(safeNext)}`,
+            data: {
+              full_name: fullName,
+              ...(signupRef ? { signup_ref: signupRef } : {}),
+            },
+            emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(safeNext)}${signupRef ? `&ref=${encodeURIComponent(signupRef)}` : ""}`,
           },
         });
         if (error) {
@@ -152,6 +166,15 @@ export default function AuthForm({ mode }: { mode: Mode }) {
           ? "Guardian remembers what matters — documents, notes, deadlines — so you can ask instead of search."
           : "Log in to ask Gideon about your documents, notes, and deadlines."}
       </p>
+
+      {isSignup && campaignWelcome ? (
+        <p
+          role="status"
+          className="mt-6 rounded-xl border border-brand/30 bg-brand-light p-4 text-sm text-brand-dark"
+        >
+          {campaignWelcome}
+        </p>
+      ) : null}
 
       {!configured && (
         <p className="mt-6 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
@@ -278,7 +301,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
           <>
             Already have an account?{" "}
             <Link
-              href="/login"
+              href={authHref("/login")}
               className="font-semibold text-brand hover:text-brand-dark"
             >
               Log in
@@ -288,7 +311,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
           <>
             New to Guardian?{" "}
             <Link
-              href="/signup"
+              href={authHref("/signup")}
               className="font-semibold text-brand hover:text-brand-dark"
             >
               Create an account

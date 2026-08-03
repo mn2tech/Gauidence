@@ -22,6 +22,7 @@ export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
   const explicitNext = searchParams.get("next");
+  const signupRef = searchParams.get("ref")?.trim() || null;
   const safeNext =
     explicitNext &&
     explicitNext.startsWith("/") &&
@@ -91,6 +92,12 @@ export async function GET(request: Request) {
       { onConflict: "id", ignoreDuplicates: true }
     );
     await ensureDefaultGuardianProfile(supabase, user);
+    if (
+      signupRef &&
+      typeof user.user_metadata?.signup_ref !== "string"
+    ) {
+      await supabase.auth.updateUser({ data: { signup_ref: signupRef } });
+    }
     if (!explicitNext) {
       const active = await getActiveGuardianProfile(supabase, user);
       redirectPath = signedInLandingPath(active, { email: user.email });

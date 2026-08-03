@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { isOlneyNnoRef, OLNEY_NNO_PATH } from "@/lib/campaigns/olney-nno";
 
 export const metadata: Metadata = {
   title: "Try Guardian",
@@ -15,6 +16,9 @@ type Props = {
 export default async function TryPage({ searchParams }: Props) {
   const params = await searchParams;
   const ref = params.ref?.trim();
+  if (isOlneyNnoRef(ref)) {
+    redirect(OLNEY_NNO_PATH);
+  }
   if (ref) {
     redirect(`/signup?ref=${encodeURIComponent(ref)}`);
   }
