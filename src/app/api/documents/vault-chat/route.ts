@@ -1038,10 +1038,14 @@ export async function POST(request: Request) {
       ? attachmentDocumentIdRaw.trim()
       : "";
 
+  const workProjectIdForAction =
+    typeof workProjectIdRaw === "string" ? workProjectIdRaw.trim() : "";
+
   const actionCtx: ActionContext = {
     question,
     userId: user.id,
     userEmail: user.email,
+    workProjectId: workProjectIdForAction || null,
     activeProfile: {
       id: active.id,
       display_name: active.display_name,

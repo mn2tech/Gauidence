@@ -37,6 +37,7 @@ import {
   type ChatTurn,
 } from "@/lib/vault/expandRetrievalQuestion";
 import { wantsReminderAgent } from "@/lib/reminders/propose";
+import { wantsWorkMemoryUpdate } from "@/lib/work-memory/propose";
 import type { AttachedVaultDocument } from "@/lib/vault/attachedDocument";
 import type { GuardianProfileType } from "@/lib/profiles/types";
 import type { LinkedVaultProfile } from "@/lib/vault/rollup";
@@ -83,6 +84,9 @@ export async function loadWorkspaceContext(
   const showPictures = wantsShowPictures(question);
   const transcriptionMode = wantsTranscription(question);
   const reminderAgent = wantsReminderAgent(question);
+  const workMemoryUpdateAgent = wantsWorkMemoryUpdate(question, {
+    focusedWorkProject: Boolean(workProjectId),
+  });
 
   const queryEmbedding =
     chunkCount > 0
@@ -252,6 +256,7 @@ Active vault in the UI: ${activeProfile.display_name}. Document search includes 
       timeZone,
       showPictures,
       reminderAgent,
+      workMemoryUpdateAgent,
       transcriptionMode,
       hasAttachedDocument: Boolean(attachedDoc),
       allVaultsNote,

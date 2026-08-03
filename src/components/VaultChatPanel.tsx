@@ -13,6 +13,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import PlanLimitAlert from "@/components/PlanLimitAlert";
 import {
+  Brain,
   ExternalLink,
   FileUp,
   Camera,
@@ -106,6 +107,12 @@ import {
   stripProposedReminderSection,
   type ProposedReminder,
 } from "@/lib/reminders/propose";
+import {
+  parseProposedWorkMemoryUpdate,
+  proposedWorkMemoryUpdateSummary,
+  stripProposedWorkMemoryUpdateSection,
+  type ProposedWorkMemoryUpdate,
+} from "@/lib/work-memory/propose";
 import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
 import { dispatchAwardsFromResponse } from "@/lib/awards/client";
 import {
@@ -586,6 +593,13 @@ export default function VaultChatPanel({
   const [confirmedReminderIds, setConfirmedReminderIds] = useState<Set<string>>(
     () => new Set()
   );
+  const [confirmingWorkMemoryId, setConfirmingWorkMemoryId] = useState<
+    string | null
+  >(null);
+  const [confirmedWorkMemoryIds, setConfirmedWorkMemoryIds] = useState<
+    Set<string>
+  >(() => new Set());
+  const [savingWorkMemory, setSavingWorkMemory] = useState(false);
   const [firstWin, setFirstWin] = useState<{
     fileName: string;
     summary: string | null;
@@ -1718,6 +1732,61 @@ export default function VaultChatPanel({
     }
   };
 
+  const confirmProposedWorkMemoryUpdate = async (
+    messageId: string,
+    proposal: ProposedWorkMemoryUpdate
+  ) => {
+    if (
+      confirmingWorkMemoryId ||
+      savingWorkMemory ||
+      vaultBusy ||
+      sending
+    ) {
+      return;
+    }
+    setConfirmingWorkMemoryId(messageId);
+    setError(null);
+    try {
+      const patch: Record<string, string> = {};
+      if (proposal.status) patch.status = proposal.status;
+      if (proposal.mission) patch.mission = proposal.mission;
+      if (proposal.currentStep) patch.currentStep = proposal.currentStep;
+      if (proposal.nextAction) patch.nextAction = proposal.nextAction;
+      if (proposal.blockers) patch.blockers = proposal.blockers;
+
+      const res = await fetch(
+        `/api/work-memory/projects/${encodeURIComponent(proposal.projectId)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(patch),
+        }
+      );
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        project?: { id: string; name: string };
+      };
+      if (!res.ok) {
+        setError(body.error ?? "Couldn't update Work Memory.");
+        return;
+      }
+      setConfirmedWorkMemoryIds((prev) => new Set(prev).add(messageId));
+      if (body.project && workProject?.id === body.project.id) {
+        setWorkProject(body.project as WorkProject);
+      }
+      const label =
+        proposedWorkMemoryUpdateSummary(
+          proposal,
+          body.project?.name ?? workProject?.name
+        ) || body.project?.name || "project";
+      pushLocalNote(`Work Memory updated: ${label}.`);
+    } catch {
+      setError("Couldn't update Work Memory. Check your connection and try again.");
+    } finally {
+      setConfirmingWorkMemoryId(null);
+    }
+  };
+
   const saveInlineLog = async (e: FormEvent) => {
     e.preventDefault();
     const saveProfileId = profileId ?? lastWriteProfileIdRef.current;
@@ -2207,6 +2276,11 @@ export default function VaultChatPanel({
       next.delete(assistantMessage.id);
       return next;
     });
+    setConfirmedWorkMemoryIds((prev) => {
+      const next = new Set(prev);
+      next.delete(assistantMessage.id);
+      return next;
+    });
     setDismissedVaultScopeIds((prev) => {
       const next = new Set(prev);
       next.delete(assistantMessage.id);
@@ -2226,10 +2300,16 @@ export default function VaultChatPanel({
       isStreaming?: boolean;
     }
   ) => {
-    const proposed = parseProposedReminder(m.content, Date.now(), timeZone);
-    const displayContent = stripProposedReminderSection(m.content);
+    const proposedReminder = parseProposedReminder(m.content, Date.now(), timeZone);
+    const proposedWorkMemory = parseProposedWorkMemoryUpdate(
+      m.content,
+      requestedWorkProjectId ?? workProject?.id
+    );
+    const displayContent = stripProposedWorkMemoryUpdateSection(
+      stripProposedReminderSection(m.content)
+    );
     const sections = parseGideonSections(
-      displayContent || (proposed ? "" : m.content)
+      displayContent || (proposedReminder || proposedWorkMemory ? "" : m.content)
     );
     const citations = Array.isArray(m.citations) ? m.citations : [];
     const uniqueCitations = [
@@ -2249,8 +2329,10 @@ export default function VaultChatPanel({
       ? []
       : [...imageCitations, ...sourceCitations];
     const linkOnlyCitations = options?.hideCitationPreviews ? [] : sourceCitations;
-    const alreadySet = confirmedReminderIds.has(m.id);
-    const confirming = confirmingReminderId === m.id;
+    const alreadySetReminder = confirmedReminderIds.has(m.id);
+    const confirmingReminder = confirmingReminderId === m.id;
+    const alreadySetWorkMemory = confirmedWorkMemoryIds.has(m.id);
+    const confirmingWorkMemory = confirmingWorkMemoryId === m.id;
     const vaultScope = m.vaultScope;
     const showVaultScopeCard =
       vaultScope &&
@@ -2293,23 +2375,23 @@ export default function VaultChatPanel({
             </p>
           </div>
         ))}
-        {proposed ? (
+        {proposedReminder ? (
           <div className="rounded-xl border border-amber-200 bg-amber-50/90 px-3 py-3">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-900/70">
               Proposed reminder
             </p>
             <p className="mt-1 text-sm font-medium text-foreground">
-              {proposed.title}
+              {proposedReminder.title}
             </p>
             <p className="mt-0.5 text-xs text-ink-muted">
-              {proposedReminderWhenLabel(proposed, timeZone)}
+              {proposedReminderWhenLabel(proposedReminder, timeZone)}
             </p>
             {m.vaultScope ? (
               <p className="mt-1 text-xs text-amber-900/80">
                 Will save to {m.vaultScope.profileName}&apos;s vault
               </p>
             ) : null}
-            {alreadySet ? (
+            {alreadySetReminder ? (
               <p className="mt-2 text-xs font-medium text-emerald-800">
                 Reminder saved. You decide what happens next.
               </p>
@@ -2317,17 +2399,19 @@ export default function VaultChatPanel({
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   type="button"
-                  disabled={confirming || savingReminder || sending || vaultBusy}
+                  disabled={
+                    confirmingReminder || savingReminder || sending || vaultBusy
+                  }
                   onClick={() =>
                     void confirmProposedReminder(
                       m.id,
-                      proposed,
+                      proposedReminder,
                       m.vaultScope?.profileId
                     )
                   }
                   className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand/90 disabled:opacity-60"
                 >
-                  {confirming ? (
+                  {confirmingReminder ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   ) : (
                     <Bell className="h-3.5 w-3.5" />
@@ -2336,18 +2420,67 @@ export default function VaultChatPanel({
                 </button>
                 <button
                   type="button"
-                  disabled={confirming || savingReminder}
+                  disabled={confirmingReminder || savingReminder}
                   onClick={() => {
                     setReminderTargetProfileId(m.vaultScope?.profileId ?? null);
-                    setReminderTitle(proposed.title);
-                    setReminderDate(proposed.date);
-                    setReminderTime(proposed.time);
+                    setReminderTitle(proposedReminder.title);
+                    setReminderDate(proposedReminder.date);
+                    setReminderTime(proposedReminder.time);
                     setReminderOpen(true);
                   }}
                   className="inline-flex items-center rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50"
                 >
                   Edit first
                 </button>
+              </div>
+            )}
+          </div>
+        ) : null}
+        {proposedWorkMemory ? (
+          <div className="rounded-xl border border-indigo-200 bg-indigo-50/90 px-3 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-900/70">
+              Proposed Work Memory update
+            </p>
+            <p className="mt-1 text-sm text-foreground">
+              {proposedWorkMemoryUpdateSummary(
+                proposedWorkMemory,
+                workProject?.id === proposedWorkMemory.projectId
+                  ? workProject.name
+                  : null
+              )}
+            </p>
+            {alreadySetWorkMemory ? (
+              <p className="mt-2 text-xs font-medium text-emerald-800">
+                Project updated in Work Memory.
+              </p>
+            ) : (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={
+                    confirmingWorkMemory ||
+                    savingWorkMemory ||
+                    sending ||
+                    vaultBusy
+                  }
+                  onClick={() =>
+                    void confirmProposedWorkMemoryUpdate(m.id, proposedWorkMemory)
+                  }
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand/90 disabled:opacity-60"
+                >
+                  {confirmingWorkMemory ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Brain className="h-3.5 w-3.5" />
+                  )}
+                  Update project
+                </button>
+                <Link
+                  href={`/work-memory/${proposedWorkMemory.projectId}`}
+                  className="inline-flex items-center rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50"
+                >
+                  Open in Work Memory
+                </Link>
               </div>
             )}
           </div>

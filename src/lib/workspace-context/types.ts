@@ -44,6 +44,7 @@ export type WorkspacePromptOptions = {
   timeZone: string;
   showPictures: boolean;
   reminderAgent: boolean;
+  workMemoryUpdateAgent: boolean;
   transcriptionMode: boolean;
   hasAttachedDocument: boolean;
   allVaultsNote: string;

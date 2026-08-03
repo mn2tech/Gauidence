@@ -12,6 +12,8 @@ export type ActionContext = {
     profile_type: GuardianProfileType;
     parent_profile_id?: string | null;
   };
+  /** Ask Gideon opened from a Work Memory project (`?projectId=`). */
+  workProjectId?: string | null;
   confirmed?: boolean;
   supabase?: SupabaseClient;
 };

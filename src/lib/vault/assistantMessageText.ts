@@ -1,9 +1,18 @@
 import { stripProposedReminderSection } from "@/lib/reminders/propose";
+import {
+  stripProposedWorkMemoryUpdateSection,
+} from "@/lib/work-memory/propose";
 import { parseGideonSections } from "@/lib/vault/gideon";
+
+function stripAssistantProposalSections(content: string): string {
+  return stripProposedWorkMemoryUpdateSection(
+    stripProposedReminderSection(content)
+  );
+}
 
 /** Plain text for copy / clipboard from a Gideon assistant message. */
 export function formatAssistantMessagePlainText(content: string): string {
-  const displayContent = stripProposedReminderSection(content);
+  const displayContent = stripAssistantProposalSections(content);
   const sections = parseGideonSections(displayContent || content);
   if (sections.length === 0) {
     return (displayContent || content).trim();
