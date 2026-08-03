@@ -679,6 +679,9 @@ export function buildVaultScopeNote(args: {
   }
 
   if (searchNames.length > 1) {
+    if (scoped) {
+      return `Answers may use all ${searchNames.length} vaults · Chat saved in ${scoped}.`;
+    }
     const list = formatVaultNameList(searchNames);
     return `Searching all ${searchNames.length} vaults: ${list}.`;
   }
@@ -719,6 +722,10 @@ export const GUARDIAN_PRODUCT_LINE =
 /** First-time welcome fallback when no vault template applies. */
 export const WELCOME_AI_MEMORY_TITLE = "Welcome to your vault.";
 export const WELCOME_AI_MEMORY_BODY = GUARDIAN_PRODUCT_LINE;
+
+/** Short prompt when the user has seen the full Ask Gideon welcome before. */
+export const GIDEON_RETURNING_PROMPT =
+  "Ask anything — I'll search your vaults and clearly label what's from your files.";
 
 export const EMPTY_VAULT_HEADLINE = "Add something for Gideon to remember";
 export const EMPTY_VAULT_BODY =

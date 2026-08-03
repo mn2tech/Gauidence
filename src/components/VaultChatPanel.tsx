@@ -64,6 +64,7 @@ import {
   FIRST_MEMORY_PROMPT,
   GIDEON_BRAND_LINE,
   GIDEON_LOADING_STATES,
+  GIDEON_RETURNING_PROMPT,
   GIDEON_WHY,
   ORGANIZE_EXAMPLES,
   ORGANIZE_INTRO,
@@ -77,6 +78,10 @@ import {
   parseGideonSections,
   type FirstMemoryActionId,
 } from "@/lib/vault/gideon";
+import {
+  readGideonWelcomeSeen,
+  writeGideonWelcomeSeen,
+} from "@/lib/vault/gideonWelcomeClient";
 import { isImageFileName } from "@/lib/vault/images";
 import { renderPdfThumbnailFromFile, renderPdfThumbnailFromUrl } from "@/lib/vault/pdfThumbnail";
 import { renderGideonText } from "@/components/gideonText";
@@ -558,6 +563,7 @@ export default function VaultChatPanel({
     else setErrorState(code ? { message, code } : { message });
   };
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [gideonWelcomeSeen, setGideonWelcomeSeen] = useState(false);
   const [whyOpen, setWhyOpen] = useState(false);
   const [plusOpen, setPlusOpen] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -627,6 +633,28 @@ export default function VaultChatPanel({
     draftAppliedRef.current = true;
     setInput(requestedDraft.trim());
   }, [requestedDraft, isScopedPanel]);
+  useEffect(() => {
+    const seen = readGideonWelcomeSeen();
+    if (seen) {
+      setGideonWelcomeSeen(true);
+      return;
+    }
+    const hasVaultContent =
+      (meta?.documentCount ?? 0) +
+        (meta?.photoCount ?? 0) +
+        (meta?.logCount ?? 0) >
+      0;
+    if (hasVaultContent) {
+      writeGideonWelcomeSeen(true);
+      setGideonWelcomeSeen(true);
+    }
+  }, [meta?.documentCount, meta?.photoCount, meta?.logCount]);
+  const markGideonWelcomeSeen = useCallback(() => {
+    if (!readGideonWelcomeSeen()) {
+      writeGideonWelcomeSeen(true);
+      setGideonWelcomeSeen(true);
+    }
+  }, []);
   const bootstrapGeneration = useRef(0);
   const bootstrappedVaultRef = useRef<string | null>(null);
   const messagesRef = useRef(messages);
@@ -1743,6 +1771,7 @@ export default function VaultChatPanel({
     const question = questionRaw.trim();
     if (!question || sending || vaultBusy) return;
 
+    markGideonWelcomeSeen();
     stopAssistantSpeech();
     setSending(true);
     setError(null);
@@ -2436,6 +2465,7 @@ export default function VaultChatPanel({
   const logCount = meta?.logCount ?? 0;
   const fileCount = docCount + photoCount;
   const emptyVault = fileCount === 0 && logCount === 0;
+  const showExpandedWelcome = !gideonWelcomeSeen || emptyVault;
   const logsOnly = fileCount === 0 && logCount > 0;
   const greetName = meta?.firstName;
   const showCreateAnotherVault =
@@ -2492,72 +2522,80 @@ export default function VaultChatPanel({
             <AskWelcomeProfileSwitch fallbackName={meta.profileName} />
           )}
 
-          <div className="space-y-1.5">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-semibold text-foreground">
-                {emptyVault
-                  ? (meta?.guidance?.headline ?? WELCOME_AI_MEMORY_TITLE)
-                  : (meta?.guidance?.headline ?? "Welcome to your vault")}
+          {showExpandedWelcome ? (
+            <div className="space-y-1.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm font-semibold text-foreground">
+                  {emptyVault
+                    ? (meta?.guidance?.headline ?? WELCOME_AI_MEMORY_TITLE)
+                    : (meta?.guidance?.headline ?? "Welcome to your vault")}
+                </p>
+                {templateBadge ? (
+                  <span className="inline-flex items-center rounded-full border border-stone-300 bg-white px-2.5 py-0.5 text-[11px] font-medium text-foreground">
+                    {templateBadge}
+                  </span>
+                ) : null}
+              </div>
+              <p className="text-sm leading-relaxed text-ink-muted">
+                {meta?.guidance?.intro ?? WELCOME_AI_MEMORY_BODY}
               </p>
-              {templateBadge ? (
-                <span className="inline-flex items-center rounded-full border border-stone-300 bg-white px-2.5 py-0.5 text-[11px] font-medium text-foreground">
-                  {templateBadge}
-                </span>
-              ) : null}
             </div>
+          ) : (
             <p className="text-sm leading-relaxed text-ink-muted">
-              {meta?.guidance?.intro ?? WELCOME_AI_MEMORY_BODY}
+              {GIDEON_RETURNING_PROMPT}
             </p>
-          </div>
+          )}
 
           {!emptyVault && countBits.length > 0 ? (
-            <div className="space-y-2 rounded-xl border border-stone-200 bg-stone-50/80 px-3 py-2.5">
-              <p className="text-xs font-semibold text-foreground">
+            <details className="rounded-xl border border-stone-200 bg-stone-50/80 px-3 py-2.5">
+              <summary className="cursor-pointer text-xs font-semibold text-foreground">
                 In this vault: {countBits.join(" · ")}
-              </p>
-              {docCount > 0 ? (
-                <div>
-                  <p className="text-[11px] font-medium text-ink-muted">
-                    Documents
-                  </p>
-                  <NameList
-                    names={meta?.documentNames ?? []}
-                    more={meta?.documentNamesMore ?? 0}
-                  />
-                </div>
-              ) : null}
-              {photoCount > 0 ? (
-                <div>
-                  <p className="text-[11px] font-medium text-ink-muted">
-                    Photos
-                  </p>
-                  <NameList
-                    names={meta?.photoNames ?? []}
-                    more={meta?.photoNamesMore ?? 0}
-                  />
-                </div>
-              ) : null}
-              {logCount > 0 ? (
-                <div>
-                  <p className="text-[11px] font-medium text-ink-muted">
-                    Daily Logs
-                  </p>
-                  <NameList
-                    names={meta?.logNames ?? []}
-                    more={meta?.logNamesMore ?? 0}
-                  />
-                </div>
-              ) : null}
-              <p className="text-[11px] text-ink-muted">
-                <Link
-                  href={docsHref}
-                  className="font-medium text-brand hover:text-brand-dark"
-                >
-                  Open Docs
-                </Link>{" "}
-                to see everything.
-              </p>
-            </div>
+              </summary>
+              <div className="mt-2 space-y-2 border-t border-stone-200 pt-2">
+                {docCount > 0 ? (
+                  <div>
+                    <p className="text-[11px] font-medium text-ink-muted">
+                      Documents
+                    </p>
+                    <NameList
+                      names={meta?.documentNames ?? []}
+                      more={meta?.documentNamesMore ?? 0}
+                    />
+                  </div>
+                ) : null}
+                {photoCount > 0 ? (
+                  <div>
+                    <p className="text-[11px] font-medium text-ink-muted">
+                      Photos
+                    </p>
+                    <NameList
+                      names={meta?.photoNames ?? []}
+                      more={meta?.photoNamesMore ?? 0}
+                    />
+                  </div>
+                ) : null}
+                {logCount > 0 ? (
+                  <div>
+                    <p className="text-[11px] font-medium text-ink-muted">
+                      Daily Logs
+                    </p>
+                    <NameList
+                      names={meta?.logNames ?? []}
+                      more={meta?.logNamesMore ?? 0}
+                    />
+                  </div>
+                ) : null}
+                <p className="text-[11px] text-ink-muted">
+                  <Link
+                    href={docsHref}
+                    className="font-medium text-brand hover:text-brand-dark"
+                  >
+                    Open Docs
+                  </Link>{" "}
+                  to see everything.
+                </p>
+              </div>
+            </details>
           ) : null}
 
           {emptyVault ? (
@@ -2684,7 +2722,7 @@ export default function VaultChatPanel({
                 </div>
               </details>
             </>
-          ) : (
+          ) : showExpandedWelcome ? (
             <>
               <p className="text-sm leading-relaxed text-ink-muted">
                 {logsOnly
@@ -2718,7 +2756,7 @@ export default function VaultChatPanel({
                 </button>
               </div>
             </>
-          )}
+          ) : null}
 
           {!emptyVault && meta && meta.suggestions.length > 0 ? (
             <div className="space-y-2 pt-0.5">
@@ -2741,7 +2779,7 @@ export default function VaultChatPanel({
             </div>
           ) : null}
 
-          {showCreateAnotherVault ? (
+          {showExpandedWelcome && showCreateAnotherVault ? (
             <div className="rounded-xl border border-stone-200 bg-stone-50/80 px-3 py-3">
               <p className="text-xs font-semibold text-foreground">
                 Create another Vault

@@ -271,7 +271,6 @@ export function AskWelcomeProfileSwitch({
     <div className="relative" ref={rootRef}>
       <p className="text-xs text-ink-muted">
         Chatting about {trigger(name)}
-        <span className="text-ink-muted"> — chats stay with this vault.</span>
       </p>
       {open && active ? (
         <ProfileMenu

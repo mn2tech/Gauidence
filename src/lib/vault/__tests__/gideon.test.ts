@@ -177,6 +177,24 @@ describe("Gideon helpers", () => {
     assert.equal(
       buildVaultScopeNote({
         allVaultNames: [
+          "crossroadconnect",
+          "Michael Kola",
+          "NM2TECH - Next Move",
+          "Matthew Kola",
+        ],
+        searchVaultNames: [
+          "crossroadconnect",
+          "Michael Kola",
+          "NM2TECH - Next Move",
+          "Matthew Kola",
+        ],
+        chatScopedProfileName: "NM2TECH - Next Move",
+      }),
+      "Answers may use all 4 vaults · Chat saved in NM2TECH - Next Move."
+    );
+    assert.equal(
+      buildVaultScopeNote({
+        allVaultNames: [
           "JAKULLA",
           "crossroadconnect",
           "CROSSROADS",
