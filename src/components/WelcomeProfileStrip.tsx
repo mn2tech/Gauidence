@@ -5,9 +5,10 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Plus } from "lucide-react";
-import { DOCUMENTS_PATH } from "@/lib/routes";
+import { DOCUMENTS_PATH, REQUESTS_PATH } from "@/lib/routes";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
+  isClientViewerProfile,
   isGroupStyleProfile,
   isLinkedMemberProfile,
   nestedUnder,
@@ -134,6 +135,48 @@ export default function WelcomeProfileStrip({
   const nested = focusedContainer
     ? nestedUnder(profiles, focusedContainer)
     : [];
+
+  if (active && isClientViewerProfile(active)) {
+    return (
+      <div className="welcome-strip space-y-4 sm:space-y-5">
+        {passwordNotice ? (
+          <p
+            role="status"
+            className="rounded-xl border border-brand/30 bg-brand-light px-4 py-3 text-sm text-brand-dark"
+          >
+            Your password has been updated.
+          </p>
+        ) : null}
+        <div>
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
+            Welcome, {ownerName}
+          </h1>
+          {ownerEmail ? (
+            <p className="mt-0.5 truncate text-sm text-ink-muted">
+              {ownerEmail}
+            </p>
+          ) : null}
+          <p className="mt-2 text-sm text-ink-muted">
+            You&apos;re viewing shared documents for{" "}
+            <span className="font-medium text-foreground">
+              {active.display_name}
+            </span>
+            .
+          </p>
+          <p className="mt-2 text-xs text-ink-muted">
+            View only — contact your provider through{" "}
+            <Link
+              href={REQUESTS_PATH}
+              className="font-medium text-brand hover:text-brand-dark"
+            >
+              Requests
+            </Link>{" "}
+            to share files or ask questions.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="welcome-strip space-y-4 sm:space-y-5">

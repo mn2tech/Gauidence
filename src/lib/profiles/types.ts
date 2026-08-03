@@ -238,6 +238,12 @@ export function canEditGuardianProfile(
   return profile.access_role == null;
 }
 
+export function isClientViewerProfile(
+  profile: Pick<GuardianProfile, "profile_type" | "access_role">
+): boolean {
+  return profile.profile_type === "client" && profile.access_role === "viewer";
+}
+
 export function isSharedGuardianProfile(
   profile: Pick<GuardianProfile, "access_role">
 ): boolean {

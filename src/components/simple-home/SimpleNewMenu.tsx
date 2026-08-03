@@ -5,7 +5,7 @@ import { FileUp, NotebookPen, MessageCircle, FolderPlus, X } from "lucide-react"
 import { useActiveProfile } from "@/components/ProfileProvider";
 import { dailyLogHref, REQUESTS_PATH } from "@/lib/routes";
 import { clientBusinessLabel } from "@/lib/client-requests/helpers";
-import { vaultCreateHref, VAULT_CREATE_CARDS } from "@/lib/profiles/types";
+import { canEditGuardianProfile, vaultCreateHref, VAULT_CREATE_CARDS } from "@/lib/profiles/types";
 
 type SimpleNewMenuProps = {
   open: boolean;
@@ -18,6 +18,7 @@ export default function SimpleNewMenu({ open, onClose }: SimpleNewMenuProps) {
   if (!open) return null;
 
   const businessLabel = clientBusinessLabel(profiles, active);
+  const canEdit = active ? canEditGuardianProfile(active) : true;
 
   const uploadHref = active
     ? `/dashboard?camera=1#documents-${active.id}`
@@ -30,18 +31,22 @@ export default function SimpleNewMenu({ open, onClose }: SimpleNewMenuProps) {
   const addVaultHref = vaultCreateHref(VAULT_CREATE_CARDS[0], "/home");
 
   const options = [
-    {
-      href: uploadHref,
-      label: "Upload something",
-      description: "Add a document or photo to your vault",
-      icon: FileUp,
-    },
-    {
-      href: noteHref,
-      label: "Create a note",
-      description: "Write a daily log or quick note",
-      icon: NotebookPen,
-    },
+    ...(canEdit
+      ? [
+          {
+            href: uploadHref,
+            label: "Upload something",
+            description: "Add a document or photo to your vault",
+            icon: FileUp,
+          },
+          {
+            href: noteHref,
+            label: "Create a note",
+            description: "Write a daily log or quick note",
+            icon: NotebookPen,
+          },
+        ]
+      : []),
     {
       href: requestHref,
       label: "Request something",
@@ -51,12 +56,16 @@ export default function SimpleNewMenu({ open, onClose }: SimpleNewMenuProps) {
           : "Ask Gideon to help with a request",
       icon: MessageCircle,
     },
-    {
-      href: addVaultHref,
-      label: "Add a vault or profile",
-      description: "Create a new vault for someone or something",
-      icon: FolderPlus,
-    },
+    ...(canEdit
+      ? [
+          {
+            href: addVaultHref,
+            label: "Add a vault or profile",
+            description: "Create a new vault for someone or something",
+            icon: FolderPlus,
+          },
+        ]
+      : []),
   ] as const;
 
   return (

@@ -7,6 +7,8 @@ import {
   normalizeInviteEmail,
 } from "@/lib/profiles/invitations";
 import { setActiveGuardianProfile } from "@/lib/profiles/server";
+import { inviteAcceptLandingPath } from "@/lib/routes";
+import { canAccessSimpleHome } from "@/lib/features/simple-home";
 
 export const runtime = "nodejs";
 
@@ -179,8 +181,6 @@ export async function POST(_request: Request, ctx: Ctx) {
     .maybeSingle();
 
   const profileType = profile?.profile_type ?? "business";
-  const isEmployeeHub =
-    profileType === "employee" && Boolean(profile?.parent_profile_id);
 
   // Invited collaborators shouldn't hit first-run intent capture.
   const now = new Date().toISOString();
@@ -198,6 +198,12 @@ export async function POST(_request: Request, ctx: Ctx) {
     ok: true,
     profileId: invite.profile_id,
     profileType,
-    redirectTo: isEmployeeHub ? "/employee" : "/dashboard",
+    redirectTo: inviteAcceptLandingPath({
+      profileId: invite.profile_id,
+      profileType,
+      parentProfileId: profile?.parent_profile_id,
+      role: invite.role,
+      simpleHome: canAccessSimpleHome({ email: user.email }),
+    }),
   });
 }

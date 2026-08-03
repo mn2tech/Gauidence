@@ -1,3 +1,6 @@
+import { EMPLOYEE_HUB_PATH } from "@/lib/employee-hub/routing";
+import { SIMPLE_HOME_PATH } from "@/lib/simple-home/routing";
+
 /** Opens the Documents vault (not the post-login default). */
 export const DOCUMENTS_PATH = "/dashboard?docs=1";
 export const REQUESTS_PATH = "/requests";
@@ -24,4 +27,22 @@ export function hasDocumentsIntent(
     params.searchTerm !== undefined ||
     params.passwordUpdated !== undefined
   );
+}
+
+/** Where to send someone after they accept a vault invitation. */
+export function inviteAcceptLandingPath(args: {
+  profileId: string;
+  profileType: string;
+  parentProfileId?: string | null;
+  role: string;
+  simpleHome?: boolean;
+}): string {
+  if (args.profileType === "employee" && args.parentProfileId) {
+    return EMPLOYEE_HUB_PATH;
+  }
+  if (args.profileType === "client" && args.role === "viewer") {
+    return args.simpleHome ? SIMPLE_HOME_PATH : documentsHref(args.profileId);
+  }
+  if (args.simpleHome) return SIMPLE_HOME_PATH;
+  return documentsHref(args.profileId);
 }

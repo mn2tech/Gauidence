@@ -28,6 +28,8 @@ import {
   type GuardianStatus,
 } from "@/lib/analysis";
 import { DOCUMENT_CATEGORIES } from "@/lib/categories";
+import { useActiveProfile } from "@/components/ProfileProvider";
+import { canEditGuardianProfile } from "@/lib/profiles/types";
 import PlanLimitAlert from "@/components/PlanLimitAlert";
 import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
 import {
@@ -140,6 +142,8 @@ export default function DocumentManager({
   searchTerm?: string | null;
 }) {
   const supabase = createClient();
+  const { active } = useActiveProfile();
+  const readOnly = active ? !canEditGuardianProfile(active) : false;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const cameraDeepLinkConsumed = useRef(false);
@@ -294,7 +298,7 @@ export default function DocumentManager({
     window.addEventListener("guardian:open-camera", onRequest);
 
     let timer: number | undefined;
-    if (autoOpenCamera && !cameraDeepLinkConsumed.current) {
+    if (autoOpenCamera && !cameraDeepLinkConsumed.current && !readOnly) {
       cameraDeepLinkConsumed.current = true;
       timer = window.setTimeout(runOpen, 350);
     }
@@ -765,9 +769,12 @@ export default function DocumentManager({
   return (
     <div className="rounded-2xl border border-stone-200 bg-white p-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-base font-semibold">Your documents</h2>
+        <h2 className="text-base font-semibold">
+          {readOnly ? "Shared documents" : "Your documents"}
+        </h2>
         <p className="text-xs text-ink-muted">
-          Uploading to: <span className="font-medium text-foreground">{profileName}</span>
+          {readOnly ? "From: " : "Uploading to: "}
+          <span className="font-medium text-foreground">{profileName}</span>
         </p>
         <span className="text-xs text-ink-muted">
           {documents.length} {documents.length === 1 ? "document" : "documents"}
@@ -781,6 +788,7 @@ export default function DocumentManager({
       ) : null}
 
       {/* Upload zone */}
+      {!readOnly ? (
       <div
         onDragOver={(e) => {
           e.preventDefault();
@@ -857,7 +865,10 @@ export default function DocumentManager({
           onChange={(e) => handleFiles(e.target.files)}
         />
       </div>
+      ) : null}
 
+      {!readOnly ? (
+      <>
       <CameraCaptureModal
         open={cameraOpen}
         onClose={() => setCameraOpen(false)}
@@ -950,6 +961,8 @@ export default function DocumentManager({
           </div>
         </form>
       ) : null}
+      </>
+      ) : null}
 
       {error && (
         <PlanLimitAlert
@@ -1028,7 +1041,9 @@ export default function DocumentManager({
         </div>
       ) : documents.length === 0 ? (
         <p className="mt-6 py-4 text-center text-sm text-ink-muted">
-          Nothing here yet. Your uploads are private to you.
+          {readOnly
+            ? "Nothing shared yet. Your provider hasn't shared documents with you — use Requests to ask."
+            : "Nothing here yet. Your uploads are private to you."}
         </p>
       ) : visibleDocuments.length === 0 ? (
         <p className="mt-6 py-4 text-center text-sm text-ink-muted">
@@ -1128,6 +1143,7 @@ export default function DocumentManager({
                           {analysis.facts.length} details
                         </span>
                       ) : null}
+                      {!readOnly ? (
                       <select
                         value={doc.category ?? ""}
                         onChange={(e) => handleSetCategory(doc, e.target.value)}
@@ -1145,6 +1161,11 @@ export default function DocumentManager({
                           </option>
                         ))}
                       </select>
+                      ) : doc.category ? (
+                        <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-ink-muted">
+                          {doc.category}
+                        </span>
+                      ) : null}
                     </div>
                   </div>
                   {confirmDeleteId === doc.id ? (
@@ -1173,16 +1194,17 @@ export default function DocumentManager({
                     </div>
                   ) : (
                     <div className="flex flex-wrap items-center gap-1">
+                      {readOnly && !analysis ? null : (
                       <button
                         type="button"
                         onClick={() => {
-                          if (analysis && doc.analysis_status !== "failed") {
+                          if (readOnly || (analysis && doc.analysis_status !== "failed")) {
                             setExpandedId(expanded ? null : doc.id);
                           } else {
                             handleAnalyze(doc);
                           }
                         }}
-                        disabled={analyzingId === doc.id}
+                        disabled={analyzingId === doc.id || (readOnly && !analysis)}
                         className="inline-flex items-center gap-1.5 rounded-full border border-brand/30 bg-brand-light px-3 py-1.5 text-xs font-semibold text-brand-dark transition hover:border-brand focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
                       >
                         {analyzingId === doc.id ? (
@@ -1192,17 +1214,21 @@ export default function DocumentManager({
                         )}
                         {analyzingId === doc.id
                           ? progressLabel ?? "Analyzing…"
-                          : doc.analysis_status === "failed"
-                            ? "Try Again"
-                            : analysis
-                              ? "View Analysis"
-                              : "Analyze"}
+                          : readOnly
+                            ? "View Analysis"
+                            : doc.analysis_status === "failed"
+                              ? "Try Again"
+                              : analysis
+                                ? "View Analysis"
+                                : "Analyze"}
                         {analysis && doc.analysis_status !== "failed" && (
                           <ChevronDown
                             className={`h-3.5 w-3.5 transition-transform ${expanded ? "rotate-180" : ""}`}
                           />
                         )}
                       </button>
+                      )}
+                      {!readOnly ? (
                       <button
                         type="button"
                         onClick={() => startRename(doc)}
@@ -1211,6 +1237,7 @@ export default function DocumentManager({
                       >
                         <Pencil className="h-4 w-4" />
                       </button>
+                      ) : null}
                       <button
                         type="button"
                         onClick={() => handleView(doc)}
@@ -1224,6 +1251,8 @@ export default function DocumentManager({
                           <Eye className="h-4 w-4" />
                         )}
                       </button>
+                      {!readOnly ? (
+                      <>
                       <ShareDocumentButton
                         documentId={doc.id}
                         fileName={doc.file_name}
@@ -1243,6 +1272,8 @@ export default function DocumentManager({
                           notifyAlertsUpdated();
                         }}
                       />
+                      </>
+                      ) : null}
                       <button
                         type="button"
                         onClick={() => handleDownload(doc)}
@@ -1256,6 +1287,7 @@ export default function DocumentManager({
                           <Download className="h-4 w-4" />
                         )}
                       </button>
+                      {!readOnly ? (
                       <button
                         type="button"
                         onClick={() => setConfirmDeleteId(doc.id)}
@@ -1264,6 +1296,7 @@ export default function DocumentManager({
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
+                      ) : null}
                     </div>
                   )}
                 </div>

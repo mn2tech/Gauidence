@@ -33,10 +33,12 @@ import {
   canHaveLinkedPets,
   canHaveLinkedStudents,
   canHaveLinkedVehicles,
+  isClientViewerProfile,
   vaultLabel,
   type GuardianProfileType,
 } from "@/lib/profiles/types";
 import { EMPLOYEE_HUB_PATH } from "@/lib/employee-hub/routing";
+import { REQUESTS_PATH } from "@/lib/routes";
 
 function DocumentsSection({
   userId,
@@ -139,6 +141,70 @@ export default function DashboardVault({ userId }: { userId: string }) {
         </Link>{" "}
         to continue.
       </p>
+    );
+  }
+
+  if (isClientViewerProfile(active)) {
+    return (
+      <div className="space-y-6">
+        <div className="rounded-2xl border border-stone-200 bg-white p-5">
+          <h2 className="text-base font-semibold text-foreground">
+            Shared with you
+          </h2>
+          <p className="mt-2 text-sm leading-relaxed text-ink-muted">
+            Documents shared for{" "}
+            <span className="font-medium text-foreground">
+              {active.display_name}
+            </span>
+            . Use Requests to message your provider or ask for more files.
+          </p>
+          <Link
+            href={REQUESTS_PATH}
+            className="mt-3 inline-flex items-center rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-foreground transition hover:border-stone-400 hover:bg-stone-50"
+          >
+            My requests
+          </Link>
+        </div>
+
+        <div className="sticky top-14 z-30 -mx-4 flex items-center justify-end gap-1.5 border-b border-stone-200 bg-background/95 px-4 py-2.5 backdrop-blur sm:top-16 sm:mx-0 sm:rounded-xl sm:border sm:bg-white/95 sm:px-3 sm:shadow-sm">
+          <Link
+            href="/ask"
+            aria-label="Ask Gideon"
+            title={askGideonContextLabel(active)}
+            className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50 sm:px-3"
+          >
+            <MessageCircle className="h-3.5 w-3.5 text-brand" aria-hidden />
+            Ask
+            <span className="text-ink-muted" aria-hidden>
+              →
+            </span>
+          </Link>
+        </div>
+
+        <VaultSection
+          id={`documents-${active.id}`}
+          title="Shared documents"
+          defaultOpen
+        >
+          <Suspense
+            fallback={
+              <DocumentManager
+                userId={userId}
+                profileId={active.id}
+                profileName={active.display_name}
+                ownerUserId={active.owner_user_id}
+              />
+            }
+          >
+            <DocumentsSection
+              userId={userId}
+              profileId={active.id}
+              profileName={active.display_name}
+              ownerUserId={active.owner_user_id}
+            />
+          </Suspense>
+        </VaultSection>
+      </div>
     );
   }
 
