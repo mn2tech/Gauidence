@@ -755,6 +755,56 @@ export function nestedUnder(
   return out;
 }
 
+export type NestedVaultGroup = {
+  label: string;
+  profiles: GuardianProfile[];
+};
+
+/** Nested vaults grouped by kind (Employees, Clients, …) for collapsible UI. */
+export function nestedGroupsUnder(
+  profiles: GuardianProfile[],
+  parent: GuardianProfile
+): NestedVaultGroup[] {
+  const groups: NestedVaultGroup[] = [];
+  if (canHaveLinkedEmployees(parent.profile_type)) {
+    const items = employeesOf(profiles, parent.id);
+    if (items.length > 0) groups.push({ label: "Employees", profiles: items });
+  }
+  if (canHaveLinkedClients(parent.profile_type)) {
+    const items = clientsOf(profiles, parent.id);
+    if (items.length > 0) groups.push({ label: "Clients", profiles: items });
+  }
+  if (canHaveLinkedFamilyMembers(parent.profile_type)) {
+    const items = familyMembersOf(profiles, parent.id);
+    if (items.length > 0) groups.push({ label: "Family members", profiles: items });
+  }
+  if (canHaveLinkedStudents(parent.profile_type)) {
+    const items = studentsOf(profiles, parent.id);
+    if (items.length > 0) groups.push({ label: "Students", profiles: items });
+  }
+  if (canHaveLinkedPets(parent.profile_type)) {
+    const items = petsOf(profiles, parent.id);
+    if (items.length > 0) groups.push({ label: "Pets", profiles: items });
+  }
+  if (canHaveLinkedHobbies(parent.profile_type)) {
+    const items = hobbiesOf(profiles, parent.id);
+    if (items.length > 0) groups.push({ label: "Hobbies", profiles: items });
+  }
+  if (canHaveLinkedHomes(parent.profile_type)) {
+    const items = homesOf(profiles, parent.id);
+    if (items.length > 0) groups.push({ label: "Homes", profiles: items });
+  }
+  if (canHaveLinkedVehicles(parent.profile_type)) {
+    const items = vehiclesOf(profiles, parent.id);
+    if (items.length > 0) groups.push({ label: "Vehicles", profiles: items });
+  }
+  if (canHaveLinkedOtherSpaces(parent.profile_type)) {
+    const items = otherSpacesOf(profiles, parent.id);
+    if (items.length > 0) groups.push({ label: "Other", profiles: items });
+  }
+  return groups;
+}
+
 /** Any nested vault under a container (org, family, or vehicles). */
 export function isLinkedMemberProfile(profile: {
   profile_type: GuardianProfileType;

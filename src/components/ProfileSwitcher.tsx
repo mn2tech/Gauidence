@@ -6,13 +6,52 @@ import { Check, ChevronDown, Plus } from "lucide-react";
 import ProfileAvatar from "@/components/ProfileAvatar";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
-  nestedUnder,
+  nestedGroupsUnder,
   profileSubtitle,
   profileTypeLabel,
   sharedProfileAccessBadge,
   topLevelProfiles,
   type GuardianProfile,
+  type NestedVaultGroup,
 } from "@/lib/profiles/types";
+
+function nestedGroupKey(parentId: string, label: string) {
+  return `${parentId}:${label}`;
+}
+
+function defaultNestedGroupCollapsed(label: string) {
+  return label === "Employees" || label === "Clients";
+}
+
+function NestedGroupHeader({
+  label,
+  count,
+  open,
+  onToggle,
+}: {
+  label: string;
+  count: number;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={open}
+      className="flex w-full items-center gap-1 px-3 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-ink-muted hover:bg-stone-50"
+    >
+      <ChevronDown
+        className={`h-3.5 w-3.5 shrink-0 transition-transform ${
+          open ? "" : "-rotate-90"
+        }`}
+        aria-hidden
+      />
+      <span className="truncate">{label}</span>
+      <span className="text-[10px] font-medium normal-case">({count})</span>
+    </button>
+  );
+}
 
 function SwitcherRow({
   profile,
@@ -72,6 +111,42 @@ function ProfileMenu({
   align?: "left" | "right";
 }) {
   const topLevel = topLevelProfiles(profiles);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set());
+
+  useEffect(() => {
+    const active = profiles.find((p) => p.id === activeId);
+    if (!active?.parent_profile_id) return;
+    const parent = profiles.find((p) => p.id === active.parent_profile_id);
+    if (!parent) return;
+    for (const group of nestedGroupsUnder(profiles, parent)) {
+      if (group.profiles.some((p) => p.id === activeId)) {
+        const key = nestedGroupKey(parent.id, group.label);
+        setExpandedGroups((prev) => {
+          if (prev.has(key)) return prev;
+          const next = new Set(prev);
+          next.add(key);
+          return next;
+        });
+      }
+    }
+  }, [activeId, profiles]);
+
+  const toggleGroup = (parentId: string, label: string) => {
+    const key = nestedGroupKey(parentId, label);
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const isGroupOpen = (parentId: string, label: string) => {
+    const key = nestedGroupKey(parentId, label);
+    if (expandedGroups.has(key)) return true;
+    return !defaultNestedGroupCollapsed(label);
+  };
+
   return (
     <div
       role="listbox"
@@ -82,7 +157,7 @@ function ProfileMenu({
       <ul className="max-h-72 overflow-y-auto py-1">
         {topLevel.map((p) => {
           const selected = p.id === activeId;
-          const children = nestedUnder(profiles, p);
+          const groups = nestedGroupsUnder(profiles, p);
           return (
             <li key={p.id}>
               <SwitcherRow
@@ -90,14 +165,26 @@ function ProfileMenu({
                 selected={selected}
                 onSelect={() => onPick(p.id)}
               />
-              {children.map((child) => (
-                <SwitcherRow
-                  key={child.id}
-                  profile={child}
-                  selected={child.id === activeId}
-                  indented
-                  onSelect={() => onPick(child.id)}
-                />
+              {groups.map((group: NestedVaultGroup) => (
+                <div key={group.label}>
+                  <NestedGroupHeader
+                    label={group.label}
+                    count={group.profiles.length}
+                    open={isGroupOpen(p.id, group.label)}
+                    onToggle={() => toggleGroup(p.id, group.label)}
+                  />
+                  {isGroupOpen(p.id, group.label)
+                    ? group.profiles.map((child) => (
+                        <SwitcherRow
+                          key={child.id}
+                          profile={child}
+                          selected={child.id === activeId}
+                          indented
+                          onSelect={() => onPick(child.id)}
+                        />
+                      ))
+                    : null}
+                </div>
               ))}
             </li>
           );

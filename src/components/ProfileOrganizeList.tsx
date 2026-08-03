@@ -54,6 +54,36 @@ import {
 } from "@/lib/profiles/types";
 
 const COLLAPSE_KEY = "guardian.profileCollapsed";
+const SECTION_COLLAPSE_KEY = "guardian.profileSectionCollapsed";
+
+function defaultSectionCollapsed(label: string) {
+  return label === "Employees" || label === "Clients";
+}
+
+function nestedSectionKey(parentId: string, label: string) {
+  return `${parentId}:${label}`;
+}
+
+function loadSectionCollapsed(): Record<string, boolean> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = localStorage.getItem(SECTION_COLLAPSE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object") return {};
+    return parsed as Record<string, boolean>;
+  } catch {
+    return {};
+  }
+}
+
+function persistSectionCollapsed(map: Record<string, boolean>) {
+  try {
+    localStorage.setItem(SECTION_COLLAPSE_KEY, JSON.stringify(map));
+  } catch {
+    /* ignore */
+  }
+}
 
 function loadCollapsed(): Record<string, boolean> {
   if (typeof window === "undefined") return {};
@@ -504,12 +534,16 @@ export default function ProfileOrganizeList({
 }: Props) {
   const desktopDrag = useDesktopDrag();
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [sectionCollapsed, setSectionCollapsed] = useState<Record<string, boolean>>(
+    {}
+  );
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const [movingId, setMovingId] = useState<string | null>(null);
 
   useEffect(() => {
     setCollapsed(loadCollapsed());
+    setSectionCollapsed(loadSectionCollapsed());
   }, []);
 
   const topLevel = useMemo(() => topLevelProfiles(profiles), [profiles]);
@@ -526,6 +560,23 @@ export default function ProfileOrganizeList({
     setCollapsed((prev) => {
       const next = { ...prev, [id]: !prev[id] };
       persistCollapsed(next);
+      return next;
+    });
+  };
+
+  const isSectionCollapsed = (parentId: string, label: string) => {
+    const key = nestedSectionKey(parentId, label);
+    if (sectionCollapsed[key] !== undefined) return sectionCollapsed[key];
+    return defaultSectionCollapsed(label);
+  };
+
+  const toggleSectionCollapsed = (parentId: string, label: string) => {
+    const key = nestedSectionKey(parentId, label);
+    setSectionCollapsed((prev) => {
+      const wasCollapsed =
+        prev[key] !== undefined ? prev[key] : defaultSectionCollapsed(label);
+      const next = { ...prev, [key]: !wasCollapsed };
+      persistSectionCollapsed(next);
       return next;
     });
   };
@@ -634,60 +685,80 @@ export default function ProfileOrganizeList({
   };
 
   const renderNestedSection = (
+    parentId: string,
     label: string,
     children: GuardianProfile[]
   ) => {
     if (children.length === 0) return null;
+    const collapsedSection = isSectionCollapsed(parentId, label);
     return (
       <>
-        <li className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">
-          {label}
+        <li>
+          <button
+            type="button"
+            onClick={() => toggleSectionCollapsed(parentId, label)}
+            aria-expanded={!collapsedSection}
+            className="flex w-full items-center gap-1.5 rounded-md px-1 py-1 text-left text-[11px] font-medium uppercase tracking-wide text-ink-muted hover:bg-stone-50"
+          >
+            <ChevronDown
+              className={`h-3.5 w-3.5 shrink-0 transition-transform ${
+                collapsedSection ? "-rotate-90" : ""
+              }`}
+              aria-hidden
+            />
+            <span>{label}</span>
+            <span className="text-[10px] font-medium normal-case">
+              ({children.length})
+            </span>
+          </button>
         </li>
-        {children.map((child) => (
-          <ProfileVaultRow
-            key={child.id}
-            profile={child}
-            activeId={activeId}
-            busy={busy}
-            moving={movingId === child.id}
-            moveOptions={moveOptionsFor(child)}
-            avatarSize="sm"
-            avatarEditable={isProfileOwner(child)}
-            subtitle={
-              <>
-                {profileTypeLabel(child.profile_type)}
-                {child.job_title ? ` · ${child.job_title}` : ""}
-              </>
-            }
-            leading={
-              desktopDrag ? (
-                <GripVertical
-                  className="mt-2 h-3.5 w-3.5 shrink-0 text-ink-muted"
-                  aria-hidden
-                />
-              ) : (
-                <span className="w-3.5 shrink-0" aria-hidden />
-              )
-            }
-            dragEnabled={desktopDrag}
-            onDragStart={onDragStart}
-            onSwitch={() => onSwitch(child.id)}
-            onSetDefault={() => onSetDefault(child.id)}
-            onEdit={() => setEditing(child)}
-            onRemove={() => onRemove(child)}
-            onLeave={
-              isSharedGuardianProfile(child)
-                ? () => void leaveSharedVault(child)
-                : undefined
-            }
-            onMove={(parentId) => void moveProfile(child.id, parentId)}
-            editing={editing}
-            setEditing={setEditing}
-            onSaveEdit={onSaveEdit}
-            onRefresh={onRefresh}
-            onAvatarError={onAvatarError}
-          />
-        ))}
+        {!collapsedSection
+          ? children.map((child) => (
+              <ProfileVaultRow
+                key={child.id}
+                profile={child}
+                activeId={activeId}
+                busy={busy}
+                moving={movingId === child.id}
+                moveOptions={moveOptionsFor(child)}
+                avatarSize="sm"
+                avatarEditable={isProfileOwner(child)}
+                subtitle={
+                  <>
+                    {profileTypeLabel(child.profile_type)}
+                    {child.job_title ? ` · ${child.job_title}` : ""}
+                  </>
+                }
+                leading={
+                  desktopDrag ? (
+                    <GripVertical
+                      className="mt-2 h-3.5 w-3.5 shrink-0 text-ink-muted"
+                      aria-hidden
+                    />
+                  ) : (
+                    <span className="w-3.5 shrink-0" aria-hidden />
+                  )
+                }
+                dragEnabled={desktopDrag}
+                onDragStart={onDragStart}
+                onSwitch={() => onSwitch(child.id)}
+                onSetDefault={() => onSetDefault(child.id)}
+                onEdit={() => setEditing(child)}
+                onRemove={() => onRemove(child)}
+                onLeave={
+                  isSharedGuardianProfile(child)
+                    ? () => void leaveSharedVault(child)
+                    : undefined
+                }
+                onMove={(moveParentId) => void moveProfile(child.id, moveParentId)}
+                editing={editing}
+                setEditing={setEditing}
+                onSaveEdit={onSaveEdit}
+                onRefresh={onRefresh}
+                onAvatarError={onAvatarError}
+              />
+            ))
+          : null}
       </>
     );
   };
@@ -878,15 +949,15 @@ export default function ProfileOrganizeList({
 
               {nested.length > 0 && !isCollapsed ? (
                 <ul className="mt-3 space-y-2 border-t border-stone-100 pt-3">
-                  {renderNestedSection("Employees", nestedEmployees)}
-                  {renderNestedSection("Clients", nestedClients)}
-                  {renderNestedSection("Family members", nestedFamily)}
-                  {renderNestedSection("Students", nestedStudents)}
-                  {renderNestedSection("Pets", nestedPets)}
-                  {renderNestedSection("Hobbies", nestedHobbies)}
-                  {renderNestedSection("Homes", nestedHomes)}
-                  {renderNestedSection("Vehicles", nestedVehicles)}
-                  {renderNestedSection("Other", nestedOthers)}
+                  {renderNestedSection(p.id, "Employees", nestedEmployees)}
+                  {renderNestedSection(p.id, "Clients", nestedClients)}
+                  {renderNestedSection(p.id, "Family members", nestedFamily)}
+                  {renderNestedSection(p.id, "Students", nestedStudents)}
+                  {renderNestedSection(p.id, "Pets", nestedPets)}
+                  {renderNestedSection(p.id, "Hobbies", nestedHobbies)}
+                  {renderNestedSection(p.id, "Homes", nestedHomes)}
+                  {renderNestedSection(p.id, "Vehicles", nestedVehicles)}
+                  {renderNestedSection(p.id, "Other", nestedOthers)}
                 </ul>
               ) : null}
 

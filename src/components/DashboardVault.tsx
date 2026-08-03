@@ -181,7 +181,11 @@ export default function DashboardVault({ userId }: { userId: string }) {
       </VaultSection>
 
       {canHaveLinkedEmployees(active.profile_type) && (
-        <VaultSection id={`employees-${active.id}`} title="Employees">
+        <VaultSection
+          id={`employees-${active.id}`}
+          title="Employees"
+          defaultOpen={false}
+        >
           <LinkedEmployeesPanel parent={active} />
         </VaultSection>
       )}
@@ -208,7 +212,11 @@ export default function DashboardVault({ userId }: { userId: string }) {
       ) : null}
 
       {canHaveLinkedClients(active.profile_type) && (
-        <VaultSection id={`clients-${active.id}`} title="Clients">
+        <VaultSection
+          id={`clients-${active.id}`}
+          title="Clients"
+          defaultOpen={false}
+        >
           <LinkedClientsPanel parent={active} />
         </VaultSection>
       )}

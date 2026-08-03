@@ -6,11 +6,12 @@ import { ChevronDown, MessageSquarePlus, Plus, Trash2 } from "lucide-react";
 import ProfileAvatar from "@/components/ProfileAvatar";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
-  nestedUnder,
+  nestedGroupsUnder,
   profileSubtitle,
   profileTypeLabel,
   topLevelProfiles,
   type GuardianProfile,
+  type NestedVaultGroup,
 } from "@/lib/profiles/types";
 import { useVaultSubVaultMenu } from "@/components/VaultSubVaultMenu";
 
@@ -100,28 +101,47 @@ function VaultRow({
   );
 }
 
+function nestedGroupKey(parentId: string, label: string) {
+  return `${parentId}:${label}`;
+}
+
+function defaultNestedGroupCollapsed(label: string) {
+  return label === "Employees" || label === "Clients";
+}
+
 function VaultGroup({
   profile,
-  subVaults,
+  groups,
   selected,
   expanded,
   onToggleExpand,
   onSelect,
   onSelectChild,
   activeChildId,
+  expandedGroups,
+  onToggleGroup,
   onContextMenu,
 }: {
   profile: GuardianProfile;
-  subVaults: GuardianProfile[];
+  groups: NestedVaultGroup[];
   selected: boolean;
   expanded: boolean;
   onToggleExpand: () => void;
   onSelect: () => void;
   onSelectChild: (id: string) => void;
   activeChildId?: string;
+  expandedGroups: Set<string>;
+  onToggleGroup: (parentId: string, label: string) => void;
   onContextMenu?: (e: MouseEvent, profile: GuardianProfile) => void;
 }) {
-  const hasSubVaults = subVaults.length > 0;
+  const subVaultCount = groups.reduce((n, g) => n + g.profiles.length, 0);
+  const hasSubVaults = subVaultCount > 0;
+
+  const isGroupOpen = (label: string) => {
+    const key = nestedGroupKey(profile.id, label);
+    if (expandedGroups.has(key)) return true;
+    return !defaultNestedGroupCollapsed(label);
+  };
 
   return (
     <li>
@@ -161,15 +181,25 @@ function VaultGroup({
         </div>
       </div>
       {hasSubVaults && expanded
-        ? subVaults.map((child) => (
-            <VaultRow
-              key={child.id}
-              profile={child}
-              selected={activeChildId === child.id}
-              indented
-              onSelect={() => onSelectChild(child.id)}
-              onContextMenu={onContextMenu}
-            />
+        ? groups.map((group) => (
+            <CollapsibleSection
+              key={group.label}
+              title={`${group.label} (${group.profiles.length})`}
+              open={isGroupOpen(group.label)}
+              onToggle={() => onToggleGroup(profile.id, group.label)}
+              className="pl-2"
+            >
+              {group.profiles.map((child) => (
+                <VaultRow
+                  key={child.id}
+                  profile={child}
+                  selected={activeChildId === child.id}
+                  indented
+                  onSelect={() => onSelectChild(child.id)}
+                  onContextMenu={onContextMenu}
+                />
+              ))}
+            </CollapsibleSection>
           ))
         : null}
     </li>
@@ -183,6 +213,9 @@ function VaultList({ onPicked }: { onPicked?: () => void }) {
   const [expandedParents, setExpandedParents] = useState<Set<string>>(
     () => new Set()
   );
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
+    () => new Set()
+  );
 
   useEffect(() => {
     if (!active?.parent_profile_id) return;
@@ -192,7 +225,20 @@ function VaultList({ onPicked }: { onPicked?: () => void }) {
       next.add(active.parent_profile_id!);
       return next;
     });
-  }, [active?.parent_profile_id]);
+    const parent = profiles.find((p) => p.id === active.parent_profile_id);
+    if (!parent) return;
+    for (const group of nestedGroupsUnder(profiles, parent)) {
+      if (group.profiles.some((p) => p.id === active.id)) {
+        const key = nestedGroupKey(parent.id, group.label);
+        setExpandedGroups((prev) => {
+          if (prev.has(key)) return prev;
+          const next = new Set(prev);
+          next.add(key);
+          return next;
+        });
+      }
+    }
+  }, [active?.id, active?.parent_profile_id, profiles]);
 
   const pick = (id: string) => {
     if (active?.id === id) {
@@ -200,6 +246,16 @@ function VaultList({ onPicked }: { onPicked?: () => void }) {
       return;
     }
     void switchProfile(id).then(() => onPicked?.());
+  };
+
+  const toggleGroup = (parentId: string, label: string) => {
+    const key = nestedGroupKey(parentId, label);
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   };
 
   const toggleParent = (parentId: string) => {
@@ -234,20 +290,23 @@ function VaultList({ onPicked }: { onPicked?: () => void }) {
       {overlay}
       <ul className="space-y-0.5" role="listbox" aria-label="Vaults">
         {topLevel.map((p) => {
-          const subVaults = nestedUnder(profiles, p);
+          const groups = nestedGroupsUnder(profiles, p);
+          const subVaultCount = groups.reduce((n, g) => n + g.profiles.length, 0);
           return (
             <VaultGroup
               key={p.id}
               profile={p}
-              subVaults={subVaults}
+              groups={groups}
               selected={active?.id === p.id}
               activeChildId={
                 active?.parent_profile_id === p.id ? active.id : undefined
               }
-              expanded={subVaults.length === 0 || expandedParents.has(p.id)}
+              expanded={subVaultCount === 0 || expandedParents.has(p.id)}
               onToggleExpand={() => toggleParent(p.id)}
               onSelect={() => pick(p.id)}
               onSelectChild={pick}
+              expandedGroups={expandedGroups}
+              onToggleGroup={toggleGroup}
               onContextMenu={handleContextMenu}
             />
           );
