@@ -129,7 +129,7 @@ export default function SimpleHomeScreen() {
         return [
           {
             href: documentsHref(active?.id),
-            label: "Documents",
+            label: "Files",
             icon: FileText,
           },
           {
@@ -142,7 +142,7 @@ export default function SimpleHomeScreen() {
         return [
           {
             href: documentsHref(active?.id),
-            label: "Documents",
+            label: "Files",
             icon: FileText,
           },
           {

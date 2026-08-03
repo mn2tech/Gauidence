@@ -24,12 +24,13 @@ import {
   isOnboardingComplete,
   writeGettingStartedDismissed,
 } from "@/lib/help/onboarding";
+import { DOCUMENTS_PATH, VAULT_NAV_LABEL } from "@/lib/routes";
 
 const HOW_TO = [
   {
     icon: Users,
     title: "Vaults",
-    body: "Each vault keeps its own documents, Daily Logs, alerts, and Gideon chats. Switch vaults from the header or dashboard.",
+    body: "Each vault keeps its own files, Daily Logs, alerts, and Gideon chats. Switch vaults from the header or Vault page.",
     href: "/settings/profiles",
     linkLabel: "Manage vaults",
   },
@@ -42,24 +43,24 @@ const HOW_TO = [
   },
   {
     icon: Camera,
-    title: "Documents",
+    title: "Files",
     body: "Scan with your camera or upload a PDF/photo. Analyze to extract dates and key facts. Rename, categorize, or share with an expiring link.",
-    href: "/dashboard",
-    linkLabel: "Open documents",
+    href: DOCUMENTS_PATH,
+    linkLabel: `Open ${VAULT_NAV_LABEL.toLowerCase()}`,
   },
   {
     icon: NotebookPen,
     title: "Daily Logs",
     body: "Jot notes and events for the active vault. Use the pencil icon to edit. Search can jump you straight to a matching log.",
-    href: "/dashboard",
+    href: DOCUMENTS_PATH,
     linkLabel: "Open Daily Log",
   },
   {
     icon: Search,
     title: "Search",
     body: "Tap Search (or Ctrl+K on desktop) to find people, logs, documents, and conversations across every vault you own.",
-    href: "/dashboard",
-    linkLabel: "Go to dashboard",
+    href: DOCUMENTS_PATH,
+    linkLabel: `Go to ${VAULT_NAV_LABEL.toLowerCase()}`,
   },
   {
     icon: MessageCircle,

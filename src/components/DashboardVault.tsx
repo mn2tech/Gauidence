@@ -341,7 +341,7 @@ export default function DashboardVault({ userId }: { userId: string }) {
         </Suspense>
       </VaultSection>
 
-      <VaultSection id={`documents-${active.id}`} title="Documents">
+      <VaultSection id={`documents-${active.id}`} title="Files">
         <Suspense
           fallback={
             <DocumentManager
@@ -367,8 +367,8 @@ export default function DashboardVault({ userId }: { userId: string }) {
         </span>
         <p className="text-sm leading-relaxed text-ink-muted">
           Documents and Daily Logs belong only to the active profile. Switch
-          profiles above or from the header to change context. Tap a section
-          title to collapse or expand it.
+          vaults in the header to change context. Tap a section title to
+          collapse or expand it.
         </p>
       </div>
     </div>

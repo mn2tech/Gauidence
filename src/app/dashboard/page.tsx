@@ -19,7 +19,7 @@ import { canAccessSimpleHome } from "@/lib/features/simple-home";
 import { SIMPLE_HOME_PATH } from "@/lib/simple-home/routing";
 
 export const metadata: Metadata = {
-  title: "Documents — Guardian",
+  title: "Vault — Guardian",
 };
 
 export default async function DashboardPage({

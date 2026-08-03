@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Plus } from "lucide-react";
-import { DOCUMENTS_PATH, REQUESTS_PATH } from "@/lib/routes";
+import { DOCUMENTS_PATH, hasDocumentsIntent, REQUESTS_PATH } from "@/lib/routes";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
   isClientViewerProfile,
@@ -15,6 +15,7 @@ import {
   profileSubtitle,
   profileTypeLabel,
   topLevelProfiles,
+  vaultLabel,
   type GuardianProfile,
 } from "@/lib/profiles/types";
 
@@ -135,6 +136,34 @@ export default function WelcomeProfileStrip({
   const nested = focusedContainer
     ? nestedUnder(profiles, focusedContainer)
     : [];
+
+  const vaultFocus = hasDocumentsIntent(
+    Object.fromEntries(searchParams.entries())
+  );
+
+  if (active && vaultFocus && !isClientViewerProfile(active)) {
+    return (
+      <div className="welcome-strip space-y-4 sm:space-y-5">
+        {passwordNotice ? (
+          <p
+            role="status"
+            className="rounded-xl border border-brand/30 bg-brand-light px-4 py-3 text-sm text-brand-dark"
+          >
+            Your password has been updated.
+          </p>
+        ) : null}
+        <div>
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
+            {vaultLabel(active)}
+          </h1>
+          <p className="mt-2 text-sm text-ink-muted">
+            Switch vault from the header. Tap a section below to expand or
+            collapse it.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (active && isClientViewerProfile(active)) {
     return (

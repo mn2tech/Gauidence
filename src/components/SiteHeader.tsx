@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import ProfileSwitcher from "@/components/ProfileSwitcher";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import GlobalVaultSearch from "@/components/GlobalVaultSearch";
-import { documentsHref } from "@/lib/routes";
+import { documentsHref, VAULT_NAV_LABEL } from "@/lib/routes";
 import { useOnboardingProgress } from "@/hooks/useOnboardingProgress";
 import { useEmployeeHubEntitlements } from "@/hooks/useEmployeeHubEntitlements";
 import { useSimpleHomeEnabled } from "@/hooks/useSimpleHomeEnabled";
@@ -213,7 +213,7 @@ export default function SiteHeader() {
               ) : null}
               {showDocuments ? (
                 <Link href={documentsNavHref} className="hover:text-foreground">
-                  Documents
+                  {VAULT_NAV_LABEL}
                 </Link>
               ) : null}
               <Link
@@ -385,7 +385,7 @@ export default function SiteHeader() {
                 ) : null}
                 {showDocuments ? (
                   <Link href={documentsNavHref} className={linkClass}>
-                    Documents
+                    {VAULT_NAV_LABEL}
                   </Link>
                 ) : null}
                 <Link href="/settings" className={linkClass}>

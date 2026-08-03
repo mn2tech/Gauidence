@@ -73,7 +73,7 @@ export default function FirstWinCard({
               >
                 Attention
               </Link>{" "}
-              on Documents — so you don&apos;t miss what matters.
+              on your vault — so you don&apos;t miss what matters.
             </p>
           ) : null}
 

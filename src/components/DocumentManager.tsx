@@ -770,7 +770,7 @@ export default function DocumentManager({
     <div className="rounded-2xl border border-stone-200 bg-white p-6">
       <div className="flex items-center justify-between">
         <h2 className="text-base font-semibold">
-          {readOnly ? "Shared documents" : "Your documents"}
+          {readOnly ? "Shared documents" : "Your files"}
         </h2>
         <p className="text-xs text-ink-muted">
           {readOnly ? "From: " : "Uploading to: "}

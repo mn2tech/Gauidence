@@ -121,7 +121,7 @@ import {
   formatAssistantMessagePlainText,
   formatAssistantMessageSpeechText,
 } from "@/lib/vault/assistantMessageText";
-import { documentsHref } from "@/lib/routes";
+import { documentsHref, VAULT_NAV_LABEL } from "@/lib/routes";
 import type { WorkProject } from "@/lib/work-memory/types";
 import OnboardingProgressChip from "@/components/OnboardingProgressChip";
 import FirstWinCard from "@/components/FirstWinCard";
@@ -2624,7 +2624,7 @@ export default function VaultChatPanel({
                     href={docsHref}
                     className="font-medium text-brand hover:text-brand-dark"
                   >
-                    Open Docs
+                    Open {VAULT_NAV_LABEL}
                   </Link>{" "}
                   to see everything.
                 </p>
@@ -3598,14 +3598,14 @@ export default function VaultChatPanel({
             <AgentModeToggle compact className="hidden sm:inline-flex" />
             <Link
               href={docsHref}
-              aria-label="Documents"
-              title="Documents"
+              aria-label={VAULT_NAV_LABEL}
+              title={VAULT_NAV_LABEL}
               className="inline-flex items-center gap-1 rounded-full border border-stone-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50 sm:px-3"
             >
               <span className="text-ink-muted" aria-hidden>
                 ←
               </span>
-              Docs
+              {VAULT_NAV_LABEL}
             </Link>
             <button
               type="button"
