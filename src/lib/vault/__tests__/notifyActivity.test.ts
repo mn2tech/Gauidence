@@ -5,19 +5,35 @@ import {
   dailyLogActivityLabel,
   filterActivityEmailRecipients,
   formatVaultActivityVaultName,
+  mergeVaultActivityMemberIds,
   pickVaultActivityRecipients,
   truncateActivityPreview,
 } from "@/lib/vault/notifyActivity";
 
 describe("pickVaultActivityRecipients", () => {
-  it("returns empty when only one member", () => {
+  it("returns empty when actor is the only member", () => {
     assert.deepEqual(pickVaultActivityRecipients(["a"], "a"), []);
+  });
+
+  it("notifies owner when only editor is in members table", () => {
+    assert.deepEqual(pickVaultActivityRecipients(["owner", "editor"], "editor"), [
+      "owner",
+    ]);
   });
 
   it("excludes the actor", () => {
     assert.deepEqual(
       pickVaultActivityRecipients(["a", "b", "c"], "b"),
       ["a", "c"]
+    );
+  });
+});
+
+describe("mergeVaultActivityMemberIds", () => {
+  it("includes profile owner when missing from members", () => {
+    assert.deepEqual(
+      mergeVaultActivityMemberIds(["editor-id"], "owner-id"),
+      ["editor-id", "owner-id"]
     );
   });
 });
@@ -98,5 +114,17 @@ describe("renderVaultActivityEmail", () => {
     assert.match(subject, /Alex/);
     assert.match(subject, /Wednesday Practice/);
     assert.match(text, /Setlist\.pdf/);
+  });
+
+  it("uses Daily Log subject for log activity", () => {
+    const { subject } = renderVaultActivityEmail({
+      to: "member@example.com",
+      vaultName: "Crossroads · NM2TECH",
+      actorName: "Aaron",
+      kind: "daily_log",
+      itemLabel: "Please remove bank from disclaimer",
+      openUrl: "https://example.com/dashboard",
+    });
+    assert.match(subject, /Aaron added a Daily Log on Crossroads/);
   });
 });

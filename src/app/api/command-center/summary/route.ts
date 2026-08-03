@@ -66,6 +66,16 @@ export async function GET() {
           .limit(5)
       : null;
 
+  const clientLogsQuery =
+    clientProfileIds.length > 0
+      ? supabase
+          .from("daily_logs")
+          .select("id, profile_id, title, content, created_at, owner_user_id")
+          .in("profile_id", clientProfileIds)
+          .order("created_at", { ascending: false })
+          .limit(5)
+      : null;
+
   const intelligenceEnabled = isKnowledgeEngineEnabled();
 
   const [
@@ -75,6 +85,7 @@ export async function GET() {
     proactiveSuggestions,
     workspaceTimeline,
     requestsRes,
+    clientLogsRes,
   ] = await Promise.all([
     supabase
       .from("alerts")
@@ -108,6 +119,7 @@ export async function GET() {
         })
       : Promise.resolve([]),
     requestsQuery ?? Promise.resolve({ data: null, error: null }),
+    clientLogsQuery ?? Promise.resolve({ data: null, error: null }),
   ]);
 
   const todayAlerts =
@@ -140,12 +152,39 @@ export async function GET() {
         profiles.find((p) => p.id === row.profile_id)?.display_name ?? null,
     })) ?? [];
 
+  const recentClientLogs =
+    (
+      clientLogsRes.data as
+        | {
+            id: string;
+            profile_id: string;
+            title: string | null;
+            content: string;
+            created_at: string;
+          }[]
+        | null
+    )?.map((row) => {
+      const preview =
+        row.title?.trim() ||
+        row.content.trim().split(/\n/)[0]?.trim().slice(0, 80) ||
+        "Daily Log";
+      return {
+        id: row.id,
+        profileId: row.profile_id,
+        profileName:
+          profiles.find((p) => p.id === row.profile_id)?.display_name ?? null,
+        preview,
+        createdAt: row.created_at,
+      };
+    }) ?? [];
+
   return NextResponse.json({
     profileId,
     profileName: active.display_name,
     todayAlerts,
     recentUploads,
     openRequests,
+    recentClientLogs,
     actionTimeline,
     proactiveSuggestions: intelligenceEnabled ? proactiveSuggestions : [],
     workspaceTimeline: intelligenceEnabled ? workspaceTimeline : [],

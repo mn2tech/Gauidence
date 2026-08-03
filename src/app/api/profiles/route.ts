@@ -297,6 +297,18 @@ export async function POST(request: Request) {
       );
     } else {
       created = data as Record<string, unknown>;
+      const memberAdmin = createAdminClient();
+      if (memberAdmin) {
+        await memberAdmin.from("guardian_profile_members").upsert(
+          {
+            profile_id: created.id,
+            user_id: user.id,
+            role: "owner",
+            invited_by: user.id,
+          },
+          { onConflict: "profile_id,user_id" }
+        );
+      }
     }
   }
 

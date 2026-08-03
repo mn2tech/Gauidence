@@ -110,7 +110,17 @@ export function useSimpleHomeData() {
             .limit(5)
         : null;
 
-    const [alertsRes, docsRes, logsRes, chatsRes, profilesRes, requestsRes] =
+    const clientLogsQuery =
+      clientProfileIds.length > 0
+        ? supabase
+            .from("daily_logs")
+            .select("id, profile_id, title, content, created_at")
+            .in("profile_id", clientProfileIds)
+            .order("created_at", { ascending: false })
+            .limit(5)
+        : null;
+
+    const [alertsRes, docsRes, logsRes, chatsRes, profilesRes, requestsRes, clientLogsRes] =
       await Promise.all([
         supabase
           .from("alerts")
@@ -144,6 +154,7 @@ export function useSimpleHomeData() {
           .order("updated_at", { ascending: false })
           .limit(3),
         requestsQuery ?? Promise.resolve({ data: null, error: null }),
+        clientLogsQuery ?? Promise.resolve({ data: null, error: null }),
       ]);
 
     const todayAlerts =
@@ -239,6 +250,26 @@ export function useSimpleHomeData() {
       });
     }
 
+    for (const row of clientLogsRes.data ?? []) {
+      const profileName =
+        profiles.find((p) => p.id === row.profile_id)?.display_name ?? "Client";
+      const preview =
+        (row.title as string | null)?.trim() ||
+        String(row.content ?? "")
+          .trim()
+          .split(/\n/)[0]
+          ?.trim()
+          .slice(0, 60) ||
+        "Daily log";
+      activity.push({
+        id: `client-log-${row.id}`,
+        kind: "note",
+        title: `Client log (${profileName}): ${preview}`,
+        occurredAt: row.created_at,
+        href: `${dailyLogHref(String(row.profile_id))}&logId=${row.id}`,
+      });
+    }
+
     activity.sort(
       (a, b) =>
         new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime()
@@ -286,10 +317,12 @@ export function useSimpleHomeData() {
     window.addEventListener("focus", onFocus);
     window.addEventListener("guardian:profile-changed", onFocus);
     window.addEventListener("guardian:alerts-updated", onFocus);
+    window.addEventListener("guardian:logs-updated", onFocus);
     return () => {
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("guardian:profile-changed", onFocus);
       window.removeEventListener("guardian:alerts-updated", onFocus);
+      window.removeEventListener("guardian:logs-updated", onFocus);
     };
   }, [refresh]);
 

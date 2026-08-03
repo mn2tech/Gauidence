@@ -45,13 +45,22 @@ export function dailyLogActivityLabel(title: string | null, content: string): st
 
 type Recipient = { userId: string; email: string };
 
-/** Members of a vault except the actor — only when the vault has 2+ members. */
+/** Merge vault members with profile owner (owner row is sometimes missing). */
+export function mergeVaultActivityMemberIds(
+  memberUserIds: string[],
+  ownerUserId?: string | null
+): string[] {
+  const ids = new Set(memberUserIds.filter(Boolean));
+  if (ownerUserId) ids.add(ownerUserId);
+  return [...ids];
+}
+
+/** Other vault members to notify — excludes the actor. */
 export function pickVaultActivityRecipients(
   memberUserIds: string[],
   actorUserId: string
 ): string[] {
-  if (memberUserIds.length < 2) return [];
-  return memberUserIds.filter((id) => id !== actorUserId);
+  return memberUserIds.filter((id) => id && id !== actorUserId);
 }
 
 export function filterActivityEmailRecipients(
@@ -87,12 +96,15 @@ export async function notifyVaultActivity(
       .eq("profile_id", profileId),
     admin
       .from("guardian_profiles")
-      .select("display_name, parent_profile_id")
+      .select("display_name, parent_profile_id, owner_user_id")
       .eq("id", profileId)
       .maybeSingle(),
   ]);
 
-  const memberIds = (members ?? []).map((m) => String(m.user_id));
+  const memberIds = mergeVaultActivityMemberIds(
+    (members ?? []).map((m) => String(m.user_id)),
+    vault?.owner_user_id as string | null | undefined
+  );
   const recipientIds = pickVaultActivityRecipients(memberIds, actorUserId);
   if (recipientIds.length === 0) {
     return { sent: 0, skipped: true };

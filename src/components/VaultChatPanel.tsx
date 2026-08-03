@@ -1902,6 +1902,7 @@ export default function VaultChatPanel({
       setLogOpen(false);
       setLogTitle("");
       setLogContent("");
+      window.dispatchEvent(new Event("guardian:logs-updated"));
       await loadMetaAndChats().catch(() => undefined);
       await sendQuestion(
         `I just saved this Daily Log${title ? ` ("${title}")` : ""}: "${saved.slice(0, 200)}". What stands out?`

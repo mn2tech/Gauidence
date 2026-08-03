@@ -15,7 +15,8 @@ export function documentsHref(profileId?: string | null): string {
 
 export function dailyLogHref(profileId?: string | null): string {
   if (!profileId) return DOCUMENTS_PATH;
-  return `${DOCUMENTS_PATH}#daily-log-${profileId}`;
+  const q = new URLSearchParams({ docs: "1", profileId });
+  return `/dashboard?${q.toString()}#daily-log-${profileId}`;
 }
 
 export function hasDocumentsIntent(

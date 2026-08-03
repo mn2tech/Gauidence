@@ -11,6 +11,13 @@ export type CommandCenterData = {
   todayAlerts: { id: string; title: string; dueDate: string }[];
   recentUploads: { id: string; fileName: string; createdAt: string }[];
   openRequests: { id: string; title: string; profileName: string | null }[];
+  recentClientLogs: {
+    id: string;
+    profileId: string;
+    profileName: string | null;
+    preview: string;
+    createdAt: string;
+  }[];
   actionTimeline: ActionTimelineItem[];
   proactiveSuggestions: ProactiveSuggestionItem[];
   workspaceTimeline: WorkspaceTimelineItem[];
@@ -22,6 +29,7 @@ const EMPTY: CommandCenterData = {
   todayAlerts: [],
   recentUploads: [],
   openRequests: [],
+  recentClientLogs: [],
   actionTimeline: [],
   proactiveSuggestions: [],
   workspaceTimeline: [],
@@ -60,10 +68,12 @@ export function useCommandCenterData() {
     window.addEventListener("focus", onFocus);
     window.addEventListener("guardian:profile-changed", onFocus);
     window.addEventListener("guardian:alerts-updated", onFocus);
+    window.addEventListener("guardian:logs-updated", onFocus);
     return () => {
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("guardian:profile-changed", onFocus);
       window.removeEventListener("guardian:alerts-updated", onFocus);
+      window.removeEventListener("guardian:logs-updated", onFocus);
     };
   }, [refresh]);
 

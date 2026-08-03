@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   Loader2,
   MessageCircle,
+  NotebookPen,
   Mic,
   Send,
   Sparkles,
@@ -23,7 +24,7 @@ import { useActiveProfile } from "@/components/ProfileProvider";
 import { useCommandCenterData } from "@/hooks/useCommandCenterData";
 import { useGideonVoiceInput } from "@/hooks/useGideonVoiceInput";
 import { ASK_GIDEON_PATH } from "@/lib/simple-home/routing";
-import { DOCUMENTS_PATH, REQUESTS_PATH } from "@/lib/routes";
+import { DOCUMENTS_PATH, REQUESTS_PATH, dailyLogHref } from "@/lib/routes";
 import { formatActivityWhen } from "@/lib/simple-home/helpers";
 
 function Section({
@@ -220,6 +221,35 @@ export default function CommandCenterScreen() {
                           · {req.profileName}
                         </span>
                       ) : null}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </Section>
+          ) : null}
+
+          {data.recentClientLogs.length > 0 ? (
+            <Section title="Client Daily Logs">
+              <ul className="space-y-2">
+                {data.recentClientLogs.map((log) => (
+                  <li key={log.id}>
+                    <Link
+                      href={`${dailyLogHref(log.profileId)}&logId=${log.id}`}
+                      className="flex items-start gap-2 text-sm font-medium text-foreground hover:text-brand"
+                    >
+                      <NotebookPen className="mt-0.5 h-4 w-4 shrink-0 text-ink-muted" />
+                      <span className="min-w-0">
+                        <span className="line-clamp-2">{log.preview}</span>
+                        {log.profileName ? (
+                          <span className="mt-0.5 block text-xs font-normal text-ink-muted">
+                            {log.profileName} · {formatActivityWhen(log.createdAt)}
+                          </span>
+                        ) : (
+                          <span className="mt-0.5 block text-xs font-normal text-ink-muted">
+                            {formatActivityWhen(log.createdAt)}
+                          </span>
+                        )}
+                      </span>
                     </Link>
                   </li>
                 ))}

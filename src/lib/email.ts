@@ -201,7 +201,10 @@ export function renderVaultActivityEmail(args: VaultActivityEmailArgs) {
     args.kind === "document"
       ? `uploaded <strong>${escapeHtml(args.itemLabel)}</strong>`
       : `added ${escapeHtml(args.itemLabel)}`;
-  const subject = `${args.actorName} updated ${args.vaultName} in Guardian`;
+  const subject =
+    args.kind === "daily_log"
+      ? `${args.actorName} added a Daily Log on ${args.vaultName}`
+      : `${args.actorName} updated ${args.vaultName} in Guardian`;
   const preview = args.preview?.trim();
   const previewBlock = preview
     ? `<p style="margin:12px 0 0;padding:12px 14px;border-left:3px solid #0f766e;background:#f5f5f4;border-radius:8px;font-size:14px;color:#44403c;line-height:1.5;white-space:pre-wrap;">${escapeHtml(preview)}</p>`

@@ -180,6 +180,7 @@ export default function DailyLogPanel({
       }
       dispatchAwardsFromResponse(body);
       setQuick("");
+      window.dispatchEvent(new Event("guardian:logs-updated"));
       await load();
     } finally {
       setSavingQuick(false);
@@ -220,6 +221,7 @@ export default function DailyLogPanel({
       setCategory("General");
       setLogDate(todayLogDate());
       setComposerOpen(false);
+      window.dispatchEvent(new Event("guardian:logs-updated"));
       await load();
     } finally {
       setSaving(false);
