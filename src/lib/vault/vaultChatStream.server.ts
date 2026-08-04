@@ -34,7 +34,7 @@ import { parseProposedReminder } from "@/lib/reminders/propose";
 import { withLlmUsage } from "@/lib/usage/record";
 import { recordChatEvent } from "@/lib/billing/quota";
 import { refreshUserAwards } from "@/lib/awards/grant";
-import { formatVaultChatError } from "@/lib/vault/vaultChatErrors";
+import { formatVaultChatError, GIDEON_EMPTY_ANSWER_FALLBACK } from "@/lib/vault/vaultChatErrors";
 import {
   listActionTimeline,
   recordActionEvent,
@@ -154,8 +154,7 @@ export function createVaultChatStreamResponse(
         );
 
         if (!answer) {
-          answer =
-            "I found potentially relevant information, but it needs verification before I can give you a reliable answer.";
+          answer = GIDEON_EMPTY_ANSWER_FALLBACK;
         }
 
         let selected = selectCitationsForAnswer(answer, args.chunks);

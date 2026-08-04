@@ -5,6 +5,10 @@ import Anthropic from "@anthropic-ai/sdk";
 const GENERIC_VAULT_CHAT_ERROR =
   "I couldn't complete that request right now. Please try again.";
 
+/** Shown when the model returns no text (not when facts need verification). */
+export const GIDEON_EMPTY_ANSWER_FALLBACK =
+  "I couldn't put together an answer just now. Try rephrasing your question, or switch search scope to Everywhere if the information might be in another vault.";
+
 export function formatVaultChatError(err: unknown): {
   error: string;
   code?: string;
