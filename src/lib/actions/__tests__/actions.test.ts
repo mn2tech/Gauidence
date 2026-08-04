@@ -60,6 +60,7 @@ describe("Guardian Action Engine", () => {
       baseCtx("add this to the vault: met with John")
     );
     assert.match(note, /PROPOSED DAILY LOG/i);
+    assert.match(note, /Never tell them to open Daily Log/i);
   });
 
   it("builds thinking steps for search", () => {

@@ -11,6 +11,10 @@ describe("daily log capture propose helpers", () => {
   it("detects capture intent", () => {
     assert.equal(wantsDailyLogCapture("Remember that Emma has soccer Tuesday"), true);
     assert.equal(wantsDailyLogCapture("Add this to the vault: met with John"), true);
+    assert.equal(wantsDailyLogCapture("Save this list"), true);
+    assert.equal(wantsDailyLogCapture("Add these to Nolan's vault"), true);
+    assert.equal(wantsDailyLogCapture("Make them permanent"), true);
+    assert.equal(wantsDailyLogCapture("Save what you just listed"), true);
     assert.equal(wantsDailyLogCapture("Remind me about registration"), false);
     assert.equal(wantsDailyLogCapture("What did I log yesterday?"), false);
     assert.equal(wantsDailyLogCapture("Upload this photo"), false);

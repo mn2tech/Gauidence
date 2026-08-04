@@ -9,7 +9,10 @@ export type ProposedDailyLog = {
 };
 
 const DAILY_LOG_CAPTURE_INTENT =
-  /\b(remember\s+(?:that|this|for\s+me)\b|log\s+this|add\s+(?:this|that)\s+to\s+(?:the\s+)?vault|save\s+(?:this|that)\s+to\s+(?:the\s+)?vault|add\s+to\s+(?:the\s+)?vault\b|note\s+that|write\s+(?:this|that)\s+down|jot\s+(?:this|that)\s+down|keep\s+(?:this|that)\s+in\s+mind|don'?t\s+forget\s+that|capture\s+this|store\s+this|make\s+a\s+note(?:\s+that)?)\b/i;
+  /\b(remember\s+(?:that|this|for\s+me)\b|log\s+this|add\s+(?:this|that|these|them|it)\s+to\s+(?:the\s+)?(?:\w+(?:'s)?\s+)?vault|save\s+(?:this|that|these|them|it|the\s+list)\b(?:\s+to\s+(?:the\s+)?(?:\w+(?:'s)?\s+)?vault)?|add\s+to\s+(?:the\s+)?(?:\w+(?:'s)?\s+)?vault\b|note\s+that|write\s+(?:this|that|these|them)\s+down|jot\s+(?:this|that|these|them)\s+down|keep\s+(?:this|that|these|them)\s+in\s+mind|don'?t\s+forget\s+that|capture\s+this|store\s+(?:this|that|these|them|it)\b|make\s+(?:this|that|these|them|it)\s+permanent|make\s+(?:them|these)\s+permanent|put\s+(?:this|that|these|them|it)\s+in\s+(?:the\s+)?vault|create\s+(?:a\s+)?(?:daily\s+)?log|new\s+(?:daily\s+)?log\s+entry|make\s+a\s+note(?:\s+that)?)\b/i;
+
+const SAVE_CHAT_CONTENT_FOLLOWUP =
+  /\b(save|store|keep|add)\s+(?:this|that|it|these|them|the\s+list|what\s+you\s+(?:just\s+)?(?:said|listed|wrote))\b/i;
 
 const DAILY_LOG_QUERY =
   /\b(what|when|where|who|which|how|did|do|does|have|has|had|show|list|find|search|tell\s+me\s+about|recall|look\s+up)\b.{0,48}\b(log|logs|note|notes|daily\s+log|vault)\b/i;
@@ -23,18 +26,23 @@ export function wantsDailyLogCapture(question: string): boolean {
   if (/\b(upload|attach|add\s+(?:a\s+)?(?:file|document|photo|image))\b/i.test(q)) {
     return false;
   }
-  return DAILY_LOG_CAPTURE_INTENT.test(q);
+  if (DAILY_LOG_CAPTURE_INTENT.test(q)) return true;
+  return SAVE_CHAT_CONTENT_FOLLOWUP.test(q);
 }
 
 export const DAILY_LOG_CAPTURE_SYSTEM_NOTE = `Daily log capture mode:
-The user wants to save a note to their vault (Daily Log). Acknowledge briefly, then if you can extract what they want remembered from their message or vault context, end with exactly:
+The user wants to save a note to their vault (Daily Log). Acknowledge briefly, then propose what to save.
+
+If they refer to "this", "that", "the list", or something from the current chat, use the relevant content from the conversation (including your previous reply) as the note body — do not ask them to paste it again.
+
+End with exactly:
 
 ## PROPOSED DAILY LOG
 title: <short title under 200 characters — optional but preferred>
 content: <the note to save — plain text; may continue on following lines>
 log_date: YYYY-MM-DD
 
-Use today's date if no date is given. Never invent facts not in the user's message. If you cannot determine what to save, omit the PROPOSED DAILY LOG section and ask what to remember. Do not save the log yourself — the user will confirm in the app.`;
+Use today's date if no date is given. Never invent facts not in the user's message or this conversation. If you cannot determine what to save, omit the PROPOSED DAILY LOG section and ask what to remember. Do not save the log yourself — the user will confirm in the app. Never tell them to open Daily Log or New Entry in the app manually.`;
 
 const SECTION_START = /^#{1,3}\s*PROPOSED DAILY LOG\s*$/i;
 
