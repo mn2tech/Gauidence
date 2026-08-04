@@ -102,6 +102,12 @@ import { recordClientActionEvent } from "@/lib/actions/client";
 import ProfileSetupHub from "@/components/ProfileSetupHub";
 import AskGideonSidebar from "@/components/AskGideonSidebar";
 import { todayLogDate } from "@/lib/logs/types";
+import {
+  parseProposedDailyLog,
+  proposedDailyLogSummary,
+  stripProposedDailyLogSection,
+  type ProposedDailyLog,
+} from "@/lib/logs/propose";
 import { calendarDateInZone } from "@/lib/reminders/time";
 import {
   parseProposedReminder,
@@ -618,6 +624,12 @@ export default function VaultChatPanel({
   const [confirmedClientRequestIds, setConfirmedClientRequestIds] = useState<
     Set<string>
   >(() => new Set());
+  const [confirmingDailyLogId, setConfirmingDailyLogId] = useState<string | null>(
+    null
+  );
+  const [confirmedDailyLogIds, setConfirmedDailyLogIds] = useState<Set<string>>(
+    () => new Set()
+  );
   const [savingClientRequestReply, setSavingClientRequestReply] = useState(false);
   const [firstWin, setFirstWin] = useState<{
     fileName: string;
@@ -1798,6 +1810,52 @@ export default function VaultChatPanel({
     }
   };
 
+  const confirmProposedDailyLog = async (
+    messageId: string,
+    proposal: ProposedDailyLog,
+    targetProfileId?: string | null
+  ) => {
+    const saveProfileId = targetProfileId ?? profileId;
+    if (
+      !saveProfileId ||
+      confirmingDailyLogId ||
+      savingLog ||
+      vaultBusy ||
+      sending
+    ) {
+      return;
+    }
+    setConfirmingDailyLogId(messageId);
+    setError(null);
+    try {
+      const res = await fetch("/api/logs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          profileId: saveProfileId,
+          content: proposal.content,
+          title: proposal.title?.trim() || undefined,
+          quick: true,
+          logDate: proposal.logDate,
+        }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setError(body.error ?? "Couldn't save Daily Log.");
+        return;
+      }
+      setConfirmedDailyLogIds((prev) => new Set(prev).add(messageId));
+      window.dispatchEvent(new Event("guardian:logs-updated"));
+      pushLocalNote(
+        `Daily Log saved: ${proposedDailyLogSummary(proposal, timeZone)}`
+      );
+    } catch {
+      setError("Couldn't save Daily Log. Check your connection and try again.");
+    } finally {
+      setConfirmingDailyLogId(null);
+    }
+  };
+
   const confirmProposedWorkMemoryUpdate = async (
     messageId: string,
     proposal: ProposedWorkMemoryUpdate
@@ -2430,6 +2488,11 @@ export default function VaultChatPanel({
       next.delete(assistantMessage.id);
       return next;
     });
+    setConfirmedDailyLogIds((prev) => {
+      const next = new Set(prev);
+      next.delete(assistantMessage.id);
+      return next;
+    });
     setDismissedVaultScopeIds((prev) => {
       const next = new Set(prev);
       next.delete(assistantMessage.id);
@@ -2450,6 +2513,7 @@ export default function VaultChatPanel({
     }
   ) => {
     const proposedReminder = parseProposedReminder(m.content, Date.now(), timeZone);
+    const proposedDailyLog = parseProposedDailyLog(m.content, todayLogDate(timeZone));
     const proposedWorkMemory = parseProposedWorkMemoryUpdate(
       m.content,
       requestedWorkProjectId ?? workProject?.id
@@ -2458,14 +2522,19 @@ export default function VaultChatPanel({
       m.content,
       requestedRequestId
     );
-    const displayContent = stripProposedClientRequestReplySection(
-      stripProposedWorkMemoryUpdateSection(
-        stripProposedReminderSection(m.content)
+    const displayContent = stripProposedDailyLogSection(
+      stripProposedClientRequestReplySection(
+        stripProposedWorkMemoryUpdateSection(
+          stripProposedReminderSection(m.content)
+        )
       )
     );
     const sections = parseGideonSections(
       displayContent ||
-        (proposedReminder || proposedWorkMemory || proposedClientRequest
+        (proposedReminder ||
+        proposedDailyLog ||
+        proposedWorkMemory ||
+        proposedClientRequest
           ? ""
           : m.content)
     );
@@ -2489,6 +2558,8 @@ export default function VaultChatPanel({
     const linkOnlyCitations = options?.hideCitationPreviews ? [] : sourceCitations;
     const alreadySetReminder = confirmedReminderIds.has(m.id);
     const confirmingReminder = confirmingReminderId === m.id;
+    const alreadySavedDailyLog = confirmedDailyLogIds.has(m.id);
+    const confirmingDailyLog = confirmingDailyLogId === m.id;
     const alreadySetWorkMemory = confirmedWorkMemoryIds.has(m.id);
     const confirmingWorkMemory = confirmingWorkMemoryId === m.id;
     const alreadyPostedClientRequest = confirmedClientRequestIds.has(m.id);
@@ -2587,6 +2658,62 @@ export default function VaultChatPanel({
                     setReminderDate(proposedReminder.date);
                     setReminderTime(proposedReminder.time);
                     setReminderOpen(true);
+                  }}
+                  className="inline-flex items-center rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50"
+                >
+                  Edit first
+                </button>
+              </div>
+            )}
+          </div>
+        ) : null}
+        {proposedDailyLog ? (
+          <div className="rounded-xl border border-violet-200 bg-violet-50/90 px-3 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-violet-900/70">
+              Proposed Daily Log
+            </p>
+            <p className="mt-1 text-sm text-foreground">
+              {proposedDailyLogSummary(proposedDailyLog, timeZone)}
+            </p>
+            {m.vaultScope ? (
+              <p className="mt-1 text-xs text-violet-900/80">
+                Will save to {m.vaultScope.profileName}&apos;s vault
+              </p>
+            ) : null}
+            {alreadySavedDailyLog ? (
+              <p className="mt-2 text-xs font-medium text-emerald-800">
+                Daily Log saved to your vault.
+              </p>
+            ) : (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={
+                    confirmingDailyLog || savingLog || sending || vaultBusy
+                  }
+                  onClick={() =>
+                    void confirmProposedDailyLog(
+                      m.id,
+                      proposedDailyLog,
+                      m.vaultScope?.profileId
+                    )
+                  }
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand/90 disabled:opacity-60"
+                >
+                  {confirmingDailyLog ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <NotebookPen className="h-3.5 w-3.5" />
+                  )}
+                  Save to vault
+                </button>
+                <button
+                  type="button"
+                  disabled={confirmingDailyLog || savingLog}
+                  onClick={() => {
+                    setLogTitle(proposedDailyLog.title ?? "");
+                    setLogContent(proposedDailyLog.content);
+                    setLogOpen(true);
                   }}
                   className="inline-flex items-center rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50"
                 >

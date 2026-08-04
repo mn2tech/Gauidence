@@ -39,6 +39,7 @@ import {
   type ChatTurn,
 } from "@/lib/vault/expandRetrievalQuestion";
 import { wantsReminderAgent } from "@/lib/reminders/propose";
+import { wantsDailyLogCapture } from "@/lib/logs/propose";
 import { wantsWorkMemoryUpdate } from "@/lib/work-memory/propose";
 import { wantsClientRequestReply } from "@/lib/client-requests/propose";
 import type { AttachedVaultDocument } from "@/lib/vault/attachedDocument";
@@ -89,6 +90,7 @@ export async function loadWorkspaceContext(
   const showPictures = wantsShowPictures(question);
   const transcriptionMode = wantsTranscription(question);
   const reminderAgent = wantsReminderAgent(question);
+  const dailyLogCaptureAgent = wantsDailyLogCapture(question);
   const workMemoryUpdateAgent = wantsWorkMemoryUpdate(question, {
     focusedWorkProject: Boolean(workProjectId),
   });
@@ -299,6 +301,7 @@ Active vault in the UI: ${activeProfile.display_name}. Document search includes 
       timeZone,
       showPictures,
       reminderAgent,
+      dailyLogCaptureAgent,
       workMemoryUpdateAgent,
       clientRequestReplyAgent,
       transcriptionMode,

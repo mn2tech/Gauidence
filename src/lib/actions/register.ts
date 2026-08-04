@@ -8,6 +8,7 @@ import {
 import { registerWorkspaceActions } from "./actions/workspace";
 import { registerWorkMemoryActions } from "./actions/workMemory";
 import { registerClientRequestActions } from "./actions/clientRequest";
+import { registerDailyLogActions } from "./actions/dailyLog";
 
 let allRegistered = false;
 
@@ -18,6 +19,7 @@ export function registerAllActions(): void {
   registerWorkspaceActions();
   registerWorkMemoryActions();
   registerClientRequestActions();
+  registerDailyLogActions();
   if (!getAction("payroll_clock")) registerAction(payrollClockAction);
   if (!getAction("upload_document")) registerAction(uploadDocumentAction);
   if (!getAction("save_document")) registerAction(saveDocumentAction);

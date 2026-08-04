@@ -46,6 +46,7 @@ export type WorkspacePromptOptions = {
   timeZone: string;
   showPictures: boolean;
   reminderAgent: boolean;
+  dailyLogCaptureAgent: boolean;
   workMemoryUpdateAgent: boolean;
   clientRequestReplyAgent: boolean;
   transcriptionMode: boolean;

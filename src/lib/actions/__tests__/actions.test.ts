@@ -6,6 +6,7 @@ import {
   registerAction,
 } from "../registry.ts";
 import { createReminderAction, searchVaultAction } from "../actions/core.ts";
+import { captureDailyLogAction } from "../actions/dailyLog.ts";
 import {
   collectActionSystemNotes,
   collectThinkingSteps,
@@ -27,6 +28,7 @@ describe("Guardian Action Engine", () => {
     clearActionsForTests();
     registerAction(createReminderAction);
     registerAction(searchVaultAction);
+    registerAction(captureDailyLogAction);
   });
 
   it("matches create_reminder intent", () => {
@@ -44,6 +46,20 @@ describe("Guardian Action Engine", () => {
       baseCtx("set a reminder for tomorrow")
     );
     assert.match(note, /PROPOSED REMINDER/i);
+  });
+
+  it("matches capture_daily_log intent", () => {
+    const matches = getMatchingActions(
+      baseCtx("remember that Emma has soccer on Tuesday")
+    );
+    assert.ok(matches.some((a) => a.id === "capture_daily_log"));
+  });
+
+  it("injects daily log capture system note", () => {
+    const note = collectActionSystemNotes(
+      baseCtx("add this to the vault: met with John")
+    );
+    assert.match(note, /PROPOSED DAILY LOG/i);
   });
 
   it("builds thinking steps for search", () => {
