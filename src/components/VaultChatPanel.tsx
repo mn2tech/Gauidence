@@ -2076,6 +2076,8 @@ export default function VaultChatPanel({
         chatId?: string;
         chats?: ChatSummary[];
         chatScopedProfile?: Meta["chatScopedProfile"];
+        searchScope?: SearchScopeMode;
+        vaultScopeNote?: string;
         writeProfile?: { profileId: string; profileName: string };
         actionTimeline?: ActionTimelineItem[];
       }) => {
