@@ -8,6 +8,7 @@ import {
   guardianTimeZoneLabel,
   GUARDIAN_TIME_ZONE,
 } from "@/lib/timezone";
+import type { SearchScopeMode } from "@/lib/workspace-context/searchScope";
 
 export const GIDEON_BRAND_LINE =
   "Guardian watches. Gideon explains. You decide.";
@@ -655,6 +656,7 @@ export function buildVaultScopeNote(args: {
   allVaultNames?: string[];
   /** Vaults actually searched in this chat thread. */
   searchVaultNames?: string[];
+  searchScope?: SearchScopeMode;
 }): string {
   const accessibleNames = (args.allVaultNames ?? [])
     .map((n) => n.trim())
@@ -688,6 +690,10 @@ export function buildVaultScopeNote(args: {
   if (searchNames.length === 1) {
     const name = searchNames[0]!;
     const possessive = name.toLowerCase().endsWith("s") ? `${name}'` : `${name}'s`;
+    const searchScope = args.searchScope ?? "workspace";
+    if (searchScope === "workspace" && accessibleNames.length > 1) {
+      return `Searching only ${possessive} vault (${accessibleNames.length} vaults available).`;
+    }
     return `Searching ${possessive} vault.`;
   }
   const activeName = args.displayName?.trim();

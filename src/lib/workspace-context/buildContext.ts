@@ -250,11 +250,13 @@ export async function loadWorkspaceContext(
     : workMemoryBody;
 
   const allVaultsNote =
-    retrievalScopes.length > 1
+    meta.searchScope === "global" && retrievalScopes.length > 1
       ? `${GIDEON_CROSS_VAULT_NOTE}
 
 Active vault in the UI: ${activeProfile.display_name}. Document search includes all ${retrievalScopes.length} vaults you can access (${retrievalScopes.map((s) => s.display_name).join(", ")}).`
-      : "Search this vault's documents, Daily Logs, client requests, and upcoming schedule; use GENERAL KNOWLEDGE when the vault does not contain the answer.";
+      : retrievalScopes.length > 1
+        ? `Search includes ${retrievalScopes.map((s) => s.display_name).join(", ")} for this chat. Attribute facts to the correct vault.`
+        : "Search this vault's documents, Daily Logs, client requests, and upcoming schedule; use GENERAL KNOWLEDGE when the vault does not contain the answer.";
 
   const attachedTextLimit = transcriptionMode ? 30_000 : 12_000;
   const attachedContext = attachedDoc

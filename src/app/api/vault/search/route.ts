@@ -95,6 +95,7 @@ export async function GET(request: Request) {
         accessibleProfiles: accessible,
         activeProfile: anchor,
         chatHomeProfileId: anchor.id,
+        searchScope: scope,
       });
       searchProfileIds = workspaceMeta.searchProfileIds;
     }

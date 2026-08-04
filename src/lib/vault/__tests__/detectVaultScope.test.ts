@@ -135,14 +135,28 @@ describe("buildVaultChatRetrievalScopes", () => {
     { id: "emma", display_name: "Emma", profile_type: "child" as const },
   ];
 
-  it("searches all accessible vaults when no scoped profile is set", () => {
+  it("searches all accessible vaults in global scope", () => {
     expect(
       buildVaultChatRetrievalScopes({
         accessibleProfiles: accessible,
         chatHomeProfileId: "personal",
         scopedProfileId: null,
+        searchScope: "global",
       })
     ).toEqual(accessible);
+  });
+
+  it("searches only chat home in workspace scope", () => {
+    expect(
+      buildVaultChatRetrievalScopes({
+        accessibleProfiles: accessible,
+        chatHomeProfileId: "personal",
+        scopedProfileId: null,
+        searchScope: "workspace",
+      })
+    ).toEqual([
+      { id: "personal", display_name: "Kola", profile_type: "personal" },
+    ]);
   });
 
   it("narrows to chat home plus scoped vault when scoped profile is set", () => {

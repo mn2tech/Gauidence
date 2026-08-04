@@ -1,5 +1,6 @@
 import type { GuardianProfile, GuardianProfileType } from "@/lib/profiles/types";
 import type { SuggestionProfileKind } from "@/lib/vault/gideon";
+import type { SearchScopeMode } from "./searchScope";
 
 /** A vault/profile in the current search scope. */
 export type RetrievalScope = {
@@ -20,6 +21,7 @@ export type WorkspaceContextMeta = {
   searchProfileIds: string[];
   chatHomeProfileId: string;
   chatScopedProfileId: string | null;
+  searchScope: SearchScopeMode;
   scopedProfile: GuardianProfile | null;
   profileKind: SuggestionProfileKind;
   chatContextLabel: string;

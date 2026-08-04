@@ -1,4 +1,5 @@
 import type { GuardianProfileType } from "@/lib/profiles/types";
+import type { SearchScopeMode } from "@/lib/workspace-context/searchScope";
 
 export type VaultScopeCandidate = {
   id: string;
@@ -172,9 +173,40 @@ export function dominantRetrievalProfileId(
 }
 
 /**
- * Vault Gideon should use when saving reminders, logs, or other writes.
- * Prefers an explicit name in the question, then a dominant retrieval source.
+ * Vault profiles Gideon searches when answering in a chat thread.
+ * workspace = chat home (+ optional scoped vault); global = every accessible vault.
  */
+export function buildVaultChatRetrievalScopes(args: {
+  accessibleProfiles: VaultChatRetrievalProfile[];
+  chatHomeProfileId: string;
+  scopedProfileId?: string | null;
+  searchScope?: SearchScopeMode;
+}): VaultChatRetrievalProfile[] {
+  const scopedId =
+    typeof args.scopedProfileId === "string" && args.scopedProfileId.trim()
+      ? args.scopedProfileId.trim()
+      : null;
+  const searchScope = args.searchScope ?? "workspace";
+  const byId = new Map(args.accessibleProfiles.map((p) => [p.id, p]));
+
+  if (searchScope === "global") {
+    return [...args.accessibleProfiles];
+  }
+
+  const out: VaultChatRetrievalProfile[] = [];
+  const seen = new Set<string>();
+
+  for (const id of [args.chatHomeProfileId, scopedId]) {
+    if (!id) continue;
+    const profile = byId.get(id);
+    if (!profile || seen.has(profile.id)) continue;
+    seen.add(profile.id);
+    out.push(profile);
+  }
+
+  return out.length > 0 ? out : [...args.accessibleProfiles];
+}
+
 /**
  * When a chat is scoped to a nested vault (e.g. client under a business),
  * default writes to the scoped vault instead of the chat home container.
@@ -241,35 +273,6 @@ export function buildVaultScopePayload(args: {
 export type VaultChatRetrievalProfile = VaultScopeCandidate & {
   profile_type: GuardianProfileType;
 };
-
-/**
- * When a thread has scoped_profile_id, search the chat home vault plus that
- * scoped vault. Otherwise search every vault the user can access.
- */
-export function buildVaultChatRetrievalScopes(args: {
-  accessibleProfiles: VaultChatRetrievalProfile[];
-  chatHomeProfileId: string;
-  scopedProfileId?: string | null;
-}): VaultChatRetrievalProfile[] {
-  const scopedId =
-    typeof args.scopedProfileId === "string" && args.scopedProfileId.trim()
-      ? args.scopedProfileId.trim()
-      : null;
-  if (!scopedId) return [...args.accessibleProfiles];
-
-  const byId = new Map(args.accessibleProfiles.map((p) => [p.id, p]));
-  const out: VaultChatRetrievalProfile[] = [];
-  const seen = new Set<string>();
-
-  for (const id of [args.chatHomeProfileId, scopedId]) {
-    const profile = byId.get(id);
-    if (!profile || seen.has(profile.id)) continue;
-    seen.add(profile.id);
-    out.push(profile);
-  }
-
-  return out.length > 0 ? out : [...args.accessibleProfiles];
-}
 
 export function chatScopedProfilePayload(args: {
   scopedProfileId?: string | null;

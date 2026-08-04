@@ -5,6 +5,14 @@ import type { WorkspaceContextMeta } from "./types";
 export const SEARCH_SCOPE_MODES = ["workspace", "global"] as const;
 export type SearchScopeMode = (typeof SEARCH_SCOPE_MODES)[number];
 
+export function parseSearchScope(raw: unknown): SearchScopeMode {
+  return raw === "global" ? "global" : "workspace";
+}
+
+export function isSearchScopeMode(value: unknown): value is SearchScopeMode {
+  return value === "workspace" || value === "global";
+}
+
 export type WorkingInDisplay = {
   mode: "working" | "searching";
   primaryName: string;

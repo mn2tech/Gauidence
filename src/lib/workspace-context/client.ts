@@ -3,6 +3,8 @@ export {
   buildWorkingInDisplay,
   profileIdsForSearchScope,
   searchScopeLabel,
+  parseSearchScope,
+  isSearchScopeMode,
   formatSearchConfidence,
   SEARCH_SCOPE_MODES,
   type SearchScopeMode,

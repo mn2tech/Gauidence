@@ -4,6 +4,10 @@ import { ArrowLeft, ChevronDown, Search } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import ProfileAvatar from "@/components/ProfileAvatar";
 import type { WorkingInDisplay } from "@/lib/workspace-context/client";
+import {
+  searchScopeLabel,
+  type SearchScopeMode,
+} from "@/lib/workspace-context/client";
 import type { GuardianProfile } from "@/lib/profiles/types";
 import { nestedUnder, topLevelProfiles } from "@/lib/profiles/types";
 
@@ -14,6 +18,9 @@ type Props = {
   onSwitchWorkspace: (profileId: string) => void;
   onReturnToWorkspace?: () => void;
   onOpenSearch?: () => void;
+  searchScope?: SearchScopeMode;
+  showSearchScopeToggle?: boolean;
+  onSearchScopeChange?: (scope: SearchScopeMode) => void;
   className?: string;
 };
 
@@ -83,6 +90,9 @@ export default function WorkspaceContextBar({
   onSwitchWorkspace,
   onReturnToWorkspace,
   onOpenSearch,
+  searchScope = "workspace",
+  showSearchScopeToggle = false,
+  onSearchScopeChange,
   className = "",
 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -117,6 +127,29 @@ export default function WorkspaceContextBar({
         </div>
         {display.scopeNote ? (
           <p className="mt-0.5 text-[11px] text-ink-muted">{display.scopeNote}</p>
+        ) : null}
+        {showSearchScopeToggle && onSearchScopeChange ? (
+          <div
+            className="mt-2 flex flex-wrap gap-1"
+            role="group"
+            aria-label="Search scope"
+          >
+            {(["workspace", "global"] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                aria-pressed={searchScope === mode}
+                onClick={() => onSearchScopeChange(mode)}
+                className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition ${
+                  searchScope === mode
+                    ? "bg-brand text-white"
+                    : "bg-white text-ink-muted ring-1 ring-stone-200 hover:bg-stone-50"
+                }`}
+              >
+                {searchScopeLabel(mode)}
+              </button>
+            ))}
+          </div>
         ) : null}
       </div>
 

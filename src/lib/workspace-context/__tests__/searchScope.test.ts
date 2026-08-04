@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   buildWorkingInDisplay,
+  parseSearchScope,
   searchScopeLabel,
 } from "../searchScope.ts";
 
@@ -30,6 +31,17 @@ describe("buildWorkingInDisplay", () => {
     assert.equal(display.mode, "searching");
     assert.equal(display.primaryName, "Payroll");
     assert.equal(display.homeName, "NM2TECH");
+  });
+});
+
+describe("parseSearchScope", () => {
+  it("defaults to workspace", () => {
+    assert.equal(parseSearchScope(undefined), "workspace");
+    assert.equal(parseSearchScope("workspace"), "workspace");
+  });
+
+  it("accepts global", () => {
+    assert.equal(parseSearchScope("global"), "global");
   });
 });
 

@@ -9,6 +9,7 @@ import {
   gideonChatContextLabel,
 } from "@/lib/vault/gideon";
 import { suggestionKindFrom } from "./suggestionKind";
+import type { SearchScopeMode } from "./searchScope";
 import type { RetrievalScope, WorkspaceContextMeta } from "./types";
 
 export type ResolveWorkspaceScopesArgs = {
@@ -16,6 +17,7 @@ export type ResolveWorkspaceScopesArgs = {
   activeProfile: GuardianProfile;
   chatHomeProfileId: string;
   chatScopedProfileId?: string | null;
+  searchScope?: SearchScopeMode;
 };
 
 /** Build retrieval scopes and workspace metadata for Gideon. */
@@ -36,6 +38,7 @@ export function resolveWorkspaceScopes(
     })),
     chatHomeProfileId,
     scopedProfileId: chatScopedProfileId,
+    searchScope: args.searchScope ?? "workspace",
   });
 
   const profileNames = Object.fromEntries(
@@ -62,6 +65,7 @@ export function resolveWorkspaceScopes(
     chatHomeProfileId,
     chatScopedProfileId,
     scopedProfile,
+    searchScope: args.searchScope ?? "workspace",
     profileKind,
     chatContextLabel: gideonChatContextLabel(
       profileKind,
@@ -73,6 +77,7 @@ export function resolveWorkspaceScopes(
       allVaultNames: accessibleProfiles.map((p) => p.display_name),
       searchVaultNames: retrievalScopes.map((p) => p.display_name),
       chatScopedProfileName: scopedProfile?.display_name,
+      searchScope: args.searchScope ?? "workspace",
     }),
   };
 }
@@ -85,6 +90,7 @@ export async function askGideonScopeMeta(
   options?: {
     chatHomeProfileId?: string;
     chatScopedProfileId?: string | null;
+    searchScope?: SearchScopeMode;
     accessibleProfiles?: GuardianProfile[];
   }
 ) {
@@ -97,6 +103,7 @@ export async function askGideonScopeMeta(
     activeProfile: active as GuardianProfile,
     chatHomeProfileId: options?.chatHomeProfileId ?? active.id,
     chatScopedProfileId: options?.chatScopedProfileId,
+    searchScope: options?.searchScope,
   });
 
   return {

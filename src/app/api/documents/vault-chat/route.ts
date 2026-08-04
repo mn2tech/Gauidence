@@ -58,8 +58,11 @@ import {
   buildGideonSystemPrompt,
   gideonMaxTokens,
   loadWorkspaceContext,
+  parseSearchScope,
+  isSearchScopeMode,
   resolveWorkspaceScopes,
   suggestionKindFrom,
+  type SearchScopeMode,
 } from "@/lib/workspace-context";
 
 export const runtime = "nodejs";
@@ -95,6 +98,7 @@ type VaultChatRow = {
   title: string;
   profile_id: string;
   scoped_profile_id?: string | null;
+  search_scope?: string | null;
 };
 
 type Authed = { supabase: SupabaseClient; user: User };
@@ -175,6 +179,16 @@ async function listChats(
   return (data ?? []) as ChatSummary[];
 }
 
+function isMissingSearchScopeColumn(error: {
+  code?: string;
+  message?: string;
+} | null): boolean {
+  if (!error) return false;
+  if (error.code === "42703" || error.code === "PGRST204") return true;
+  const msg = error.message ?? "";
+  return /search_scope/i.test(msg) && /does not exist|unknown|schema cache/i.test(msg);
+}
+
 function isMissingScopedProfileColumn(error: {
   code?: string;
   message?: string;
@@ -195,13 +209,37 @@ async function loadVaultChatById(
 > {
   const scoped = await supabase
     .from("vault_chats")
-    .select("id, title, profile_id, scoped_profile_id")
+    .select("id, title, profile_id, scoped_profile_id, search_scope")
     .eq("id", chatId)
     .maybeSingle();
 
   if (!scoped.error) {
     if (!scoped.data) return { ok: false, reason: "not_found" };
-    return { ok: true, chat: scoped.data as VaultChatRow };
+    return {
+      ok: true,
+      chat: {
+        ...(scoped.data as VaultChatRow),
+        search_scope: parseSearchScope(scoped.data.search_scope),
+      },
+    };
+  }
+
+  if (isMissingSearchScopeColumn(scoped.error)) {
+    const withoutScope = await supabase
+      .from("vault_chats")
+      .select("id, title, profile_id, scoped_profile_id")
+      .eq("id", chatId)
+      .maybeSingle();
+    if (!withoutScope.error) {
+      if (!withoutScope.data) return { ok: false, reason: "not_found" };
+      return {
+        ok: true,
+        chat: {
+          ...(withoutScope.data as VaultChatRow),
+          search_scope: "workspace",
+        },
+      };
+    }
   }
 
   if (isMissingScopedProfileColumn(scoped.error)) {
@@ -221,7 +259,7 @@ async function loadVaultChatById(
     if (!base.data) return { ok: false, reason: "not_found" };
     return {
       ok: true,
-      chat: { ...base.data, scoped_profile_id: null },
+      chat: { ...base.data, scoped_profile_id: null, search_scope: "workspace" },
     };
   }
 
@@ -271,6 +309,27 @@ async function setVaultChatScopedProfile(
   }
 }
 
+async function setVaultChatSearchScope(
+  supabase: SupabaseClient,
+  chatId: string,
+  searchScope: SearchScopeMode
+): Promise<void> {
+  const { error } = await supabase
+    .from("vault_chats")
+    .update({
+      search_scope: searchScope,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", chatId);
+  if (error && !isMissingSearchScopeColumn(error)) {
+    console.error(
+      "vault_chats search_scope set failed:",
+      error.code,
+      error.message
+    );
+  }
+}
+
 async function updateVaultChatRow(
   supabase: SupabaseClient,
   chatId: string,
@@ -278,6 +337,7 @@ async function updateVaultChatRow(
     updated_at: string;
     title?: string;
     scoped_profile_id?: string | null;
+    search_scope?: SearchScopeMode;
   }
 ): Promise<void> {
   const { error } = await supabase
@@ -291,6 +351,19 @@ async function updateVaultChatRow(
     "scoped_profile_id" in updates
   ) {
     const { scoped_profile_id: _ignored, ...rest } = updates;
+    const retry = await supabase.from("vault_chats").update(rest).eq("id", chatId);
+    if (retry.error) {
+      console.error(
+        "vault_chats update failed:",
+        retry.error.code,
+        retry.error.message
+      );
+    }
+    return;
+  }
+
+  if (isMissingSearchScopeColumn(error) && "search_scope" in updates) {
+    const { search_scope: _ignored, ...rest } = updates;
     const retry = await supabase.from("vault_chats").update(rest).eq("id", chatId);
     if (retry.error) {
       console.error(
@@ -392,6 +465,8 @@ export async function GET(request: Request) {
     const scopeMeta = await askGideonScopeMeta(supabase, user.id, chatProfile, {
       chatHomeProfileId: chatProfile.id,
       chatScopedProfileId: chat.scoped_profile_id,
+      searchScope: parseSearchScope(chat.search_scope),
+      accessibleProfiles,
     });
 
     return NextResponse.json({
@@ -406,6 +481,7 @@ export async function GET(request: Request) {
         askContextLabel: askGideonContextLabel(chatProfile),
         chatContextLabel: scopeMeta.chatContextLabel,
         vaultScopeNote: scopeMeta.vaultScopeNote,
+        searchScope: parseSearchScope(chat.search_scope),
         templateLabel: template.label,
         templateBadge: template.badge,
         chatScopedProfile: scopedProfile
@@ -544,6 +620,7 @@ export async function GET(request: Request) {
         askContextLabel: askGideonContextLabel(active),
         chatContextLabel: scopeMeta.chatContextLabel,
         vaultScopeNote: scopeMeta.vaultScopeNote,
+        searchScope: "workspace" as const,
         templateLabel: template.label,
         templateBadge: template.badge,
         actionTimeline,
@@ -563,11 +640,13 @@ export async function PATCH(request: Request) {
   let chatIdRaw: unknown;
   let clearScopedProfile = false;
   let setScopedProfileRaw: unknown;
+  let setSearchScopeRaw: unknown;
   try {
     const body = await request.json();
     chatIdRaw = body.chatId;
     clearScopedProfile = body.clearScopedProfile === true;
     setScopedProfileRaw = body.setScopedProfile;
+    setSearchScopeRaw = body.setSearchScope;
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
@@ -578,8 +657,14 @@ export async function PATCH(request: Request) {
     typeof setScopedProfileRaw === "string" && setScopedProfileRaw.trim()
       ? setScopedProfileRaw.trim()
       : null;
+  const setSearchScope = isSearchScopeMode(setSearchScopeRaw)
+    ? setSearchScopeRaw
+    : null;
 
-  if (!chatId || (!clearScopedProfile && !setScopedProfile)) {
+  if (
+    !chatId ||
+    (!clearScopedProfile && !setScopedProfile && !setSearchScope)
+  ) {
     return NextResponse.json({ error: "Missing chatId or action." }, { status: 400 });
   }
 
@@ -611,6 +696,22 @@ export async function PATCH(request: Request) {
   }
 
   const accessibleProfiles = await listGuardianProfiles(supabase, user.id);
+
+  if (setSearchScope) {
+    await setVaultChatSearchScope(supabase, chatId, setSearchScope);
+    const scopeMeta = await askGideonScopeMeta(supabase, user.id, chatProfile, {
+      chatHomeProfileId: chatProfile.id,
+      chatScopedProfileId: loaded.chat.scoped_profile_id,
+      searchScope: setSearchScope,
+      accessibleProfiles,
+    });
+    return NextResponse.json({
+      ok: true,
+      searchScope: setSearchScope,
+      vaultScopeNote: scopeMeta.vaultScopeNote,
+    });
+  }
+
   const scopedMatch = accessibleProfiles.find((p) => p.id === setScopedProfile);
   if (!scopedMatch) {
     return NextResponse.json(
@@ -721,6 +822,7 @@ export async function POST(request: Request) {
   let regenerateAssistantIdRaw: unknown;
   let clearScopedProfile = false;
   let setScopedProfileRaw: unknown;
+  let setSearchScopeRaw: unknown;
   let profileIdRaw: unknown;
   let agentMode = false;
   try {
@@ -732,6 +834,7 @@ export async function POST(request: Request) {
     regenerateAssistantIdRaw = body.regenerateAssistantId;
     clearScopedProfile = body.clearScopedProfile === true;
     setScopedProfileRaw = body.setScopedProfile;
+    setSearchScopeRaw = body.searchScope;
     profileIdRaw = body.profileId;
     agentMode = body.agentMode === true;
   } catch {
@@ -781,6 +884,7 @@ export async function POST(request: Request) {
   let isNewChat = false;
   let chatHomeProfileId = active.id;
   let chatScopedProfileId: string | null = null;
+  let chatSearchScope: SearchScopeMode = "workspace";
   const requestedId =
     typeof chatIdRaw === "string" && chatIdRaw.trim() ? chatIdRaw.trim() : null;
 
@@ -817,6 +921,7 @@ export async function POST(request: Request) {
       typeof existingChat.scoped_profile_id === "string"
         ? existingChat.scoped_profile_id
         : null;
+    chatSearchScope = parseSearchScope(existingChat.search_scope);
   } else {
     if (!initialQuestion) {
       return NextResponse.json(
@@ -824,12 +929,16 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+    const initialSearchScope = isSearchScopeMode(setSearchScopeRaw)
+      ? setSearchScopeRaw
+      : "workspace";
     const { data: created, error: chatError } = await supabase
       .from("vault_chats")
       .insert({
         user_id: user.id,
         profile_id: active.id,
         title: titleFromQuestion(initialQuestion),
+        search_scope: initialSearchScope,
       })
       .select("id")
       .single();
@@ -842,6 +951,7 @@ export async function POST(request: Request) {
     chatId = created.id;
     isNewChat = true;
     chatHomeProfileId = active.id;
+    chatSearchScope = initialSearchScope;
   }
 
   const setScopedProfile =
@@ -864,11 +974,20 @@ export async function POST(request: Request) {
     chatScopedProfileId = scopedMatch.id;
   }
 
+  const requestedSearchScope = isSearchScopeMode(setSearchScopeRaw)
+    ? setSearchScopeRaw
+    : null;
+  if (requestedSearchScope && requestedSearchScope !== chatSearchScope) {
+    await setVaultChatSearchScope(supabase, chatId, requestedSearchScope);
+    chatSearchScope = requestedSearchScope;
+  }
+
   const workspaceMeta = resolveWorkspaceScopes({
     accessibleProfiles,
     activeProfile: active,
     chatHomeProfileId,
     chatScopedProfileId,
+    searchScope: chatSearchScope,
   });
   const { retrievalScopes, searchProfileIds: allSearchIds, profileNames } =
     workspaceMeta;
@@ -1223,5 +1342,7 @@ export async function POST(request: Request) {
     vaultScope: responseVaultScope,
     writeProfile,
     chatScopedProfile: persistedChatScopedProfile,
+    searchScope: chatSearchScope,
+    vaultScopeNote: workspaceMeta.vaultScopeNote,
   });
 }

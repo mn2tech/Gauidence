@@ -93,6 +93,7 @@ import SmartUploadSuggestionCard from "@/components/SmartUploadSuggestionCard";
 import WorkspaceContextBar from "@/components/WorkspaceContextBar";
 import GlobalVaultSearch from "@/components/GlobalVaultSearch";
 import { buildWorkingInDisplay } from "@/lib/workspace-context/client";
+import type { SearchScopeMode } from "@/lib/workspace-context/client";
 import {
   buildSmartUploadPresentation,
   shouldPromptSmartUpload,
@@ -398,6 +399,7 @@ type Meta = {
   askContextLabel?: string;
   chatContextLabel?: string;
   vaultScopeNote?: string;
+  searchScope?: SearchScopeMode;
   templateLabel?: string;
   templateBadge?: string;
   chatScopedProfile?: {
@@ -1569,6 +1571,53 @@ export default function VaultChatPanel({
     }
   };
 
+  const setChatSearchScope = async (scope: SearchScopeMode) => {
+    setMeta((prev) =>
+      prev
+        ? {
+            ...prev,
+            searchScope: scope,
+          }
+        : prev
+    );
+    if (!activeChatId) return;
+    try {
+      const res = await fetch("/api/documents/vault-chat", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          withVaultChatProfileId(
+            {
+              chatId: activeChatId,
+              setSearchScope: scope,
+            },
+            vaultProfileId
+          )
+        ),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        searchScope?: SearchScopeMode;
+        vaultScopeNote?: string;
+      };
+      if (!res.ok) {
+        setError(body.error ?? "Couldn't update search scope.");
+        return;
+      }
+      setMeta((prev) =>
+        prev
+          ? {
+              ...prev,
+              searchScope: body.searchScope ?? scope,
+              vaultScopeNote: body.vaultScopeNote ?? prev.vaultScopeNote,
+            }
+          : prev
+      );
+    } catch {
+      setError("Couldn't update search scope. Try again.");
+    }
+  };
+
   const clearChatScopedProfile = async () => {
     if (!activeChatId) {
       setMeta((prev) =>
@@ -1968,6 +2017,7 @@ export default function VaultChatPanel({
             ? { workProjectId: requestedWorkProjectId }
             : {}),
           ...(agentModeEnabled ? { agentMode: true } : {}),
+          searchScope: meta?.searchScope ?? "workspace",
         },
         vaultProfileId ?? profileId
       );
@@ -2040,6 +2090,17 @@ export default function VaultChatPanel({
           setMeta((prev) =>
             prev
               ? { ...prev, chatScopedProfile: body.chatScopedProfile ?? null }
+              : prev
+          );
+        }
+        if (body.searchScope) {
+          setMeta((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  searchScope: body.searchScope,
+                  vaultScopeNote: body.vaultScopeNote ?? prev.vaultScopeNote,
+                }
               : prev
           );
         }
@@ -3337,6 +3398,11 @@ export default function VaultChatPanel({
           onOpenSearch={
             isPage ? () => setVaultSearchOpen(true) : undefined
           }
+          searchScope={meta?.searchScope ?? "workspace"}
+          showSearchScopeToggle={
+            profiles.length > 1 && workingInDisplay.mode !== "searching"
+          }
+          onSearchScopeChange={(scope) => void setChatSearchScope(scope)}
         />
       </div>
     </div>

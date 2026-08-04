@@ -51,15 +51,26 @@ describe("resolveWorkspaceScopes", () => {
     }),
   ];
 
-  it("defaults search to chat home profile", () => {
+  it("defaults search to chat home profile in workspace scope", () => {
     const meta = resolveWorkspaceScopes({
       accessibleProfiles: accessible,
       activeProfile: accessible[0]!,
       chatHomeProfileId: "p1",
+      searchScope: "workspace",
     });
     assert.equal(meta.activeProfile.id, "p1");
-    assert.ok(meta.searchProfileIds.length >= 1);
+    assert.deepEqual(meta.searchProfileIds, ["p1"]);
     assert.match(meta.chatContextLabel, /NM2TECH/);
+  });
+
+  it("searches every vault in global scope", () => {
+    const meta = resolveWorkspaceScopes({
+      accessibleProfiles: accessible,
+      activeProfile: accessible[0]!,
+      chatHomeProfileId: "p1",
+      searchScope: "global",
+    });
+    assert.equal(meta.searchProfileIds.length, accessible.length);
   });
 
   it("narrows scope when chat is scoped to a child vault", () => {
