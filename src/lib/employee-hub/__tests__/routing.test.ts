@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   EMPLOYEE_HUB_PATH,
+  employeeInvoiceUploadHref,
   isEmployeeHubProfile,
   postLoginPathForProfile,
 } from "../routing";
@@ -45,6 +46,13 @@ describe("employee hub routing", () => {
         parent_profile_id: null,
       }),
       "/ask"
+    );
+  });
+
+  it("builds invoice upload deep links with durable docs intent", () => {
+    assert.equal(
+      employeeInvoiceUploadHref("emp-1"),
+      "/dashboard?docs=1&camera=1&profileId=emp-1#documents-emp-1"
     );
   });
 });

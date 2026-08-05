@@ -38,7 +38,7 @@ import {
   type GuardianProfileType,
 } from "@/lib/profiles/types";
 import { EMPLOYEE_HUB_PATH } from "@/lib/employee-hub/routing";
-import { REQUESTS_PATH } from "@/lib/routes";
+import { hasDocumentsIntent, REQUESTS_PATH } from "@/lib/routes";
 import { clientBusinessLabel } from "@/lib/client-requests/helpers";
 
 function DocumentsSection({
@@ -117,10 +117,20 @@ export default function DashboardVault({ userId }: { userId: string }) {
 
   useEffect(() => {
     if (!active || loading) return;
-    if (active.profile_type === "employee" && active.parent_profile_id) {
-      router.replace(EMPLOYEE_HUB_PATH);
+    if (active.profile_type !== "employee" || !active.parent_profile_id) return;
+    const params: Record<string, string> = {};
+    searchParams.forEach((value, key) => {
+      params[key] = value;
+    });
+    if (hasDocumentsIntent(params)) return;
+    if (
+      typeof window !== "undefined" &&
+      window.location.hash.startsWith("#documents-")
+    ) {
+      return;
     }
-  }, [active, loading, router]);
+    router.replace(EMPLOYEE_HUB_PATH);
+  }, [active, loading, router, searchParams]);
 
   if (loading && !active && profiles.length === 0) {
     return (

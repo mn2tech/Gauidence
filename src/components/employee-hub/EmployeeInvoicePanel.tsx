@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Receipt } from "lucide-react";
+import { employeeInvoiceUploadHref } from "@/lib/employee-hub/routing";
 
 type Props = {
   profileId: string;
@@ -23,7 +24,7 @@ export default function EmployeeInvoicePanel({ profileId }: Props) {
         Scan or upload invoices to your vault documents.
       </p>
       <Link
-        href={`/dashboard?camera=1#documents-${profileId}`}
+        href={employeeInvoiceUploadHref(profileId)}
         className="mt-3 inline-flex rounded-full border border-stone-300 px-4 py-2 text-sm font-medium hover:bg-stone-50"
       >
         Upload invoice

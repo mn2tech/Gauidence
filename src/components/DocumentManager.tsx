@@ -29,6 +29,7 @@ import {
 } from "@/lib/analysis";
 import { DOCUMENT_CATEGORIES } from "@/lib/categories";
 import { useActiveProfile } from "@/components/ProfileProvider";
+import { useEmployeeHubEntitlements } from "@/hooks/useEmployeeHubEntitlements";
 import { canEditGuardianProfile } from "@/lib/profiles/types";
 import PlanLimitAlert from "@/components/PlanLimitAlert";
 import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
@@ -143,6 +144,15 @@ export default function DocumentManager({
 }) {
   const supabase = createClient();
   const { active } = useActiveProfile();
+  const isEmployeeVault = active?.profile_type === "employee";
+  const { entitlements: employeeEntitlements } = useEmployeeHubEntitlements(
+    isEmployeeVault ? active?.id : undefined,
+    isEmployeeVault ? active?.parent_profile_id ?? undefined : undefined
+  );
+  const invoiceUploadAllowed =
+    isEmployeeVault && Boolean(employeeEntitlements?.invoice_upload);
+  const canUpload =
+    !active || canEditGuardianProfile(active) || invoiceUploadAllowed;
   const readOnly = active ? !canEditGuardianProfile(active) : false;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -298,7 +308,7 @@ export default function DocumentManager({
     window.addEventListener("guardian:open-camera", onRequest);
 
     let timer: number | undefined;
-    if (autoOpenCamera && !cameraDeepLinkConsumed.current && !readOnly) {
+    if (autoOpenCamera && !cameraDeepLinkConsumed.current && canUpload) {
       cameraDeepLinkConsumed.current = true;
       timer = window.setTimeout(runOpen, 350);
     }
@@ -311,7 +321,7 @@ export default function DocumentManager({
       if (timer) window.clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- openCamera is stable enough for mount/deeplink
-  }, [profileId, autoOpenCamera]);
+  }, [profileId, autoOpenCamera, canUpload]);
 
   async function handleFiles(files: FileList | File[] | null) {
     const list = files
@@ -770,10 +780,14 @@ export default function DocumentManager({
     <div className="rounded-2xl border border-stone-200 bg-white p-6">
       <div className="flex items-center justify-between">
         <h2 className="text-base font-semibold">
-          {readOnly ? "Shared documents" : "Your files"}
+          {readOnly && !canUpload
+            ? "Shared documents"
+            : invoiceUploadAllowed && readOnly
+              ? "Invoices"
+              : "Your files"}
         </h2>
         <p className="text-xs text-ink-muted">
-          {readOnly ? "From: " : "Uploading to: "}
+          {readOnly && !canUpload ? "From: " : "Uploading to: "}
           <span className="font-medium text-foreground">{profileName}</span>
         </p>
         <span className="text-xs text-ink-muted">
@@ -788,7 +802,7 @@ export default function DocumentManager({
       ) : null}
 
       {/* Upload zone */}
-      {!readOnly ? (
+      {canUpload ? (
       <div
         onDragOver={(e) => {
           e.preventDefault();
@@ -867,7 +881,7 @@ export default function DocumentManager({
       </div>
       ) : null}
 
-      {!readOnly ? (
+      {canUpload ? (
       <>
       <CameraCaptureModal
         open={cameraOpen}
