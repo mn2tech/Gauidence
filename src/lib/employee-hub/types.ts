@@ -38,6 +38,15 @@ export type BusinessLeaveRequest = EmployeeLeaveRequest & {
   employee_name: string;
 };
 
+export type EmployeeInvoiceDocument = {
+  id: string;
+  file_name: string;
+  created_at: string;
+  analysis_status: string;
+  title: string | null;
+  document_type: string | null;
+};
+
 export const EMPLOYEE_HUB_ENTITLEMENT_SELECT =
   "id, business_profile_id, employee_profile_id, time_tracking, manual_time_entry, status_reports, invoice_upload, leave_requests, documents, gideon_chat, research, work_memory, experts, recruit, payroll_admin, created_at, updated_at";
 

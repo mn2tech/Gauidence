@@ -4,8 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Camera, Loader2, Receipt, UploadCloud } from "lucide-react";
 import CameraCaptureModal from "@/components/CameraCaptureModal";
-import { createClient } from "@/lib/supabase/client";
 import { employeeInvoiceDocumentsHref } from "@/lib/employee-hub/routing";
+import type { EmployeeInvoiceDocument } from "@/lib/employee-hub/types";
 import {
   uploadAndAnalyzeToVault,
   VAULT_ACCEPTED_TYPES,
@@ -18,14 +18,7 @@ type Props = {
   showVaultLink?: boolean;
 };
 
-type InvoiceRow = {
-  id: string;
-  file_name: string;
-  created_at: string;
-  analysis_status: string;
-  title: string | null;
-  document_type: string | null;
-};
+type InvoiceRow = EmployeeInvoiceDocument;
 
 function formatUploadedAt(iso: string): { date: string; time: string } {
   try {
@@ -83,42 +76,26 @@ export default function EmployeeInvoicePanel({
   const [cameraOpen, setCameraOpen] = useState(false);
 
   const load = useCallback(async () => {
-    const supabase = createClient();
-    if (!supabase || !profileId) return;
+    if (!profileId) return;
     setLoading(true);
+    setError(null);
     try {
-      const [docsRes, analysesRes] = await Promise.all([
-        supabase
-          .from("documents")
-          .select("id, file_name, created_at, analysis_status")
-          .eq("profile_id", profileId)
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("extracted_data")
-          .select("document_id, title, document_type")
-          .eq("profile_id", profileId),
-      ]);
-
-      const analyses = new Map(
-        (analysesRes.data ?? []).map((row) => [
-          String((row as { document_id: string }).document_id),
-          row as { title: string | null; document_type: string | null },
-        ])
+      const res = await fetch(
+        `/api/employee-hub/invoices?employeeProfileId=${encodeURIComponent(profileId)}`
       );
-
-      setInvoices(
-        (docsRes.data ?? []).map((doc) => {
-          const analysis = analyses.get(String(doc.id));
-          return {
-            id: String(doc.id),
-            file_name: String(doc.file_name),
-            created_at: String(doc.created_at),
-            analysis_status: String(doc.analysis_status ?? "uploaded"),
-            title: analysis?.title ?? null,
-            document_type: analysis?.document_type ?? null,
-          };
-        })
-      );
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        invoices?: EmployeeInvoiceDocument[];
+      };
+      if (!res.ok) {
+        setError(body.error ?? "Couldn't load invoices.");
+        setInvoices([]);
+        return;
+      }
+      setInvoices(body.invoices ?? []);
+    } catch {
+      setError("Couldn't load invoices.");
+      setInvoices([]);
     } finally {
       setLoading(false);
     }

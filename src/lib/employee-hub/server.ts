@@ -7,6 +7,7 @@ import {
   type EmployeeHubEntitlements,
   type EmployeeLeaveRequest,
   type BusinessLeaveRequest,
+  type EmployeeInvoiceDocument,
 } from "./types";
 
 export async function getEmployeeHubEntitlements(
@@ -172,4 +173,69 @@ export async function canEditEmployeeEntitlements(
   if (!data) return false;
   const role = (data as { role: string }).role;
   return role === "owner" || role === "editor";
+}
+
+export type { EmployeeInvoiceDocument };
+
+export async function canAccessEmployeeInvoices(
+  supabase: SupabaseClient,
+  employeeProfileId: string,
+  userId: string
+): Promise<boolean> {
+  const entitlements = await getEmployeeHubEntitlements(supabase, employeeProfileId);
+  if (!entitlements?.invoice_upload) return false;
+
+  const { data, error } = await supabase
+    .from("guardian_profile_members")
+    .select("user_id")
+    .eq("profile_id", employeeProfileId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("canAccessEmployeeInvoices:", error.message);
+    return false;
+  }
+  return Boolean(data);
+}
+
+export async function listEmployeeInvoices(
+  supabase: SupabaseClient,
+  employeeProfileId: string
+): Promise<EmployeeInvoiceDocument[]> {
+  const [docsRes, analysesRes] = await Promise.all([
+    supabase
+      .from("documents")
+      .select("id, file_name, created_at, analysis_status")
+      .eq("profile_id", employeeProfileId)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("extracted_data")
+      .select("document_id, title, document_type")
+      .eq("profile_id", employeeProfileId),
+  ]);
+
+  if (docsRes.error) {
+    console.error("listEmployeeInvoices:", docsRes.error.message);
+    return [];
+  }
+
+  const analyses = new Map(
+    (analysesRes.data ?? []).map((row) => [
+      String((row as { document_id: string }).document_id),
+      row as { title: string | null; document_type: string | null },
+    ])
+  );
+
+  return (docsRes.data ?? []).map((doc) => {
+    const analysis = analyses.get(String(doc.id));
+    return {
+      id: String(doc.id),
+      file_name: String(doc.file_name),
+      created_at: String(doc.created_at),
+      analysis_status: String(doc.analysis_status ?? "uploaded"),
+      title: analysis?.title ?? null,
+      document_type: analysis?.document_type ?? null,
+    };
+  });
 }
