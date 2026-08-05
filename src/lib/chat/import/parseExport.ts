@@ -42,8 +42,8 @@ export function toConversationPreviews(
 }
 
 export type { ChatImportSource, ImportedConversation, ImportedConversationPreview };
+export { detectExportFormat } from "./detectFormat";
 export {
-  detectExportFormat,
   parseChatGptConversation,
   parseChatGptExport,
 } from "./parseChatGpt";

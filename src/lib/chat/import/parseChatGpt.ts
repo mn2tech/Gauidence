@@ -70,7 +70,7 @@ function flattenActiveBranch(
   while (nodeId && !seen.has(nodeId)) {
     seen.add(nodeId);
     chain.push(nodeId);
-    const node = mapping[nodeId];
+    const node: ChatGptNode | undefined = mapping[nodeId];
     if (!node?.parent) break;
     nodeId = node.parent;
   }

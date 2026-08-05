@@ -46,6 +46,7 @@ import GideonWorkspaceTimeline, {
   type WorkspaceTimelineItem,
 } from "@/components/GideonWorkspaceTimeline";
 import CameraCaptureModal from "@/components/CameraCaptureModal";
+import VaultChatDrawer from "@/components/VaultChatDrawer";
 import VaultChatImportModal from "@/components/VaultChatImportModal";
 import ImminentReminderBanner from "@/components/ImminentReminderBanner";
 import {
