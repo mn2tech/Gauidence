@@ -13,6 +13,7 @@ import {
   PLAN_TAGLINES,
   type PlanId,
 } from "@/lib/billing/plans";
+import { formatStorageBytes } from "@/lib/billing/storageFormat";
 
 export const metadata: Metadata = {
   title: "Pricing — Guardian",
@@ -58,8 +59,8 @@ export default async function PricingPage() {
               Simple pricing for every vault
             </h1>
             <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-ink-muted sm:text-lg">
-              Start free. Upgrade when you need more analyses, Ask Gideon, and
-              Research. Cancel anytime from Settings.
+              Start free. Upgrade when you need more vault storage, analyses, Ask
+              Gideon, and Research. Cancel anytime from Settings.
             </p>
           </div>
         </section>
@@ -70,6 +71,7 @@ export default async function PricingPage() {
               const limits = PLAN_LIMITS[plan];
               const featured = plan === "personal";
               const features = [
+                `${formatStorageBytes(limits.storageBytes)} vault storage`,
                 `${limits.analyzePerMonth} document analyses / month`,
                 `${limits.chatPerMonth.toLocaleString("en-US")} Ask Gideon / chat turns`,
                 `${limits.researchPerMonth} Research briefs / month`,

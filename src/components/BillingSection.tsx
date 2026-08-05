@@ -9,6 +9,7 @@ import {
   type PaidPlanId,
   type PlanId,
 } from "@/lib/billing/plans";
+import { formatStorageBytes } from "@/lib/billing/storageFormat";
 
 type CatalogItem = {
   id: PaidPlanId;
@@ -18,6 +19,7 @@ type CatalogItem = {
     analyzePerMonth: number;
     chatPerMonth: number;
     researchPerMonth: number;
+    storageBytes: number;
   };
   canUpgradeTo: boolean;
 };
@@ -31,6 +33,7 @@ type StatusPayload = {
     analyzePerMonth: number;
     chatPerMonth: number;
     researchPerMonth: number;
+    storageBytes: number;
   };
   catalog: CatalogItem[];
   usage: {
@@ -234,7 +237,8 @@ export default function BillingSection() {
               <span className="font-semibold text-foreground">{c.label}</span>
               <span>{c.price}</span>
               <span>
-                · {c.limits.analyzePerMonth} analyses · {c.limits.chatPerMonth}{" "}
+                · {formatStorageBytes(c.limits.storageBytes)} storage ·{" "}
+                {c.limits.analyzePerMonth} analyses · {c.limits.chatPerMonth}{" "}
                 chat · {c.limits.researchPerMonth} research
               </span>
             </li>
