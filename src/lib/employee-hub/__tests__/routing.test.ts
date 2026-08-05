@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   EMPLOYEE_HUB_PATH,
+  employeeGideonHref,
   employeeInvoiceDocumentsHref,
   employeeInvoiceUploadHref,
   isEmployeeHubProfile,
@@ -56,5 +57,10 @@ describe("employee hub routing", () => {
       "/dashboard?docs=1&profileId=emp-1#documents-emp-1"
     );
     assert.equal(employeeInvoiceUploadHref("emp-1"), employeeInvoiceDocumentsHref("emp-1"));
+  });
+
+  it("builds employee Gideon links under the hub", () => {
+    assert.equal(employeeGideonHref("emp-1"), "/employee/ask?profileId=emp-1");
+    assert.equal(employeeGideonHref(), "/employee/ask");
   });
 });

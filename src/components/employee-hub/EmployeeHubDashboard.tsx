@@ -5,6 +5,7 @@ import { MessageCircle } from "lucide-react";
 import type { GuardianProfile } from "@/lib/profiles/types";
 import type { EmployeeHubEntitlements } from "@/lib/employee-hub/types";
 import { useEmployeeHubEntitlements } from "@/hooks/useEmployeeHubEntitlements";
+import { employeeGideonHref } from "@/lib/employee-hub/routing";
 import EmployeeTimeCard from "@/components/employee-hub/EmployeeTimeCard";
 import EmployeeLeavePanel from "@/components/employee-hub/EmployeeLeavePanel";
 import EmployeeStatusPanel from "@/components/employee-hub/EmployeeStatusPanel";
@@ -102,7 +103,7 @@ export default function EmployeeHubDashboard({
             </div>
           </div>
           <Link
-            href="/ask"
+            href={employeeGideonHref(employeeProfile.id)}
             className="mt-3 inline-flex rounded-full border border-stone-300 px-4 py-2 text-sm font-medium hover:bg-stone-50"
           >
             Open Gideon

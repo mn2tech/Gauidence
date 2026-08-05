@@ -16,6 +16,7 @@ import SimpleNavigation from "@/components/simple-home/SimpleNavigation";
 import SimpleNewMenu from "@/components/simple-home/SimpleNewMenu";
 import SimpleSecondaryNavLinks from "@/components/simple-home/SimpleSecondaryNavLinks";
 import { employeeShowsPowerNav } from "@/lib/employee-hub/entitlements";
+import { employeeGideonHref } from "@/lib/employee-hub/routing";
 import { SIMPLE_HOME_PATH } from "@/lib/simple-home/routing";
 
 export default function SiteHeader() {
@@ -103,7 +104,9 @@ export default function SiteHeader() {
       ? `/dashboard?camera=1#documents-${active.id}`
       : "/dashboard?camera=1";
   const documentsNavHref = documentsHref(active?.id);
-  const askHref = "/ask";
+  const askHref = isEmployeeVault
+    ? employeeGideonHref(active?.id)
+    : "/ask";
   const researchHref = needsSetup ? "/ask" : "/research";
 
   const linkClass =

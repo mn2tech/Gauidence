@@ -175,8 +175,6 @@ export async function canEditEmployeeEntitlements(
   return role === "owner" || role === "editor";
 }
 
-export type { EmployeeInvoiceDocument };
-
 export async function canAccessEmployeeInvoices(
   supabase: SupabaseClient,
   employeeProfileId: string,
@@ -238,4 +236,21 @@ export async function listEmployeeInvoices(
       document_type: analysis?.document_type ?? null,
     };
   });
+}
+
+export async function employeeGideonChatEnabled(
+  supabase: SupabaseClient,
+  employeeProfileId: string,
+  businessProfileId: string
+): Promise<boolean> {
+  let entitlements = await getEmployeeHubEntitlements(supabase, employeeProfileId);
+  if (!entitlements) {
+    await ensureEmployeeHubEntitlements(
+      supabase,
+      businessProfileId,
+      employeeProfileId
+    );
+    entitlements = await getEmployeeHubEntitlements(supabase, employeeProfileId);
+  }
+  return entitlements?.gideon_chat !== false;
 }
