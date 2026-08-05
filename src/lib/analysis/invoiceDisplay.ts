@@ -1,5 +1,7 @@
 import type { ExtractedFact } from "./types";
 import { normalizeFact } from "./normalize";
+import type { InvoiceRateSource } from "./invoiceLineRates";
+import { isPlausibleHourlyRate } from "./invoiceLineRates";
 
 function asNumber(v: unknown): number | null {
   if (typeof v === "number" && Number.isFinite(v)) return v;
@@ -8,6 +10,10 @@ function asNumber(v: unknown): number | null {
     return Number.isFinite(n) ? n : null;
   }
   return null;
+}
+
+function approxEqual(a: number, b: number): boolean {
+  return Math.abs(a - b) <= 0.02;
 }
 
 /** Build a single canonical fact list for invoices (no duplicates). Safe for client. */
@@ -148,6 +154,99 @@ export function buildInvoiceCanonicalFacts(
     confidence: direction === "unknown" ? 0.5 : 0.95,
     needs_verification: direction === "unknown",
   });
+
+  return facts;
+}
+
+function hourlyMoney(n: number): string {
+  return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/hr`;
+}
+
+/** Per-line facts with explicit rate provenance (document vs calculated/inferred). */
+export function buildInvoiceLineItemFacts(
+  specialist: Record<string, unknown>
+): ExtractedFact[] {
+  const lineItems = Array.isArray(specialist.line_items)
+    ? (specialist.line_items as Record<string, unknown>[])
+    : [];
+  if (lineItems.length === 0) return [];
+
+  const facts: ExtractedFact[] = [];
+  const push = (partial: Partial<ExtractedFact> & { label: string; value: string }) => {
+    const f = normalizeFact({
+      source_type: "document",
+      confidence: 0.9,
+      source_excerpt: "",
+      page_number: null,
+      needs_verification: false,
+      date: null,
+      is_deadline: false,
+      is_past_event: false,
+      ...partial,
+    });
+    if (f) facts.push(f);
+  };
+
+  for (const item of lineItems) {
+    const name = String(item.contractor ?? item.person_or_service ?? "Line item");
+    const hours = asNumber(item.hours) ?? asNumber(item.quantity);
+    const rate = asNumber(item.rate) ?? asNumber(item.unit_rate);
+    const amount = asNumber(item.amount) ?? asNumber(item.line_total);
+    const rateSource = (item.rate_source as InvoiceRateSource | undefined) ?? "document";
+    const rateNeedsVerification = Boolean(item.rate_needs_verification);
+    const impliedRate = asNumber(item.implied_rate);
+    const showImpliedRate =
+      impliedRate != null &&
+      isPlausibleHourlyRate(impliedRate) &&
+      (rate == null || (rateNeedsVerification && !approxEqual(impliedRate, rate)));
+
+    if (hours != null) {
+      push({
+        label: `${name} — hours`,
+        value: String(hours),
+        confidence: asNumber(item.confidence) ?? 0.9,
+        needs_verification: (asNumber(item.confidence) ?? 0.9) < 0.75,
+      });
+    }
+
+    if (amount != null && !Boolean(item.amount_needs_verification)) {
+      push({
+        label: `${name} — line amount`,
+        value: `$${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        confidence: asNumber(item.confidence) ?? 0.9,
+      });
+    }
+
+    if (rate != null && rateSource === "document") {
+      const mathOk = !rateNeedsVerification || !showImpliedRate;
+      push({
+        label: mathOk ? `${name} — rate` : `${name} — rate (from document)`,
+        value: hourlyMoney(rate),
+        confidence: rateNeedsVerification ? 0.4 : asNumber(item.confidence) ?? 0.9,
+        needs_verification: rateNeedsVerification,
+      });
+    }
+
+    if (rate != null && rateSource === "inferred") {
+      push({
+        label: `${name} — rate (inferred from line total ÷ hours)`,
+        value: hourlyMoney(rate),
+        source_type: "calculated",
+        confidence: 0.75,
+        needs_verification: true,
+      });
+    }
+
+    if (showImpliedRate) {
+      push({
+        label: `${name} — rate (calculated from line total ÷ hours)`,
+        value: hourlyMoney(impliedRate!),
+        source_type: "calculated",
+        confidence: 0.85,
+        needs_verification: true,
+      });
+    }
+  }
 
   return facts;
 }

@@ -150,6 +150,7 @@ function normalizeLineItems(raw: unknown): Record<string, unknown>[] {
       line_total: amount,
       person_or_service: contractor,
       confidence: asNumber(row.confidence) ?? 0.5,
+      rate_source: row.rate_source ?? "document",
     };
   });
 }
@@ -231,6 +232,7 @@ function reconcileWithAnchors(
         line_total: row.amount,
         person_or_service: row.contractor,
         confidence: 0.95,
+        rate_source: "document",
       }));
     }
   }

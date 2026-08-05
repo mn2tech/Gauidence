@@ -2,7 +2,8 @@ import type { GuardianAnalysis, GuardianStatus } from "./types";
 import { CONFIDENCE_MEDIUM } from "./types";
 import { daysRelativeTo } from "./dates";
 import { sanitizeAnalysisDates } from "./dateResolve";
-import { buildInvoiceCanonicalFacts } from "./invoiceDisplay";
+import { buildInvoiceCanonicalFacts, buildInvoiceLineItemFacts } from "./invoiceDisplay";
+import { applyLineItemRateClassification } from "./invoiceLineRates";
 
 const MONEY_TOLERANCE = 0.02;
 
@@ -45,6 +46,9 @@ export function validateAnalysis(
     let lineItemVerificationWarned = false;
 
     for (const item of lineItems) {
+      const classified = applyLineItemRateClassification(item);
+      Object.assign(item, classified);
+
       const hours = asNumber(item.hours) ?? asNumber(item.quantity);
       const rate = asNumber(item.rate) ?? asNumber(item.unit_rate);
       const amount = asNumber(item.amount) ?? asNumber(item.line_total);
@@ -166,7 +170,11 @@ export function validateAnalysis(
     );
     return {
       ...result,
-      facts: [...buildInvoiceCanonicalFacts(specialist), ...calculatedFacts],
+      facts: [
+        ...buildInvoiceCanonicalFacts(specialist),
+        ...buildInvoiceLineItemFacts(specialist),
+        ...calculatedFacts,
+      ],
       warnings,
       overall_confidence: overall,
       specialist,
