@@ -171,7 +171,7 @@ async function listChats(
 ): Promise<ChatSummary[]> {
   const { data } = await supabase
     .from("vault_chats")
-    .select("id, title, updated_at, created_at")
+    .select("id, title, updated_at, created_at, imported_from")
     .eq("user_id", userId)
     .eq("profile_id", profileId)
     .order("updated_at", { ascending: false })

@@ -2,7 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
-import { ChevronDown, MessageSquarePlus, Plus, Trash2 } from "lucide-react";
+import {
+  ChevronDown,
+  Import,
+  MessageSquarePlus,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import ProfileAvatar from "@/components/ProfileAvatar";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
@@ -20,6 +26,7 @@ import { useVaultSubVaultMenu } from "@/components/VaultSubVaultMenu";
 type ChatSummary = {
   id: string;
   title: string;
+  imported_from?: "chatgpt" | "claude" | null;
 };
 
 function CollapsibleSection({
@@ -341,6 +348,7 @@ type Props = {
   onNewChat: () => void;
   onSelectChat: (chatId: string) => void;
   onDeleteChat: (chatId: string, e: MouseEvent) => void;
+  onImportChats?: () => void;
   onSidebarAction?: () => void;
 };
 
@@ -353,6 +361,7 @@ export default function AskGideonSidebar({
   onNewChat,
   onSelectChat,
   onDeleteChat,
+  onImportChats,
   onSidebarAction,
 }: Props) {
   const vaultLabel = activeVaultName?.trim() || "this vault";
@@ -374,6 +383,20 @@ export default function AskGideonSidebar({
           <MessageSquarePlus className="h-4 w-4" />
           New chat
         </button>
+        {onImportChats ? (
+          <button
+            type="button"
+            onClick={() => {
+              onImportChats();
+              onSidebarAction?.();
+            }}
+            disabled={sending}
+            className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-full border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-stone-50 disabled:opacity-50"
+          >
+            <Import className="h-4 w-4" />
+            Import chats
+          </button>
+        ) : null}
       </div>
 
       <div
@@ -420,7 +443,12 @@ export default function AskGideonSidebar({
                       }}
                       className="min-w-0 flex-1 truncate px-2.5 py-2 text-left text-sm hover:text-foreground"
                     >
-                      {c.title || "New chat"}
+                      <span className="block truncate">{c.title || "New chat"}</span>
+                      {c.imported_from ? (
+                        <span className="block truncate text-[10px] font-medium uppercase tracking-wide text-ink-muted">
+                          From {c.imported_from === "chatgpt" ? "ChatGPT" : "Claude"}
+                        </span>
+                      ) : null}
                     </button>
                     <button
                       type="button"

@@ -46,7 +46,7 @@ import GideonWorkspaceTimeline, {
   type WorkspaceTimelineItem,
 } from "@/components/GideonWorkspaceTimeline";
 import CameraCaptureModal from "@/components/CameraCaptureModal";
-import VaultChatDrawer from "@/components/VaultChatDrawer";
+import VaultChatImportModal from "@/components/VaultChatImportModal";
 import ImminentReminderBanner from "@/components/ImminentReminderBanner";
 import {
   AskTitleProfileSwitch,
@@ -386,6 +386,7 @@ type ChatSummary = {
   title: string;
   updated_at: string;
   created_at: string;
+  imported_from?: "chatgpt" | "claude" | null;
 };
 
 type Meta = {
@@ -591,6 +592,7 @@ export default function VaultChatPanel({
   const [gideonWelcomeSeen, setGideonWelcomeSeen] = useState(readGideonWelcomeSeen);
   const [whyOpen, setWhyOpen] = useState(false);
   const [plusOpen, setPlusOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [logOpen, setLogOpen] = useState(false);
   const [logTitle, setLogTitle] = useState("");
@@ -1286,6 +1288,17 @@ export default function VaultChatPanel({
       }
     } catch {
       setError("Couldn't delete chat.");
+    }
+  };
+
+  const handleImportComplete = async (result: {
+    chatIds: string[];
+    chats: ChatSummary[];
+  }) => {
+    setChats(result.chats);
+    const firstImported = result.chatIds[0];
+    if (firstImported) {
+      await selectChat(firstImported);
     }
   };
 
@@ -3328,6 +3341,7 @@ export default function VaultChatPanel({
       onNewChat={() => void startNewChat()}
       onSelectChat={(id) => void selectChat(id)}
       onDeleteChat={(id, e) => void deleteChat(id, e)}
+      onImportChats={() => setImportOpen(true)}
       onSidebarAction={() => setSidebarOpen(false)}
     />
   );
@@ -3664,6 +3678,19 @@ export default function VaultChatPanel({
                     <Bell className="h-4 w-4 text-brand" />
                     Add reminder
                   </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={vaultBusy || sending || !profileId}
+                    onClick={() => {
+                      setPlusOpen(false);
+                      setImportOpen(true);
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-medium text-foreground hover:bg-stone-50 disabled:opacity-50"
+                  >
+                    <FileUp className="h-4 w-4 text-brand" />
+                    Import ChatGPT / Claude
+                  </button>
                 </div>
               )}
             </div>
@@ -3917,6 +3944,12 @@ export default function VaultChatPanel({
           </form>
         </div>
       ) : null}
+      <VaultChatImportModal
+        open={importOpen}
+        profileId={vaultProfileId ?? profileId}
+        onClose={() => setImportOpen(false)}
+        onImported={(result) => void handleImportComplete(result)}
+      />
     </>
   );
 
