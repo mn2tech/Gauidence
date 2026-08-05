@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveGuardianProfile } from "@/lib/profiles/server";
 import { isEmployeeHubProfile } from "@/lib/employee-hub/routing";
+import { getEmployeeHubEntitlements } from "@/lib/employee-hub/server";
 import SiteHeader from "@/components/SiteHeader";
 import VaultChatPanel from "@/components/VaultChatPanel";
 
@@ -24,7 +25,10 @@ export default async function AskGideonPage() {
 
   const active = await getActiveGuardianProfile(supabase, user);
   if (isEmployeeHubProfile(active)) {
-    redirect("/employee");
+    const entitlements = await getEmployeeHubEntitlements(supabase, active.id);
+    if (entitlements && !entitlements.gideon_chat) {
+      redirect("/employee");
+    }
   }
 
   return (
