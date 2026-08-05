@@ -13,11 +13,13 @@ import EmployeeInvoicePanel from "@/components/employee-hub/EmployeeInvoicePanel
 type Props = {
   employeeProfile: GuardianProfile;
   businessProfileId: string;
+  userId: string;
 };
 
 export default function EmployeeHubDashboard({
   employeeProfile,
   businessProfileId,
+  userId,
 }: Props) {
   const { entitlements, loading } = useEmployeeHubEntitlements(
     employeeProfile.id,
@@ -58,7 +60,12 @@ export default function EmployeeHubDashboard({
       ) : null}
 
       {e.invoice_upload ? (
-        <EmployeeInvoicePanel profileId={employeeProfile.id} />
+        <EmployeeInvoicePanel
+          profileId={employeeProfile.id}
+          ownerUserId={employeeProfile.owner_user_id}
+          userId={userId}
+          showVaultLink={e.documents}
+        />
       ) : null}
 
       <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">

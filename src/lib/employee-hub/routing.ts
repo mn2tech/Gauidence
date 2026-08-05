@@ -4,14 +4,18 @@ export const EMPLOYEE_HUB_PATH = "/employee";
 
 export type PostLoginPath = typeof EMPLOYEE_HUB_PATH | "/ask";
 
-/** Deep link into the employee vault files section with camera open. */
-export function employeeInvoiceUploadHref(employeeProfileId: string): string {
+/** Deep link into the employee vault files section (no auto camera). */
+export function employeeInvoiceDocumentsHref(employeeProfileId: string): string {
   const q = new URLSearchParams({
     docs: "1",
-    camera: "1",
     profileId: employeeProfileId,
   });
   return `/dashboard?${q.toString()}#documents-${employeeProfileId}`;
+}
+
+/** @deprecated Use employeeInvoiceDocumentsHref; kept for existing links. */
+export function employeeInvoiceUploadHref(employeeProfileId: string): string {
+  return employeeInvoiceDocumentsHref(employeeProfileId);
 }
 
 export function isEmployeeHubProfile(

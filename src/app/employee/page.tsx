@@ -32,6 +32,7 @@ export default async function EmployeeHubPage() {
           <EmployeeHubDashboard
             employeeProfile={active}
             businessProfileId={active.parent_profile_id}
+            userId={user.id}
           />
         </section>
       </main>
