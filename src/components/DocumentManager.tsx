@@ -44,6 +44,10 @@ import MoveDocumentButton from "@/components/MoveDocumentButton";
 import OrganizationSuggestionModal from "@/components/OrganizationSuggestionModal";
 import SearchHighlight from "@/components/SearchHighlight";
 import { syncDocumentAwards } from "@/lib/awards/client";
+import {
+  checkVaultStorageQuota,
+  isStorageLimitError,
+} from "@/lib/billing/storageClient";
 import { notifyVaultActivityClient } from "@/lib/vault/clientNotifyActivity";
 import type { OrganizationSuggestionPayload } from "@/lib/organization/types";
 
@@ -346,6 +350,22 @@ export default function DocumentManager({
     }
 
     setUploading(true);
+    try {
+      await checkVaultStorageQuota({
+        additionalBytes: file.size,
+        storageOwnerId: ownerUserId,
+      });
+    } catch (err) {
+      setUploading(false);
+      setError(
+        isStorageLimitError(err) && err instanceof Error
+          ? err.message
+          : "Couldn't verify storage space. Please try again.",
+        isStorageLimitError(err) ? "storage_limit" : undefined
+      );
+      return;
+    }
+
     const safeName = file.name.replace(/[^\w.\- ]/g, "_");
     const storageOwner = ownerUserId || userId;
     const path = `${storageOwner}/${profileId}/${crypto.randomUUID()}-${safeName}`;
@@ -380,10 +400,16 @@ export default function DocumentManager({
       if (insertError || !inserted) {
         // Don't leave an orphaned file behind if the record failed.
         await supabase.storage.from("documents").remove([path]);
+        const detail = insertError?.message?.trim();
         setError(
-          insertError?.message
-            ? `We couldn't save the document record: ${insertError.message}`
-            : "We couldn't save the document record. Please try again."
+          detail && /storage_limit_exceeded|vault storage limit/i.test(detail)
+            ? "You've reached your vault storage limit. Open Settings → Storage to review usage or upgrade your plan."
+            : detail
+              ? `We couldn't save the document record: ${detail}`
+              : "We couldn't save the document record. Please try again.",
+          detail && /storage_limit_exceeded|vault storage limit/i.test(detail)
+            ? "storage_limit"
+            : undefined
         );
         setUploading(false);
         return;

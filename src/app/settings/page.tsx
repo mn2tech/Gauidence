@@ -7,6 +7,7 @@ import SiteFooter from "@/components/SiteFooter";
 import SettingsForm from "@/components/SettingsForm";
 import NotificationSettings from "@/components/NotificationSettings";
 import BillingSection from "@/components/BillingSection";
+import StorageSection from "@/components/StorageSection";
 import ShareGuardianCard from "@/components/ShareGuardianCard";
 import { isPlatformAdmin } from "@/lib/admin";
 import {
@@ -82,6 +83,7 @@ export default async function SettingsPage() {
             >
               <BillingSection />
             </Suspense>
+            <StorageSection />
             <ShareGuardianCard
               shareUrl={guardianTryUrl(guardianReferralCode(user.id))}
             />

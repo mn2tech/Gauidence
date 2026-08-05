@@ -8,11 +8,11 @@ const LEGACY_UPGRADE_SUFFIX_ALT =
   / Upgrade your plan in Settings for a higher monthly allowance\.?$/;
 
 export function isPlanLimitCode(code?: string | null): boolean {
-  return code === "plan_limit";
+  return code === "plan_limit" || code === "storage_limit";
 }
 
 export function isPlanLimitMessage(message: string): boolean {
-  return PLAN_LIMIT_MESSAGE.test(message);
+  return PLAN_LIMIT_MESSAGE.test(message) || /vault storage/i.test(message);
 }
 
 export function normalizePlanLimitMessage(message: string): string {

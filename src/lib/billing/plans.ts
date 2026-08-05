@@ -14,6 +14,8 @@ export type PlanLimits = {
   analyzePerHour: number;
   chatPerHour: number;
   researchPerHour: number;
+  /** Total vault file storage for the account (bytes). */
+  storageBytes: number;
 };
 
 export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
@@ -24,6 +26,7 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
     analyzePerHour: 5,
     chatPerHour: 10,
     researchPerHour: 3,
+    storageBytes: 1 * 1024 * 1024 * 1024,
   },
   personal: {
     analyzePerMonth: 100,
@@ -32,6 +35,7 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
     analyzePerHour: 20,
     chatPerHour: 60,
     researchPerHour: 20,
+    storageBytes: 10 * 1024 * 1024 * 1024,
   },
   family: {
     analyzePerMonth: 200,
@@ -40,6 +44,7 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
     analyzePerHour: 30,
     chatPerHour: 80,
     researchPerHour: 30,
+    storageBytes: 25 * 1024 * 1024 * 1024,
   },
   business: {
     analyzePerMonth: 500,
@@ -48,6 +53,7 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
     analyzePerHour: 40,
     chatPerHour: 120,
     researchPerHour: 40,
+    storageBytes: 50 * 1024 * 1024 * 1024,
   },
 };
 

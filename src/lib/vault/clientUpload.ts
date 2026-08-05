@@ -20,6 +20,10 @@ export {
 
 import type { OrganizationSuggestionPayload } from "@/lib/organization/types";
 import { ANALYZE_CLIENT_TIMEOUT_MS } from "@/lib/analysis/timeout";
+import {
+  checkVaultStorageQuota,
+  isStorageLimitError,
+} from "@/lib/billing/storageClient";
 import { notifyVaultActivityClient } from "@/lib/vault/clientNotifyActivity";
 import type { Fact } from "@/lib/analysis/types";
 
@@ -68,6 +72,20 @@ export async function uploadAndAnalyzeToVault(args: {
     throw new Error("That file is larger than 15 MB. Please upload a smaller file.");
   }
 
+  try {
+    await checkVaultStorageQuota({
+      additionalBytes: args.file.size,
+      storageOwnerId: args.ownerUserId,
+    });
+  } catch (err) {
+    if (isStorageLimitError(err)) {
+      throw err instanceof Error
+        ? err
+        : new Error("Vault storage limit reached.");
+    }
+    throw new Error("Couldn't verify storage space. Please try again.");
+  }
+
   args.onStatus?.("Uploading to your vault…");
   const safeName = args.file.name.replace(/[^\w.\- ]/g, "_");
   const storageOwner = args.ownerUserId || args.userId;
@@ -101,6 +119,11 @@ export async function uploadAndAnalyzeToVault(args: {
   if (insertError || !inserted) {
     await supabase.storage.from("documents").remove([path]);
     const detail = insertError?.message?.trim();
+    if (detail && /storage_limit_exceeded|vault storage limit/i.test(detail)) {
+      throw new Error(
+        "You've reached your vault storage limit. Delete files in Settings → Storage or upgrade your plan."
+      );
+    }
     console.error(
       "Vault document insert failed:",
       insertError?.code,
