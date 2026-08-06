@@ -39,6 +39,7 @@ export type WorkspaceContextBlocks = {
   linkedProfiles: string;
   vaultMap: string;
   workMemory: string;
+  structuredKnowledge: string;
 };
 
 /** Options that modify how the system prompt is assembled. */

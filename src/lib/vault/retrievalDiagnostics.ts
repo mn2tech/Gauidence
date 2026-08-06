@@ -15,6 +15,7 @@ export type RetrievalDiagnostics = {
   embeddingDurationMs: number;
   contextBuildDurationMs: number;
   embeddingCache: EmbeddingCacheStats;
+  knowledgeCandidateCount?: number;
 };
 
 export function isRetrievalDiagnosticsEnabled(): boolean {

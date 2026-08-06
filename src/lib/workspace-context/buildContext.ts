@@ -13,6 +13,9 @@ import {
   hashQueryForDiagnostics,
   logRetrievalDiagnostics,
 } from "@/lib/vault/retrievalDiagnostics";
+import { isKnowledgeEngineV2Enabled } from "@/lib/features/knowledge-engine-v2";
+import { retrieveStructuredKnowledge } from "@/lib/knowledge/v2/retrieve";
+import { formatKnowledgeForGideon } from "@/lib/knowledge/v2/formatForGideon";
 import {
   formatClientRequestsForGideon,
   loadActiveClientRequestsForGideon,
@@ -107,6 +110,7 @@ export async function loadWorkspaceContext(
   let vectorCandidateCount = 0;
   let keywordCandidateCount = 0;
   let mergedCandidateCount = 0;
+  let knowledgeCandidateCount = 0;
 
   const embeddingStarted = Date.now();
   const queryEmbedding =
@@ -149,6 +153,19 @@ export async function loadWorkspaceContext(
 
   const chunks = mergePinnedChunks(attachedDoc?.chunks ?? [], retrievedChunks);
   const formatted = formatRetrievalContext(chunks);
+
+  let structuredKnowledgeContext = "(none)";
+  if (isKnowledgeEngineV2Enabled()) {
+    const knowledge = await retrieveStructuredKnowledge(supabase, {
+      question: retrievalQuestion,
+      profileIds: searchProfileIds,
+    });
+    knowledgeCandidateCount = knowledge.facts.length;
+    structuredKnowledgeContext = formatKnowledgeForGideon(
+      knowledge,
+      profileNames
+    );
+  }
 
   const { logs: dailyLogs, authorNames } = await retrieveRelevantDailyLogs(
     supabase,
@@ -314,6 +331,7 @@ Active vault in the UI: ${activeProfile.display_name}. Document search includes 
       workMemory:
         workMemoryContext.trim() ||
         "(none — user has no active work projects)",
+      structuredKnowledge: structuredKnowledgeContext,
     },
     promptOptions: {
       timeZone,
@@ -345,6 +363,7 @@ Active vault in the UI: ${activeProfile.display_name}. Document search includes 
     embeddingDurationMs,
     contextBuildDurationMs,
     embeddingCache: getEmbeddingCacheStats(),
+    knowledgeCandidateCount,
   });
 
   return { context, chunks };

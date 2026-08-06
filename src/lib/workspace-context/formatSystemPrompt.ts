@@ -90,7 +90,11 @@ ${blocks.vaultMap}
 
 --- WORK MEMORY (user's active projects and recent sessions) ---
 ${blocks.workMemory}
---- END WORK MEMORY ---`;
+--- END WORK MEMORY ---
+
+--- STRUCTURED KNOWLEDGE (verified facts from the knowledge graph; always cite the source document named here — do not state facts without source provenance) ---
+${blocks.structuredKnowledge}
+--- END STRUCTURED KNOWLEDGE ---`;
 }
 
 /** Suggested max tokens based on prompt options. */

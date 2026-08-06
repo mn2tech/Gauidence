@@ -53,6 +53,14 @@ export default async function SettingsPage() {
               Manage people & spaces →
             </a>
           </p>
+          <p className="mt-2">
+            <a
+              href="/settings/knowledge"
+              className="text-sm font-semibold text-brand hover:text-brand-dark"
+            >
+              Knowledge Engine →
+            </a>
+          </p>
           {showUsage ? (
             <>
               <p className="mt-2">

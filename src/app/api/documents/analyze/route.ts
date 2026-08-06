@@ -327,6 +327,14 @@ export async function POST(request: Request) {
         )
     );
 
+    void import("@/lib/knowledge/v2/trigger").then(({ triggerKnowledgeEngineV2 }) =>
+      triggerKnowledgeEngineV2(supabase, {
+        documentId: doc.id,
+        profileId,
+        userId: user.id,
+      })
+    );
+
     return NextResponse.json({
       summary: analysis.summary,
       facts,
