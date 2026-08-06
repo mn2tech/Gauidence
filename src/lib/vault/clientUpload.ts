@@ -19,41 +19,28 @@ export {
 } from "@/lib/vault/pastedText";
 
 import type { OrganizationSuggestionPayload } from "@/lib/organization/types";
-import { ANALYZE_CLIENT_TIMEOUT_MS } from "@/lib/analysis/timeout";
 import {
   checkVaultStorageQuota,
   isStorageLimitError,
 } from "@/lib/billing/storageClient";
 import { notifyVaultActivityClient } from "@/lib/vault/clientNotifyActivity";
 import type { Fact } from "@/lib/analysis/types";
+import {
+  scheduleDocumentAnalysis,
+  type VaultUploadResult,
+} from "@/lib/documents/clientProcessing";
 
-export type VaultUploadResult = {
-  documentId: string;
-  fileName: string;
-  analyzed: boolean;
-  analysisError?: string;
-  organizationSuggestion?: OrganizationSuggestionPayload | null;
-  organizationAutoApplied?: boolean;
-  summary?: string | null;
-  title?: string | null;
-  facts?: Fact[];
-  documentType?: string | null;
-  classificationConfidence?: number | null;
-  overallConfidence?: number | null;
-};
+export type { VaultUploadResult };
 
 /**
- * Upload a file into the active profile vault and run analysis once.
- * Used by Documents and Ask Gideon inline attach.
+ * Upload a file into the active profile vault and queue background analysis.
  */
 export async function uploadAndAnalyzeToVault(args: {
   userId: string;
   profileId: string;
-  /** Vault owner account id — used for storage path so editors write into the shared vault folder. */
   ownerUserId?: string;
   file: File;
   onStatus?: (label: string) => void;
-  /** When false, save to the vault without waiting for Gideon analysis (e.g. request attachments). */
   analyze?: boolean;
 }): Promise<VaultUploadResult> {
   const supabase = createClient();
@@ -124,13 +111,6 @@ export async function uploadAndAnalyzeToVault(args: {
         "You've reached your vault storage limit. Delete files in Settings → Storage or upgrade your plan."
       );
     }
-    console.error(
-      "Vault document insert failed:",
-      insertError?.code,
-      detail,
-      insertError?.details,
-      insertError?.hint
-    );
     throw new Error(
       detail
         ? `We couldn't save the document record: ${detail}`
@@ -153,72 +133,16 @@ export async function uploadAndAnalyzeToVault(args: {
     };
   }
 
-  args.onStatus?.("Reading the document…");
-  try {
-    const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), ANALYZE_CLIENT_TIMEOUT_MS);
-    let res: Response;
-    try {
-      res = await fetch("/api/documents/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          documentId: inserted.id,
-          timeZone: GUARDIAN_TIME_ZONE,
-        }),
-        signal: controller.signal,
-      });
-    } finally {
-      window.clearTimeout(timeoutId);
-    }
+  args.onStatus?.("Upload complete — processing in the background…");
+  const scheduled = await scheduleDocumentAnalysis(inserted.id);
 
-    if (!res.ok) {
-      const body = (await res.json().catch(() => ({}))) as { error?: string };
-      return {
-        documentId: inserted.id,
-        fileName: inserted.file_name,
-        analyzed: false,
-        analysisError:
-          body.error ??
-          (res.status === 504
-            ? "Analysis took too long. Try again from Documents, or upload a clearer photo."
-            : "Analysis failed. You can retry from Documents."),
-      };
-    }
-
-    const body = (await res.json().catch(() => ({}))) as {
-      organizationSuggestion?: OrganizationSuggestionPayload | null;
-      organizationAutoApplied?: boolean;
-      summary?: string;
-      title?: string;
-      facts?: Fact[];
-      documentType?: string;
-      classificationConfidence?: number;
-      overallConfidence?: number;
-    };
-
-    return {
-      documentId: inserted.id,
-      fileName: inserted.file_name,
-      analyzed: true,
-      organizationSuggestion: body.organizationSuggestion ?? null,
-      organizationAutoApplied: Boolean(body.organizationAutoApplied),
-      summary: body.summary ?? null,
-      title: body.title ?? null,
-      facts: Array.isArray(body.facts) ? body.facts : [],
-      documentType: body.documentType ?? null,
-      classificationConfidence: body.classificationConfidence ?? null,
-      overallConfidence: body.overallConfidence ?? null,
-    };
-  } catch (err) {
-    const timedOut = err instanceof DOMException && err.name === "AbortError";
-    return {
-      documentId: inserted.id,
-      fileName: inserted.file_name,
-      analyzed: false,
-      analysisError: timedOut
-        ? "Analysis took too long. Try again from Documents, or upload a clearer photo."
-        : "Analysis didn't finish. The file is in your vault — retry from Documents.",
-    };
-  }
+  return {
+    documentId: inserted.id,
+    fileName: inserted.file_name,
+    analyzed: scheduled.queued,
+    queued: scheduled.queued,
+    processingStage: scheduled.processingStage,
+    processingLabel: scheduled.processingLabel,
+    analysisError: scheduled.error,
+  };
 }

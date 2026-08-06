@@ -1,12 +1,17 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import {
+  enqueueAnalyzePipeline,
+  processPendingDocumentJobs,
+  retryDocumentProcessing,
+} from "@/lib/documents/processingJobs";
 
 export const runtime = "nodejs";
 
 const STUCK_THRESHOLD_MS = 20 * 60 * 1000;
-const MAX_AUTO_RETRIES = 3;
+const MAX_BATCH = 20;
 
-type RetryMode = "failed" | "uploaded" | "stuck" | "all";
+type RetryMode = "failed" | "uploaded" | "stuck" | "all" | "indexing" | "knowledge";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -33,7 +38,9 @@ export async function POST(request: Request) {
 
   let query = supabase
     .from("documents")
-    .select("id, file_name, analysis_status, created_at, profile_id");
+    .select(
+      "id, file_name, analysis_status, indexing_status, knowledge_status, created_at, profile_id"
+    );
 
   if (body.documentIds?.length) {
     query = query.in("id", body.documentIds);
@@ -41,50 +48,93 @@ export async function POST(request: Request) {
     query = query.eq("analysis_status", "failed");
   } else if (mode === "uploaded") {
     query = query.eq("analysis_status", "uploaded");
+  } else if (mode === "indexing") {
+    query = query.in("indexing_status", ["failed", "retryable"]);
+  } else if (mode === "knowledge") {
+    query = query.in("knowledge_status", ["failed", "retryable"]);
   } else if (mode === "stuck") {
-    query = query.eq("analysis_status", "analyzing").lt("created_at", threshold);
+    query = query
+      .in("analysis_status", [
+        "extracting",
+        "classifying",
+        "analyzing",
+        "validating",
+        "queued",
+      ])
+      .lt("processing_started_at", threshold);
   } else {
-    query = query.in("analysis_status", [
-      "failed",
-      "uploaded",
-      "analyzing",
-    ]);
+    query = query.or(
+      "analysis_status.eq.failed,analysis_status.eq.uploaded,indexing_status.in.(failed,retryable),knowledge_status.in.(failed,retryable)"
+    );
   }
 
-  const { data: docs, error } = await query.limit(50);
+  const { data: docs, error } = await query.limit(MAX_BATCH);
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const eligible = (docs ?? []).filter((doc) => {
-    if (doc.analysis_status === "analyzing") {
-      return doc.created_at && doc.created_at < threshold;
+  const results: { id: string; fileName: string; stage: string }[] = [];
+
+  for (const doc of docs ?? []) {
+    let stage: "analyze_document" | "index_document" | "extract_knowledge" =
+      "analyze_document";
+
+    if (
+      doc.analysis_status === "completed" ||
+      doc.analysis_status === "needs_verification"
+    ) {
+      if (["failed", "retryable"].includes(doc.indexing_status ?? "")) {
+        stage = "index_document";
+      } else if (["failed", "retryable"].includes(doc.knowledge_status ?? "")) {
+        stage = "extract_knowledge";
+      } else if (doc.analysis_status === "uploaded") {
+        stage = "analyze_document";
+      } else {
+        continue;
+      }
+    } else if (
+      doc.analysis_status === "failed" ||
+      doc.analysis_status === "uploaded" ||
+      doc.analysis_status === "queued"
+    ) {
+      stage = "analyze_document";
+    } else {
+      stage = "analyze_document";
     }
-    return true;
-  });
 
-  const results: { id: string; fileName: string; status: string }[] = [];
-
-  for (const doc of eligible.slice(0, MAX_AUTO_RETRIES * 10)) {
-    if (doc.analysis_status === "analyzing") {
-      await supabase
-        .from("documents")
-        .update({
-          analysis_status: "uploaded",
-        })
-        .eq("id", doc.id);
+    if (stage === "analyze_document" && doc.analysis_status === "uploaded") {
+      await enqueueAnalyzePipeline(supabase, {
+        documentId: doc.id,
+        profileId: doc.profile_id,
+        userId: user.id,
+      });
+    } else {
+      await retryDocumentProcessing(supabase, {
+        documentId: doc.id,
+        profileId: doc.profile_id,
+        userId: user.id,
+        stage,
+      });
     }
 
     results.push({
       id: doc.id,
       fileName: doc.file_name,
-      status: "queued_for_retry",
+      stage,
     });
   }
+
+  void processPendingDocumentJobs(supabase, user.id, { limit: 2 }).catch(
+    (err) => {
+      console.error(
+        "Retry processing drain failed:",
+        err instanceof Error ? err.message : "error"
+      );
+    }
+  );
 
   return NextResponse.json({
     queued: results.length,
     documents: results,
-    note: "Re-trigger analysis from the Documents UI for each queued document.",
   });
 }

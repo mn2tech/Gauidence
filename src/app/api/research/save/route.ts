@@ -182,7 +182,10 @@ export async function POST(request: Request) {
       }),
     });
     if (analyzeRes.ok) {
-      analyzed = true;
+      const body = (await analyzeRes.json().catch(() => ({}))) as {
+        queued?: boolean;
+      };
+      analyzed = Boolean(body.queued ?? true);
     } else {
       const analyzeBody = (await analyzeRes.json().catch(() => ({}))) as {
         error?: string;

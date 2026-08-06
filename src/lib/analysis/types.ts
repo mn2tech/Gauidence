@@ -51,6 +51,7 @@ export type GuardianStatus =
 
 export type AnalysisStatus =
   | "uploaded"
+  | "queued"
   | "extracting"
   | "classifying"
   | "analyzing"
@@ -105,6 +106,7 @@ export const CLASSIFY_ROUTE_THRESHOLD = 0.8;
 
 export const ANALYSIS_STATUS_LABELS: Record<AnalysisStatus, string> = {
   uploaded: "Upload complete",
+  queued: "Waiting for analysis",
   extracting: "Reading document",
   classifying: "Identifying document type",
   analyzing: "Extracting important details",

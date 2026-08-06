@@ -50,6 +50,8 @@ import {
 } from "@/lib/billing/storageClient";
 import { notifyVaultActivityClient } from "@/lib/vault/clientNotifyActivity";
 import type { OrganizationSuggestionPayload } from "@/lib/organization/types";
+import { scheduleDocumentAnalysis } from "@/lib/documents/clientProcessing";
+import { useDocumentProcessingPoll } from "@/hooks/useDocumentProcessingPoll";
 
 type DocumentRow = {
   id: string;
@@ -65,13 +67,12 @@ type DocumentRow = {
 type SortKey = "newest" | "oldest" | "name" | "largest";
 
 const IN_PROGRESS_ANALYSIS: AnalysisStatus[] = [
+  "queued",
   "extracting",
   "classifying",
   "analyzing",
   "validating",
 ];
-
-import { ANALYZE_CLIENT_TIMEOUT_MS } from "@/lib/analysis/timeout";
 
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "newest", label: "Newest first" },
@@ -201,6 +202,28 @@ export default function DocumentManager({
   const [organizationSuggestion, setOrganizationSuggestion] =
     useState<OrganizationSuggestionPayload | null>(null);
   const [orgNotice, setOrgNotice] = useState<string | null>(null);
+  const [uploadToast, setUploadToast] = useState<string | null>(null);
+
+  const activeDocumentIds = documents
+    .filter((d) => {
+      if (IN_PROGRESS_ANALYSIS.includes(d.analysis_status)) return true;
+      if (d.analysis_status === "uploaded") return true;
+      const snap = processingStatuses[d.id];
+      if (snap?.active) return true;
+      if (
+        (d.analysis_status === "completed" ||
+          d.analysis_status === "needs_verification") &&
+        snap &&
+        !snap.searchable
+      ) {
+        return true;
+      }
+      return false;
+    })
+    .map((d) => d.id);
+
+  const { statuses: processingStatuses, markActive, refreshStatus } =
+    useDocumentProcessingPoll(activeDocumentIds);
 
   const loadDocuments = useCallback(async () => {
     if (!supabase || !profileId) return;
@@ -223,15 +246,7 @@ export default function DocumentManager({
       setError("We couldn't load your documents. Refresh the page to try again.");
     } else {
       const rows = (docsRes.data ?? []).map((d) => {
-        let status = (d.analysis_status as AnalysisStatus) ?? "uploaded";
-        // Recover stuck in-progress rows left by a timed-out or killed request.
-        if (IN_PROGRESS_ANALYSIS.includes(status)) {
-          status = "failed";
-          void supabase
-            .from("documents")
-            .update({ analysis_status: "failed" })
-            .eq("id", d.id);
-        }
+        const status = (d.analysis_status as AnalysisStatus) ?? "uploaded";
         return {
           ...d,
           analysis_status: status,
@@ -262,6 +277,48 @@ export default function DocumentManager({
     setLoading(true);
     void loadDocuments();
   }, [loadDocuments]);
+
+  useEffect(() => {
+    const entries = Object.values(processingStatuses);
+    if (entries.length === 0) return;
+
+    setDocuments((docs) =>
+      docs.map((d) => {
+        const snap = processingStatuses[d.id];
+        if (!snap) return d;
+        return {
+          ...d,
+          analysis_status: snap.analysisStatus as AnalysisStatus,
+        };
+      })
+    );
+
+    setAnalyses((prev) => {
+      const next = { ...prev };
+      for (const snap of entries) {
+        if (!snap.searchable && !snap.summary) continue;
+        next[snap.documentId] = {
+          summary: snap.summary ?? prev[snap.documentId]?.summary ?? "",
+          facts: (snap.facts as Fact[]) ?? prev[snap.documentId]?.facts ?? [],
+          model: snap.model ?? prev[snap.documentId]?.model ?? null,
+          title: snap.title ?? prev[snap.documentId]?.title,
+          documentType:
+            snap.documentType ?? prev[snap.documentId]?.documentType,
+          guardianStatus: prev[snap.documentId]?.guardianStatus,
+          overallConfidence: prev[snap.documentId]?.overallConfidence,
+          classificationConfidence:
+            prev[snap.documentId]?.classificationConfidence,
+        };
+      }
+      return next;
+    });
+  }, [processingStatuses]);
+
+  useEffect(() => {
+    if (!uploadToast) return;
+    const timer = window.setTimeout(() => setUploadToast(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [uploadToast]);
 
   useEffect(() => {
     if (!highlightDocumentId || loading) return;
@@ -425,7 +482,9 @@ export default function DocumentManager({
       });
       if (fileInputRef.current) fileInputRef.current.value = "";
       if (cameraInputRef.current) cameraInputRef.current.value = "";
-      // Auto-analyze once after upload — not on every page load.
+      setUploadToast(
+        "Upload complete. Guardian is processing this document in the background."
+      );
       void handleAnalyze({
         ...inserted,
         analysis_status: (inserted.analysis_status as AnalysisStatus) ?? "uploaded",
@@ -607,164 +666,32 @@ export default function DocumentManager({
   async function handleAnalyze(doc: DocumentRow) {
     setError(null);
     setAnalyzingId(doc.id);
-    setProgressLabel(ANALYSIS_STATUS_LABELS.extracting);
+    setProgressLabel("Waiting for analysis");
     setDocuments((docs) =>
       docs.map((d) =>
-        d.id === doc.id ? { ...d, analysis_status: "extracting" } : d
+        d.id === doc.id ? { ...d, analysis_status: "queued" } : d
       )
     );
 
-    const stages: AnalysisStatus[] = [
-      "extracting",
-      "classifying",
-      "analyzing",
-      "validating",
-    ];
-    let stageIdx = 0;
-    const progressTimer = window.setInterval(() => {
-      stageIdx = Math.min(stageIdx + 1, stages.length - 1);
-      setProgressLabel(ANALYSIS_STATUS_LABELS[stages[stageIdx]]);
-    }, 2500);
+    const scheduled = await scheduleDocumentAnalysis(doc.id);
+    markActive(doc.id);
 
-    try {
-      const controller = new AbortController();
-      const timeoutId = window.setTimeout(
-        () => controller.abort(),
-        ANALYZE_CLIENT_TIMEOUT_MS
-      );
-      let res: Response;
-      try {
-        res = await fetch("/api/documents/analyze", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            documentId: doc.id,
-            timeZone: GUARDIAN_TIME_ZONE,
-          }),
-          signal: controller.signal,
-        });
-      } finally {
-        window.clearTimeout(timeoutId);
-      }
-      let body: {
-        error?: string;
-        code?: string;
-        summary?: string;
-        facts?: Analysis["facts"];
-        model?: string;
-        title?: string;
-        documentType?: string;
-        guardianStatus?: string;
-        overallConfidence?: number;
-        classificationConfidence?: number;
-        category?: string | null;
-        analysisStatus?: AnalysisStatus;
-        organizationSuggestion?: OrganizationSuggestionPayload | null;
-        organizationAutoApplied?: boolean;
-      } = {};
-      try {
-        body = await res.json();
-      } catch {
-        setError(
-          res.ok
-            ? "Analysis finished but returned an unexpected response. Please try again."
-            : res.status === 504
-              ? "Analysis took too long on this file. Try again, or upload a clearer photo or smaller PDF."
-              : "The analysis service failed. Please try again in a moment."
-        );
-        setDocuments((docs) =>
-          docs.map((d) =>
-            d.id === doc.id ? { ...d, analysis_status: "failed" } : d
-          )
-        );
-        return;
-      }
-      if (!res.ok) {
-        setError(body.error ?? "Analysis failed. Please try again.", body.code);
-        setDocuments((docs) =>
-          docs.map((d) =>
-            d.id === doc.id ? { ...d, analysis_status: "failed" } : d
-          )
-        );
-      } else {
-        setAnalyses((prev) => ({
-          ...prev,
-          [doc.id]: {
-            summary: body.summary ?? "",
-            facts: body.facts ?? [],
-            model: body.model ?? null,
-            title: body.title,
-            documentType: body.documentType,
-            guardianStatus: body.guardianStatus as GuardianStatus | undefined,
-            overallConfidence: body.overallConfidence,
-            classificationConfidence: body.classificationConfidence,
-          },
-        }));
-        if (body.category && !doc.category) {
-          const category = body.category;
-          setDocuments((docs) =>
-            docs.map((d) =>
-              d.id === doc.id
-                ? {
-                    ...d,
-                    category,
-                    analysis_status: body.analysisStatus ?? "completed",
-                  }
-                : d
-            )
-          );
-        } else {
-          setDocuments((docs) =>
-            docs.map((d) =>
-              d.id === doc.id
-                ? { ...d, analysis_status: body.analysisStatus ?? "completed" }
-                : d
-            )
-          );
-        }
-        setExpandedId(doc.id);
-        notifyAlertsUpdated();
-        const isFirstDocument =
-          documents.filter((d) => d.id !== doc.id).length === 0;
-        if (
-          !isFirstDocument &&
-          body.organizationSuggestion &&
-          (body.organizationSuggestion.status === "pending" ||
-            body.organizationAutoApplied)
-        ) {
-          setOrganizationSuggestion({
-            ...body.organizationSuggestion,
-            autoApplied: Boolean(body.organizationAutoApplied),
-          });
-        }
-        if (
-          !isFirstDocument &&
-          body.organizationAutoApplied &&
-          body.organizationSuggestion
-        ) {
-          setOrgNotice(
-            `Guardian filed this in ${body.organizationSuggestion.profilePath ?? "the suggested vault"}. You can undo from the card.`
-          );
-        }
-      }
-    } catch (err) {
-      const timedOut =
-        err instanceof DOMException && err.name === "AbortError";
+    if (!scheduled.queued) {
       setError(
-        timedOut
-          ? "Analysis took too long on this file. Try again, or upload a clearer photo or smaller PDF."
-          : "We couldn't reach the analysis service. Check your connection and try again."
+        scheduled.error ?? "Analysis couldn't be scheduled. Please try again."
       );
       setDocuments((docs) =>
         docs.map((d) =>
           d.id === doc.id ? { ...d, analysis_status: "failed" } : d
         )
       );
-    } finally {
-      window.clearInterval(progressTimer);
-      setProgressLabel(null);
-      setAnalyzingId(null);
+    } else {
+      setProgressLabel(scheduled.processingLabel ?? "Analyzing in the background…");
+      void refreshStatus(doc.id);
     }
+
+    setAnalyzingId(null);
+    setProgressLabel(null);
   }
 
   const categoriesInUse = DOCUMENT_CATEGORIES.filter((c) =>
@@ -824,6 +751,12 @@ export default function DocumentManager({
       {orgNotice ? (
         <p className="mt-3 rounded-xl bg-brand-light px-3 py-2 text-sm text-brand-dark">
           {orgNotice}
+        </p>
+      ) : null}
+
+      {uploadToast ? (
+        <p className="mt-3 rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+          {uploadToast}
         </p>
       ) : null}
 
@@ -1175,7 +1108,8 @@ export default function DocumentManager({
                         {formatSize(doc.size_bytes)} · {formatDate(doc.created_at)}
                       </span>
                       <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-ink-muted">
-                        {ANALYSIS_STATUS_LABELS[doc.analysis_status] ??
+                        {processingStatuses[doc.id]?.processingLabel ??
+                          ANALYSIS_STATUS_LABELS[doc.analysis_status] ??
                           doc.analysis_status}
                       </span>
                       {analysis?.facts?.length ? (
