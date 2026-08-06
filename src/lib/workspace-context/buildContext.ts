@@ -4,10 +4,15 @@ import type { User, SupabaseClient } from "@supabase/supabase-js";
 import type { RetrievedChunk } from "@/lib/vault/retrieve";
 import { formatRetrievalContext } from "@/lib/vault/indexDocument";
 import { wantsShowPictures } from "@/lib/vault/images";
-import { formatVaultFileListForGideon } from "@/lib/vault/askInventory";
-import { retrieveAllAccessibleVaultChunks } from "@/lib/vault/rollup";
+import { loadVaultFileInventoryContext } from "@/lib/vault/loadInventory";
 import { mergePinnedChunks } from "@/lib/vault/retrieve";
 import { embedQuery } from "@/lib/vault/embeddings";
+import { hybridRetrieveVaultChunks } from "@/lib/vault/hybridRetrieval";
+import { getEmbeddingCacheStats } from "@/lib/vault/embeddingCache";
+import {
+  hashQueryForDiagnostics,
+  logRetrievalDiagnostics,
+} from "@/lib/vault/retrievalDiagnostics";
 import {
   formatClientRequestsForGideon,
   loadActiveClientRequestsForGideon,
@@ -96,6 +101,14 @@ export async function loadWorkspaceContext(
   });
   const clientRequestReplyAgent = wantsClientRequestReply(question);
 
+  const contextBuildStarted = Date.now();
+  let embeddingDurationMs = 0;
+  let retrievalDurationMs = 0;
+  let vectorCandidateCount = 0;
+  let keywordCandidateCount = 0;
+  let mergedCandidateCount = 0;
+
+  const embeddingStarted = Date.now();
   const queryEmbedding =
     chunkCount > 0
       ? await embedQuery(retrievalQuestion).catch((embedErr) => {
@@ -106,6 +119,7 @@ export async function loadWorkspaceContext(
           return null;
         })
       : null;
+  embeddingDurationMs = Date.now() - embeddingStarted;
 
   const matchCount = showPictures ? 10 : 8;
   const rollupScopes: LinkedVaultProfile[] = retrievalScopes.map((scope) => ({
@@ -115,14 +129,23 @@ export async function loadWorkspaceContext(
       scope.profile_type ??
       (activeProfile.profile_type as GuardianProfileType),
   }));
-  const retrievedChunks = queryEmbedding
-    ? await retrieveAllAccessibleVaultChunks(
-        supabase,
-        queryEmbedding,
-        rollupScopes,
-        matchCount
-      )
-    : [];
+
+  let retrievedChunks: RetrievedChunk[] = [];
+  if (queryEmbedding) {
+    const retrievalStarted = Date.now();
+    const hybrid = await hybridRetrieveVaultChunks({
+      supabase,
+      query: retrievalQuestion,
+      queryEmbedding,
+      scopes: rollupScopes,
+      finalTopK: matchCount,
+    });
+    retrievalDurationMs = Date.now() - retrievalStarted;
+    vectorCandidateCount = hybrid.vectorCount;
+    keywordCandidateCount = hybrid.keywordCount;
+    mergedCandidateCount = hybrid.mergedCount;
+    retrievedChunks = hybrid.results;
+  }
 
   const chunks = mergePinnedChunks(attachedDoc?.chunks ?? [], retrievedChunks);
   const formatted = formatRetrievalContext(chunks);
@@ -195,16 +218,11 @@ export async function loadWorkspaceContext(
     requestAssigneeNames
   );
 
-  const { data: vaultFileRows } = await supabase
-    .from("documents")
-    .select("file_name, mime_type, profile_id")
-    .in("profile_id", searchProfileIds)
-    .order("created_at", { ascending: false })
-    .limit(250);
-
-  const fileInventoryContext = formatVaultFileListForGideon(
-    vaultFileRows ?? [],
-    profileNames
+  const fileInventoryContext = await loadVaultFileInventoryContext(
+    supabase,
+    searchProfileIds,
+    profileNames,
+    retrievalQuestion
   );
 
   const upcomingAlerts = await retrieveUpcomingAlertsForGideon(supabase, {
@@ -313,6 +331,21 @@ Active vault in the UI: ${activeProfile.display_name}. Document search includes 
       fullLogQuote,
     },
   };
+
+  const contextBuildDurationMs = Date.now() - contextBuildStarted;
+  logRetrievalDiagnostics({
+    searchScope: meta.searchScope,
+    profileIds: searchProfileIds,
+    queryHash: hashQueryForDiagnostics(retrievalQuestion),
+    vectorCandidateCount,
+    keywordCandidateCount,
+    mergedCandidateCount,
+    selectedEvidenceCount: chunks.length,
+    retrievalDurationMs,
+    embeddingDurationMs,
+    contextBuildDurationMs,
+    embeddingCache: getEmbeddingCacheStats(),
+  });
 
   return { context, chunks };
 }

@@ -10,7 +10,7 @@ import { generateVaultChatTitle } from "@/lib/chat/generateVaultChatTitle";
 import { shouldGenerateVaultChatTitle } from "@/lib/chat/vaultChatTitle";
 import { isVaultEmbeddingConfigured } from "@/lib/vault/embeddings";
 import { buildAskVaultInventory } from "@/lib/vault/askInventory";
-import { ensureUserVaultIndexed } from "@/lib/vault/ensureIndexed";
+import { enqueueMissingVaultIndexing } from "@/lib/vault/ensureIndexed";
 import {
   buildGideonSuggestions,
   buildGideonLogSuggestions,
@@ -996,9 +996,9 @@ export async function POST(request: Request) {
   try {
     await Promise.all(
       retrievalScopes.map((scope) =>
-        ensureUserVaultIndexed(supabase, user.id, scope.id).catch((err) => {
+        enqueueMissingVaultIndexing(supabase, user.id, scope.id).catch((err) => {
           console.error(
-            "Vault ensure index failed:",
+            "Vault index enqueue failed:",
             err instanceof Error ? err.message : "error"
           );
         })

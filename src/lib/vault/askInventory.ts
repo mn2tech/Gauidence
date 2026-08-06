@@ -1,6 +1,15 @@
 import { isImageFileName, isImageMimeType } from "@/lib/vault/images";
 
 export const ASK_VAULT_NAME_PREVIEW = 6;
+export const RECENT_VAULT_FILE_PREVIEW = 5;
+
+const INVENTORY_QUESTION_PATTERN =
+  /\b(what(?:'s| is| are)?\s+(?:in\s+)?(?:the\s+)?(?:vault|uploaded|stored|files?|documents?|photos?)|list\s+(?:all\s+)?(?:files?|documents?|uploads?|photos?)|how\s+many\s+(?:files?|documents?|photos?|uploads?)|show\s+(?:me\s+)?(?:all\s+)?(?:files?|documents?|uploads?)|(?:count|browse|compare)\s+(?:files?|documents?|uploads?)|everything\s+(?:in|uploaded)|file\s+inventory)\b/i;
+
+/** True when the user is asking to list, count, browse, or compare vault files. */
+export function wantsVaultFileInventory(question: string): boolean {
+  return INVENTORY_QUESTION_PATTERN.test(question.trim());
+}
 
 export type AskVaultFileRow = {
   file_name: string;
@@ -92,6 +101,45 @@ export function formatVaultFileListForGideon(
   }
 
   return blocks.join("\n\n");
+}
+
+/** Brief summary for normal questions — recent files and counts only. */
+export function formatVaultFileSummaryForGideon(
+  files: VaultFileInventoryRow[],
+  profileNames: Record<string, string>,
+  countsByProfile: Record<string, number>
+): string {
+  const total = files.length;
+  if (total === 0) {
+    return "(no documents or photos uploaded in the active vault scope)";
+  }
+
+  const byProfile = new Map<string, VaultFileInventoryRow[]>();
+  for (const file of files) {
+    const bucket = byProfile.get(file.profile_id) ?? [];
+    bucket.push(file);
+    byProfile.set(file.profile_id, bucket);
+  }
+
+  const lines: string[] = [
+    `(Summary only — ask to list files for the full inventory. ${total} recent file(s) shown.)`,
+  ];
+
+  for (const [profileId, rows] of byProfile) {
+    const vaultName = profileNames[profileId]?.trim() || "Vault";
+    const totalInVault = countsByProfile[profileId] ?? rows.length;
+    const recent = rows
+      .slice(0, RECENT_VAULT_FILE_PREVIEW)
+      .map((r) => r.file_name)
+      .join(", ");
+  const more =
+      totalInVault > RECENT_VAULT_FILE_PREVIEW
+        ? ` (+${totalInVault - RECENT_VAULT_FILE_PREVIEW} more)`
+        : "";
+    lines.push(`${vaultName}: ${totalInVault} file(s). Recent: ${recent}${more}`);
+  }
+
+  return lines.join("\n");
 }
 
 /** Split vault files into documents vs photos and preview names for Ask welcome. */

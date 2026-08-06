@@ -1,6 +1,11 @@
 import "server-only";
 
 import OpenAI from "openai";
+import {
+  getCachedEmbedding,
+  hashEmbeddingCacheKey,
+  setCachedEmbedding,
+} from "./embeddingCache";
 
 export const EMBEDDING_MODEL =
   process.env.OPENAI_EMBEDDING_MODEL ?? "text-embedding-3-small";
@@ -33,7 +38,12 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
 }
 
 export async function embedQuery(query: string): Promise<number[]> {
+  const cacheKey = hashEmbeddingCacheKey(query);
+  const cached = getCachedEmbedding(cacheKey);
+  if (cached) return cached;
+
   const [vec] = await embedTexts([query]);
   if (!vec) throw new Error("Empty embedding response.");
+  setCachedEmbedding(cacheKey, vec);
   return vec;
 }

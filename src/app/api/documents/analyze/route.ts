@@ -227,6 +227,10 @@ export async function POST(request: Request) {
     // Best-effort vault RAG index (requires OPENAI_API_KEY for embeddings).
     try {
       const { indexDocumentForVault } = await import("@/lib/vault/indexDocument");
+      const {
+        markDocumentIndexCompleted,
+        processPendingIndexJobs,
+      } = await import("@/lib/vault/indexingJobs");
       await indexDocumentForVault({
         supabase,
         userId: user.id,
@@ -243,11 +247,24 @@ export async function POST(request: Request) {
           sourceText,
         },
       });
+      await markDocumentIndexCompleted(supabase, doc.id);
+      void processPendingIndexJobs(supabase, user.id, {
+        limit: 3,
+        profileId,
+      }).catch((err) => {
+        console.error(
+          "Vault pending index drain failed:",
+          err instanceof Error ? err.message : "error"
+        );
+      });
     } catch (indexErr) {
-      console.error(
-        "Vault index after analyze failed:",
-        indexErr instanceof Error ? indexErr.message : "error"
+      const { markDocumentIndexFailed } = await import(
+        "@/lib/vault/indexingJobs"
       );
+      const message =
+        indexErr instanceof Error ? indexErr.message : "error";
+      await markDocumentIndexFailed(supabase, doc.id, profileId, message);
+      console.error("Vault index after analyze failed:", message);
     }
 
     await setStatus(finalStatus);

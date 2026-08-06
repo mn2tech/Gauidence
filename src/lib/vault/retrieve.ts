@@ -19,6 +19,11 @@ export type RetrievedChunk = {
   /** Set when searching a linked member vault from a Family/Business container. */
   profile_id?: string;
   profile_name?: string;
+  /** Hybrid retrieval diagnostics (optional). */
+  vector_rank?: number | null;
+  keyword_rank?: number | null;
+  fusion_score?: number;
+  match_source?: string;
 };
 
 export function formatRetrievalContext(chunks: RetrievedChunk[]): {
@@ -45,8 +50,13 @@ export function formatRetrievalContext(chunks: RetrievedChunk[]): {
     const label = c.profile_name?.trim()
       ? `${c.profile_name.trim()} · ${c.file_name}`
       : c.file_name;
+    const rankMeta =
+      c.vector_rank != null || c.keyword_rank != null
+        ? ` | vRank:${c.vector_rank ?? "-"} | kRank:${c.keyword_rank ?? "-"} | fusion:${(c.fusion_score ?? c.similarity).toFixed(3)}`
+        : ` | sim:${c.similarity.toFixed(3)}`;
+    const sourceMeta = c.match_source ? ` | match:${c.match_source}` : "";
     blocks.push(
-      `[Source: ${label}${vault} | doc:${c.document_id} | chunk:${c.chunk_index} | sim:${c.similarity.toFixed(3)}]\n${trimChunkContent(c.content)}`
+      `[Source: ${label}${vault} | doc:${c.document_id} | chunk:${c.chunk_index}${rankMeta}${sourceMeta}]\n${trimChunkContent(c.content)}`
     );
   }
 
