@@ -1,38 +1,56 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 
 type Props = {
   id: string;
   title: string;
+  /** When false, section starts collapsed unless opened via hash or jump nav. */
   defaultOpen?: boolean;
   children: ReactNode;
 };
 
 function storageKey(id: string) {
-  return `guardian:vault-section:${id}`;
+  return `guardian:vault-section:v2:${id}`;
 }
 
 export default function VaultSection({
   id,
   title,
-  defaultOpen = true,
+  defaultOpen = false,
   children,
 }: Props) {
   const [open, setOpen] = useState(defaultOpen);
   const [ready, setReady] = useState(false);
+
+  const openSection = useCallback((scroll = true) => {
+    setOpen(true);
+    try {
+      localStorage.setItem(storageKey(id), "1");
+    } catch {
+      /* ignore */
+    }
+    if (!scroll) return;
+    window.requestAnimationFrame(() => {
+      document.getElementById(id)?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  }, [id]);
 
   useEffect(() => {
     try {
       const saved = localStorage.getItem(storageKey(id));
       if (saved === "0") setOpen(false);
       else if (saved === "1") setOpen(true);
+      else setOpen(defaultOpen);
     } catch {
-      /* ignore */
+      setOpen(defaultOpen);
     }
     setReady(true);
-  }, [id]);
+  }, [id, defaultOpen]);
 
   useEffect(() => {
     const applyDeepLink = () => {
@@ -41,24 +59,26 @@ export default function VaultSection({
       const cameraDocs =
         id.startsWith("documents-") &&
         new URLSearchParams(window.location.search).get("camera") === "1";
-      if (!hashMatch && !cameraDocs) return;
-      setOpen(true);
-      try {
-        localStorage.setItem(storageKey(id), "1");
-      } catch {
-        /* ignore */
-      }
-      window.requestAnimationFrame(() => {
-        document.getElementById(id)?.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        });
-      });
+      const logDeepLink =
+        id.startsWith("daily-log-") &&
+        new URLSearchParams(window.location.search).has("logId");
+      if (!hashMatch && !cameraDocs && !logDeepLink) return;
+      openSection();
     };
+
+    const onJump = (e: Event) => {
+      const detail = (e as CustomEvent<{ id: string }>).detail;
+      if (detail?.id === id) openSection();
+    };
+
     applyDeepLink();
     window.addEventListener("hashchange", applyDeepLink);
-    return () => window.removeEventListener("hashchange", applyDeepLink);
-  }, [id]);
+    window.addEventListener("guardian:vault-section-open", onJump);
+    return () => {
+      window.removeEventListener("hashchange", applyDeepLink);
+      window.removeEventListener("guardian:vault-section-open", onJump);
+    };
+  }, [id, openSection]);
 
   const toggle = () => {
     setOpen((prev) => {
@@ -73,7 +93,7 @@ export default function VaultSection({
   };
 
   return (
-    <section id={id} className="scroll-mt-24 space-y-2">
+    <section id={id} className="scroll-mt-36 space-y-2">
       <button
         type="button"
         onClick={toggle}
@@ -93,5 +113,19 @@ export default function VaultSection({
       {ready && open ? children : null}
       {!ready && defaultOpen ? children : null}
     </section>
+  );
+}
+
+export function openVaultSection(sectionId: string) {
+  if (typeof window === "undefined") return;
+  const nextHash = `#${sectionId}`;
+  if (window.location.hash !== nextHash) {
+    window.location.hash = sectionId;
+    return;
+  }
+  window.dispatchEvent(
+    new CustomEvent("guardian:vault-section-open", {
+      detail: { id: sectionId },
+    })
   );
 }

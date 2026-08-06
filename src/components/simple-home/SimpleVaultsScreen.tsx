@@ -2,19 +2,23 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Users } from "lucide-react";
+import { ChevronRight, Users } from "lucide-react";
 import ProfileAvatar from "@/components/ProfileAvatar";
 import ProfileSetupHub from "@/components/ProfileSetupHub";
-import LinkedClientsPanel from "@/components/LinkedClientsPanel";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
   canHaveLinkedClients,
   canManageProfileAccess,
+  clientsOf,
   nestedUnder,
   profileTypeLabel,
   topLevelProfiles,
 } from "@/lib/profiles/types";
-import { documentsHref } from "@/lib/routes";
+import { DOCUMENTS_PATH } from "@/lib/routes";
+
+function clientsSectionHref(profileId: string) {
+  return `${DOCUMENTS_PATH}&profileId=${profileId}#clients-${profileId}`;
+}
 
 export default function SimpleVaultsScreen() {
   const router = useRouter();
@@ -48,10 +52,13 @@ export default function SimpleVaultsScreen() {
       <ul className="space-y-3">
         {topLevel.map((vault) => {
           const children = nestedUnder(profiles, vault);
-          const showClientPanel =
+          const showClientsLink =
             canHaveLinkedClients(vault.profile_type) &&
             canManageProfileAccess(vault);
-          const nestedChildren = showClientPanel
+          const clientCount = showClientsLink
+            ? clientsOf(profiles, vault.id).length
+            : 0;
+          const nestedChildren = showClientsLink
             ? children.filter((child) => child.profile_type !== "client")
             : children;
 
@@ -61,7 +68,7 @@ export default function SimpleVaultsScreen() {
                 type="button"
                 onClick={() => {
                   void switchProfile(vault.id);
-                  router.push(documentsHref(vault.id));
+                  router.push(`${DOCUMENTS_PATH}#documents-${vault.id}`);
                 }}
                 className="flex w-full items-center gap-3 px-4 py-4 text-left transition hover:bg-brand-light/30"
               >
@@ -76,9 +83,26 @@ export default function SimpleVaultsScreen() {
                 </span>
               </button>
 
-              {showClientPanel ? (
-                <div className="border-t border-border-subtle px-3 pb-3 pt-1">
-                  <LinkedClientsPanel parent={vault} embedded />
+              {showClientsLink ? (
+                <div className="border-t border-border-subtle px-4 py-2.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void switchProfile(vault.id);
+                      router.push(clientsSectionHref(vault.id));
+                    }}
+                    className="inline-flex w-full items-center justify-between gap-2 rounded-lg px-1 py-1 text-left text-sm font-medium text-brand-dark transition hover:bg-brand-light/35"
+                  >
+                    <span>
+                      {clientCount === 0
+                        ? "No clients yet"
+                        : `${clientCount} client${clientCount === 1 ? "" : "s"}`}
+                    </span>
+                    <span className="inline-flex items-center gap-0.5 text-xs font-semibold">
+                      View clients
+                      <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+                    </span>
+                  </button>
                 </div>
               ) : null}
 
@@ -91,7 +115,7 @@ export default function SimpleVaultsScreen() {
                           type="button"
                           onClick={() => {
                             void switchProfile(child.id);
-                            router.push(documentsHref(child.id));
+                            router.push(`${DOCUMENTS_PATH}#documents-${child.id}`);
                           }}
                           className="flex min-w-0 flex-1 items-center gap-3 px-2 py-2 text-left text-sm"
                         >

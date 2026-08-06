@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useRef } from "react";
+import { Suspense, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { MessageCircle, Search, ShieldCheck } from "lucide-react";
@@ -22,6 +22,7 @@ import ProfileSetupHub from "@/components/ProfileSetupHub";
 import GettingStartedStrip from "@/components/GettingStartedStrip";
 import AwardsPanel from "@/components/AwardsPanel";
 import VaultSection from "@/components/VaultSection";
+import VaultJumpBar from "@/components/VaultJumpBar";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
   askGideonContextLabel,
@@ -92,12 +93,58 @@ function DailyLogSection({
   );
 }
 
+function useVaultSectionDefaults(profileId: string) {
+  const searchParams = useSearchParams();
+
+  return useMemo(() => {
+    const hash =
+      typeof window !== "undefined" ? window.location.hash.replace(/^#/, "") : "";
+    const hasLogIntent = searchParams.has("logId");
+    const hasDocIntent =
+      searchParams.get("camera") === "1" ||
+      searchParams.has("documentId") ||
+      searchParams.has("searchTerm");
+
+    const matches = (sectionId: string) => hash === sectionId;
+
+    const sectionOpen = (sectionId: string, fallback = false) => {
+      if (matches(sectionId)) return true;
+      if (hash) return false;
+      if (sectionId === `documents-${profileId}`) {
+        return hasDocIntent || !hasLogIntent;
+      }
+      if (sectionId === `daily-log-${profileId}`) {
+        return hasLogIntent;
+      }
+      return fallback;
+    };
+
+    return {
+      files: sectionOpen(`documents-${profileId}`),
+      dailyLog: sectionOpen(`daily-log-${profileId}`),
+      attention: matches(`attention-${profileId}`),
+      employees: matches(`employees-${profileId}`),
+      leave: matches(`leave-${profileId}`),
+      timesheets: matches(`timesheets-${profileId}`),
+      myHours: matches(`my-hours-${profileId}`),
+      clients: matches(`clients-${profileId}`),
+      family: matches(`family-${profileId}`),
+      students: matches(`students-${profileId}`),
+      pets: matches(`pets-${profileId}`),
+      hobbies: matches(`hobbies-${profileId}`),
+      homes: matches(`homes-${profileId}`),
+      vehicles: matches(`vehicles-${profileId}`),
+    };
+  }, [profileId, searchParams]);
+}
+
 export default function DashboardVault({ userId }: { userId: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { active, profiles, loading, switchProfile } = useActiveProfile();
   const requestedProfileId = searchParams.get("profileId");
   const switchingRef = useRef(false);
+  const sectionDefaults = useVaultSectionDefaults(active?.id ?? "");
 
   useEffect(() => {
     const onChange = () => router.refresh();
@@ -282,106 +329,13 @@ export default function DashboardVault({ userId }: { userId: string }) {
         </div>
       </div>
 
-      <VaultSection id={`attention-${active.id}`} title="Attention">
-        <AlertsPanel profileId={active.id} />
-      </VaultSection>
+      <VaultJumpBar profile={active} />
 
-      {canHaveLinkedEmployees(active.profile_type) && (
-        <VaultSection
-          id={`employees-${active.id}`}
-          title="Employees"
-          defaultOpen={false}
-        >
-          <LinkedEmployeesPanel parent={active} />
-        </VaultSection>
-      )}
-
-      {canHaveLinkedEmployees(active.profile_type) && (
-        <VaultSection id={`leave-${active.id}`} title="Leave requests">
-          <OwnerLeavePanel businessProfileId={active.id} />
-        </VaultSection>
-      )}
-
-      {canHaveLinkedEmployees(active.profile_type) && (
-        <VaultSection id={`timesheets-${active.id}`} title="Timesheets">
-          <PayrollTimesheetPanel businessProfile={active} />
-        </VaultSection>
-      )}
-
-      {active.profile_type === "employee" && active.parent_profile_id ? (
-        <VaultSection id={`my-hours-${active.id}`} title="My hours">
-          <EmployeeClockPanel
-            employeeProfile={active}
-            businessProfileId={active.parent_profile_id}
-          />
-        </VaultSection>
-      ) : null}
-
-      {canHaveLinkedClients(active.profile_type) && (
-        <VaultSection
-          id={`clients-${active.id}`}
-          title="Clients"
-          defaultOpen={false}
-        >
-          <LinkedClientsPanel parent={active} />
-        </VaultSection>
-      )}
-
-      {canHaveLinkedFamilyMembers(active.profile_type) && (
-        <VaultSection id={`family-${active.id}`} title="Family members">
-          <LinkedFamilyPanel parent={active} />
-        </VaultSection>
-      )}
-
-      {canHaveLinkedStudents(active.profile_type) && (
-        <VaultSection id={`students-${active.id}`} title="Students">
-          <LinkedStudentsPanel parent={active} />
-        </VaultSection>
-      )}
-
-      {canHaveLinkedPets(active.profile_type) && (
-        <VaultSection id={`pets-${active.id}`} title="Pets">
-          <LinkedPetsPanel parent={active} />
-        </VaultSection>
-      )}
-
-      {canHaveLinkedHobbies(active.profile_type) && (
-        <VaultSection id={`hobbies-${active.id}`} title="Hobbies & sports">
-          <LinkedHobbiesPanel parent={active} />
-        </VaultSection>
-      )}
-
-      {canHaveLinkedHomes(active.profile_type) && (
-        <VaultSection id={`homes-${active.id}`} title="Homes">
-          <LinkedHomesPanel parent={active} />
-        </VaultSection>
-      )}
-
-      {canHaveLinkedVehicles(active.profile_type) && (
-        <VaultSection id={`vehicles-${active.id}`} title="Vehicles">
-          <LinkedVehiclesPanel parent={active} />
-        </VaultSection>
-      )}
-
-      <VaultSection id={`daily-log-${active.id}`} title="Daily Log">
-        <Suspense
-          fallback={
-            <DailyLogPanel
-              profileId={active.id}
-              profileName={active.display_name}
-              profileType={active.profile_type}
-            />
-          }
-        >
-          <DailyLogSection
-            profileId={active.id}
-            profileName={active.display_name}
-            profileType={active.profile_type}
-          />
-        </Suspense>
-      </VaultSection>
-
-      <VaultSection id={`documents-${active.id}`} title="Files">
+      <VaultSection
+        id={`documents-${active.id}`}
+        title="Files"
+        defaultOpen={sectionDefaults.files}
+      >
         <Suspense
           fallback={
             <DocumentManager
@@ -401,14 +355,156 @@ export default function DashboardVault({ userId }: { userId: string }) {
         </Suspense>
       </VaultSection>
 
+      <VaultSection
+        id={`daily-log-${active.id}`}
+        title="Daily Log"
+        defaultOpen={sectionDefaults.dailyLog}
+      >
+        <Suspense
+          fallback={
+            <DailyLogPanel
+              profileId={active.id}
+              profileName={active.display_name}
+              profileType={active.profile_type}
+            />
+          }
+        >
+          <DailyLogSection
+            profileId={active.id}
+            profileName={active.display_name}
+            profileType={active.profile_type}
+          />
+        </Suspense>
+      </VaultSection>
+
+      <VaultSection
+        id={`attention-${active.id}`}
+        title="Attention"
+        defaultOpen={sectionDefaults.attention}
+      >
+        <AlertsPanel profileId={active.id} />
+      </VaultSection>
+
+      {canHaveLinkedEmployees(active.profile_type) && (
+        <VaultSection
+          id={`leave-${active.id}`}
+          title="Leave requests"
+          defaultOpen={sectionDefaults.leave}
+        >
+          <OwnerLeavePanel businessProfileId={active.id} />
+        </VaultSection>
+      )}
+
+      {canHaveLinkedEmployees(active.profile_type) && (
+        <VaultSection
+          id={`timesheets-${active.id}`}
+          title="Timesheets"
+          defaultOpen={sectionDefaults.timesheets}
+        >
+          <PayrollTimesheetPanel businessProfile={active} />
+        </VaultSection>
+      )}
+
+      {active.profile_type === "employee" && active.parent_profile_id ? (
+        <VaultSection
+          id={`my-hours-${active.id}`}
+          title="My hours"
+          defaultOpen={sectionDefaults.myHours}
+        >
+          <EmployeeClockPanel
+            employeeProfile={active}
+            businessProfileId={active.parent_profile_id}
+          />
+        </VaultSection>
+      ) : null}
+
+      {canHaveLinkedEmployees(active.profile_type) && (
+        <VaultSection
+          id={`employees-${active.id}`}
+          title="Employees"
+          defaultOpen={sectionDefaults.employees}
+        >
+          <LinkedEmployeesPanel parent={active} />
+        </VaultSection>
+      )}
+
+      {canHaveLinkedClients(active.profile_type) && (
+        <VaultSection
+          id={`clients-${active.id}`}
+          title="Clients"
+          defaultOpen={sectionDefaults.clients}
+        >
+          <LinkedClientsPanel parent={active} />
+        </VaultSection>
+      )}
+
+      {canHaveLinkedFamilyMembers(active.profile_type) && (
+        <VaultSection
+          id={`family-${active.id}`}
+          title="Family members"
+          defaultOpen={sectionDefaults.family}
+        >
+          <LinkedFamilyPanel parent={active} />
+        </VaultSection>
+      )}
+
+      {canHaveLinkedStudents(active.profile_type) && (
+        <VaultSection
+          id={`students-${active.id}`}
+          title="Students"
+          defaultOpen={sectionDefaults.students}
+        >
+          <LinkedStudentsPanel parent={active} />
+        </VaultSection>
+      )}
+
+      {canHaveLinkedPets(active.profile_type) && (
+        <VaultSection
+          id={`pets-${active.id}`}
+          title="Pets"
+          defaultOpen={sectionDefaults.pets}
+        >
+          <LinkedPetsPanel parent={active} />
+        </VaultSection>
+      )}
+
+      {canHaveLinkedHobbies(active.profile_type) && (
+        <VaultSection
+          id={`hobbies-${active.id}`}
+          title="Hobbies & sports"
+          defaultOpen={sectionDefaults.hobbies}
+        >
+          <LinkedHobbiesPanel parent={active} />
+        </VaultSection>
+      )}
+
+      {canHaveLinkedHomes(active.profile_type) && (
+        <VaultSection
+          id={`homes-${active.id}`}
+          title="Homes"
+          defaultOpen={sectionDefaults.homes}
+        >
+          <LinkedHomesPanel parent={active} />
+        </VaultSection>
+      )}
+
+      {canHaveLinkedVehicles(active.profile_type) && (
+        <VaultSection
+          id={`vehicles-${active.id}`}
+          title="Vehicles"
+          defaultOpen={sectionDefaults.vehicles}
+        >
+          <LinkedVehiclesPanel parent={active} />
+        </VaultSection>
+      )}
+
       <div className="flex items-start gap-3 rounded-2xl border border-stone-200 bg-white p-5">
         <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-light text-brand">
           <ShieldCheck className="h-4 w-4" />
         </span>
         <p className="text-sm leading-relaxed text-ink-muted">
-          Documents and Daily Logs belong only to the active profile. Switch
-          vaults in the header to change context. Tap a section title to
-          collapse or expand it.
+          Files and Daily Logs belong to the active profile. Use the section
+          chips above to jump quickly, or tap a title to expand or collapse.
         </p>
       </div>
     </div>
