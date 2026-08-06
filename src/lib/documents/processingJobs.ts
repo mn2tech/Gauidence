@@ -143,6 +143,7 @@ async function enqueueNextStage(
     completedStage: ProcessingJobType;
   }
 ): Promise<void> {
+  const { completedStage } = args;
   if (completedStage === "analyze_document") {
     if (!isVaultEmbeddingConfigured()) {
       await supabase

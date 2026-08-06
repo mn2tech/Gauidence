@@ -30,7 +30,7 @@ export type ExecuteAnalysisResult = {
   warnings: string[];
   analysisStatus: AnalysisStatus;
   suggestedCategory: string | null;
-  sourceText: string;
+  sourceText: string | null;
   analysis: Awaited<ReturnType<typeof runAnalysisPipeline>>["analysis"];
   classification: Awaited<ReturnType<typeof runAnalysisPipeline>>["classification"];
   diagnostics?: ProcessingDiagnostics;
@@ -266,7 +266,7 @@ export async function triggerLegacyKnowledgeEngines(
     documentId: string;
     profileId: string;
     fileName: string;
-    sourceText: string;
+    sourceText: string | null;
     analysis: ExecuteAnalysisResult["analysis"];
   }
 ): Promise<void> {
