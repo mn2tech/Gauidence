@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Camera,
   Check,
@@ -204,23 +204,25 @@ export default function DocumentManager({
   const [orgNotice, setOrgNotice] = useState<string | null>(null);
   const [uploadToast, setUploadToast] = useState<string | null>(null);
 
-  const activeDocumentIds = documents
-    .filter((d) => {
-      if (IN_PROGRESS_ANALYSIS.includes(d.analysis_status)) return true;
-      if (d.analysis_status === "uploaded") return true;
-      const snap = processingStatuses[d.id];
-      if (snap?.active) return true;
-      if (
-        (d.analysis_status === "completed" ||
-          d.analysis_status === "needs_verification") &&
-        snap &&
-        !snap.searchable
-      ) {
-        return true;
-      }
-      return false;
-    })
-    .map((d) => d.id);
+  const activeDocumentIds = useMemo(
+    () =>
+      documents
+        .filter((d) => {
+          if (IN_PROGRESS_ANALYSIS.includes(d.analysis_status)) return true;
+          if (d.analysis_status === "uploaded" || d.analysis_status === "queued") {
+            return true;
+          }
+          if (
+            d.analysis_status === "completed" ||
+            d.analysis_status === "needs_verification"
+          ) {
+            return true;
+          }
+          return false;
+        })
+        .map((d) => d.id),
+    [documents]
+  );
 
   const { statuses: processingStatuses, markActive, refreshStatus } =
     useDocumentProcessingPoll(activeDocumentIds);
