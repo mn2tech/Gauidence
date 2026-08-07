@@ -47,6 +47,7 @@ function sample(
     industry: null,
     website: null,
     description: null,
+    location_address: null,
     job_title: null,
     department: null,
     organization_name: null,

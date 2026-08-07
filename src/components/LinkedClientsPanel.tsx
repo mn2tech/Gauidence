@@ -3,6 +3,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { Briefcase, Loader2, Plus, Users } from "lucide-react";
+import ProfileLocationRow from "@/components/ProfileLocationRow";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
   ACTIVE_CLIENTS_GROUP_LABEL,
@@ -25,12 +26,14 @@ function ClientRow({
   statusBusyId,
   onOpenVault,
   onSetStatus,
+  onRefresh,
 }: {
   cli: GuardianProfile;
   openingId: string | null;
   statusBusyId: string | null;
   onOpenVault: (id: string) => void;
   onSetStatus: (id: string, status: "active" | "inactive") => void;
+  onRefresh: () => void | Promise<void>;
 }) {
   const isInactive = cli.client_status === "inactive";
 
@@ -40,11 +43,12 @@ function ClientRow({
         isInactive ? "opacity-80" : ""
       }`}
     >
-      <div>
+      <div className="min-w-0 flex-1">
         <p className="text-sm font-medium">{cli.display_name}</p>
-        <p className="text-xs text-ink-muted">
-          {cli.description?.trim() || "Client"}
-        </p>
+        {cli.description?.trim() ? (
+          <p className="text-xs text-ink-muted">{cli.description.trim()}</p>
+        ) : null}
+        <ProfileLocationRow profile={cli} onSaved={onRefresh} />
       </div>
       <div className="flex flex-wrap gap-2">
         {canManageProfileAccess(cli) ? (
@@ -89,6 +93,7 @@ export default function LinkedClientsPanel({ parent, embedded = false }: Props) 
   const { profiles, refresh, switchProfile } = useActiveProfile();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
+  const [address, setAddress] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -116,6 +121,7 @@ export default function LinkedClientsPanel({ parent, embedded = false }: Props) 
         body: JSON.stringify({
           optionId: "client",
           displayName: name.trim(),
+          locationAddress: address.trim() || null,
           description: note.trim() || null,
           parentProfileId: parent.id,
           linkedKind: "client",
@@ -128,6 +134,7 @@ export default function LinkedClientsPanel({ parent, embedded = false }: Props) 
         return;
       }
       setName("");
+      setAddress("");
       setNote("");
       setOpen(false);
       await refresh();
@@ -224,6 +231,15 @@ export default function LinkedClientsPanel({ parent, embedded = false }: Props) 
             />
           </label>
           <label className="block text-sm">
+            <span className="font-medium">Site address</span>
+            <input
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none ring-brand focus:ring-2"
+              placeholder="123 Business Park Dr, City, ST"
+            />
+          </label>
+          <label className="block text-sm">
             <span className="text-ink-muted">Notes (optional)</span>
             <input
               value={note}
@@ -281,6 +297,7 @@ export default function LinkedClientsPanel({ parent, embedded = false }: Props) 
                     statusBusyId={statusBusyId}
                     onOpenVault={openVault}
                     onSetStatus={setClientStatus}
+                    onRefresh={refresh}
                   />
                 ))
               )}
@@ -306,6 +323,7 @@ export default function LinkedClientsPanel({ parent, embedded = false }: Props) 
                     statusBusyId={statusBusyId}
                     onOpenVault={openVault}
                     onSetStatus={setClientStatus}
+                    onRefresh={refresh}
                   />
                 ))
               )}

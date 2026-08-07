@@ -8,6 +8,7 @@ import {
   isOrgStyleProfile,
   profileCompanyContext,
   profileTypeLabel,
+  GUARDIAN_PROFILE_SELECT,
   type GuardianProfileType,
 } from "@/lib/profiles/types";
 import {
@@ -228,6 +229,10 @@ export async function POST(request: Request) {
       typeof body.description === "string"
         ? body.description.trim() || null
         : null,
+    location_address:
+      typeof body.locationAddress === "string"
+        ? body.locationAddress.trim() || null
+        : null,
     job_title:
       typeof body.jobTitle === "string" ? body.jobTitle.trim() || null : null,
     department:
@@ -245,8 +250,7 @@ export async function POST(request: Request) {
     row.is_default = true;
   }
 
-  const profileSelect =
-    "id, owner_user_id, profile_type, display_name, relationship, avatar_url, date_of_birth, school_name, grade_level, business_legal_name, industry, website, description, job_title, department, organization_name, parent_profile_id, is_default, created_at, updated_at, client_status";
+  const profileSelect = GUARDIAN_PROFILE_SELECT;
 
   const admin = createAdminClient();
   // Prefer service-role insert so shared-vault RLS/trigger edge cases can't block owners.

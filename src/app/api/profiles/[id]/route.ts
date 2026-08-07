@@ -12,6 +12,7 @@ import {
   isClientStatus,
   isGroupStyleProfile,
   isGuardianProfileType,
+  GUARDIAN_PROFILE_SELECT,
 } from "@/lib/profiles/types";
 
 export const runtime = "nodejs";
@@ -74,9 +75,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
       .update({ is_default: true, updated_at: new Date().toISOString() })
       .eq("id", id)
       .eq("owner_user_id", user.id)
-      .select(
-        "id, owner_user_id, profile_type, display_name, relationship, avatar_url, date_of_birth, school_name, grade_level, business_legal_name, industry, website, description, job_title, department, organization_name, parent_profile_id, is_default, created_at, updated_at, client_status"
-      )
+      .select(GUARDIAN_PROFILE_SELECT)
       .single();
     if (error || !data) {
       return NextResponse.json(
@@ -127,6 +126,12 @@ export async function PATCH(request: Request, ctx: Ctx) {
   }
   if (typeof body.description === "string") {
     patch.description = body.description.trim() || null;
+  }
+  if (body.locationAddress !== undefined) {
+    patch.location_address =
+      typeof body.locationAddress === "string"
+        ? body.locationAddress.trim() || null
+        : null;
   }
   if (typeof body.jobTitle === "string") {
     patch.job_title = body.jobTitle.trim() || null;
@@ -218,9 +223,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
     .update(patch)
     .eq("id", id)
     .eq("owner_user_id", user.id)
-    .select(
-      "id, owner_user_id, profile_type, display_name, relationship, avatar_url, date_of_birth, school_name, grade_level, business_legal_name, industry, website, description, job_title, department, organization_name, parent_profile_id, is_default, created_at, updated_at, client_status"
-    )
+    .select(GUARDIAN_PROFILE_SELECT)
     .single();
 
   if (error || !data) {

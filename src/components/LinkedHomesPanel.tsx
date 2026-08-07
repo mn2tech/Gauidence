@@ -3,6 +3,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { Home, Loader2, Plus, Users } from "lucide-react";
+import ProfileLocationRow from "@/components/ProfileLocationRow";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
   canManageProfileAccess,
@@ -20,6 +21,7 @@ export default function LinkedHomesPanel({ parent }: Props) {
   const [open, setOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
   const [name, setName] = useState("");
+  const [address, setAddress] = useState("");
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -64,6 +66,7 @@ export default function LinkedHomesPanel({ parent }: Props) {
         body: JSON.stringify({
           optionId: "home",
           displayName: name.trim(),
+          locationAddress: address.trim() || null,
           description: description.trim() || null,
           parentProfileId: parent.id,
           switchTo: false,
@@ -75,6 +78,7 @@ export default function LinkedHomesPanel({ parent }: Props) {
         return;
       }
       setName("");
+      setAddress("");
       setDescription("");
       setOpen(false);
       await refresh();
@@ -193,12 +197,21 @@ export default function LinkedHomesPanel({ parent }: Props) {
             />
           </label>
           <label className="block text-sm">
-            <span className="text-ink-muted">Address or notes (optional)</span>
+            <span className="font-medium">Address</span>
+            <input
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none ring-brand focus:ring-2"
+              placeholder="123 Oak St, City, ST"
+            />
+          </label>
+          <label className="block text-sm">
+            <span className="text-ink-muted">Notes (optional)</span>
             <input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="mt-1 w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none ring-brand focus:ring-2"
-              placeholder="123 Oak St"
+              placeholder="Primary residence, rental property, etc."
             />
           </label>
           <div className="flex flex-wrap gap-2">
@@ -236,11 +249,12 @@ export default function LinkedHomesPanel({ parent }: Props) {
               key={h.id}
               className="flex flex-wrap items-center justify-between gap-2 py-3"
             >
-              <div>
+              <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium">{h.display_name}</p>
-                <p className="text-xs text-ink-muted">
-                  {h.description?.trim() || "Home"}
-                </p>
+                {h.description?.trim() ? (
+                  <p className="text-xs text-ink-muted">{h.description.trim()}</p>
+                ) : null}
+                <ProfileLocationRow profile={h} onSaved={refresh} />
               </div>
               <div className="flex flex-wrap gap-2">
                 {canManageProfileAccess(h) ? (

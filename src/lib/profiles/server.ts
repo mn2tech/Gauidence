@@ -7,12 +7,12 @@ import {
   isGuardianProfileAccessRole,
   isGuardianProfileType,
   isClientStatus,
+  GUARDIAN_PROFILE_SELECT,
   type GuardianProfile,
   type GuardianProfileAccessRole,
 } from "./types";
 
-const PROFILE_SELECT =
-  "id, owner_user_id, profile_type, display_name, relationship, avatar_url, date_of_birth, school_name, grade_level, business_legal_name, industry, website, description, job_title, department, organization_name, parent_profile_id, is_default, created_at, updated_at, client_status";
+const PROFILE_SELECT = GUARDIAN_PROFILE_SELECT;
 
 function asProfile(
   row: Record<string, unknown>,
@@ -35,6 +35,7 @@ function asProfile(
     industry: (row.industry as string | null) ?? null,
     website: (row.website as string | null) ?? null,
     description: (row.description as string | null) ?? null,
+    location_address: (row.location_address as string | null) ?? null,
     job_title: (row.job_title as string | null) ?? null,
     department: (row.department as string | null) ?? null,
     organization_name: (row.organization_name as string | null) ?? null,

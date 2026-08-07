@@ -258,6 +258,10 @@ export function sharedProfileAccessBadge(
   return null;
 }
 
+/** Columns returned when loading guardian profiles from the API. */
+export const GUARDIAN_PROFILE_SELECT =
+  "id, owner_user_id, profile_type, display_name, relationship, avatar_url, date_of_birth, school_name, grade_level, business_legal_name, industry, website, description, location_address, job_title, department, organization_name, parent_profile_id, is_default, created_at, updated_at, client_status";
+
 export type GuardianProfile = {
   id: string;
   owner_user_id: string;
@@ -272,6 +276,8 @@ export type GuardianProfile = {
   industry: string | null;
   website: string | null;
   description: string | null;
+  /** Street or site address for driving directions. */
+  location_address: string | null;
   job_title: string | null;
   department: string | null;
   organization_name: string | null;
