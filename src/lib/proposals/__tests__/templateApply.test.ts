@@ -15,7 +15,7 @@ const sampleTemplate: ProposalTemplate = {
   default_title: "{{company_name}} — Assessment",
   default_summary: "Review for {{website_url}}",
   default_introduction: "Hello {{client_name}}",
-  default_terms: "$99 credited within 30 days.",
+  default_terms: "$99 credited by {{assessment_credit_deadline}}. Valid {{proposal_date}}.",
   default_line_items: [
     {
       id: "li-1",
@@ -46,6 +46,15 @@ describe("applyProposalTemplate", () => {
     assert.match(applied.introduction, /Alex/);
     assert.notEqual(applied.lineItems[0]?.id, "li-1");
     assert.equal(applied.lineItems[0]?.unitPriceCents, 9900);
+  });
+
+  it("fills assessment credit deadline and proposal date placeholders", () => {
+    const applied = applyProposalTemplate(sampleTemplate, {
+      company_name: "Proxdose",
+      assessment_credit_deadline: "September 6, 2026",
+      proposal_date: "August 7, 2026",
+    });
+    assert.match(applied.terms, /September 6, 2026/);
   });
 });
 

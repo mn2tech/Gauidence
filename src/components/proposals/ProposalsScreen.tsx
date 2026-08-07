@@ -28,6 +28,7 @@ import {
   type ProposalWithMeta,
   type ServiceTemplate,
   canShareProposal,
+  canEditProposal,
 } from "@/lib/proposals/types";
 import { activeClientsOf, canEditGuardianProfile, isOrgStyleProfile } from "@/lib/profiles/types";
 import { formatMoney } from "@/lib/proposals/pricing";
@@ -414,6 +415,45 @@ export default function ProposalsScreen() {
     }
   };
 
+  const applyLatestTemplate = async (proposal: ProposalWithMeta) => {
+    const confirmed = window.confirm(
+      "Replace this proposal's content with the latest Homepage Redesign Sprint template? Your manual edits will be overwritten."
+    );
+    if (!confirmed) return;
+
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/proposals/${proposal.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "apply_template" }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        throw new Error(body.error ?? "Couldn't apply template.");
+      }
+      const updated = body.proposal as ProposalWithMeta;
+      setDraft({
+        clientProfileId: updated.client_profile_id,
+        title: updated.title,
+        summary: updated.summary ?? "",
+        introduction: updated.introduction ?? "",
+        terms: updated.terms ?? "",
+        taxRateBps: updated.tax_rate_bps,
+        lineItems: updated.line_items,
+        timeline: updated.timeline,
+        deliverables: updated.deliverables,
+        addons: updated.addons,
+      });
+      await loadAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't apply template.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (isClientVault) {
     return <ClientProposalsScreen />;
   }
@@ -710,6 +750,21 @@ export default function ProposalsScreen() {
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               Save proposal
             </button>
+            {selected && canEditProposal(selected.status) ? (
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => void applyLatestTemplate(selected)}
+                className="inline-flex items-center gap-2 rounded-xl border border-stone-300 px-4 py-2.5 text-sm font-semibold hover:bg-stone-50 disabled:opacity-50"
+              >
+                {saving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4" />
+                )}
+                Apply latest template
+              </button>
+            ) : null}
             {selected && canShareProposal(selected.status) ? (
               <ShareProposalButton
                 proposalId={selected.id}

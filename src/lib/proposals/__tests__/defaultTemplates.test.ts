@@ -13,12 +13,13 @@ describe("DEFAULT_PROPOSAL_TEMPLATE_SEEDS", () => {
       (s) => s.name === DEFAULT_HOMEPAGE_SPRINT_TEMPLATE_NAME
     );
     assert.ok(sprint);
-    assert.match(sprint!.default_terms, /50% deposit/i);
+    assert.match(sprint!.default_terms, /due at signing/i);
     assert.match(sprint!.default_terms, /net 7/i);
-    assert.match(sprint!.default_terms, /OUT OF SCOPE/i);
-    assert.match(sprint!.default_terms, /hero, trust\/testimonials/i);
-    assert.match(sprint!.default_terms, /assessment delivery/i);
-    assert.match(sprint!.default_introduction, /2–3 weeks/i);
+    assert.match(sprint!.default_terms, /{{assessment_credit_deadline}}/);
+    assert.match(sprint!.default_terms, /hero; trust\/testimonials/i);
+    assert.match(sprint!.default_introduction, /Your team provides/i);
+    assert.match(sprint!.default_introduction, /Not included/i);
+    assert.match(sprint!.default_introduction, /approximately 3 weeks/i);
     assert.ok(sprint!.default_addons.length >= 2);
     assert.ok(
       sprint!.default_timeline.every((t) => /business day/i.test(t.description))

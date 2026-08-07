@@ -17,6 +17,7 @@ import {
   defaultPortalExpiry,
 } from "@/lib/proposals/portal";
 import {
+  applyTemplateToProposal,
   enrichProposals,
   getProposalById,
   recordProposalEvent,
@@ -37,6 +38,7 @@ import {
   parseTimeline,
   parseTitle,
   parseCurrency,
+  parseUuid,
 } from "@/lib/proposals/validators";
 
 export const runtime = "nodejs";
@@ -144,6 +146,46 @@ export async function PATCH(request: Request, context: RouteContext) {
     });
     const [proposal] = await enrichProposals(supabase, [data]);
     return NextResponse.json({ proposal, portalToken: token });
+  }
+
+  if (action === "apply_template") {
+    if (!businessEditor) {
+      return NextResponse.json(
+        { error: "You don't have permission to update this proposal." },
+        { status: 403 }
+      );
+    }
+    if (!canEditProposal(existing.status)) {
+      return NextResponse.json(
+        { error: "Only draft or change-request proposals can be refreshed from a template." },
+        { status: 400 }
+      );
+    }
+    try {
+      const templateId = parseUuid(body.templateId ?? body.template_id);
+      const proposal = await applyTemplateToProposal(supabase, {
+        proposal: existing,
+        userId: user.id,
+        templateId,
+      });
+      await recordProposalEvent(supabase, {
+        proposalId: id,
+        eventType: "updated",
+        actorUserId: user.id,
+        metadata: { applyTemplate: true },
+      });
+      return NextResponse.json({ proposal });
+    } catch (err) {
+      return NextResponse.json(
+        {
+          error:
+            err instanceof Error
+              ? err.message
+              : "Couldn't apply template to proposal.",
+        },
+        { status: 500 }
+      );
+    }
   }
 
   if (action === "share") {

@@ -2,6 +2,17 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  ensureDefaultProposalTemplates,
+  findHomepageSprintTemplate,
+  loadProposalTemplate,
+} from "./ensureDefaultTemplates";
+import { calculateProposalPricing } from "./pricing";
+import { applyProposalTemplate } from "./templateApply";
+import {
+  assessmentCreditDeadline,
+  formatProposalDate,
+} from "./templateDates";
+import {
   PROPOSAL_SELECT,
   PROPOSAL_STATUSES,
   type Proposal,
@@ -190,6 +201,99 @@ export async function clientVaultIdsForBusiness(
     .eq("parent_profile_id", businessProfileId)
     .eq("profile_type", "client");
   return (data ?? []).map((row) => String(row.id));
+}
+
+function companyNameFromProposalTitle(title: string): string | undefined {
+  const match = title.match(/^(.+?)\s+[—–-]\s+/);
+  return match?.[1]?.trim() || undefined;
+}
+
+/** Re-apply a stored template to an existing draft proposal. */
+export async function applyTemplateToProposal(
+  supabase: SupabaseClient,
+  args: {
+    proposal: ProposalWithMeta;
+    userId: string;
+    templateId?: string | null;
+  }
+): Promise<ProposalWithMeta> {
+  await ensureDefaultProposalTemplates(supabase, {
+    businessProfileId: args.proposal.business_profile_id,
+    userId: args.userId,
+  });
+
+  const template =
+    (args.templateId
+      ? await loadProposalTemplate(supabase, args.templateId)
+      : null) ??
+    (args.proposal.template_id
+      ? await loadProposalTemplate(supabase, args.proposal.template_id)
+      : null) ??
+    (await findHomepageSprintTemplate(
+      supabase,
+      args.proposal.business_profile_id
+    ));
+
+  if (!template) {
+    throw new Error("No proposal template found to apply.");
+  }
+
+  let company_name = companyNameFromProposalTitle(args.proposal.title);
+  let website_url: string | undefined;
+  let analyzed_at: string | null = null;
+
+  const { data: assessment } = await supabase
+    .from("business_assessments")
+    .select("company_name, website_url, analyzed_at")
+    .eq("proposal_id", args.proposal.id)
+    .maybeSingle();
+
+  if (assessment) {
+    company_name = String(assessment.company_name);
+    website_url = String(assessment.website_url);
+    analyzed_at = (assessment.analyzed_at as string | null) ?? null;
+  }
+
+  const applied = applyProposalTemplate(template, {
+    company_name: company_name ?? args.proposal.client_name ?? undefined,
+    website_url,
+    client_name: args.proposal.client_name ?? undefined,
+    assessment_credit_deadline: assessmentCreditDeadline(analyzed_at),
+    proposal_date: formatProposalDate(),
+  });
+
+  const pricing = calculateProposalPricing({
+    lineItems: applied.lineItems,
+    addons: applied.addons,
+    taxRateBps: args.proposal.tax_rate_bps,
+  });
+
+  const { data, error } = await supabase
+    .from("proposals")
+    .update({
+      template_id: applied.templateId,
+      title: applied.title,
+      summary: applied.summary || null,
+      introduction: applied.introduction || null,
+      terms: applied.terms || null,
+      line_items: applied.lineItems,
+      timeline: applied.timeline,
+      deliverables: applied.deliverables,
+      addons: applied.addons,
+      subtotal_cents: pricing.subtotalCents,
+      tax_cents: pricing.taxCents,
+      total_cents: pricing.totalCents,
+    })
+    .eq("id", args.proposal.id)
+    .select(PROPOSAL_SELECT)
+    .single();
+
+  if (error || !data) {
+    throw new Error("Couldn't apply template to proposal.");
+  }
+
+  const [proposal] = await enrichProposals(supabase, [data]);
+  return proposal;
 }
 
 export { mapProposalRow };

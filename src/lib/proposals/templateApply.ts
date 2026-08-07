@@ -10,6 +10,8 @@ export type TemplatePersonalization = {
   company_name?: string;
   website_url?: string;
   client_name?: string;
+  assessment_credit_deadline?: string;
+  proposal_date?: string;
 };
 
 function personalizeText(
@@ -20,7 +22,20 @@ function personalizeText(
   return value
     .replaceAll("{{company_name}}", vars.company_name ?? "your company")
     .replaceAll("{{website_url}}", vars.website_url ?? "your website")
-    .replaceAll("{{client_name}}", vars.client_name ?? "you");
+    .replaceAll("{{client_name}}", vars.client_name ?? "you")
+    .replaceAll(
+      "{{assessment_credit_deadline}}",
+      vars.assessment_credit_deadline ?? "the deadline in this proposal"
+    )
+    .replaceAll(
+      "{{proposal_date}}",
+      vars.proposal_date ??
+        new Date().toLocaleDateString("en-US", {
+          month: "long",
+          day: "numeric",
+          year: "numeric",
+        })
+    );
 }
 
 function cloneLineItems(

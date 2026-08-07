@@ -20,6 +20,10 @@ import {
 } from "./catalog";
 import { applyProposalTemplate } from "@/lib/proposals/templateApply";
 import {
+  assessmentCreditDeadline,
+  formatProposalDate,
+} from "@/lib/proposals/templateDates";
+import {
   ensureDefaultProposalTemplates,
   findDefaultAssessmentTemplate,
   loadProposalTemplate,
@@ -378,6 +382,8 @@ export async function createProposalFromAssessment(
     company_name: detail.company_name,
     website_url: detail.website_url,
     client_name: detail.client_name ?? undefined,
+    assessment_credit_deadline: assessmentCreditDeadline(detail.analyzed_at),
+    proposal_date: formatProposalDate(),
   });
 
   const pricing = calculateProposalPricing({
