@@ -35,6 +35,7 @@ export type WorkspaceContextBlocks = {
   attachedDocument: string;
   dailyLogs: string;
   clientRequests: string;
+  proposals: string;
   schedule: string;
   linkedProfiles: string;
   vaultMap: string;

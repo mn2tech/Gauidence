@@ -91,6 +91,10 @@ ${blocks.dailyLogs}
 ${blocks.clientRequests}
 --- END CLIENT REQUESTS ---
 
+--- PROPOSALS (business quotes and estimates for client vaults) ---
+${blocks.proposals}
+--- END PROPOSALS ---
+
 --- UPCOMING SCHEDULE (saved reminders and document deadlines; vault owner labeled when linked) ---
 ${blocks.schedule}
 --- END UPCOMING SCHEDULE ---

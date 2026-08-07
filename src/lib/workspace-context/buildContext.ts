@@ -55,6 +55,9 @@ import {
   clientRequestCreateSystemNote,
   formatClientVaultCatalog,
 } from "@/lib/client-requests/proposeCreate";
+import { formatProposalsForGideon } from "@/lib/proposals/retrieve";
+import { PROPOSAL_SELECT } from "@/lib/proposals/types";
+import { mapProposalRow } from "@/lib/proposals/server";
 import type { AttachedVaultDocument } from "@/lib/vault/attachedDocument";
 import { isOrgStyleProfile, type GuardianProfileType } from "@/lib/profiles/types";
 import { collaboratorDisplayName } from "@/lib/profiles/collaboratorDisplay";
@@ -242,6 +245,24 @@ export async function loadWorkspaceContext(
     requestAssigneeNames
   );
 
+  let proposalsContext = "(none)";
+  if (
+    isOrgStyleProfile(activeProfile.profile_type) &&
+    activeProfile.profile_type !== "client" &&
+    /\b(proposal|proposals|quote|estimate)\b/i.test(retrievalQuestion)
+  ) {
+    const { data: proposalRows } = await supabase
+      .from("proposals")
+      .select(PROPOSAL_SELECT)
+      .eq("business_profile_id", activeProfile.id)
+      .order("updated_at", { ascending: false })
+      .limit(8);
+    proposalsContext = formatProposalsForGideon(
+      (proposalRows ?? []).map((row) => mapProposalRow(row)),
+      profileNames
+    );
+  }
+
   const fileInventoryContext = await loadVaultFileInventoryContext(
     supabase,
     searchProfileIds,
@@ -332,6 +353,7 @@ Active vault in the UI: ${activeProfile.display_name}. Document search includes 
       attachedDocument: attachedContext.trim() || "(none)",
       dailyLogs: logContext.trim() || "(none)",
       clientRequests: clientRequestContext.trim() || "(none)",
+      proposals: proposalsContext.trim() || "(none)",
       schedule: scheduleContext.trim() || "(none)",
       linkedProfiles: linkedContext.trim() || "(none)",
       vaultMap: vaultMapContext,

@@ -20,6 +20,7 @@ const DEFAULT_LINK_CLASS =
 const BUSINESS_TOOL_LINKS = [
   { href: "/work-memory", label: "Work Memory" },
   { href: "/recruit", label: "Recruit" },
+  { href: "/proposals", label: "Proposals" },
 ] as const;
 
 /**

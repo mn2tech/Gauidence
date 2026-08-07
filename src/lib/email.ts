@@ -362,6 +362,49 @@ export async function sendClientRequestEmail(args: ClientRequestEmailArgs) {
   return true;
 }
 
+export type ProposalEmailArgs = {
+  to: string;
+  subject: string;
+  heading: string;
+  body: string;
+  openUrl: string;
+};
+
+export function renderProposalEmail(args: ProposalEmailArgs) {
+  const html = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#fafaf9;padding:24px;">
+    <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e7e5e4;border-radius:16px;padding:28px;">
+      <h1 style="margin:0 0 12px;font-size:20px;color:#0f766e;">${escapeHtml(args.heading)}</h1>
+      <p style="margin:0;font-size:14px;color:#44403c;line-height:1.6;white-space:pre-wrap;">${escapeHtml(args.body)}</p>
+      <a href="${escapeHtml(args.openUrl)}" style="display:inline-block;margin-top:20px;padding:12px 20px;border-radius:999px;background:#0f766e;color:#fff;font-size:14px;font-weight:600;text-decoration:none;">Open proposal</a>
+    </div>
+  </div>`;
+  const text = `${args.heading}\n\n${args.body}\n\nOpen proposal: ${args.openUrl}`;
+  return { subject: args.subject, html, text };
+}
+
+export async function sendProposalEmail(args: ProposalEmailArgs) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return false;
+  const from =
+    process.env.INVITE_FROM_EMAIL ??
+    process.env.REMINDER_FROM_EMAIL ??
+    "Guardian <onboarding@resend.dev>";
+  const resend = new Resend(apiKey);
+  const { subject, html, text } = renderProposalEmail(args);
+  const { error } = await resend.emails.send({
+    from,
+    to: args.to,
+    subject,
+    html,
+    text,
+  });
+  if (error) {
+    console.error("Proposal email failed:", args.to, error.message);
+    return false;
+  }
+  return true;
+}
+
 export type ExpertAssignedEmailArgs = {
   to: string;
   expertName: string;

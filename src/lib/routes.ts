@@ -4,6 +4,7 @@ import { SIMPLE_HOME_PATH } from "@/lib/simple-home/routing";
 /** Full vault workspace (sections for files, logs, linked people, etc.). */
 export const DOCUMENTS_PATH = "/dashboard?docs=1";
 export const REQUESTS_PATH = "/requests";
+export const PROPOSALS_PATH = "/proposals";
 
 /** Header / nav label for {@link DOCUMENTS_PATH}. */
 export const VAULT_NAV_LABEL = "Vault";
