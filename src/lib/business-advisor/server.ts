@@ -7,7 +7,10 @@ import {
   createLlmClient,
   runChatCompletion,
 } from "@/lib/analysis/llm";
-import { isAnthropicConfigured } from "@/lib/analysis/chatProvider";
+import {
+  isAnthropicConfigured,
+  isChatLlmConfigured,
+} from "@/lib/analysis/chatProvider";
 import { withLlmUsage } from "@/lib/usage/record";
 import { calculateProposalPricing } from "@/lib/proposals/pricing";
 import type { ProposalLineItem, ProposalTimelineItem, ProposalDeliverable } from "@/lib/proposals/types";
@@ -22,7 +25,7 @@ import { allAnalyzerFindings } from "./analyzers";
 import {
   SYNTHESIS_SYSTEM,
   buildSynthesisPrompt,
-  parseSynthesis,
+  resolveSynthesis,
 } from "./synthesize";
 import {
   ASSESSMENT_SELECT,
@@ -131,29 +134,41 @@ export async function runAssessmentAnalysis(
     const findings = allAnalyzerFindings(discovery);
     const catalog = await ensureAdvisorCatalog(supabase, args.businessProfileId);
 
-    const client = isAnthropicConfigured() ? createLlmClient() : null;
-    const raw = await withLlmUsage(
-      { userId: args.userId, feature: "other" },
-      () =>
-        runChatCompletion(client, {
-          system: SYNTHESIS_SYSTEM,
-          model: CHAT_MODEL,
-          maxTokens: 2200,
-          messages: [
-            {
-              role: "user",
-              content: buildSynthesisPrompt({
-                companyName: detail.company_name,
-                websiteUrl: detail.website_url,
-                findings,
-                catalog,
-                textSample: discovery.textSample,
-              }),
-            },
-          ],
-        })
-    );
-    const synthesis = parseSynthesis(raw);
+    let raw: string | null = null;
+    if (isChatLlmConfigured()) {
+      const client = isAnthropicConfigured() ? createLlmClient() : null;
+      try {
+        raw = await withLlmUsage(
+          { userId: args.userId, feature: "other" },
+          () =>
+            runChatCompletion(client, {
+              system: SYNTHESIS_SYSTEM,
+              model: CHAT_MODEL,
+              maxTokens: 2200,
+              messages: [
+                {
+                  role: "user",
+                  content: buildSynthesisPrompt({
+                    companyName: detail.company_name,
+                    websiteUrl: detail.website_url,
+                    findings,
+                    catalog,
+                    textSample: discovery.textSample,
+                  }),
+                },
+              ],
+            })
+        );
+      } catch (err) {
+        console.warn("Business Advisor LLM synthesis failed; using fallback", err);
+      }
+    }
+    const synthesis = resolveSynthesis(raw, {
+      companyName: detail.company_name,
+      websiteUrl: detail.website_url,
+      findings,
+      catalog,
+    });
 
     await supabase
       .from("assessment_findings")

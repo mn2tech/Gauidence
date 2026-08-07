@@ -15,6 +15,7 @@ import {
 import { useActiveProfile } from "@/components/ProfileProvider";
 import { activeClientsOf, isOrgStyleProfile } from "@/lib/profiles/types";
 import { formatMoney } from "@/lib/proposals/pricing";
+import { readJsonResponse } from "@/lib/http/readJsonResponse";
 import { PROPOSALS_PATH } from "@/lib/routes";
 import type { BusinessAssessment, BusinessAssessmentDetail } from "@/lib/business-advisor/types";
 
@@ -67,7 +68,10 @@ export default function BusinessAdvisorScreen() {
       const res = await fetch(
         `/api/business-advisor/assessments?businessProfileId=${businessProfileId}`
       );
-      const body = await res.json();
+      const body = await readJsonResponse<{
+        error?: string;
+        assessments?: BusinessAssessment[];
+      }>(res);
       if (!res.ok) throw new Error(body.error ?? "Couldn't load assessments.");
       setAssessments(body.assessments ?? []);
     } catch (err) {
@@ -81,7 +85,7 @@ export default function BusinessAdvisorScreen() {
     setError(null);
     try {
       const res = await fetch(`/api/business-advisor/assessments/${id}`);
-      const body = await res.json();
+      const body = await readJsonResponse<{ error?: string; assessment?: BusinessAssessmentDetail }>(res);
       if (!res.ok) throw new Error(body.error ?? "Couldn't load assessment.");
       setDetail(body.assessment ?? null);
     } catch (err) {
@@ -115,8 +119,14 @@ export default function BusinessAdvisorScreen() {
           clientProfileId: clientProfileId || undefined,
         }),
       });
-      const body = await res.json();
+      const body = await readJsonResponse<{
+        error?: string;
+        assessment?: { id: string };
+      }>(res);
       if (!res.ok) throw new Error(body.error ?? "Couldn't create assessment.");
+      if (!body.assessment?.id) {
+        throw new Error("Couldn't create assessment.");
+      }
       setShowNew(false);
       await loadList();
       router.push(`/business-advisor?id=${body.assessment.id}`);
@@ -133,7 +143,7 @@ export default function BusinessAdvisorScreen() {
         `/api/business-advisor/assessments/${id}/analyze`,
         { method: "POST" }
       );
-      const body = await res.json();
+      const body = await readJsonResponse<{ error?: string; assessment?: BusinessAssessmentDetail }>(res);
       if (!res.ok) throw new Error(body.error ?? "Analysis failed.");
       setDetail(body.assessment);
       await loadList();
@@ -161,8 +171,14 @@ export default function BusinessAdvisorScreen() {
           body: JSON.stringify({ clientProfileId: clientId }),
         }
       );
-      const body = await res.json();
+      const body = await readJsonResponse<{
+        error?: string;
+        proposalId?: string;
+      }>(res);
       if (!res.ok) throw new Error(body.error ?? "Couldn't create proposal.");
+      if (!body.proposalId) {
+        throw new Error("Couldn't create proposal.");
+      }
       router.push(`${PROPOSALS_PATH}?id=${body.proposalId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't create proposal.");

@@ -90,9 +90,7 @@ export type SynthesisResult = {
   recommendedSolutionKeys: string[];
 };
 
-export function parseSynthesis(raw: string): SynthesisResult {
-  const jsonText = raw.trim().replace(/^```json\s*/i, "").replace(/```$/i, "").trim();
-  const parsed = JSON.parse(jsonText) as Record<string, unknown>;
+function normalizeSynthesis(parsed: Record<string, unknown>): SynthesisResult {
   return {
     industry: String(parsed.industry ?? "general"),
     executiveSummary: String(parsed.executiveSummary ?? ""),
@@ -106,4 +104,128 @@ export function parseSynthesis(raw: string): SynthesisResult {
       ? (parsed.recommendedSolutionKeys as string[])
       : [],
   };
+}
+
+export function parseSynthesis(raw: string): SynthesisResult {
+  const jsonText = raw
+    .trim()
+    .replace(/^```json\s*/i, "")
+    .replace(/```$/i, "")
+    .trim();
+  if (!jsonText) {
+    throw new Error("AI synthesis returned empty output.");
+  }
+  try {
+    return normalizeSynthesis(JSON.parse(jsonText) as Record<string, unknown>);
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : "Invalid JSON";
+    throw new Error(`AI synthesis returned invalid JSON: ${detail}`);
+  }
+}
+
+const FINDING_SOLUTION_MAP: Record<string, string> = {
+  transport: "website_security_hardening",
+  headers: "website_security_hardening",
+  security: "website_security_hardening",
+  seo: "seo_optimization",
+  metadata: "seo_optimization",
+  content: "seo_optimization",
+  performance: "performance_optimization",
+  trust: "client_portal",
+  accessibility: "accessibility_compliance",
+};
+
+function severityToImpact(
+  severity: AnalyzerFinding["severity"]
+): "low" | "medium" | "high" {
+  if (severity === "critical" || severity === "high") return "high";
+  if (severity === "medium") return "medium";
+  return "low";
+}
+
+function solutionKeyForFinding(finding: AnalyzerFinding): string | null {
+  return (
+    FINDING_SOLUTION_MAP[finding.category] ??
+    FINDING_SOLUTION_MAP[finding.analyzer] ??
+    null
+  );
+}
+
+/** Rule-based synthesis when the LLM is unavailable or returns bad JSON. */
+export function fallbackSynthesis(args: {
+  companyName: string;
+  websiteUrl: string;
+  findings: AnalyzerFinding[];
+  catalog: AdvisorServiceCatalogItem[];
+}): SynthesisResult {
+  const catalogKeys = new Set(args.catalog.map((c) => c.service_key));
+  const playbook = INDUSTRY_PLAYBOOKS.general;
+
+  const opportunities = args.findings.map((f, index) => ({
+    title: f.business_impact,
+    description: f.description,
+    category: f.analyzer === "security" ? "security" : f.category || "operations",
+    estimatedImpact: severityToImpact(f.severity),
+    confidence: "high" as const,
+    priority: Math.max(10, 100 - index * 8),
+    potentialOutcome: f.business_impact,
+    guardianSolutionKey: solutionKeyForFinding(f),
+    findingTitle: f.title,
+  }));
+
+  const recommendedSolutionKeys = [
+    ...new Set(
+      [
+        ...args.findings
+          .map(solutionKeyForFinding)
+          .filter((key): key is string => Boolean(key)),
+        ...playbook.solutionKeys,
+      ].filter((key) => catalogKeys.has(key))
+    ),
+  ].slice(0, 6);
+
+  const outcomes = args.findings.slice(0, 5).map((f) => ({
+    outcomeText: f.business_impact,
+    measurableMetric: undefined,
+  }));
+
+  const findingSummary =
+    args.findings.length === 0
+      ? "No critical issues were detected in the automated scan."
+      : `Our scan identified ${args.findings.length} area${
+          args.findings.length === 1 ? "" : "s"
+        } to strengthen security, trust, and discoverability.`;
+
+  return {
+    industry: "general",
+    executiveSummary: `Guardian reviewed ${args.companyName}'s website (${args.websiteUrl}). ${findingSummary} The recommendations below translate technical findings into business outcomes and Guardian solutions you can price and deliver.`,
+    opportunities,
+    outcomes,
+    recommendedSolutionKeys,
+  };
+}
+
+/** Parse LLM JSON when possible; otherwise use deterministic fallback. */
+export function resolveSynthesis(
+  raw: string | null | undefined,
+  fallbackArgs: {
+    companyName: string;
+    websiteUrl: string;
+    findings: AnalyzerFinding[];
+    catalog: AdvisorServiceCatalogItem[];
+  }
+): SynthesisResult {
+  const trimmed = raw?.trim() ?? "";
+  if (!trimmed) {
+    return fallbackSynthesis(fallbackArgs);
+  }
+  try {
+    return parseSynthesis(trimmed);
+  } catch (err) {
+    console.warn(
+      "Business Advisor LLM synthesis parse failed; using fallback",
+      err
+    );
+    return fallbackSynthesis(fallbackArgs);
+  }
 }
