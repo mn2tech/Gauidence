@@ -13,6 +13,7 @@ import {
   profileTypeLabel,
   sharedProfileAccessBadge,
   topLevelProfiles,
+  vaultLabel,
   type GuardianProfile,
   type NestedVaultGroup,
 } from "@/lib/profiles/types";
@@ -218,7 +219,7 @@ function ProfileMenu({
   );
 }
 
-function useProfileMenu() {
+function useProfileMenu(onAfterSwitch?: (id: string) => void) {
   const { profiles, active, loading, switchProfile } = useActiveProfile();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -235,6 +236,7 @@ function useProfileMenu() {
   const pick = (id: string) => {
     void (async () => {
       if (active && id !== active.id) await switchProfile(id);
+      onAfterSwitch?.(id);
       setOpen(false);
     })();
   };
@@ -283,6 +285,50 @@ export default function ProfileSwitcher() {
           onPick={pick}
           onClose={close}
           align="right"
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/** Vault workspace header: active vault name + dropdown to switch vaults. */
+export function VaultHeaderProfileSwitch({
+  onAfterSwitch,
+}: {
+  onAfterSwitch?: (id: string) => void;
+}) {
+  const { profiles, active, loading, open, setOpen, rootRef, pick, close } =
+    useProfileMenu(onAfterSwitch);
+
+  if (loading && !active) {
+    return <span className="text-xs text-ink-muted">Loading…</span>;
+  }
+  if (!active) return null;
+
+  return (
+    <div className="relative min-w-0" ref={rootRef}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        aria-label={`Switch vault (currently ${active.display_name})`}
+        title={vaultLabel(active)}
+        className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-lg px-1 py-0.5 text-left transition hover:bg-stone-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+      >
+        <ProfileAvatar profile={active} size="sm" />
+        <span className="min-w-0 truncate text-sm font-medium text-foreground">
+          {vaultLabel(active)}
+        </span>
+        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-ink-muted" />
+      </button>
+      {open ? (
+        <ProfileMenu
+          profiles={profiles}
+          activeId={active.id}
+          onPick={pick}
+          onClose={close}
+          align="left"
         />
       ) : null}
     </div>

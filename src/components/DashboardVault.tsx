@@ -1,10 +1,12 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { MessageCircle, Search, ShieldCheck } from "lucide-react";
 import DocumentManager from "@/components/DocumentManager";
+import GlobalVaultSearch from "@/components/GlobalVaultSearch";
+import { VaultHeaderProfileSwitch } from "@/components/ProfileSwitcher";
 import AlertsPanel from "@/components/AlertsPanel";
 import DailyLogPanel from "@/components/DailyLogPanel";
 import LinkedEmployeesPanel from "@/components/LinkedEmployeesPanel";
@@ -35,12 +37,47 @@ import {
   canHaveLinkedStudents,
   canHaveLinkedVehicles,
   isClientViewerProfile,
-  vaultLabel,
   type GuardianProfileType,
 } from "@/lib/profiles/types";
 import { EMPLOYEE_HUB_PATH } from "@/lib/employee-hub/routing";
 import { hasDocumentsIntent, REQUESTS_PATH } from "@/lib/routes";
 import { clientBusinessLabel } from "@/lib/client-requests/helpers";
+
+function vaultSwitchHref(profileId: string, searchParams: URLSearchParams) {
+  const params = new URLSearchParams(searchParams.toString());
+  if (!params.has("docs")) params.set("docs", "1");
+  const qs = params.toString();
+  return `/dashboard?${qs}#documents-${profileId}`;
+}
+
+function VaultStickyBar({
+  onVaultSwitch,
+  onSearchOpen,
+  actions,
+}: {
+  onVaultSwitch: (id: string) => void;
+  onSearchOpen: () => void;
+  actions: ReactNode;
+}) {
+  return (
+    <div className="sticky top-14 z-30 -mx-4 flex flex-wrap items-center justify-between gap-2 border-b border-stone-200 bg-background/95 px-4 py-2.5 backdrop-blur sm:top-16 sm:mx-0 sm:rounded-xl sm:border sm:bg-white/95 sm:px-3 sm:shadow-sm">
+      <div className="flex min-w-0 flex-1 items-center gap-1.5">
+        <VaultHeaderProfileSwitch onAfterSwitch={onVaultSwitch} />
+        <button
+          type="button"
+          onClick={onSearchOpen}
+          aria-label="Search vaults"
+          title="Search people, logs, and documents"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-stone-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50 sm:px-3"
+        >
+          <Search className="h-3.5 w-3.5 text-brand" aria-hidden />
+          Search
+        </button>
+      </div>
+      <div className="flex shrink-0 items-center gap-1.5">{actions}</div>
+    </div>
+  );
+}
 
 function DocumentsSection({
   userId,
@@ -145,6 +182,14 @@ export default function DashboardVault({ userId }: { userId: string }) {
   const requestedProfileId = searchParams.get("profileId");
   const switchingRef = useRef(false);
   const sectionDefaults = useVaultSectionDefaults(active?.id ?? "");
+  const [vaultSearchOpen, setVaultSearchOpen] = useState(false);
+
+  const handleVaultSwitch = useCallback(
+    (profileId: string) => {
+      router.replace(vaultSwitchHref(profileId, searchParams));
+    },
+    [router, searchParams]
+  );
 
   useEffect(() => {
     const onChange = () => router.refresh();
@@ -224,28 +269,34 @@ export default function DashboardVault({ userId }: { userId: string }) {
           </Link>
         </div>
 
-        <div className="sticky top-14 z-30 -mx-4 flex items-center justify-end gap-1.5 border-b border-stone-200 bg-background/95 px-4 py-2.5 backdrop-blur sm:top-16 sm:mx-0 sm:rounded-xl sm:border sm:bg-white/95 sm:px-3 sm:shadow-sm">
-          <Link
-            href={REQUESTS_PATH}
-            aria-label="My requests"
-            title="View and create requests"
-            className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50 sm:px-3"
-          >
-            Requests
-          </Link>
-          <Link
-            href="/ask"
-            aria-label="Ask Gideon"
-            title={askGideonContextLabel(active)}
-            className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50 sm:px-3"
-          >
-            <MessageCircle className="h-3.5 w-3.5 text-brand" aria-hidden />
-            Ask
-            <span className="text-ink-muted" aria-hidden>
-              →
-            </span>
-          </Link>
-        </div>
+        <VaultStickyBar
+          onVaultSwitch={handleVaultSwitch}
+          onSearchOpen={() => setVaultSearchOpen(true)}
+          actions={
+            <>
+              <Link
+                href={REQUESTS_PATH}
+                aria-label="My requests"
+                title="View and create requests"
+                className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50 sm:px-3"
+              >
+                Requests
+              </Link>
+              <Link
+                href="/ask"
+                aria-label="Ask Gideon"
+                title={askGideonContextLabel(active)}
+                className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50 sm:px-3"
+              >
+                <MessageCircle className="h-3.5 w-3.5 text-brand" aria-hidden />
+                Ask
+                <span className="text-ink-muted" aria-hidden>
+                  →
+                </span>
+              </Link>
+            </>
+          }
+        />
 
         <VaultSection
           id={`documents-${active.id}`}
@@ -270,6 +321,10 @@ export default function DashboardVault({ userId }: { userId: string }) {
             />
           </Suspense>
         </VaultSection>
+        <GlobalVaultSearch
+          open={vaultSearchOpen}
+          onClose={() => setVaultSearchOpen(false)}
+        />
       </div>
     );
   }
@@ -278,55 +333,55 @@ export default function DashboardVault({ userId }: { userId: string }) {
     <div className="space-y-6">
       <GettingStartedStrip />
 
-      <div className="sticky top-14 z-30 -mx-4 flex items-center justify-between gap-3 border-b border-stone-200 bg-background/95 px-4 py-2.5 backdrop-blur sm:top-16 sm:mx-0 sm:rounded-xl sm:border sm:bg-white/95 sm:px-3 sm:shadow-sm">
-        <p className="min-w-0 truncate text-sm text-ink-muted">
-          {vaultLabel(active)}
-        </p>
-        <div className="flex shrink-0 items-center gap-1.5">
-          {active.profile_type === "client" ? (
-            <>
+      <VaultStickyBar
+        onVaultSwitch={handleVaultSwitch}
+        onSearchOpen={() => setVaultSearchOpen(true)}
+        actions={
+          <>
+            {active.profile_type === "client" ? (
+              <>
+                <Link
+                  href={REQUESTS_PATH}
+                  aria-label="My requests"
+                  title="View your requests"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50 sm:px-3"
+                >
+                  Requests
+                </Link>
+                <Link
+                  href={`${REQUESTS_PATH}?new=1`}
+                  aria-label="New request"
+                  title={`New request for ${clientBusinessLabel(profiles, active)}`}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-brand/30 bg-brand/5 px-2.5 py-1.5 text-xs font-semibold text-brand transition hover:bg-brand/10 sm:px-3"
+                >
+                  New request
+                </Link>
+              </>
+            ) : (
               <Link
-                href={REQUESTS_PATH}
-                aria-label="My requests"
-                title="View your requests"
+                href="/research"
+                aria-label="Research"
+                title="Research a company or person"
                 className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50 sm:px-3"
               >
-                Requests
+                Research
               </Link>
-              <Link
-                href={`${REQUESTS_PATH}?new=1`}
-                aria-label="New request"
-                title={`New request for ${clientBusinessLabel(profiles, active)}`}
-                className="inline-flex items-center gap-1.5 rounded-full border border-brand/30 bg-brand/5 px-2.5 py-1.5 text-xs font-semibold text-brand transition hover:bg-brand/10 sm:px-3"
-              >
-                New request
-              </Link>
-            </>
-          ) : (
+            )}
             <Link
-              href="/research"
-              aria-label="Research"
-              title="Research a company or person"
+              href="/ask"
+              aria-label="Ask Gideon"
+              title={askGideonContextLabel(active)}
               className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50 sm:px-3"
             >
-              <Search className="h-3.5 w-3.5 text-brand" aria-hidden />
-              Research
+              <MessageCircle className="h-3.5 w-3.5 text-brand" aria-hidden />
+              Ask
+              <span className="text-ink-muted" aria-hidden>
+                →
+              </span>
             </Link>
-          )}
-          <Link
-            href="/ask"
-            aria-label="Ask Gideon"
-            title={askGideonContextLabel(active)}
-            className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50 sm:px-3"
-          >
-            <MessageCircle className="h-3.5 w-3.5 text-brand" aria-hidden />
-            Ask
-            <span className="text-ink-muted" aria-hidden>
-              →
-            </span>
-          </Link>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       <VaultJumpBar profile={active} />
 
@@ -508,6 +563,10 @@ export default function DashboardVault({ userId }: { userId: string }) {
           chips above to jump quickly, or tap a title to expand or collapse.
         </p>
       </div>
+      <GlobalVaultSearch
+        open={vaultSearchOpen}
+        onClose={() => setVaultSearchOpen(false)}
+      />
     </div>
   );
 }
