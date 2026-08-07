@@ -19,13 +19,14 @@ export type ProposalTemplateSeed = {
 };
 
 export const DEFAULT_ASSESSMENT_TEMPLATE_NAME = "Website & Conversion Assessment";
+export const DEFAULT_HOMEPAGE_SPRINT_TEMPLATE_NAME = "Homepage Redesign Sprint";
 export const DEFAULT_KNOWLEDGE_BASE_TEMPLATE_NAME = "Guardian Knowledge Base";
 
 export const DEFAULT_PROPOSAL_TEMPLATE_SEEDS: ProposalTemplateSeed[] = [
   {
     name: DEFAULT_ASSESSMENT_TEMPLATE_NAME,
     description:
-      "$99 website and conversion assessment. Fee credited toward implementation within 30 days.",
+      "$99 website and conversion assessment. Fee credited toward implementation within 30 days of delivery.",
     default_title: "{{company_name}} — Website & Conversion Assessment",
     default_summary:
       "A focused review of {{company_name}}'s website ({{website_url}}) with a written priority plan and walkthrough.",
@@ -34,8 +35,13 @@ export const DEFAULT_PROPOSAL_TEMPLATE_SEEDS: ProposalTemplateSeed[] = [
       "",
       "This assessment includes everything from your free website review, plus a written plan and a short walkthrough call.",
     ].join("\n"),
-    default_terms:
-      "The $99 assessment fee is fully credited toward implementation if you proceed within 30 days. Pricing valid for 30 days.",
+    default_terms: [
+      "The $99 assessment fee is fully credited toward an implementation project (e.g. Homepage Redesign Sprint) if you approve that proposal within 30 days of assessment delivery — the date your written priority plan and walkthrough are delivered.",
+      "",
+      "Pricing valid for 30 days from this proposal date.",
+      "",
+      "Next step: approve this assessment proposal below. We will confirm scheduling and send any payment link for the $99 fee.",
+    ].join("\n"),
     default_line_items: [
       {
         title: "Website & Conversion Assessment",
@@ -43,7 +49,7 @@ export const DEFAULT_PROPOSAL_TEMPLATE_SEEDS: ProposalTemplateSeed[] = [
           "Everything in your free website review package.",
           "Written priority plan based on your site review.",
           "15-minute walkthrough call or Loom recording.",
-          "$99 fully credited toward implementation if you proceed within 30 days.",
+          "$99 fully credited toward implementation if you approve within 30 days of assessment delivery.",
         ].join("\n"),
         quantity: 1,
         unitLabel: "assessment",
@@ -53,12 +59,14 @@ export const DEFAULT_PROPOSAL_TEMPLATE_SEEDS: ProposalTemplateSeed[] = [
     default_timeline: [
       {
         title: "Kickoff & access",
-        description: "Confirm goals, analytics access, and review materials.",
+        description:
+          "Confirm goals, analytics access, and review materials. (1–2 business days)",
         sortOrder: 0,
       },
       {
         title: "Assessment delivery",
-        description: "Written priority plan and walkthrough of recommendations.",
+        description:
+          "Written priority plan and walkthrough of recommendations. (2–3 business days from kickoff; 3–5 business days total)",
         sortOrder: 1,
       },
     ],
@@ -82,19 +90,57 @@ export const DEFAULT_PROPOSAL_TEMPLATE_SEEDS: ProposalTemplateSeed[] = [
     default_addons: [],
   },
   {
-    name: "Homepage Redesign Sprint",
+    name: DEFAULT_HOMEPAGE_SPRINT_TEMPLATE_NAME,
     description:
-      "Design and build homepage improvements for trust, clarity, and conversions.",
+      "Design and build homepage improvements for trust, clarity, and conversions. 2–3 week fixed-scope sprint.",
     default_title: "{{company_name}} — Homepage Redesign Sprint",
     default_summary:
-      "A focused redesign sprint to improve {{company_name}}'s homepage based on your website review.",
+      "A focused 2–3 week redesign sprint to improve {{company_name}}'s homepage — trust, messaging, CTAs, and conversion paths — based on your website review.",
     default_introduction: [
       "This sprint addresses the highest-impact homepage improvements identified in your review — trust signals, clearer messaging, stronger calls to action, and conversion paths.",
       "",
-      "Scope is confirmed during kickoff. Assessment fee applies as credit when purchased within 30 days.",
+      "Timeline: 2–3 weeks total from kickoff (see phases below). Final homepage scope is confirmed during kickoff.",
+      "",
+      "Client responsibilities",
+      "• Provide brand assets, homepage copy, and site/CMS access before or at kickoff",
+      "• Name one decision-maker for consolidated feedback",
+      "• Return feedback within 3 business days per review round",
+      "",
+      "What's not included",
+      "Interior pages, net-new copywriting beyond homepage edits, photography, logo/brand design, hosting/domain fees, and post-launch change requests. Full out-of-scope list is in Terms.",
+      "",
+      "After launch",
+      "Many clients continue with interior pages or a monthly care plan — see optional add-ons below.",
     ].join("\n"),
-    default_terms:
-      "Final scope confirmed at kickoff. One round of revision included per major section. Pricing valid for 30 days.",
+    default_terms: [
+      "PAYMENT",
+      "• 50% deposit due to schedule kickoff; 50% balance due at launch",
+      "• Invoices are net 7 days",
+      "• Pricing valid for 30 days from this proposal date",
+      "",
+      "ASSESSMENT CREDIT",
+      "• If you purchased the Website & Conversion Assessment, the $99 fee credits toward this sprint when you approve within 30 days of assessment delivery (the date your written plan and walkthrough are delivered)",
+      "",
+      "REVISIONS",
+      "• One round of revisions included per major homepage section: hero, trust/testimonials, services, about/team, and CTA/contact",
+      "• Additional rounds, new sections, or scope changes are billed separately",
+      "",
+      "CLIENT RESPONSIBILITIES",
+      "• Timely delivery of content, brand assets, and site/CMS access",
+      "• Feedback within 3 business days per review round",
+      "• Schedule shifts caused by client delays will be communicated in writing",
+      "",
+      "OUT OF SCOPE",
+      "• Interior or additional pages beyond the homepage",
+      "• Net-new copywriting beyond light homepage edits",
+      "• Photography, videography, or logo/brand identity work",
+      "• Hosting, domain, or third-party subscription fees",
+      "• Post-launch edits, A/B tests, or ongoing SEO (available as add-ons)",
+      "",
+      "NEXT STEP",
+      "• Click Approve proposal below to accept these terms",
+      "• We will send a 50% deposit invoice within 1 business day; the sprint is scheduled when the deposit is received",
+    ].join("\n"),
     default_line_items: [
       {
         title: "Homepage Redesign Sprint",
@@ -102,7 +148,9 @@ export const DEFAULT_PROPOSAL_TEMPLATE_SEEDS: ProposalTemplateSeed[] = [
           "Homepage UX and content strategy aligned to your review.",
           "Design concepts and responsive build.",
           "Trust and conversion improvements (testimonials, team, CTAs, forms).",
+          "One revision round per major section: hero, trust/testimonials, services, about/team, CTA/contact.",
           "QA, launch support, and handoff documentation.",
+          "2–3 weeks total from kickoff.",
         ].join("\n"),
         quantity: 1,
         unitLabel: "project",
@@ -112,38 +160,68 @@ export const DEFAULT_PROPOSAL_TEMPLATE_SEEDS: ProposalTemplateSeed[] = [
     default_timeline: [
       {
         title: "Discovery & kickoff",
-        description: "Align on scope, brand, and success metrics.",
+        description:
+          "Align on scope, brand, success metrics, and client asset handoff. (2–3 business days)",
         sortOrder: 0,
       },
       {
         title: "Design & build",
-        description: "Homepage redesign, content updates, and development.",
+        description:
+          "Homepage redesign, content updates, development, and one revision round per major section. (7–10 business days)",
         sortOrder: 1,
       },
       {
         title: "Launch & handoff",
-        description: "QA, go-live, and team training.",
+        description:
+          "QA, go-live, team walkthrough, and documentation. (2–3 business days; 2–3 weeks total)",
         sortOrder: 2,
       },
     ],
     default_deliverables: [
       {
         title: "Homepage redesign",
-        description: "Updated layout, messaging, and visual design.",
+        description:
+          "Updated layout, messaging, and visual design for the homepage only.",
         sortOrder: 0,
       },
       {
         title: "Trust & conversion upgrades",
-        description: "Testimonials, team/about, quote paths, and form improvements as scoped.",
+        description:
+          "Testimonials, team/about, quote paths, and form improvements within homepage scope.",
         sortOrder: 1,
       },
       {
         title: "Launch & documentation",
-        description: "Deployed site plus handoff notes for your team.",
+        description: "Deployed homepage plus handoff notes for your team.",
         sortOrder: 2,
       },
+      {
+        title: "Out of scope (reference)",
+        description:
+          "Interior pages, new copy packages, photography, logo work, hosting, and post-launch changes — not included in this sprint.",
+        sortOrder: 3,
+      },
     ],
-    default_addons: [],
+    default_addons: [
+      {
+        title: "Interior pages — design & build (up to 3 pages)",
+        description:
+          "Extend the new homepage look to key interior pages (e.g. services, about, contact).",
+        quantity: 1,
+        unitLabel: "package",
+        unitPriceCents: 250000,
+        optional: true,
+      },
+      {
+        title: "Website care plan — monthly",
+        description:
+          "Post-launch updates, security patches, minor content edits, and monthly performance check-in.",
+        quantity: 1,
+        unitLabel: "month",
+        unitPriceCents: 29900,
+        optional: true,
+      },
+    ],
   },
   {
     name: "SEO & Discoverability Program",

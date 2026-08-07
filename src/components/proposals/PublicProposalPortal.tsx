@@ -253,13 +253,24 @@ export default function PublicProposalPortal({ token }: { token: string }) {
       {done ? (
         <p className="mt-6 rounded-xl border border-emerald-500/30 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-100">
           {done === "accepted"
-            ? "Thank you — this proposal has been accepted."
+            ? "Thank you — this proposal is approved. If a deposit applies, watch for an invoice within 1 business day so we can schedule kickoff."
             : done === "declined"
               ? "This proposal has been declined."
               : "Your change request has been sent to the business."}
         </p>
       ) : proposal.status !== "accepted" && proposal.status !== "declined" ? (
         <div className="mt-8 space-y-3">
+          <div className="rounded-xl border border-teal-500/30 bg-teal-950/20 px-4 py-3">
+            <h2 className="text-sm font-semibold text-teal-200">Next step</h2>
+            <p className="mt-1 text-sm leading-relaxed text-stone-300">
+              Review the terms above. When you&apos;re ready, click{" "}
+              <strong className="font-semibold text-stone-100">
+                Approve proposal
+              </strong>{" "}
+              below. If a deposit applies, you&apos;ll receive an invoice within 1
+              business day to schedule kickoff.
+            </p>
+          </div>
           <textarea
             className="w-full rounded-xl border border-stone-700 bg-stone-950 px-3 py-2.5 text-sm text-stone-100 placeholder:text-stone-500 focus:border-teal-500 focus:outline-none"
             placeholder="Optional feedback or change requests"
@@ -278,7 +289,7 @@ export default function PublicProposalPortal({ token }: { token: string }) {
               ) : (
                 <CheckCircle2 className="h-4 w-4" />
               )}
-              Accept proposal
+              Approve proposal
             </button>
             <button
               type="button"

@@ -345,7 +345,7 @@ export default function ClientProposalsScreen() {
             {done ? (
               <p className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
                 {done === "accepted"
-                  ? "Thank you — this proposal has been accepted."
+                  ? "Thank you — this proposal is approved. If a deposit applies, watch for an invoice within 1 business day so we can schedule kickoff."
                   : done === "declined"
                     ? "This proposal has been declined."
                     : "Your change request has been sent."}
@@ -353,6 +353,19 @@ export default function ClientProposalsScreen() {
             ) : proposal.status !== "accepted" &&
               proposal.status !== "declined" ? (
               <div className="mt-8 space-y-3">
+                <div className="rounded-xl border border-brand/20 bg-brand/5 px-4 py-3">
+                  <h2 className="text-sm font-semibold text-foreground">
+                    Next step
+                  </h2>
+                  <p className="mt-1 text-sm leading-relaxed text-ink-muted">
+                    Review the terms above. When you&apos;re ready, click{" "}
+                    <strong className="font-semibold text-foreground">
+                      Approve proposal
+                    </strong>{" "}
+                    below. If a deposit applies, you&apos;ll receive an invoice
+                    within 1 business day to schedule kickoff.
+                  </p>
+                </div>
                 <textarea
                   className={inputClass}
                   placeholder="Optional feedback or change requests"
@@ -371,7 +384,7 @@ export default function ClientProposalsScreen() {
                     ) : (
                       <CheckCircle2 className="h-4 w-4" />
                     )}
-                    Accept proposal
+                    Approve proposal
                   </button>
                   <button
                     type="button"

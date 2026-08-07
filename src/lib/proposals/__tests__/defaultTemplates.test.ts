@@ -1,12 +1,30 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  DEFAULT_HOMEPAGE_SPRINT_TEMPLATE_NAME,
   DEFAULT_KNOWLEDGE_BASE_TEMPLATE_NAME,
   DEFAULT_PROPOSAL_TEMPLATE_SEEDS,
   templateSeedTotalCents,
 } from "../defaultTemplates.ts";
 
 describe("DEFAULT_PROPOSAL_TEMPLATE_SEEDS", () => {
+  it("includes Homepage Redesign Sprint with commercial guardrails", () => {
+    const sprint = DEFAULT_PROPOSAL_TEMPLATE_SEEDS.find(
+      (s) => s.name === DEFAULT_HOMEPAGE_SPRINT_TEMPLATE_NAME
+    );
+    assert.ok(sprint);
+    assert.match(sprint!.default_terms, /50% deposit/i);
+    assert.match(sprint!.default_terms, /net 7/i);
+    assert.match(sprint!.default_terms, /OUT OF SCOPE/i);
+    assert.match(sprint!.default_terms, /hero, trust\/testimonials/i);
+    assert.match(sprint!.default_terms, /assessment delivery/i);
+    assert.match(sprint!.default_introduction, /2–3 weeks/i);
+    assert.ok(sprint!.default_addons.length >= 2);
+    assert.ok(
+      sprint!.default_timeline.every((t) => /business day/i.test(t.description))
+    );
+  });
+
   it("includes Guardian Knowledge Base with SOP and compliance deliverables", () => {
     const kb = DEFAULT_PROPOSAL_TEMPLATE_SEEDS.find(
       (s) => s.name === DEFAULT_KNOWLEDGE_BASE_TEMPLATE_NAME
