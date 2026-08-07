@@ -7,6 +7,7 @@ import {
   useState,
   type ClipboardEvent,
   type FormEvent,
+  type KeyboardEvent,
   type MouseEvent,
 } from "react";
 import Link from "next/link";
@@ -720,6 +721,32 @@ export default function VaultChatPanel({
     : isDrawer
       ? "ask-gideon-drawer-input"
       : "ask-gideon-input";
+  const composerInputRef = useRef<HTMLTextAreaElement>(null);
+  const COMPOSER_MAX_LINES = 6;
+
+  const resizeComposerInput = useCallback(() => {
+    const el = composerInputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    const styles = window.getComputedStyle(el);
+    const lineHeight = parseFloat(styles.lineHeight) || 20;
+    const padding =
+      parseFloat(styles.paddingTop) + parseFloat(styles.paddingBottom);
+    const maxHeight = lineHeight * COMPOSER_MAX_LINES + padding;
+    const nextHeight = Math.min(el.scrollHeight, maxHeight);
+    el.style.height = `${nextHeight}px`;
+    el.style.overflowY = el.scrollHeight > maxHeight ? "auto" : "hidden";
+  }, []);
+
+  useEffect(() => {
+    resizeComposerInput();
+  }, [input, resizeComposerInput]);
+
+  const handleComposerKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key !== "Enter" || e.shiftKey) return;
+    e.preventDefault();
+    e.currentTarget.form?.requestSubmit();
+  };
   const scopedProfile = scopedProfileId
     ? profiles.find((p) => p.id === scopedProfileId) ?? null
     : null;
@@ -3592,11 +3619,13 @@ export default function VaultChatPanel({
             <label className="sr-only" htmlFor={inputId}>
               Ask Gideon
             </label>
-            <input
+            <textarea
               id={inputId}
-              type="text"
+              ref={composerInputRef}
+              rows={1}
               value={input}
               onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleComposerKeyDown}
               disabled={sending || vaultBusy || loadingHistory || voiceListening}
               maxLength={2000}
               placeholder={
@@ -3610,7 +3639,7 @@ export default function VaultChatPanel({
                         ? "Ask about Daily Logs or anything else…"
                         : "Ask about your documents, paste a screenshot, or ask anything…"
               }
-              className="w-full border-0 bg-transparent py-1.5 text-sm outline-none placeholder:text-ink-muted disabled:opacity-50"
+              className="block w-full resize-none border-0 bg-transparent py-1.5 text-sm leading-5 outline-none placeholder:text-ink-muted disabled:opacity-50"
             />
           </div>
 
