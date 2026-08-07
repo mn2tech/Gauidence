@@ -5,7 +5,10 @@ import {
   requireEditableBusinessProfile,
   requireProposalUser,
 } from "@/lib/proposals/auth";
-import { respondToProposalAsClient } from "@/lib/proposals/clientRespond";
+import {
+  respondToProposalAsClient,
+  userCanAccessProposalAsClient,
+} from "@/lib/proposals/clientRespond";
 import { notifyProposalActivity } from "@/lib/proposals/notify";
 import { calculateProposalPricing } from "@/lib/proposals/pricing";
 import {
@@ -138,6 +141,49 @@ export async function PATCH(request: Request, context: RouteContext) {
       kind: "sent",
       portalToken: token,
     });
+    const [proposal] = await enrichProposals(supabase, [data]);
+    return NextResponse.json({ proposal, portalToken: token });
+  }
+
+  if (action === "share") {
+    const canShareAsClient = await userCanAccessProposalAsClient(
+      supabase,
+      user.id,
+      existing
+    );
+    if (!businessEditor && !canShareAsClient) {
+      return NextResponse.json(
+        { error: "You don't have permission to share this proposal." },
+        { status: 403 }
+      );
+    }
+    if (existing.status === "draft") {
+      return NextResponse.json(
+        { error: "Send the proposal first, then share the client link." },
+        { status: 400 }
+      );
+    }
+    const { token, hash } = generateProposalPortalToken();
+    const patch: Record<string, unknown> = {
+      portal_token_hash: hash,
+      portal_token_expires_at: defaultPortalExpiry(),
+    };
+    if (existing.status === "expired") {
+      patch.status = "sent";
+      patch.sent_at = new Date().toISOString();
+    }
+    const { data, error } = await supabase
+      .from("proposals")
+      .update(patch)
+      .eq("id", id)
+      .select(PROPOSAL_SELECT)
+      .single();
+    if (error || !data) {
+      return NextResponse.json(
+        { error: "Couldn't create share link." },
+        { status: 500 }
+      );
+    }
     const [proposal] = await enrichProposals(supabase, [data]);
     return NextResponse.json({ proposal, portalToken: token });
   }

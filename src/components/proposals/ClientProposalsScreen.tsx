@@ -12,9 +12,10 @@ import {
 } from "lucide-react";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import ProposalStatusBadge from "@/components/proposals/ProposalStatusBadge";
+import ShareProposalButton from "@/components/proposals/ShareProposalButton";
 import { clientBusinessLabel } from "@/lib/client-requests/helpers";
 import { formatMoney } from "@/lib/proposals/pricing";
-import type { ProposalWithMeta } from "@/lib/proposals/types";
+import { canShareProposal, type ProposalWithMeta } from "@/lib/proposals/types";
 import { PROPOSALS_PATH } from "@/lib/routes";
 
 const inputClass =
@@ -326,7 +327,17 @@ export default function ClientProposalsScreen() {
                   Sent {formatWhen(proposal.sent_at ?? proposal.updated_at)}
                 </p>
               </div>
-              <ProposalStatusBadge status={proposal.status} />
+              <div className="flex flex-wrap items-center gap-2">
+                <ProposalStatusBadge status={proposal.status} />
+                {canShareProposal(proposal.status) ? (
+                  <ShareProposalButton
+                    proposalId={proposal.id}
+                    proposalTitle={proposal.title}
+                    clientName={proposal.client_name}
+                    className="inline-flex items-center gap-2 rounded-xl border border-stone-300 px-3 py-2 text-xs font-semibold hover:bg-stone-50"
+                  />
+                ) : null}
+              </div>
             </div>
 
             <ProposalDetailBody proposal={proposal} />

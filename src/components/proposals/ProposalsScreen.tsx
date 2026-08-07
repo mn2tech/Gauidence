@@ -18,6 +18,7 @@ import {
 import { useActiveProfile } from "@/components/ProfileProvider";
 import ClientProposalsScreen from "@/components/proposals/ClientProposalsScreen";
 import ProposalStatusBadge from "@/components/proposals/ProposalStatusBadge";
+import ShareProposalButton from "@/components/proposals/ShareProposalButton";
 import {
   PROPOSAL_STATUSES,
   PROPOSAL_STATUS_LABELS,
@@ -26,6 +27,7 @@ import {
   type ProposalTemplate,
   type ProposalWithMeta,
   type ServiceTemplate,
+  canShareProposal,
 } from "@/lib/proposals/types";
 import { activeClientsOf, isOrgStyleProfile } from "@/lib/profiles/types";
 import { formatMoney } from "@/lib/proposals/pricing";
@@ -678,6 +680,15 @@ export default function ProposalsScreen() {
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               Save proposal
             </button>
+            {selected && canShareProposal(selected.status) ? (
+              <ShareProposalButton
+                proposalId={selected.id}
+                proposalTitle={selected.title}
+                clientName={selected.client_name}
+                className="inline-flex items-center gap-2 rounded-xl border border-stone-300 px-4 py-2.5 text-sm font-semibold hover:bg-stone-50"
+                label="Share link"
+              />
+            ) : null}
           </div>
         </div>
       </div>
@@ -841,6 +852,13 @@ export default function ProposalsScreen() {
                           <Send className="h-3.5 w-3.5" />
                           Send
                         </button>
+                      ) : null}
+                      {canShareProposal(proposal.status) ? (
+                        <ShareProposalButton
+                          proposalId={proposal.id}
+                          proposalTitle={proposal.title}
+                          clientName={proposal.client_name}
+                        />
                       ) : null}
                     </div>
                   </div>

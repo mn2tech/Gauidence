@@ -181,3 +181,7 @@ export function canEditProposal(status: ProposalStatus): boolean {
 export function canSendProposal(status: ProposalStatus): boolean {
   return status === "draft" || status === "changes_requested";
 }
+
+export function canShareProposal(status: ProposalStatus): boolean {
+  return status !== "draft";
+}
