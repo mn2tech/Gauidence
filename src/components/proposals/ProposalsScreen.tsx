@@ -12,6 +12,7 @@ import {
   Search,
   Send,
   Sparkles,
+  Trash2,
   Wrench,
 } from "lucide-react";
 import { useActiveProfile } from "@/components/ProfileProvider";
@@ -705,56 +706,70 @@ function ProposalBuilderSection({
       </div>
       <div className="space-y-2">
         {items.map((item, index) => (
-          <div key={item.id} className="grid gap-2 rounded-xl border border-stone-200 p-3 sm:grid-cols-4">
-            <input
-              className={inputClass}
-              placeholder="Title"
-              value={item.title}
-              onChange={(e) => {
-                const next = [...items];
-                next[index] = { ...item, title: e.target.value };
-                onChange(next);
-              }}
-            />
-            <input
-              className={inputClass}
-              type="number"
-              min={0}
-              step="0.01"
-              placeholder="Qty"
-              value={item.quantity}
-              onChange={(e) => {
-                const next = [...items];
-                next[index] = { ...item, quantity: Number(e.target.value) || 1 };
-                onChange(next);
-              }}
-            />
-            <input
-              className={inputClass}
-              type="number"
-              min={0}
-              step="0.01"
-              placeholder="Price ($)"
-              value={(item.unitPriceCents / 100).toFixed(2)}
-              onChange={(e) => {
-                const next = [...items];
-                next[index] = {
-                  ...item,
-                  unitPriceCents: Math.round(Number(e.target.value) * 100) || 0,
-                };
-                onChange(next);
-              }}
-            />
-            <input
-              className={inputClass}
-              placeholder="Unit"
-              value={item.unitLabel}
-              onChange={(e) => {
-                const next = [...items];
-                next[index] = { ...item, unitLabel: e.target.value };
-                onChange(next);
-              }}
-            />
+          <div
+            key={item.id}
+            className="flex items-start gap-2 rounded-xl border border-stone-200 p-3"
+          >
+            <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-4">
+              <input
+                className={inputClass}
+                placeholder="Title"
+                value={item.title}
+                onChange={(e) => {
+                  const next = [...items];
+                  next[index] = { ...item, title: e.target.value };
+                  onChange(next);
+                }}
+              />
+              <input
+                className={inputClass}
+                type="number"
+                min={0}
+                step="0.01"
+                placeholder="Qty"
+                value={item.quantity}
+                onChange={(e) => {
+                  const next = [...items];
+                  next[index] = { ...item, quantity: Number(e.target.value) || 1 };
+                  onChange(next);
+                }}
+              />
+              <input
+                className={inputClass}
+                type="number"
+                min={0}
+                step="0.01"
+                placeholder="Price ($)"
+                value={(item.unitPriceCents / 100).toFixed(2)}
+                onChange={(e) => {
+                  const next = [...items];
+                  next[index] = {
+                    ...item,
+                    unitPriceCents: Math.round(Number(e.target.value) * 100) || 0,
+                  };
+                  onChange(next);
+                }}
+              />
+              <input
+                className={inputClass}
+                placeholder="Unit"
+                value={item.unitLabel}
+                onChange={(e) => {
+                  const next = [...items];
+                  next[index] = { ...item, unitLabel: e.target.value };
+                  onChange(next);
+                }}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => onChange(items.filter((_, i) => i !== index))}
+              className="mt-0.5 shrink-0 rounded-lg p-2 text-ink-muted transition hover:bg-rose-50 hover:text-rose-700"
+              aria-label="Remove line item"
+              title="Remove line item"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
           </div>
         ))}
       </div>
@@ -791,37 +806,51 @@ function TimelineSection({
         </button>
       </div>
       {items.map((item, index) => (
-        <div key={item.id} className="mb-2 grid gap-2 rounded-xl border border-stone-200 p-3 sm:grid-cols-3">
-          <input
-            className={inputClass}
-            placeholder="Milestone"
-            value={item.title}
-            onChange={(e) => {
-              const next = [...items];
-              next[index] = { ...item, title: e.target.value };
-              onChange(next);
-            }}
-          />
-          <input
-            className={inputClass}
-            type="date"
-            value={item.startDate ?? ""}
-            onChange={(e) => {
-              const next = [...items];
-              next[index] = { ...item, startDate: e.target.value };
-              onChange(next);
-            }}
-          />
-          <input
-            className={inputClass}
-            type="date"
-            value={item.endDate ?? ""}
-            onChange={(e) => {
-              const next = [...items];
-              next[index] = { ...item, endDate: e.target.value };
-              onChange(next);
-            }}
-          />
+        <div
+          key={item.id}
+          className="mb-2 flex items-start gap-2 rounded-xl border border-stone-200 p-3"
+        >
+          <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-3">
+            <input
+              className={inputClass}
+              placeholder="Milestone"
+              value={item.title}
+              onChange={(e) => {
+                const next = [...items];
+                next[index] = { ...item, title: e.target.value };
+                onChange(next);
+              }}
+            />
+            <input
+              className={inputClass}
+              type="date"
+              value={item.startDate ?? ""}
+              onChange={(e) => {
+                const next = [...items];
+                next[index] = { ...item, startDate: e.target.value };
+                onChange(next);
+              }}
+            />
+            <input
+              className={inputClass}
+              type="date"
+              value={item.endDate ?? ""}
+              onChange={(e) => {
+                const next = [...items];
+                next[index] = { ...item, endDate: e.target.value };
+                onChange(next);
+              }}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => onChange(items.filter((_, i) => i !== index))}
+            className="mt-0.5 shrink-0 rounded-lg p-2 text-ink-muted transition hover:bg-rose-50 hover:text-rose-700"
+            aria-label="Remove milestone"
+            title="Remove milestone"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
         </div>
       ))}
     </div>
@@ -853,17 +882,27 @@ function DeliverablesSection({
         </button>
       </div>
       {items.map((item, index) => (
-        <input
-          key={item.id}
-          className={`${inputClass} mb-2`}
-          placeholder="Deliverable"
-          value={item.title}
-          onChange={(e) => {
-            const next = [...items];
-            next[index] = { ...item, title: e.target.value };
-            onChange(next);
-          }}
-        />
+        <div key={item.id} className="mb-2 flex items-start gap-2">
+          <input
+            className={`${inputClass} min-w-0 flex-1`}
+            placeholder="Deliverable"
+            value={item.title}
+            onChange={(e) => {
+              const next = [...items];
+              next[index] = { ...item, title: e.target.value };
+              onChange(next);
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => onChange(items.filter((_, i) => i !== index))}
+            className="shrink-0 rounded-lg p-2 text-ink-muted transition hover:bg-rose-50 hover:text-rose-700"
+            aria-label="Remove deliverable"
+            title="Remove deliverable"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
       ))}
     </div>
   );
