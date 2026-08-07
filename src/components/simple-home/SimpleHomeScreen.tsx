@@ -25,7 +25,7 @@ import {
   timeOfDayGreeting,
 } from "@/lib/simple-home/helpers";
 import { VAULTS_PATH } from "@/lib/simple-home/routing";
-import { documentsHref, dailyLogHref, REQUESTS_PATH } from "@/lib/routes";
+import { DOCUMENTS_PATH, documentsHref, dailyLogHref, REQUESTS_PATH } from "@/lib/routes";
 import { profileTypeLabel } from "@/lib/profiles/types";
 import { clientBusinessLabel } from "@/lib/client-requests/helpers";
 
@@ -297,7 +297,9 @@ export default function SimpleHomeScreen() {
               {data.todayDocuments.map((doc) => (
                 <li key={doc.id}>
                   <Link
-                    href={`${documentsHref(active?.id)}&documentId=${doc.id}`}
+                    href={`${DOCUMENTS_PATH}&documentId=${doc.id}${
+                      active?.id ? `#documents-${active.id}` : ""
+                    }`}
                     className="flex items-start gap-3 rounded-xl px-2 py-2.5 text-sm transition hover:bg-brand-light/40"
                   >
                     <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-light">
