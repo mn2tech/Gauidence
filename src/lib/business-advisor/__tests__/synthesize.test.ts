@@ -4,6 +4,7 @@ import {
   fallbackSynthesis,
   parseSynthesis,
   resolveSynthesis,
+  tryParseSynthesis,
 } from "../synthesize.ts";
 import type { AnalyzerFinding } from "../analyzers.ts";
 import { DEFAULT_ADVISOR_CATALOG } from "../catalog.ts";
@@ -35,7 +36,13 @@ describe("parseSynthesis", () => {
   });
 
   it("throws on empty output", () => {
-    assert.throws(() => parseSynthesis(""), /empty output/i);
+    assert.throws(() => parseSynthesis(""), /invalid or empty json/i);
+  });
+
+  it("returns null for truncated JSON", () => {
+    const truncated =
+      '{"industry":"general","executiveSummary":"This summary was cut off mid';
+    assert.equal(tryParseSynthesis(truncated), null);
   });
 });
 
@@ -62,5 +69,19 @@ describe("resolveSynthesis", () => {
       catalog,
     });
     assert.equal(result.opportunities.length, 1);
+  });
+
+  it("falls back when raw output is truncated JSON", () => {
+    const result = resolveSynthesis(
+      '{"industry":"general","executiveSummary":"Cut off mid sentence',
+      {
+        companyName: "Proxdose",
+        websiteUrl: "https://proxdose.com",
+        findings: [sampleFinding],
+        catalog,
+      }
+    );
+    assert.equal(result.opportunities.length, 1);
+    assert.match(result.executiveSummary, /Proxdose/);
   });
 });

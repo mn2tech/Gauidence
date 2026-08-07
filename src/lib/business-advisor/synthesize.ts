@@ -3,35 +3,32 @@ import type { AdvisorServiceCatalogItem } from "./types";
 import { INDUSTRY_PLAYBOOKS } from "./catalog";
 
 export const SYNTHESIS_SYSTEM = `You are Guardian Business Advisor — an executive consultant.
-Given website/security findings and a service catalog, produce JSON only (no markdown fences):
+Return ONE compact JSON object only (no markdown, no prose). Keep every string short.
 
 {
   "industry": "fire_department|healthcare|environmental|church|legal|professional_services|restaurant|general",
-  "executiveSummary": "2-3 paragraph executive summary for the business owner",
+  "executiveSummary": "One paragraph, max 80 words.",
   "opportunities": [
     {
-      "title": "business opportunity title (outcome language, not technical)",
-      "description": "why this matters",
+      "title": "outcome-focused title",
+      "description": "max 20 words",
       "category": "security|seo|performance|trust|ai|operations",
       "estimatedImpact": "low|medium|high",
       "confidence": "low|medium|high",
       "priority": 1-100,
-      "potentialOutcome": "measurable business outcome e.g. Increase buyer trust",
-      "guardianSolutionKey": "service_key from catalog or null",
-      "findingTitle": "optional matching finding title"
+      "potentialOutcome": "measurable outcome",
+      "guardianSolutionKey": "service_key or null",
+      "findingTitle": "optional finding title"
     }
   ],
-  "outcomes": [
-    { "outcomeText": "Increase customer trust", "measurableMetric": "optional %" }
-  ],
-  "recommendedSolutionKeys": ["service_key", ...]
+  "outcomes": [{ "outcomeText": "short outcome", "measurableMetric": "optional" }],
+  "recommendedSolutionKeys": ["service_key"]
 }
 
 Rules:
-- Translate technical findings into business opportunities and executive outcomes.
-- Never say "add testimonials" — say "Increase buyer trust".
-- recommendedSolutionKeys must exist in the SERVICE CATALOG provided.
-- Pick 3-6 solutions max, prioritized for the detected industry.`;
+- Max 4 opportunities, max 4 outcomes, max 5 recommendedSolutionKeys.
+- Use only service_key values from the SERVICE CATALOG.
+- Translate technical findings into business outcomes (never say "add testimonials").`;
 
 export function buildSynthesisPrompt(args: {
   companyName: string;
@@ -90,37 +87,69 @@ export type SynthesisResult = {
   recommendedSolutionKeys: string[];
 };
 
+function stripJsonFences(raw: string): string {
+  return raw
+    .trim()
+    .replace(/^```json\s*/i, "")
+    .replace(/```$/i, "")
+    .trim();
+}
+
 function normalizeSynthesis(parsed: Record<string, unknown>): SynthesisResult {
   return {
     industry: String(parsed.industry ?? "general"),
     executiveSummary: String(parsed.executiveSummary ?? ""),
     opportunities: Array.isArray(parsed.opportunities)
-      ? (parsed.opportunities as SynthesisResult["opportunities"])
+      ? (parsed.opportunities as SynthesisResult["opportunities"]).slice(0, 6)
       : [],
     outcomes: Array.isArray(parsed.outcomes)
-      ? (parsed.outcomes as SynthesisResult["outcomes"])
+      ? (parsed.outcomes as SynthesisResult["outcomes"]).slice(0, 6)
       : [],
     recommendedSolutionKeys: Array.isArray(parsed.recommendedSolutionKeys)
-      ? (parsed.recommendedSolutionKeys as string[])
+      ? (parsed.recommendedSolutionKeys as string[]).slice(0, 6)
       : [],
   };
 }
 
+function tryParseJsonObject(text: string): Record<string, unknown> | null {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+
+  const attempts = [
+    trimmed,
+    (() => {
+      const start = trimmed.indexOf("{");
+      const end = trimmed.lastIndexOf("}");
+      return start >= 0 && end > start ? trimmed.slice(start, end + 1) : null;
+    })(),
+  ].filter((value): value is string => Boolean(value));
+
+  for (const candidate of attempts) {
+    try {
+      return JSON.parse(candidate) as Record<string, unknown>;
+    } catch {
+      // try next salvage strategy
+    }
+  }
+
+  return null;
+}
+
+/** Parse LLM JSON when valid; returns null instead of throwing. */
+export function tryParseSynthesis(raw: string): SynthesisResult | null {
+  const jsonText = stripJsonFences(raw);
+  if (!jsonText) return null;
+  const parsed = tryParseJsonObject(jsonText);
+  if (!parsed) return null;
+  return normalizeSynthesis(parsed);
+}
+
 export function parseSynthesis(raw: string): SynthesisResult {
-  const jsonText = raw
-    .trim()
-    .replace(/^```json\s*/i, "")
-    .replace(/```$/i, "")
-    .trim();
-  if (!jsonText) {
-    throw new Error("AI synthesis returned empty output.");
+  const result = tryParseSynthesis(raw);
+  if (!result) {
+    throw new Error("AI synthesis returned invalid or empty JSON.");
   }
-  try {
-    return normalizeSynthesis(JSON.parse(jsonText) as Record<string, unknown>);
-  } catch (err) {
-    const detail = err instanceof Error ? err.message : "Invalid JSON";
-    throw new Error(`AI synthesis returned invalid JSON: ${detail}`);
-  }
+  return result;
 }
 
 const FINDING_SOLUTION_MAP: Record<string, string> = {
@@ -215,17 +244,12 @@ export function resolveSynthesis(
     catalog: AdvisorServiceCatalogItem[];
   }
 ): SynthesisResult {
-  const trimmed = raw?.trim() ?? "";
-  if (!trimmed) {
-    return fallbackSynthesis(fallbackArgs);
-  }
-  try {
-    return parseSynthesis(trimmed);
-  } catch (err) {
+  const parsed = raw?.trim() ? tryParseSynthesis(raw) : null;
+  if (parsed) return parsed;
+  if (raw?.trim()) {
     console.warn(
-      "Business Advisor LLM synthesis parse failed; using fallback",
-      err
+      "Business Advisor LLM synthesis parse failed; using rule-based fallback"
     );
-    return fallbackSynthesis(fallbackArgs);
   }
+  return fallbackSynthesis(fallbackArgs);
 }

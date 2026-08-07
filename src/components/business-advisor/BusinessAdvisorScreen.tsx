@@ -145,7 +145,7 @@ export default function BusinessAdvisorScreen() {
       );
       const body = await readJsonResponse<{ error?: string; assessment?: BusinessAssessmentDetail }>(res);
       if (!res.ok) throw new Error(body.error ?? "Analysis failed.");
-      setDetail(body.assessment);
+      setDetail(body.assessment ?? null);
       await loadList();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Analysis failed.");

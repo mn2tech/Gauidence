@@ -144,7 +144,7 @@ export async function runAssessmentAnalysis(
             runChatCompletion(client, {
               system: SYNTHESIS_SYSTEM,
               model: CHAT_MODEL,
-              maxTokens: 2200,
+              maxTokens: 4096,
               messages: [
                 {
                   role: "user",
@@ -288,13 +288,15 @@ export async function runAssessmentAnalysis(
     if (!result) throw new Error("Assessment not found after analysis.");
     return result;
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Analysis failed.";
+    const rawMessage = err instanceof Error ? err.message : "Analysis failed.";
+    const message = /json/i.test(rawMessage)
+      ? "Analysis could not finish. Please run the scan again."
+      : rawMessage;
     await supabase
       .from("business_assessments")
       .update({ status: "failed", error_message: message })
       .eq("id", args.assessmentId);
-    throw err;
+    throw new Error(message);
   }
 }
 
