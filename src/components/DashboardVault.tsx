@@ -553,7 +553,9 @@ export default function DashboardVault({ userId }: { userId: string }) {
         </VaultSection>
       )}
 
-      <AwardsPanel compact />
+      <VaultSection id={`awards-${active.id}`} title="Your awards" defaultOpen={false}>
+        <AwardsPanel compact embedded />
+      </VaultSection>
 
       <div className="flex items-start gap-3 rounded-2xl border border-stone-200 bg-white p-5">
         <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-light text-brand">

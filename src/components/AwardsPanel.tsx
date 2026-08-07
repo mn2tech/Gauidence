@@ -28,34 +28,25 @@ const ICONS: Record<AwardKey, typeof Award> = {
 /**
  * Compact awards gallery on the dashboard.
  */
-export default function AwardsPanel({ compact = false }: { compact?: boolean }) {
+export default function AwardsPanel({
+  compact = false,
+  embedded = false,
+}: {
+  compact?: boolean;
+  /** Inside VaultSection: hide duplicate section title. */
+  embedded?: boolean;
+}) {
   const { awards, earnedCount, totalCount, loading } = useAwards();
 
   if (loading) return null;
 
   const sorted = [...awards].sort((a, b) => a.sortOrder - b.sortOrder);
 
-  return (
-    <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm sm:p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-brand-dark">
-            Your awards
-          </p>
-          <p className="mt-0.5 text-sm text-ink-muted">
-            {earnedCount} of {totalCount} earned — recognition for building your
-            vault.
-          </p>
-        </div>
-        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-light text-brand">
-          <Trophy className="h-4 w-4" aria-hidden />
-        </span>
-      </div>
-
+  const badgeList = (
       <ul
         className={
-          compact
-            ? "mt-4 flex flex-wrap gap-2"
+          compact || embedded
+            ? "flex flex-wrap gap-2"
             : "mt-4 grid gap-2 sm:grid-cols-2"
         }
       >
@@ -103,6 +94,37 @@ export default function AwardsPanel({ compact = false }: { compact?: boolean }) 
           );
         })}
       </ul>
+  );
+
+  if (embedded) {
+    return (
+      <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm sm:p-5">
+        <p className="mb-4 text-sm text-ink-muted">
+          {earnedCount} of {totalCount} earned — recognition for building your
+          vault.
+        </p>
+        {badgeList}
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm sm:p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-brand-dark">
+            Your awards
+          </p>
+          <p className="mt-0.5 text-sm text-ink-muted">
+            {earnedCount} of {totalCount} earned — recognition for building your
+            vault.
+          </p>
+        </div>
+        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-light text-brand">
+          <Trophy className="h-4 w-4" aria-hidden />
+        </span>
+      </div>
+      <div className={compact ? "mt-4" : undefined}>{badgeList}</div>
     </div>
   );
 }
