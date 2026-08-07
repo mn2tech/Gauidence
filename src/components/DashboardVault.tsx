@@ -66,8 +66,8 @@ function VaultStickyBar({
         <button
           type="button"
           onClick={onSearchOpen}
-          aria-label="Search vaults"
-          title="Search people, logs, and documents"
+          aria-label="Search vaults and content"
+          title="Search vaults, logs, and documents across every vault"
           className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-stone-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50 sm:px-3"
         >
           <Search className="h-3.5 w-3.5 text-brand" aria-hidden />
@@ -324,6 +324,7 @@ export default function DashboardVault({ userId }: { userId: string }) {
         <GlobalVaultSearch
           open={vaultSearchOpen}
           onClose={() => setVaultSearchOpen(false)}
+          defaultScope="global"
         />
       </div>
     );
@@ -566,6 +567,7 @@ export default function DashboardVault({ userId }: { userId: string }) {
       <GlobalVaultSearch
         open={vaultSearchOpen}
         onClose={() => setVaultSearchOpen(false)}
+        defaultScope="global"
       />
     </div>
   );

@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { Check, ChevronDown, Plus } from "lucide-react";
+import { Check, ChevronDown, Plus, Search } from "lucide-react";
 import ProfileAvatar from "@/components/ProfileAvatar";
 import { useActiveProfile } from "@/components/ProfileProvider";
+import { buildProfilePath } from "@/lib/search";
 import {
   ACTIVE_CLIENTS_GROUP_LABEL,
   INACTIVE_CLIENTS_GROUP_LABEL,
@@ -105,21 +106,115 @@ function SwitcherRow({
   );
 }
 
+function profileSearchHaystack(profile: GuardianProfile): string {
+  return [
+    profile.display_name,
+    profileSubtitle(profile),
+    profileTypeLabel(profile.profile_type),
+    profile.relationship,
+    profile.organization_name,
+    profile.business_legal_name,
+    profile.school_name,
+    profile.job_title,
+    profile.department,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+function SwitcherSearchRow({
+  profile,
+  profiles,
+  selected,
+  onSelect,
+}: {
+  profile: GuardianProfile;
+  profiles: GuardianProfile[];
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const path = buildProfilePath(profiles, profile.id);
+  const subtitle =
+    path !== profile.display_name.trim() ? path : profileSubtitle(profile);
+
+  return (
+    <button
+      type="button"
+      role="option"
+      aria-selected={selected}
+      onClick={onSelect}
+      className="flex w-full items-start gap-2 px-3 py-2 text-left text-sm hover:bg-stone-50"
+    >
+      <span className="mt-0.5 w-4 shrink-0">
+        {selected ? <Check className="h-4 w-4 text-brand" /> : null}
+      </span>
+      <ProfileAvatar profile={profile} size="sm" />
+      <span className="min-w-0">
+        <span className="block truncate font-medium">
+          {profile.display_name}
+          {sharedProfileAccessBadge(profile) ? (
+            <span className="ml-1 text-[10px] font-medium text-brand">
+              {sharedProfileAccessBadge(profile)}
+            </span>
+          ) : null}
+        </span>
+        <span className="block truncate text-[11px] text-ink-muted">
+          {subtitle}
+        </span>
+      </span>
+    </button>
+  );
+}
+
 function ProfileMenu({
   profiles,
   activeId,
   onPick,
   onClose,
   align = "right",
+  searchable = false,
 }: {
   profiles: GuardianProfile[];
   activeId: string;
   onPick: (id: string) => void;
   onClose: () => void;
   align?: "left" | "right";
+  searchable?: boolean;
 }) {
+  const searchRef = useRef<HTMLInputElement>(null);
+  const [query, setQuery] = useState("");
   const topLevel = topLevelProfiles(profiles);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set());
+  const trimmedQuery = query.trim().toLowerCase();
+
+  useEffect(() => {
+    if (!searchable) return;
+    searchRef.current?.focus({ preventScroll: true });
+    const t = window.setTimeout(() => {
+      searchRef.current?.focus({ preventScroll: true });
+    }, 0);
+    return () => window.clearTimeout(t);
+  }, [searchable]);
+
+  const filteredProfiles = useMemo(() => {
+    if (!trimmedQuery) return null;
+    return profiles
+      .filter((profile) => profileSearchHaystack(profile).includes(trimmedQuery))
+      .sort((a, b) => {
+        const aName = a.display_name.toLowerCase();
+        const bName = b.display_name.toLowerCase();
+        if (aName === trimmedQuery && bName !== trimmedQuery) return -1;
+        if (bName === trimmedQuery && aName !== trimmedQuery) return 1;
+        if (aName.startsWith(trimmedQuery) && !bName.startsWith(trimmedQuery)) {
+          return -1;
+        }
+        if (bName.startsWith(trimmedQuery) && !aName.startsWith(trimmedQuery)) {
+          return 1;
+        }
+        return aName.localeCompare(bName);
+      });
+  }, [profiles, trimmedQuery]);
 
   useEffect(() => {
     const active = profiles.find((p) => p.id === activeId);
@@ -162,8 +257,45 @@ function ProfileMenu({
         align === "left" ? "left-0" : "right-0"
       }`}
     >
+      {searchable ? (
+        <div className="border-b border-stone-100 px-2 py-2">
+          <div className="relative">
+            <Search
+              className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-muted"
+              aria-hidden
+            />
+            <input
+              ref={searchRef}
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search vaults…"
+              aria-label="Search vaults"
+              className="w-full rounded-lg border border-stone-200 bg-stone-50 py-2 pl-8 pr-3 text-sm outline-none placeholder:text-ink-muted focus:border-brand/40 focus:bg-white focus:ring-2 focus:ring-brand/20"
+            />
+          </div>
+        </div>
+      ) : null}
       <ul className="max-h-72 overflow-y-auto py-1">
-        {topLevel.map((p) => {
+        {filteredProfiles ? (
+          filteredProfiles.length === 0 ? (
+            <li className="px-3 py-3 text-sm text-ink-muted">
+              No vaults match &ldquo;{query.trim()}&rdquo;.
+            </li>
+          ) : (
+            filteredProfiles.map((profile) => (
+              <li key={profile.id}>
+                <SwitcherSearchRow
+                  profile={profile}
+                  profiles={profiles}
+                  selected={profile.id === activeId}
+                  onSelect={() => onPick(profile.id)}
+                />
+              </li>
+            ))
+          )
+        ) : (
+          topLevel.map((p) => {
           const selected = p.id === activeId;
           const groups = nestedGroupsUnder(profiles, p);
           return (
@@ -196,7 +328,8 @@ function ProfileMenu({
               ))}
             </li>
           );
-        })}
+        })
+        )}
       </ul>
       <div className="border-t border-stone-100 py-1">
         <Link
@@ -285,6 +418,7 @@ export default function ProfileSwitcher() {
           onPick={pick}
           onClose={close}
           align="right"
+          searchable
         />
       ) : null}
     </div>
@@ -329,6 +463,7 @@ export function VaultHeaderProfileSwitch({
           onPick={pick}
           onClose={close}
           align="left"
+          searchable
         />
       ) : null}
     </div>

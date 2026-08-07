@@ -45,9 +45,15 @@ const KIND_META: Record<
 type Props = {
   open: boolean;
   onClose: () => void;
+  /** Scope preset when the modal opens (resets each time). */
+  defaultScope?: SearchScopeMode;
 };
 
-export default function GlobalVaultSearch({ open, onClose }: Props) {
+export default function GlobalVaultSearch({
+  open,
+  onClose,
+  defaultScope = "workspace",
+}: Props) {
   const router = useRouter();
   const { switchProfile, active } = useActiveProfile();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -71,14 +77,14 @@ export default function GlobalVaultSearch({ open, onClose }: Props) {
     setResults([]);
     setError(null);
     setActiveIndex(0);
-    setSearchScope("workspace");
+    setSearchScope(defaultScope);
     // Prefer immediate focus so iOS still treats it as part of the tap gesture.
     inputRef.current?.focus({ preventScroll: true });
     const t = window.setTimeout(() => {
       inputRef.current?.focus({ preventScroll: true });
     }, 0);
     return () => window.clearTimeout(t);
-  }, [open]);
+  }, [defaultScope, open]);
 
   useEffect(() => {
     if (!open) return;
