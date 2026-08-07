@@ -6,6 +6,7 @@ import { useEmployeeHubEntitlements } from "@/hooks/useEmployeeHubEntitlements";
 import { employeeShowsPowerNav } from "@/lib/employee-hub/entitlements";
 import { isOrgStyleProfile } from "@/lib/profiles/types";
 import { COMMAND_CENTER_PATH } from "@/lib/simple-home/routing";
+import { PROPOSALS_PATH } from "@/lib/routes";
 
 type SimpleSecondaryNavLinksProps = {
   onNavigate?: () => void;
@@ -38,6 +39,7 @@ export default function SimpleSecondaryNavLinks({
 
   const needsSetup = !profilesLoading && profiles.length === 0;
   const isEmployeeVault = active?.profile_type === "employee";
+  const isClientVault = active?.profile_type === "client";
   const isBusinessVault =
     active != null && isOrgStyleProfile(active.profile_type);
   const { entitlements: employeeEntitlements } = useEmployeeHubEntitlements(
@@ -61,7 +63,9 @@ export default function SimpleSecondaryNavLinks({
         { href: "/research", label: "Research" },
         { href: "/payroll", label: "Payroll" },
       ]
-    : isEmployeeVault
+    : isClientVault
+      ? [{ href: PROPOSALS_PATH, label: "Proposals" }]
+      : isEmployeeVault
       ? [
           ...(ent?.research ? [{ href: "/research", label: "Research" }] : []),
           ...(ent?.work_memory

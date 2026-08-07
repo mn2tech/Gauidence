@@ -78,6 +78,25 @@ export async function resolveBusinessProfile(
   return null;
 }
 
+export async function resolveClientProfile(
+  supabase: SupabaseClient,
+  user: User,
+  profileId?: string | null
+) {
+  if (profileId) {
+    const profile = await requireAccessibleGuardianProfile(
+      supabase,
+      user.id,
+      profileId
+    );
+    if (profile?.profile_type === "client") return profile;
+    return null;
+  }
+  const active = await getActiveGuardianProfile(supabase, user);
+  if (active?.profile_type === "client") return active;
+  return null;
+}
+
 export async function requireEditableBusinessProfile(
   supabase: SupabaseClient,
   userId: string,

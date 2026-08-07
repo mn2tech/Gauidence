@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import ProfileSwitcher from "@/components/ProfileSwitcher";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import GlobalVaultSearch from "@/components/GlobalVaultSearch";
-import { documentsHref, REQUESTS_PATH, VAULT_NAV_LABEL } from "@/lib/routes";
+import { documentsHref, PROPOSALS_PATH, REQUESTS_PATH, VAULT_NAV_LABEL } from "@/lib/routes";
 import { useOnboardingProgress } from "@/hooks/useOnboardingProgress";
 import { useEmployeeHubEntitlements } from "@/hooks/useEmployeeHubEntitlements";
 import { useSimpleHomeEnabled } from "@/hooks/useSimpleHomeEnabled";
@@ -221,9 +221,14 @@ export default function SiteHeader() {
                 </Link>
               ) : null}
               {isClientVault ? (
-                <Link href={REQUESTS_PATH} className="hover:text-foreground">
-                  Requests
-                </Link>
+                <>
+                  <Link href={REQUESTS_PATH} className="hover:text-foreground">
+                    Requests
+                  </Link>
+                  <Link href={PROPOSALS_PATH} className="hover:text-foreground">
+                    Proposals
+                  </Link>
+                </>
               ) : null}
               <Link
                 href="/settings"
@@ -398,9 +403,14 @@ export default function SiteHeader() {
                   </Link>
                 ) : null}
                 {isClientVault ? (
-                  <Link href={REQUESTS_PATH} className={linkClass}>
-                    Requests
-                  </Link>
+                  <>
+                    <Link href={REQUESTS_PATH} className={linkClass}>
+                      Requests
+                    </Link>
+                    <Link href={PROPOSALS_PATH} className={linkClass}>
+                      Proposals
+                    </Link>
+                  </>
                 ) : null}
                 <Link href="/settings" className={linkClass}>
                   Settings

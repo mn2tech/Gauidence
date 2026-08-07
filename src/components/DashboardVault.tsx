@@ -40,7 +40,7 @@ import {
   type GuardianProfileType,
 } from "@/lib/profiles/types";
 import { EMPLOYEE_HUB_PATH } from "@/lib/employee-hub/routing";
-import { hasDocumentsIntent, REQUESTS_PATH } from "@/lib/routes";
+import { hasDocumentsIntent, PROPOSALS_PATH, REQUESTS_PATH } from "@/lib/routes";
 import { clientBusinessLabel } from "@/lib/client-requests/helpers";
 
 function vaultSwitchHref(profileId: string, searchParams: URLSearchParams) {
@@ -267,6 +267,12 @@ export default function DashboardVault({ userId }: { userId: string }) {
           >
             My requests
           </Link>
+          <Link
+            href={PROPOSALS_PATH}
+            className="mt-3 ml-2 inline-flex items-center rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-foreground transition hover:border-stone-400 hover:bg-stone-50"
+          >
+            My proposals
+          </Link>
         </div>
 
         <VaultStickyBar
@@ -281,6 +287,14 @@ export default function DashboardVault({ userId }: { userId: string }) {
                 className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50 sm:px-3"
               >
                 Requests
+              </Link>
+              <Link
+                href={PROPOSALS_PATH}
+                aria-label="My proposals"
+                title="View proposals from your provider"
+                className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50 sm:px-3"
+              >
+                Proposals
               </Link>
               <Link
                 href="/ask"
@@ -348,6 +362,14 @@ export default function DashboardVault({ userId }: { userId: string }) {
                   className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50 sm:px-3"
                 >
                   Requests
+                </Link>
+                <Link
+                  href={PROPOSALS_PATH}
+                  aria-label="My proposals"
+                  title="View proposals from your provider"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50 sm:px-3"
+                >
+                  Proposals
                 </Link>
                 <Link
                   href={`${REQUESTS_PATH}?new=1`}

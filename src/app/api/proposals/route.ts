@@ -4,6 +4,7 @@ import {
   requireEditableBusinessProfile,
   requireProposalUser,
   resolveBusinessProfile,
+  resolveClientProfile,
 } from "@/lib/proposals/auth";
 import { calculateProposalPricing } from "@/lib/proposals/pricing";
 import {
@@ -42,7 +43,41 @@ export async function GET(request: Request) {
     url.searchParams.get("businessProfileId") ?? url.searchParams.get("profileId");
   const status = parseProposalStatus(url.searchParams.get("status") ?? "");
   const search = parseProposalSearchQuery(url.searchParams.get("q"));
-  const clientProfileId = parseUuid(url.searchParams.get("clientProfileId"));
+  const requestedClientProfileId = parseUuid(
+    url.searchParams.get("clientProfileId")
+  );
+
+  const client = await resolveClientProfile(
+    supabase,
+    user,
+    requestedClientProfileId
+  );
+  if (client) {
+    let query = supabase
+      .from("proposals")
+      .select(PROPOSAL_SELECT)
+      .eq("client_profile_id", client.id)
+      .neq("status", "draft")
+      .order("updated_at", { ascending: false });
+
+    if (status) query = query.eq("status", status);
+    if (search) {
+      query = query.or(
+        `title.ilike.%${search}%,summary.ilike.%${search}%`
+      );
+    }
+
+    const { data, error } = await query.limit(100);
+    if (error) {
+      return NextResponse.json(
+        { error: "Couldn't load proposals." },
+        { status: 500 }
+      );
+    }
+
+    const proposals = await enrichProposals(supabase, data ?? []);
+    return NextResponse.json({ proposals });
+  }
 
   const business = await resolveBusinessProfile(
     supabase,
@@ -51,7 +86,7 @@ export async function GET(request: Request) {
   );
   if (!business) {
     return NextResponse.json(
-      { error: "Switch to a business vault to view proposals." },
+      { error: "Switch to a business or client vault to view proposals." },
       { status: 400 }
     );
   }
@@ -63,7 +98,9 @@ export async function GET(request: Request) {
     .order("updated_at", { ascending: false });
 
   if (status) query = query.eq("status", status);
-  if (clientProfileId) query = query.eq("client_profile_id", clientProfileId);
+  if (requestedClientProfileId) {
+    query = query.eq("client_profile_id", requestedClientProfileId);
+  }
   if (search) {
     query = query.or(
       `title.ilike.%${search}%,summary.ilike.%${search}%`

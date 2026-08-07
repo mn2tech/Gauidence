@@ -2,8 +2,10 @@ import { NextResponse } from "next/server";
 import { runProposalAcceptanceWorkflow } from "@/lib/proposals/accept";
 import {
   isProposalAuthed,
+  requireEditableBusinessProfile,
   requireProposalUser,
 } from "@/lib/proposals/auth";
+import { respondToProposalAsClient } from "@/lib/proposals/clientRespond";
 import { notifyProposalActivity } from "@/lib/proposals/notify";
 import { calculateProposalPricing } from "@/lib/proposals/pricing";
 import {
@@ -67,6 +69,38 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   const action = typeof body.action === "string" ? body.action.trim() : "";
+  const businessEditor = await requireEditableBusinessProfile(
+    supabase,
+    user.id,
+    existing.business_profile_id
+  );
+  const clientActions = new Set([
+    "view",
+    "accept",
+    "decline",
+    "request_changes",
+  ]);
+
+  if (!businessEditor && clientActions.has(action)) {
+    try {
+      const proposal = await respondToProposalAsClient(supabase, user, existing, {
+        action: action as "view" | "accept" | "decline" | "request_changes",
+        clientFeedback: parseOptionalText(
+          body.clientFeedback ?? body.client_feedback
+        ),
+      });
+      return NextResponse.json({ proposal });
+    } catch (err) {
+      return NextResponse.json(
+        {
+          error:
+            err instanceof Error ? err.message : "Couldn't update proposal.",
+        },
+        { status: err instanceof Error && err.message.includes("access") ? 403 : 400 }
+      );
+    }
+  }
+
   if (action === "send") {
     if (!canSendProposal(existing.status)) {
       return NextResponse.json(

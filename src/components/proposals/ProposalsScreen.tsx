@@ -16,6 +16,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { useActiveProfile } from "@/components/ProfileProvider";
+import ClientProposalsScreen from "@/components/proposals/ClientProposalsScreen";
 import ProposalStatusBadge from "@/components/proposals/ProposalStatusBadge";
 import {
   PROPOSAL_STATUSES,
@@ -77,6 +78,7 @@ export default function ProposalsScreen() {
     active != null &&
     isOrgStyleProfile(active.profile_type) &&
     active.profile_type !== "client";
+  const isClientVault = active?.profile_type === "client";
   const businessProfileId = isBusiness ? active?.id ?? null : null;
   const clients = useMemo(
     () => (active ? activeClientsOf(profiles, active.id) : []),
@@ -379,6 +381,10 @@ export default function ProposalsScreen() {
       setSaving(false);
     }
   };
+
+  if (isClientVault) {
+    return <ClientProposalsScreen />;
+  }
 
   if (!isBusiness) {
     return (
