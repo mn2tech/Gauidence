@@ -19,6 +19,7 @@ export type ProposalTemplateSeed = {
 };
 
 export const DEFAULT_ASSESSMENT_TEMPLATE_NAME = "Website & Conversion Assessment";
+export const DEFAULT_KNOWLEDGE_BASE_TEMPLATE_NAME = "Guardian Knowledge Base";
 
 export const DEFAULT_PROPOSAL_TEMPLATE_SEEDS: ProposalTemplateSeed[] = [
   {
@@ -203,6 +204,125 @@ export const DEFAULT_PROPOSAL_TEMPLATE_SEEDS: ProposalTemplateSeed[] = [
         quantity: 1,
         unitLabel: "month",
         unitPriceCents: 150000,
+        optional: true,
+      },
+    ],
+  },
+  {
+    name: DEFAULT_KNOWLEDGE_BASE_TEMPLATE_NAME,
+    description:
+      "AI-powered knowledge engine for SOPs, compliance docs, policies, and team search — with Guardian Ask Gideon.",
+    default_title: "{{company_name}} — Guardian Knowledge Base",
+    default_summary:
+      "Centralize {{company_name}}'s SOPs, compliance documents, and policies in one searchable knowledge base your staff and clients can trust.",
+    default_introduction: [
+      "{{company_name}} runs on institutional knowledge — procedures, compliance requirements, and how work actually gets done.",
+      "",
+      "Guardian Knowledge Base turns scattered PDFs, Word docs, and shared drives into a structured library with AI search. Your team finds the right answer in seconds instead of digging through email or outdated folders.",
+      "",
+      "Example content we help you organize:",
+      "• Standard Operating Procedures (SOPs) — onboarding, daily operations, equipment use, closing checklists",
+      "• Compliance & regulatory — HIPAA privacy practices, OSHA safety plans, licensing renewals, audit evidence",
+      "• Policies & handbooks — employee handbook, code of conduct, IT acceptable use, PTO and leave",
+      "• Training & job aids — role-specific guides, troubleshooting steps, customer intake scripts",
+      "• Client-facing FAQs — service explanations, forms, and request instructions",
+    ].join("\n"),
+    default_terms:
+      "Pricing valid for 30 days. Document migration scope confirmed at kickoff. Optional monthly subscription for hosting, updates, and support after launch.",
+    default_line_items: [
+      {
+        title: "Guardian Knowledge Base — Implementation",
+        description: [
+          "Knowledge base setup in your Guardian business vault.",
+          "Document import and structuring (PDF, Word, and existing files).",
+          "SOP, compliance, and policy libraries with clear categories.",
+          "AI-powered search and Ask Gideon over your approved content.",
+          "Role-based access so staff see what they need — not everything.",
+          "Team training and launch handoff.",
+        ].join("\n"),
+        quantity: 1,
+        unitLabel: "project",
+        unitPriceCents: 500000,
+      },
+    ],
+    default_timeline: [
+      {
+        title: "Discovery & content audit",
+        description:
+          "Inventory existing SOPs, compliance docs, and policies; agree on library structure.",
+        sortOrder: 0,
+      },
+      {
+        title: "Import & organization",
+        description:
+          "Upload, tag, and structure documents into SOP, compliance, policy, and training collections.",
+        sortOrder: 1,
+      },
+      {
+        title: "AI search & training",
+        description:
+          "Enable Guardian search, validate answers against source docs, train your team.",
+        sortOrder: 2,
+      },
+      {
+        title: "Launch & handoff",
+        description: "Go-live, documentation, and ongoing content ownership plan.",
+        sortOrder: 3,
+      },
+    ],
+    default_deliverables: [
+      {
+        title: "SOP library",
+        description:
+          "Structured standard operating procedures — e.g. opening/closing checklists, equipment maintenance, client intake, escalation paths.",
+        sortOrder: 0,
+      },
+      {
+        title: "Compliance document hub",
+        description:
+          "Central place for regulatory and audit materials — e.g. HIPAA policies, OSHA logs, license certificates, inspection reports.",
+        sortOrder: 1,
+      },
+      {
+        title: "Policies & employee handbook",
+        description:
+          "Handbook sections, HR policies, safety rules, and acknowledgment tracking guidance.",
+        sortOrder: 2,
+      },
+      {
+        title: "Training & job aids",
+        description:
+          "Quick-reference guides, troubleshooting steps, and role-based onboarding packets.",
+        sortOrder: 3,
+      },
+      {
+        title: "AI search (Ask Gideon)",
+        description:
+          "Search across approved documents with cited answers — no guessing from outdated copies.",
+        sortOrder: 4,
+      },
+      {
+        title: "Launch training",
+        description: "Walkthrough for admins and staff on finding and maintaining content.",
+        sortOrder: 5,
+      },
+    ],
+    default_addons: [
+      {
+        title: "Knowledge Base — monthly care plan",
+        description:
+          "Hosting, content updates, quarterly review, and priority support for your knowledge library.",
+        quantity: 1,
+        unitLabel: "month",
+        unitPriceCents: 49900,
+        optional: true,
+      },
+      {
+        title: "Additional document migration batch",
+        description: "Import and structure up to 50 additional documents beyond kickoff scope.",
+        quantity: 1,
+        unitLabel: "batch",
+        unitPriceCents: 75000,
         optional: true,
       },
     ],

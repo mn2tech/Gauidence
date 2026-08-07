@@ -4,24 +4,15 @@ import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   DEFAULT_PROPOSAL_TEMPLATE_SEEDS,
+  type ProposalTemplateSeed,
 } from "./defaultTemplates";
 import { PROPOSAL_TEMPLATE_SELECT, type ProposalTemplate } from "./types";
 
-export async function ensureDefaultProposalTemplates(
-  supabase: SupabaseClient,
+function seedToRow(
+  seed: ProposalTemplateSeed,
   args: { businessProfileId: string; userId: string }
-): Promise<ProposalTemplate[]> {
-  const { data: existing } = await supabase
-    .from("proposal_templates")
-    .select(PROPOSAL_TEMPLATE_SELECT)
-    .eq("business_profile_id", args.businessProfileId)
-    .eq("is_active", true);
-
-  if ((existing ?? []).length > 0) {
-    return (existing ?? []) as ProposalTemplate[];
-  }
-
-  const rows = DEFAULT_PROPOSAL_TEMPLATE_SEEDS.map((seed) => ({
+) {
+  return {
     business_profile_id: args.businessProfileId,
     created_by: args.userId,
     name: seed.name,
@@ -47,14 +38,36 @@ export async function ensureDefaultProposalTemplates(
       id: randomUUID(),
     })),
     is_active: true,
-  }));
+  };
+}
 
+export async function ensureDefaultProposalTemplates(
+  supabase: SupabaseClient,
+  args: { businessProfileId: string; userId: string }
+): Promise<ProposalTemplate[]> {
+  const { data: existing } = await supabase
+    .from("proposal_templates")
+    .select(PROPOSAL_TEMPLATE_SELECT)
+    .eq("business_profile_id", args.businessProfileId)
+    .eq("is_active", true);
+
+  const current = (existing ?? []) as ProposalTemplate[];
+  const existingNames = new Set(current.map((t) => t.name.trim().toLowerCase()));
+  const missingSeeds = DEFAULT_PROPOSAL_TEMPLATE_SEEDS.filter(
+    (seed) => !existingNames.has(seed.name.trim().toLowerCase())
+  );
+
+  if (missingSeeds.length === 0) {
+    return current;
+  }
+
+  const rows = missingSeeds.map((seed) => seedToRow(seed, args));
   const { data: inserted } = await supabase
     .from("proposal_templates")
     .insert(rows)
     .select(PROPOSAL_TEMPLATE_SELECT);
 
-  return (inserted ?? []) as ProposalTemplate[];
+  return [...current, ...((inserted ?? []) as ProposalTemplate[])];
 }
 
 export async function loadProposalTemplate(
