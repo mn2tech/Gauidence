@@ -520,6 +520,30 @@ function forgetVaultChat(profileId: string | null) {
   sessionStorage.removeItem(vaultChatStorageKey(profileId));
 }
 
+function confirmedDailyLogsStorageKey(chatId: string): string {
+  return `gideon:confirmedDailyLogs:${chatId}`;
+}
+
+function readConfirmedDailyLogIds(chatId: string | null): Set<string> {
+  if (!chatId || typeof window === "undefined") return new Set();
+  try {
+    const raw = sessionStorage.getItem(confirmedDailyLogsStorageKey(chatId));
+    if (!raw) return new Set();
+    const ids = JSON.parse(raw) as string[];
+    return new Set(Array.isArray(ids) ? ids : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function writeConfirmedDailyLogIds(chatId: string | null, ids: Set<string>) {
+  if (!chatId || typeof window === "undefined") return;
+  sessionStorage.setItem(
+    confirmedDailyLogsStorageKey(chatId),
+    JSON.stringify([...ids])
+  );
+}
+
 function isChatNotFoundError(message: string): boolean {
   return message === "Chat not found." || message === "Chat not found";
 }
@@ -640,6 +664,7 @@ export default function VaultChatPanel({
   const [confirmedDailyLogIds, setConfirmedDailyLogIds] = useState<Set<string>>(
     () => new Set()
   );
+  const pendingDailyLogMessageIdRef = useRef<string | null>(null);
   const [savingClientRequestReply, setSavingClientRequestReply] = useState(false);
   const [confirmingClientRequestCreateId, setConfirmingClientRequestCreateId] =
     useState<string | null>(null);
@@ -1201,6 +1226,19 @@ export default function VaultChatPanel({
   }, [needsSetup, scopedProfileId]);
 
   useEffect(() => {
+    setConfirmedDailyLogIds(readConfirmedDailyLogIds(activeChatId));
+    pendingDailyLogMessageIdRef.current = null;
+  }, [activeChatId]);
+
+  const markDailyLogConfirmed = useCallback((messageId: string) => {
+    setConfirmedDailyLogIds((prev) => {
+      const next = new Set(prev).add(messageId);
+      writeConfirmedDailyLogIds(activeChatIdRef.current, next);
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, sending, vaultBusy, vaultStatus, savingLog]);
 
@@ -1598,6 +1636,7 @@ export default function VaultChatPanel({
 
   const openLogForm = () => {
     setPlusOpen(false);
+    pendingDailyLogMessageIdRef.current = null;
     setLogTitle("");
     setLogContent("");
     setLogOpen(true);
@@ -1899,7 +1938,7 @@ export default function VaultChatPanel({
         setError(body.error ?? "Couldn't save Daily Log.");
         return;
       }
-      setConfirmedDailyLogIds((prev) => new Set(prev).add(messageId));
+      markDailyLogConfirmed(messageId);
       window.dispatchEvent(new Event("guardian:logs-updated"));
       pushLocalNote(
         `Daily Log saved: ${proposedDailyLogSummary(proposal, timeZone)}`
@@ -2197,10 +2236,19 @@ export default function VaultChatPanel({
         return;
       }
       const saved = logContent.trim();
+      const proposalMessageId = pendingDailyLogMessageIdRef.current;
+      pendingDailyLogMessageIdRef.current = null;
       setLogOpen(false);
       setLogTitle("");
       setLogContent("");
       window.dispatchEvent(new Event("guardian:logs-updated"));
+      if (proposalMessageId) {
+        markDailyLogConfirmed(proposalMessageId);
+        pushLocalNote(
+          `Daily Log saved${title ? `: "${title}"` : ""}. You decide what happens next.`
+        );
+        return;
+      }
       await loadMetaAndChats().catch(() => undefined);
       await sendQuestion(
         `I just saved this Daily Log${title ? ` ("${title}")` : ""}: "${saved.slice(0, 200)}". What stands out?`
@@ -2916,6 +2964,7 @@ export default function VaultChatPanel({
                   type="button"
                   disabled={confirmingDailyLog || savingLog}
                   onClick={() => {
+                    pendingDailyLogMessageIdRef.current = m.id;
                     setLogTitle(proposedDailyLog.title ?? "");
                     setLogContent(proposedDailyLog.content);
                     setLogOpen(true);
@@ -4051,7 +4100,10 @@ export default function VaultChatPanel({
               </div>
               <button
                 type="button"
-                onClick={() => setLogOpen(false)}
+                onClick={() => {
+                  pendingDailyLogMessageIdRef.current = null;
+                  setLogOpen(false);
+                }}
                 aria-label="Close"
                 className="rounded-full p-1 text-ink-muted hover:bg-stone-100 hover:text-foreground"
               >
@@ -4089,7 +4141,10 @@ export default function VaultChatPanel({
             <div className="mt-4 flex justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setLogOpen(false)}
+                onClick={() => {
+                  pendingDailyLogMessageIdRef.current = null;
+                  setLogOpen(false);
+                }}
                 className="rounded-full px-4 py-2 text-sm font-medium text-ink-muted hover:bg-stone-50"
               >
                 Cancel

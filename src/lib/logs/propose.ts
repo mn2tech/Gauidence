@@ -1,6 +1,7 @@
 import { isValidLogDate, todayLogDate, formatLogDayHeading } from "./types";
 import { wantsReminderAgent } from "@/lib/reminders/propose";
 import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
+import type { ChatTurn } from "@/lib/vault/expandRetrievalQuestion";
 
 export type ProposedDailyLog = {
   title?: string;
@@ -17,10 +18,47 @@ const SAVE_CHAT_CONTENT_FOLLOWUP =
 const DAILY_LOG_QUERY =
   /\b(what|when|where|who|which|how|did|do|does|have|has|had|show|list|find|search|tell\s+me\s+about|recall|look\s+up)\b.{0,48}\b(log|logs|note|notes|daily\s+log|vault)\b/i;
 
+const DAILY_LOG_CONFIRM_ACK =
+  /^(yes|yeah|yep|yup|ok(?:ay)?|sure|go ahead|do it|confirm|please do|that'?s? (?:right|correct|good)|sounds good|perfect|add it|save it|save that|log it|put it in(?: the vault)?)\.?$/i;
+
+const DAILY_LOG_SHORT_VAULT_CONFIRM =
+  /^(?:please\s+)?(?:add|save|log|put)\s+(?:it|that|this)(?:\s+to\s+(?:the\s+)?(?:\w+(?:'s)?\s+)?vault)?\.?$/i;
+
+/** Short affirmations after Gideon already proposed a Daily Log (user should use Save to vault). */
+export function isDailyLogConfirmationMessage(question: string): boolean {
+  const q = question.trim();
+  if (!q || q.length > 120) return false;
+  if (DAILY_LOG_CONFIRM_ACK.test(q)) return true;
+  if (DAILY_LOG_SHORT_VAULT_CONFIRM.test(q)) return true;
+  return (
+    /\b(yes|yeah|yep|ok(?:ay)?|sure|go ahead|please|confirm)\b/i.test(q) &&
+    /\b(save|add|log|vault|it|that|this)\b/i.test(q)
+  );
+}
+
+function lastAssistantProposedDailyLog(history: ChatTurn[]): boolean {
+  for (let i = history.length - 1; i >= 0; i--) {
+    const turn = history[i];
+    if (turn?.role === "assistant") {
+      return parseProposedDailyLog(turn.content) !== null;
+    }
+  }
+  return false;
+}
+
 /** True when the user wants Gideon to propose saving a Daily Log from chat. */
-export function wantsDailyLogCapture(question: string): boolean {
+export function wantsDailyLogCapture(
+  question: string,
+  chatHistory: ChatTurn[] = []
+): boolean {
   const q = question.trim();
   if (!q) return false;
+  if (
+    lastAssistantProposedDailyLog(chatHistory) &&
+    isDailyLogConfirmationMessage(q)
+  ) {
+    return false;
+  }
   if (wantsReminderAgent(q)) return false;
   if (DAILY_LOG_QUERY.test(q)) return false;
   if (/\b(upload|attach|add\s+(?:a\s+)?(?:file|document|photo|image))\b/i.test(q)) {
@@ -42,7 +80,9 @@ title: <short title under 200 characters — optional but preferred>
 content: <the note to save — plain text; may continue on following lines>
 log_date: YYYY-MM-DD
 
-Use today's date if no date is given. Never invent facts not in the user's message or this conversation. If you cannot determine what to save, omit the PROPOSED DAILY LOG section and ask what to remember. Do not save the log yourself — the user will confirm in the app. Never tell them to open Daily Log or New Entry in the app manually.`;
+Use today's date if no date is given. Never invent facts not in the user's message or this conversation. If you cannot determine what to save, omit the PROPOSED DAILY LOG section and ask what to remember. Do not save the log yourself — the user will confirm in the app. Never tell them to open Daily Log or New Entry in the app manually.
+
+If RETRIEVED DAILY LOGS already contains this note, or you already proposed a Daily Log in this thread and the user affirmed or saved it, acknowledge it is in the vault — do NOT emit another PROPOSED DAILY LOG. The app has Save to vault / Edit first buttons; the user does not need a second proposal.`;
 
 const SECTION_START = /^#{1,3}\s*PROPOSED DAILY LOG\s*$/i;
 

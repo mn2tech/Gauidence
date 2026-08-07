@@ -10,7 +10,7 @@ export const captureDailyLogAction: ActionDefinition = {
   label: "Capture Daily Log",
   description:
     "Propose saving a Daily Log note from conversation for user confirmation.",
-  matches: (question) => wantsDailyLogCapture(question),
+  matches: (question, ctx) => wantsDailyLogCapture(question, ctx.chatHistory ?? []),
   systemNote: () => DAILY_LOG_CAPTURE_SYSTEM_NOTE,
   requiresConfirmation: true,
   thinkingSteps: [

@@ -1172,6 +1172,7 @@ export async function POST(request: Request) {
       parent_profile_id: active.parent_profile_id,
     },
     supabase,
+    chatHistory: history,
   };
 
   if (isSimpleTodayDateQuestion(question) && !attachmentDocumentId) {

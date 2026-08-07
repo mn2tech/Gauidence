@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { GuardianProfileType } from "@/lib/profiles/types";
+import type { ChatTurn } from "@/lib/vault/expandRetrievalQuestion";
 
 /** Runtime context passed to action matchers and executors. */
 export type ActionContext = {
@@ -16,6 +17,7 @@ export type ActionContext = {
   workProjectId?: string | null;
   confirmed?: boolean;
   supabase?: SupabaseClient;
+  chatHistory?: ChatTurn[];
 };
 
 /** Result from a direct (non-LLM) action execution. */

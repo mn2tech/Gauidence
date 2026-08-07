@@ -106,7 +106,7 @@ export async function loadWorkspaceContext(
   const showPictures = wantsShowPictures(question);
   const transcriptionMode = wantsTranscription(question);
   const reminderAgent = wantsReminderAgent(question);
-  const dailyLogCaptureAgent = wantsDailyLogCapture(question);
+  const dailyLogCaptureAgent = wantsDailyLogCapture(question, chatHistory);
   const workMemoryUpdateAgent = wantsWorkMemoryUpdate(question, {
     focusedWorkProject: Boolean(workProjectId),
   });
