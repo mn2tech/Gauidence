@@ -385,12 +385,24 @@ export async function PATCH(request: Request, context: RouteContext) {
 export async function DELETE(_request: Request, context: RouteContext) {
   const auth = await requireProposalUser();
   if (!isProposalAuthed(auth)) return auth;
+  const { supabase, user } = auth;
   const { id } = await context.params;
-  const existing = await getProposalById(auth.supabase, id);
+  const existing = await getProposalById(supabase, id);
   if (!existing) {
     return NextResponse.json({ error: "Proposal not found." }, { status: 404 });
   }
-  const { error } = await auth.supabase.from("proposals").delete().eq("id", id);
+  const business = await requireEditableBusinessProfile(
+    supabase,
+    user.id,
+    existing.business_profile_id
+  );
+  if (!business) {
+    return NextResponse.json(
+      { error: "You don't have permission to delete this proposal." },
+      { status: 403 }
+    );
+  }
+  const { error } = await supabase.from("proposals").delete().eq("id", id);
   if (error) {
     return NextResponse.json({ error: "Couldn't delete proposal." }, { status: 500 });
   }

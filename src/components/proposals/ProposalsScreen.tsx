@@ -29,7 +29,7 @@ import {
   type ServiceTemplate,
   canShareProposal,
 } from "@/lib/proposals/types";
-import { activeClientsOf, isOrgStyleProfile } from "@/lib/profiles/types";
+import { activeClientsOf, canEditGuardianProfile, isOrgStyleProfile } from "@/lib/profiles/types";
 import { formatMoney } from "@/lib/proposals/pricing";
 import {
   applyProposalTemplate,
@@ -114,6 +114,10 @@ export default function ProposalsScreen() {
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [portalLink, setPortalLink] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const canDeleteProposals =
+    isBusiness && active != null && canEditGuardianProfile(active);
 
   const [draft, setDraft] = useState({
     clientProfileId: "",
@@ -381,6 +385,32 @@ export default function ProposalsScreen() {
       setError(err instanceof Error ? err.message : "Couldn't send proposal.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const deleteProposal = async (proposal: ProposalWithMeta) => {
+    const confirmed = window.confirm(
+      `Delete "${proposal.title}" for ${proposal.client_name ?? "this client"}? This can't be undone.`
+    );
+    if (!confirmed) return;
+
+    setDeletingId(proposal.id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/proposals/${proposal.id}`, {
+        method: "DELETE",
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error ?? "Couldn't delete proposal.");
+      if (selectedId === proposal.id) {
+        setShowEditor(false);
+        window.history.replaceState(null, "", PROPOSALS_PATH);
+      }
+      await loadAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't delete proposal.");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -689,6 +719,21 @@ export default function ProposalsScreen() {
                 label="Share link"
               />
             ) : null}
+            {selected && canDeleteProposals ? (
+              <button
+                type="button"
+                disabled={deletingId === selected.id}
+                onClick={() => void deleteProposal(selected)}
+                className="inline-flex items-center gap-2 rounded-xl border border-rose-200 px-4 py-2.5 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+              >
+                {deletingId === selected.id ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
+                Delete
+              </button>
+            ) : null}
           </div>
         </div>
       </div>
@@ -859,6 +904,22 @@ export default function ProposalsScreen() {
                           proposalTitle={proposal.title}
                           clientName={proposal.client_name}
                         />
+                      ) : null}
+                      {canDeleteProposals ? (
+                        <button
+                          type="button"
+                          disabled={deletingId === proposal.id}
+                          onClick={() => void deleteProposal(proposal)}
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                          title="Delete proposal"
+                        >
+                          {deletingId === proposal.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-3.5 w-3.5" />
+                          )}
+                          Delete
+                        </button>
                       ) : null}
                     </div>
                   </div>
