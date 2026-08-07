@@ -7,7 +7,7 @@ import {
   useState,
   type ClipboardEvent,
   type FormEvent,
-  type KeyboardEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent,
 } from "react";
 import Link from "next/link";
@@ -742,7 +742,7 @@ export default function VaultChatPanel({
     resizeComposerInput();
   }, [input, resizeComposerInput]);
 
-  const handleComposerKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleComposerKeyDown = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key !== "Enter" || e.shiftKey) return;
     e.preventDefault();
     e.currentTarget.form?.requestSubmit();
@@ -1214,7 +1214,7 @@ export default function VaultChatPanel({
     const onDoc = (e: globalThis.MouseEvent) => {
       if (!plusRef.current?.contains(e.target as Node)) setPlusOpen(false);
     };
-    const onKey = (e: KeyboardEvent) => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
       if (e.key === "Escape") setPlusOpen(false);
     };
     document.addEventListener("mousedown", onDoc);
@@ -1226,7 +1226,7 @@ export default function VaultChatPanel({
   }, [plusOpen]);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "u") return;
       if (vaultBusy || sending || !profileId) return;
       const target = e.target as HTMLElement | null;
