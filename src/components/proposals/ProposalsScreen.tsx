@@ -28,6 +28,10 @@ import {
 } from "@/lib/proposals/types";
 import { activeClientsOf, isOrgStyleProfile } from "@/lib/profiles/types";
 import { formatMoney } from "@/lib/proposals/pricing";
+import {
+  applyProposalTemplate,
+  proposalTemplateTotalCents,
+} from "@/lib/proposals/templateApply";
 import { PROPOSALS_PATH } from "@/lib/routes";
 
 type Tab = "dashboard" | "templates" | "services";
@@ -89,6 +93,20 @@ export default function ProposalsScreen() {
   const [statusFilter, setStatusFilter] = useState<ProposalStatus | "all">("all");
   const [search, setSearch] = useState("");
   const [showEditor, setShowEditor] = useState(false);
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+  const [templateDraft, setTemplateDraft] = useState({
+    name: "",
+    description: "",
+    title: "",
+    summary: "",
+    introduction: "",
+    terms: "",
+    lineItems: [] as BuilderLineItem[],
+    timeline: [] as TimelineItem[],
+    deliverables: [] as DeliverableItem[],
+    addons: [] as BuilderLineItem[],
+  });
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [portalLink, setPortalLink] = useState<string | null>(null);
@@ -166,7 +184,82 @@ export default function ProposalsScreen() {
 
   const openCreate = () => {
     resetDraft();
+    setShowTemplatePicker(true);
+  };
+
+  const startBlankProposal = () => {
+    resetDraft();
+    setShowTemplatePicker(false);
     setShowEditor(true);
+  };
+
+  const startFromTemplate = (template: ProposalTemplate) => {
+    const applied = applyProposalTemplate(template, {});
+    setDraft({
+      clientProfileId: clients[0]?.id ?? "",
+      title: applied.title,
+      summary: applied.summary,
+      introduction: applied.introduction,
+      terms: applied.terms,
+      taxRateBps: 0,
+      lineItems: applied.lineItems,
+      timeline: applied.timeline,
+      deliverables: applied.deliverables,
+      addons: applied.addons,
+    });
+    setShowTemplatePicker(false);
+    setShowEditor(true);
+  };
+
+  const openTemplateEditor = (template: ProposalTemplate) => {
+    setEditingTemplateId(template.id);
+    setTemplateDraft({
+      name: template.name,
+      description: template.description ?? "",
+      title: template.default_title ?? "",
+      summary: template.default_summary ?? "",
+      introduction: template.default_introduction ?? "",
+      terms: template.default_terms ?? "",
+      lineItems: template.default_line_items,
+      timeline: template.default_timeline,
+      deliverables: template.default_deliverables,
+      addons: template.default_addons,
+    });
+  };
+
+  const saveTemplate = async () => {
+    if (!businessProfileId || !editingTemplateId || !templateDraft.name.trim()) {
+      setError("Template name is required.");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/proposals/templates/${editingTemplateId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: templateDraft.name,
+          description: templateDraft.description,
+          defaultTitle: templateDraft.title,
+          defaultSummary: templateDraft.summary,
+          defaultIntroduction: templateDraft.introduction,
+          defaultTerms: templateDraft.terms,
+          defaultLineItems: templateDraft.lineItems,
+          defaultTimeline: templateDraft.timeline,
+          defaultDeliverables: templateDraft.deliverables,
+          defaultAddons: templateDraft.addons,
+        }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error ?? "Couldn't save template.");
+      setEditingTemplateId(null);
+      await loadAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't save template.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const openEdit = (proposal: ProposalWithMeta) => {
@@ -294,6 +387,164 @@ export default function ProposalsScreen() {
         <p className="mt-2 text-sm text-ink-muted">
           Switch to a business vault to create and manage client proposals.
         </p>
+      </div>
+    );
+  }
+
+  if (editingTemplateId) {
+    return (
+      <div className="space-y-4">
+        <button
+          type="button"
+          onClick={() => setEditingTemplateId(null)}
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-brand hover:underline"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to templates
+        </button>
+        <div className={cardClass}>
+          <h2 className="text-lg font-semibold">Edit proposal template</h2>
+          <p className="mt-1 text-sm text-ink-muted">
+            Use {"{{company_name}}"} and {"{{website_url}}"} in titles and copy — they
+            are filled in when you create a proposal from this template.
+          </p>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <label className="block text-sm sm:col-span-2">
+              <span className="mb-1 block font-medium">Template name</span>
+              <input
+                className={inputClass}
+                value={templateDraft.name}
+                onChange={(e) =>
+                  setTemplateDraft((d) => ({ ...d, name: e.target.value }))
+                }
+              />
+            </label>
+            <label className="block text-sm sm:col-span-2">
+              <span className="mb-1 block font-medium">Description (internal)</span>
+              <input
+                className={inputClass}
+                value={templateDraft.description}
+                onChange={(e) =>
+                  setTemplateDraft((d) => ({ ...d, description: e.target.value }))
+                }
+              />
+            </label>
+            <label className="block text-sm sm:col-span-2">
+              <span className="mb-1 block font-medium">Default proposal title</span>
+              <input
+                className={inputClass}
+                value={templateDraft.title}
+                onChange={(e) =>
+                  setTemplateDraft((d) => ({ ...d, title: e.target.value }))
+                }
+              />
+            </label>
+          </div>
+          {[
+            ["summary", "Default summary"],
+            ["introduction", "Default introduction"],
+            ["terms", "Default terms"],
+          ].map(([key, label]) => (
+            <label key={key} className="mt-4 block text-sm">
+              <span className="mb-1 block font-medium">{label}</span>
+              <textarea
+                className={`${inputClass} min-h-[96px]`}
+                value={templateDraft[key as keyof typeof templateDraft] as string}
+                onChange={(e) =>
+                  setTemplateDraft((d) => ({ ...d, [key]: e.target.value }))
+                }
+              />
+            </label>
+          ))}
+          <ProposalBuilderSection
+            title="Services & pricing"
+            items={templateDraft.lineItems}
+            onChange={(lineItems) =>
+              setTemplateDraft((d) => ({ ...d, lineItems }))
+            }
+            services={services}
+          />
+          <ProposalBuilderSection
+            title="Optional add-ons"
+            items={templateDraft.addons}
+            onChange={(addons) =>
+              setTemplateDraft((d) => ({
+                ...d,
+                addons: addons.map((a) => ({ ...a, optional: true })),
+              }))
+            }
+            services={services}
+            optional
+          />
+          <TimelineSection
+            items={templateDraft.timeline}
+            onChange={(timeline) => setTemplateDraft((d) => ({ ...d, timeline }))}
+          />
+          <DeliverablesSection
+            items={templateDraft.deliverables}
+            onChange={(deliverables) =>
+              setTemplateDraft((d) => ({ ...d, deliverables }))
+            }
+          />
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => void saveTemplate()}
+            className={`${buttonPrimary} mt-6`}
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            Save template
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (showTemplatePicker) {
+    return (
+      <div className="space-y-4">
+        <button
+          type="button"
+          onClick={() => setShowTemplatePicker(false)}
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-brand hover:underline"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to proposals
+        </button>
+        <div>
+          <h2 className="text-lg font-semibold">Choose a proposal template</h2>
+          <p className="mt-1 text-sm text-ink-muted">
+            Pick a packaged service with pricing, or start from a blank proposal.
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {templates.map((template) => (
+            <button
+              key={template.id}
+              type="button"
+              onClick={() => startFromTemplate(template)}
+              className={`${cardClass} text-left transition hover:border-brand/40`}
+            >
+              <h3 className="font-semibold">{template.name}</h3>
+              {template.description ? (
+                <p className="mt-1 text-sm text-ink-muted">{template.description}</p>
+              ) : null}
+              <p className="mt-2 text-sm font-bold text-brand">
+                {formatMoney(proposalTemplateTotalCents(template))}
+              </p>
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={startBlankProposal}
+            className={`${cardClass} text-left transition hover:border-brand/40`}
+          >
+            <h3 className="font-semibold">Blank proposal</h3>
+            <p className="mt-1 text-sm text-ink-muted">
+              Start empty and add line items manually.
+            </p>
+          </button>
+        </div>
       </div>
     );
   }
@@ -604,6 +855,7 @@ export default function ProposalsScreen() {
           businessProfileId={businessProfileId!}
           templates={templates}
           onChanged={() => void loadAll()}
+          onEdit={openTemplateEditor}
         />
       ) : null}
 
@@ -925,10 +1177,12 @@ function TemplatesPanel({
   businessProfileId,
   templates,
   onChanged,
+  onEdit,
 }: {
   businessProfileId: string;
   templates: ProposalTemplate[];
   onChanged: () => void;
+  onEdit: (template: ProposalTemplate) => void;
 }) {
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
@@ -946,10 +1200,14 @@ function TemplatesPanel({
   };
   return (
     <div className="space-y-4">
+      <p className="text-sm text-ink-muted">
+        Templates are reusable service packages with prices, deliverables, and terms.
+        New proposals and Business Advisor proposals use these templates.
+      </p>
       <div className={`${cardClass} flex flex-wrap gap-2`}>
         <input
           className={`${inputClass} min-w-[220px] flex-1`}
-          placeholder="Template name"
+          placeholder="New template name"
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
@@ -959,10 +1217,30 @@ function TemplatesPanel({
       </div>
       {templates.map((template) => (
         <div key={template.id} className={cardClass}>
-          <h3 className="font-semibold">{template.name}</h3>
-          {template.description ? (
-            <p className="mt-1 text-sm text-ink-muted">{template.description}</p>
-          ) : null}
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="font-semibold">{template.name}</h3>
+              {template.description ? (
+                <p className="mt-1 text-sm text-ink-muted">{template.description}</p>
+              ) : null}
+              <p className="mt-2 text-sm font-bold text-brand">
+                {formatMoney(proposalTemplateTotalCents(template))}
+                {template.default_line_items.length > 0 ? (
+                  <span className="ml-2 font-normal text-ink-muted">
+                    · {template.default_line_items.length} line item
+                    {template.default_line_items.length === 1 ? "" : "s"}
+                  </span>
+                ) : null}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => onEdit(template)}
+              className="rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium hover:bg-stone-50"
+            >
+              Edit template
+            </button>
+          </div>
         </div>
       ))}
     </div>

@@ -48,11 +48,14 @@ export async function POST(request: Request, context: RouteContext) {
     });
   }
 
+  const templateId = parseUuid(body.templateId ?? body.template_id);
+
   try {
     const { proposalId } = await createProposalFromAssessment(auth.supabase, {
       assessmentId: id,
       userId: auth.user.id,
       clientProfileId,
+      templateId,
     });
     return NextResponse.json({ proposalId });
   } catch (err) {

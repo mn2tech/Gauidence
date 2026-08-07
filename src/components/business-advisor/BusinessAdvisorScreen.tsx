@@ -15,9 +15,11 @@ import {
 import { useActiveProfile } from "@/components/ProfileProvider";
 import { activeClientsOf, isOrgStyleProfile } from "@/lib/profiles/types";
 import { formatMoney } from "@/lib/proposals/pricing";
+import { proposalTemplateTotalCents } from "@/lib/proposals/templateApply";
 import { readJsonResponse } from "@/lib/http/readJsonResponse";
 import { PROPOSALS_PATH } from "@/lib/routes";
 import type { BusinessAssessment, BusinessAssessmentDetail } from "@/lib/business-advisor/types";
+import type { ProposalTemplate } from "@/lib/proposals/types";
 
 const inputClass =
   "w-full rounded-xl border border-border-subtle px-3 py-2.5 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/25";
@@ -55,6 +57,8 @@ export default function BusinessAdvisorScreen() {
   const [showNew, setShowNew] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [creatingProposal, setCreatingProposal] = useState(false);
+  const [proposalTemplates, setProposalTemplates] = useState<ProposalTemplate[]>([]);
+  const [proposalTemplateId, setProposalTemplateId] = useState("");
 
   const [companyName, setCompanyName] = useState("");
   const [websiteUrl, setWebsiteUrl] = useState("");
@@ -92,6 +96,29 @@ export default function BusinessAdvisorScreen() {
       setError(err instanceof Error ? err.message : "Couldn't load assessment.");
     }
   }, []);
+
+  useEffect(() => {
+    if (!businessProfileId) return;
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/proposals/templates?businessProfileId=${businessProfileId}`
+        );
+        const body = await readJsonResponse<{
+          error?: string;
+          templates?: ProposalTemplate[];
+        }>(res);
+        if (res.ok) {
+          const list = body.templates ?? [];
+          setProposalTemplates(list);
+          const assessment = list.find((t) => /assessment/i.test(t.name));
+          setProposalTemplateId(assessment?.id ?? list[0]?.id ?? "");
+        }
+      } catch {
+        // templates optional until create proposal
+      }
+    })();
+  }, [businessProfileId]);
 
   useEffect(() => {
     void loadList();
@@ -168,7 +195,10 @@ export default function BusinessAdvisorScreen() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ clientProfileId: clientId }),
+          body: JSON.stringify({
+            clientProfileId: clientId,
+            templateId: proposalTemplateId || undefined,
+          }),
         }
       );
       const body = await readJsonResponse<{
@@ -419,6 +449,22 @@ export default function BusinessAdvisorScreen() {
                       {clients.map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.display_name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
+                {!detail.proposal_id && proposalTemplates.length > 0 ? (
+                  <label className="block text-sm">
+                    <span className="mb-1 block font-medium">Proposal template</span>
+                    <select
+                      className={inputClass}
+                      value={proposalTemplateId}
+                      onChange={(e) => setProposalTemplateId(e.target.value)}
+                    >
+                      {proposalTemplates.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name} — {formatMoney(proposalTemplateTotalCents(t))}
                         </option>
                       ))}
                     </select>

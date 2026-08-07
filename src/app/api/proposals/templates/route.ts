@@ -17,6 +17,7 @@ import {
   parseTitle,
   parseUuid,
 } from "@/lib/proposals/validators";
+import { ensureDefaultProposalTemplates } from "@/lib/proposals/ensureDefaultTemplates";
 
 export const runtime = "nodejs";
 
@@ -57,17 +58,11 @@ export async function GET(request: Request) {
   if (!business) {
     return NextResponse.json({ error: "Business vault required." }, { status: 400 });
   }
-  const { data, error } = await auth.supabase
-    .from("proposal_templates")
-    .select(PROPOSAL_TEMPLATE_SELECT)
-    .eq("business_profile_id", business.id)
-    .order("updated_at", { ascending: false });
-  if (error) {
-    return NextResponse.json({ error: "Couldn't load templates." }, { status: 500 });
-  }
-  return NextResponse.json({
-    templates: (data ?? []).map((row) => mapTemplate(row)),
+  const templates = await ensureDefaultProposalTemplates(auth.supabase, {
+    businessProfileId: business.id,
+    userId: auth.user.id,
   });
+  return NextResponse.json({ templates });
 }
 
 export async function POST(request: Request) {

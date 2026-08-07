@@ -18,7 +18,12 @@ import {
   calculateCatalogPrice,
   INDUSTRY_PLAYBOOKS,
 } from "./catalog";
-import { buildClientReadyProposalContent } from "./proposalFromAssessment";
+import { applyProposalTemplate } from "@/lib/proposals/templateApply";
+import {
+  ensureDefaultProposalTemplates,
+  findDefaultAssessmentTemplate,
+  loadProposalTemplate,
+} from "@/lib/proposals/ensureDefaultTemplates";
 import { discoverWebsite } from "./discovery";
 import { allAnalyzerFindings } from "./analyzers";
 import {
@@ -306,6 +311,7 @@ export async function createProposalFromAssessment(
     assessmentId: string;
     userId: string;
     clientProfileId: string;
+    templateId?: string | null;
   }
 ): Promise<{ proposalId: string }> {
   const detail = await loadAssessmentDetail(supabase, args.assessmentId);
@@ -313,11 +319,30 @@ export async function createProposalFromAssessment(
     throw new Error("Complete an assessment before creating a proposal.");
   }
 
-  const draft = buildClientReadyProposalContent(detail);
+  await ensureDefaultProposalTemplates(supabase, {
+    businessProfileId: detail.business_profile_id,
+    userId: args.userId,
+  });
+
+  const template =
+    (args.templateId
+      ? await loadProposalTemplate(supabase, args.templateId)
+      : null) ??
+    (await findDefaultAssessmentTemplate(supabase, detail.business_profile_id));
+
+  if (!template) {
+    throw new Error("No proposal template found. Add a template in Proposals.");
+  }
+
+  const applied = applyProposalTemplate(template, {
+    company_name: detail.company_name,
+    website_url: detail.website_url,
+    client_name: detail.client_name ?? undefined,
+  });
 
   const pricing = calculateProposalPricing({
-    lineItems: draft.lineItems,
-    addons: [],
+    lineItems: applied.lineItems,
+    addons: applied.addons,
     taxRateBps: 0,
   });
 
@@ -328,14 +353,15 @@ export async function createProposalFromAssessment(
       client_profile_id: args.clientProfileId,
       created_by: args.userId,
       assessment_id: args.assessmentId,
-      title: draft.title,
-      summary: draft.summary,
-      introduction: draft.introduction,
-      terms: draft.terms,
-      line_items: draft.lineItems,
-      timeline: draft.timeline,
-      deliverables: draft.deliverables,
-      addons: [],
+      template_id: applied.templateId,
+      title: applied.title,
+      summary: applied.summary || null,
+      introduction: applied.introduction || null,
+      terms: applied.terms || null,
+      line_items: applied.lineItems,
+      timeline: applied.timeline,
+      deliverables: applied.deliverables,
+      addons: applied.addons,
       subtotal_cents: pricing.subtotalCents,
       tax_cents: pricing.taxCents,
       total_cents: pricing.totalCents,
