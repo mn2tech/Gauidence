@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { User, SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   getActiveGuardianProfile,
   requireEditableGuardianProfile,
@@ -9,10 +10,14 @@ import { getUserTimeZone } from "@/lib/timezone/server";
 import {
   calendarDateInZone,
   formatReminderWhen,
+  normalizeReminderTime,
   zonedDateTimeToIso,
 } from "@/lib/reminders/time";
 
 export const runtime = "nodejs";
+
+const REMINDER_SELECT =
+  "id, title, due_date, due_at, source, profile_id, created_at";
 
 type Authed = { supabase: SupabaseClient; user: User };
 
@@ -38,6 +43,21 @@ async function requireUser(): Promise<Authed | NextResponse> {
 
 function isAuthed(v: Authed | NextResponse): v is Authed {
   return !(v instanceof NextResponse);
+}
+
+function reminderSaveError(message: string | undefined): string {
+  const msg = message ?? "";
+  if (
+    msg.includes("due_at") ||
+    msg.includes("document_id") ||
+    msg.includes("alerts_document_or_user_chk")
+  ) {
+    return "Reminders aren't set up on this project yet — run migration 0021_user_reminders.sql in Supabase.";
+  }
+  if (msg.includes("row-level security")) {
+    return "You can't add reminders for this vault. Switch to a vault you can edit.";
+  }
+  return "Couldn't save that reminder. Please try again.";
 }
 
 /**
@@ -72,7 +92,7 @@ export async function POST(request: Request) {
   }
 
   const date = typeof body.date === "string" ? body.date.trim() : "";
-  const time = typeof body.time === "string" ? body.time.trim() : "09:00";
+  const time = normalizeReminderTime(body.time);
   const dueAt = zonedDateTimeToIso({ date, time, timeZone: userTz });
   if (!dueAt) {
     return NextResponse.json(
@@ -97,17 +117,8 @@ export async function POST(request: Request) {
   }
 
   let profileId =
-    typeof body.profileId === "string" ? body.profileId : null;
-  if (profileId) {
-    const editable = await requireEditableGuardianProfile(
-      supabase,
-      user.id,
-      profileId
-    );
-    if (!editable) {
-      return NextResponse.json({ error: "Profile not found." }, { status: 404 });
-    }
-  } else {
+    typeof body.profileId === "string" ? body.profileId.trim() : "";
+  if (!profileId) {
     const active = await getActiveGuardianProfile(supabase, user);
     if (!active) {
       return NextResponse.json(
@@ -121,32 +132,50 @@ export async function POST(request: Request) {
     profileId = active.id;
   }
 
-  const dueDate = calendarDateInZone(dueInstant, userTz);
-
-  const { data, error } = await supabase
-    .from("alerts")
-    .insert({
-      document_id: null,
-      user_id: user.id,
-      profile_id: profileId,
-      title,
-      due_date: dueDate,
-      due_at: dueAt,
-      source: "user",
-    })
-    .select("id, title, due_date, due_at, source, profile_id, created_at")
-    .single();
-
-  if (error || !data) {
-    console.error("Create reminder failed:", error?.message ?? "unknown");
+  const editable = await requireEditableGuardianProfile(
+    supabase,
+    user.id,
+    profileId
+  );
+  if (!editable) {
     return NextResponse.json(
       {
         error:
-          error?.message?.includes("due_at") ||
-          error?.message?.includes("document_id")
-            ? "Reminders aren't set up on this project yet — run migration 0021_user_reminders.sql in Supabase."
-            : "Couldn't save that reminder. Please try again.",
+          "You can't add reminders for this vault. Switch to a vault you can edit.",
       },
+      { status: 403 }
+    );
+  }
+
+  const dueDate = calendarDateInZone(dueInstant, userTz);
+  const row = {
+    document_id: null,
+    user_id: user.id,
+    profile_id: profileId,
+    title,
+    due_date: dueDate,
+    due_at: dueAt,
+    source: "user",
+  };
+
+  const admin = createAdminClient();
+  const writer = admin ?? supabase;
+  const { data, error } = await writer
+    .from("alerts")
+    .insert(row)
+    .select(REMINDER_SELECT)
+    .single();
+
+  if (error || !data) {
+    console.error(
+      "Create reminder failed:",
+      error?.code,
+      error?.message ?? "unknown",
+      error?.details,
+      error?.hint
+    );
+    return NextResponse.json(
+      { error: reminderSaveError(error?.message) },
       { status: 502 }
     );
   }

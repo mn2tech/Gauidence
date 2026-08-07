@@ -1,4 +1,4 @@
-import { formatReminderWhen, zonedDateTimeToIso } from "./time";
+import { formatReminderWhen, normalizeReminderTime, zonedDateTimeToIso } from "./time";
 import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
 
 export type ProposedReminder = {
@@ -52,9 +52,8 @@ export function parseProposedReminder(
 
   const title = (fields.title ?? "").trim().slice(0, 200);
   const date = (fields.date ?? "").trim();
-  const time = (fields.time ?? "09:00").trim();
+  const time = normalizeReminderTime(fields.time ?? "09:00");
   if (!title || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
-  if (!/^\d{2}:\d{2}$/.test(time)) return null;
 
   const dueAt = zonedDateTimeToIso({
     date,

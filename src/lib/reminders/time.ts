@@ -17,6 +17,28 @@ export function calendarDateInZone(
  * Build a timestamptz from a local calendar date + HH:mm in a named zone.
  * Returns null if inputs are invalid.
  */
+export function normalizeReminderTime(
+  raw: unknown,
+  fallback = "09:00"
+): string {
+  if (typeof raw !== "string") return fallback;
+  const trimmed = raw.trim();
+  if (!trimmed) return fallback;
+
+  const withSeconds = /^(\d{1,2}):(\d{2})(?::\d{2})?$/.exec(trimmed);
+  if (!withSeconds) return fallback;
+
+  const hour = Number(withSeconds[1]);
+  const minute = Number(withSeconds[2]);
+  if (hour > 23 || minute > 59) return fallback;
+
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+/**
+ * Build a timestamptz from a local calendar date + HH:mm in a named zone.
+ * Returns null if inputs are invalid.
+ */
 export function zonedDateTimeToIso(args: {
   date: string; // YYYY-MM-DD
   time: string; // HH:mm

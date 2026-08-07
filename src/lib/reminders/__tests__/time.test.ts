@@ -4,6 +4,7 @@ import {
   calendarDateInZone,
   formatReminderWhen,
   isImminentReminder,
+  normalizeReminderTime,
   zonedDateTimeToIso,
 } from "../time.ts";
 
@@ -28,6 +29,13 @@ describe("reminder time helpers", () => {
       zonedDateTimeToIso({ date: "2026-07-16", time: "7pm" }),
       null
     );
+  });
+
+  it("normalizes reminder clock times", () => {
+    assert.equal(normalizeReminderTime(""), "09:00");
+    assert.equal(normalizeReminderTime("9:05"), "09:05");
+    assert.equal(normalizeReminderTime("09:05:00"), "09:05");
+    assert.equal(normalizeReminderTime("invalid"), "09:00");
   });
 
   it("formats reminder when with clock time", () => {
