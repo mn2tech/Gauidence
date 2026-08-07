@@ -5,6 +5,7 @@ import { SIMPLE_HOME_PATH } from "@/lib/simple-home/routing";
 export const DOCUMENTS_PATH = "/dashboard?docs=1";
 export const REQUESTS_PATH = "/requests";
 export const PROPOSALS_PATH = "/proposals";
+export const BUSINESS_ADVISOR_PATH = "/business-advisor";
 
 /** Header / nav label for {@link DOCUMENTS_PATH}. */
 export const VAULT_NAV_LABEL = "Vault";
