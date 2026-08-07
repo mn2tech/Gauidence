@@ -38,6 +38,39 @@ import {
   type BusinessAssessmentDetail,
 } from "./types";
 
+export async function clearAssessmentProposalLinks(
+  supabase: SupabaseClient,
+  proposalId: string
+): Promise<void> {
+  await supabase
+    .from("business_assessments")
+    .update({ proposal_id: null })
+    .eq("proposal_id", proposalId);
+}
+
+async function reconcileAssessmentProposalId(
+  supabase: SupabaseClient,
+  assessmentId: string,
+  proposalId: string | null
+): Promise<string | null> {
+  if (!proposalId) return null;
+
+  const { data: proposal } = await supabase
+    .from("proposals")
+    .select("id")
+    .eq("id", proposalId)
+    .maybeSingle();
+
+  if (proposal) return proposalId;
+
+  await supabase
+    .from("business_assessments")
+    .update({ proposal_id: null })
+    .eq("id", assessmentId);
+
+  return null;
+}
+
 export async function ensureAdvisorCatalog(
   supabase: SupabaseClient,
   businessProfileId: string
@@ -105,8 +138,15 @@ export async function loadAssessmentDetail(
     client_name = (client?.display_name as string) ?? null;
   }
 
+  const proposal_id = await reconcileAssessmentProposalId(
+    supabase,
+    assessmentId,
+    assessment.proposal_id ? String(assessment.proposal_id) : null
+  );
+
   return {
     ...(assessment as BusinessAssessmentDetail),
+    proposal_id,
     findings: (findings.data ?? []) as BusinessAssessmentDetail["findings"],
     opportunities: (opportunities.data ??
       []) as BusinessAssessmentDetail["opportunities"],

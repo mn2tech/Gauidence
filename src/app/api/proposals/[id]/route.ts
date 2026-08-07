@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { clearAssessmentProposalLinks } from "@/lib/business-advisor/server";
 import { runProposalAcceptanceWorkflow } from "@/lib/proposals/accept";
 import {
   isProposalAuthed,
@@ -402,6 +403,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
       { status: 403 }
     );
   }
+  await clearAssessmentProposalLinks(supabase, id);
   const { error } = await supabase.from("proposals").delete().eq("id", id);
   if (error) {
     return NextResponse.json({ error: "Couldn't delete proposal." }, { status: 500 });
