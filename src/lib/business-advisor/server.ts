@@ -1,6 +1,5 @@
 import "server-only";
 
-import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   CHAT_MODEL,
@@ -13,13 +12,13 @@ import {
 } from "@/lib/analysis/chatProvider";
 import { withLlmUsage } from "@/lib/usage/record";
 import { calculateProposalPricing } from "@/lib/proposals/pricing";
-import type { ProposalLineItem, ProposalTimelineItem, ProposalDeliverable } from "@/lib/proposals/types";
 import { PROPOSAL_SELECT } from "@/lib/proposals/types";
 import {
   DEFAULT_ADVISOR_CATALOG,
   calculateCatalogPrice,
   INDUSTRY_PLAYBOOKS,
 } from "./catalog";
+import { buildClientReadyProposalContent } from "./proposalFromAssessment";
 import { discoverWebsite } from "./discovery";
 import { allAnalyzerFindings } from "./analyzers";
 import {
@@ -314,71 +313,13 @@ export async function createProposalFromAssessment(
     throw new Error("Complete an assessment before creating a proposal.");
   }
 
-  const lineItems: ProposalLineItem[] = detail.solutions.map((s) => ({
-    id: randomUUID(),
-    title: s.title,
-    description: s.description ?? undefined,
-    quantity: 1,
-    unitLabel: "project",
-    unitPriceCents: s.price_cents,
-  }));
+  const draft = buildClientReadyProposalContent(detail);
 
   const pricing = calculateProposalPricing({
-    lineItems,
+    lineItems: draft.lineItems,
     addons: [],
     taxRateBps: 0,
   });
-
-  const findingsSummary = detail.findings
-    .slice(0, 6)
-    .map((f) => `• ${f.title}: ${f.description}`)
-    .join("\n");
-
-  const outcomesSummary = detail.outcomes
-    .map((o) => `• ${o.outcome_text}`)
-    .join("\n");
-
-  const introduction = [
-    detail.executive_summary,
-    "",
-    "## Key findings",
-    findingsSummary,
-    "",
-    "## Business outcomes we will deliver",
-    outcomesSummary,
-  ]
-    .filter(Boolean)
-    .join("\n");
-
-  const deliverables: ProposalDeliverable[] = detail.solutions.map((s, i) => ({
-    id: randomUUID(),
-    title: s.title,
-    description: s.implementation_time ?? undefined,
-    sortOrder: i,
-  }));
-
-  const timeline: ProposalTimelineItem[] = [
-    {
-      id: randomUUID(),
-      title: "Discovery & kickoff",
-      description: "Align on scope, access, and success metrics.",
-      sortOrder: 0,
-    },
-    {
-      id: randomUUID(),
-      title: "Implementation",
-      description: "Deliver recommended Guardian solutions.",
-      sortOrder: 1,
-    },
-    {
-      id: randomUUID(),
-      title: "Launch & handoff",
-      description: "Training, documentation, and go-live support.",
-      sortOrder: 2,
-    },
-  ];
-
-  const title = `${detail.company_name} — Digital Growth & Security Proposal`;
 
   const { data: proposal, error } = await supabase
     .from("proposals")
@@ -387,14 +328,13 @@ export async function createProposalFromAssessment(
       client_profile_id: args.clientProfileId,
       created_by: args.userId,
       assessment_id: args.assessmentId,
-      title,
-      summary: detail.executive_summary?.slice(0, 500) ?? null,
-      introduction,
-      terms:
-        "This proposal is based on an automated website and security assessment. Final scope will be confirmed during kickoff. Pricing valid for 30 days.",
-      line_items: lineItems,
-      timeline,
-      deliverables,
+      title: draft.title,
+      summary: draft.summary,
+      introduction: draft.introduction,
+      terms: draft.terms,
+      line_items: draft.lineItems,
+      timeline: draft.timeline,
+      deliverables: draft.deliverables,
       addons: [],
       subtotal_cents: pricing.subtotalCents,
       tax_cents: pricing.taxCents,

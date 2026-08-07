@@ -101,6 +101,30 @@ export const DEFAULT_ADVISOR_CATALOG: Omit<
     maximum_price_cents: 700000,
     subscription_monthly_cents: 29900,
   },
+  {
+    service_key: "paid_website_assessment",
+    name: "Website & Conversion Assessment",
+    category: "consulting",
+    description:
+      "Priority plan from your website review, walkthrough call, and fee credited toward implementation.",
+    estimated_hours: 2,
+    hourly_rate_cents: 4950,
+    minimum_price_cents: 9900,
+    maximum_price_cents: 9900,
+    subscription_monthly_cents: null,
+  },
+  {
+    service_key: "website_redesign_sprint",
+    name: "Homepage Trust & Conversion Redesign",
+    category: "website",
+    description:
+      "Design and build homepage improvements that address trust, content, and conversion gaps from the review.",
+    estimated_hours: 40,
+    hourly_rate_cents: 17500,
+    minimum_price_cents: 450000,
+    maximum_price_cents: 1200000,
+    subscription_monthly_cents: null,
+  },
 ];
 
 export function calculateCatalogPrice(item: {

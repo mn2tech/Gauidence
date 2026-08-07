@@ -712,12 +712,25 @@ function ProposalBuilderSection({
           >
             <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-4">
               <input
-                className={inputClass}
+                className={`${inputClass} sm:col-span-4`}
                 placeholder="Title"
                 value={item.title}
                 onChange={(e) => {
                   const next = [...items];
                   next[index] = { ...item, title: e.target.value };
+                  onChange(next);
+                }}
+              />
+              <textarea
+                className={`${inputClass} min-h-[72px] sm:col-span-4`}
+                placeholder="What's included — what the client gets"
+                value={item.description ?? ""}
+                onChange={(e) => {
+                  const next = [...items];
+                  next[index] = {
+                    ...item,
+                    description: e.target.value || undefined,
+                  };
                   onChange(next);
                 }}
               />

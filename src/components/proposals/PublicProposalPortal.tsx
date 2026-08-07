@@ -127,22 +127,108 @@ export default function PublicProposalPortal({ token }: { token: string }) {
       </div>
 
       {proposal.line_items.length > 0 ? (
-        <div className="mt-6 space-y-2">
+        <div className="mt-6 space-y-3">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-500">
-            Services
+            What you&apos;re getting
           </h2>
           {proposal.line_items.map((item) => (
             <div
               key={item.id}
-              className="flex items-start justify-between gap-3 rounded-xl border border-stone-800 px-3 py-2"
+              className="rounded-xl border border-stone-800 px-4 py-3"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <p className="font-medium">{item.title}</p>
+                <p className="shrink-0 text-sm font-semibold text-stone-200">
+                  {formatMoney(
+                    Math.round(item.quantity * item.unitPriceCents),
+                    proposal.currency
+                  )}
+                </p>
+              </div>
+              {item.description ? (
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-stone-400">
+                  {item.description}
+                </p>
+              ) : null}
+              {item.quantity !== 1 || item.unitLabel !== "project" ? (
+                <p className="mt-1 text-xs text-stone-500">
+                  {item.quantity} × {formatMoney(item.unitPriceCents, proposal.currency)}{" "}
+                  / {item.unitLabel}
+                </p>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {proposal.deliverables.length > 0 ? (
+        <div className="mt-6 space-y-2">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-500">
+            Deliverables
+          </h2>
+          <ul className="space-y-2">
+            {proposal.deliverables.map((item) => (
+              <li
+                key={item.id}
+                className="rounded-xl border border-stone-800 px-4 py-3"
+              >
+                <p className="font-medium">{item.title}</p>
+                {item.description ? (
+                  <p className="mt-1 text-sm text-stone-400">{item.description}</p>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {proposal.timeline.length > 0 ? (
+        <div className="mt-6 space-y-2">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-500">
+            Timeline
+          </h2>
+          <ol className="space-y-2">
+            {proposal.timeline.map((item, index) => (
+              <li
+                key={item.id}
+                className="rounded-xl border border-stone-800 px-4 py-3"
+              >
+                <p className="font-medium">
+                  {index + 1}. {item.title}
+                </p>
+                {item.description ? (
+                  <p className="mt-1 text-sm text-stone-400">{item.description}</p>
+                ) : null}
+                {item.startDate || item.endDate ? (
+                  <p className="mt-1 text-xs text-stone-500">
+                    {[item.startDate, item.endDate].filter(Boolean).join(" → ")}
+                  </p>
+                ) : null}
+              </li>
+            ))}
+          </ol>
+        </div>
+      ) : null}
+
+      {proposal.addons.length > 0 ? (
+        <div className="mt-6 space-y-2">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-500">
+            Optional add-ons
+          </h2>
+          {proposal.addons.map((item) => (
+            <div
+              key={item.id}
+              className="flex items-start justify-between gap-3 rounded-xl border border-dashed border-stone-700 px-4 py-3"
             >
               <div>
                 <p className="font-medium">{item.title}</p>
                 {item.description ? (
-                  <p className="text-xs text-stone-400">{item.description}</p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm text-stone-400">
+                    {item.description}
+                  </p>
                 ) : null}
               </div>
-              <p className="text-sm font-semibold text-stone-200">
+              <p className="text-sm font-semibold text-stone-300">
                 {formatMoney(
                   Math.round(item.quantity * item.unitPriceCents),
                   proposal.currency
@@ -150,6 +236,17 @@ export default function PublicProposalPortal({ token }: { token: string }) {
               </p>
             </div>
           ))}
+        </div>
+      ) : null}
+
+      {proposal.terms ? (
+        <div className="mt-6 rounded-xl border border-stone-800 bg-stone-950/40 px-4 py-3">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+            Terms
+          </h2>
+          <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-stone-400">
+            {proposal.terms}
+          </p>
         </div>
       ) : null}
 
