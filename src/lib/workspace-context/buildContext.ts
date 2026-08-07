@@ -50,6 +50,11 @@ import { wantsReminderAgent } from "@/lib/reminders/propose";
 import { wantsDailyLogCapture } from "@/lib/logs/propose";
 import { wantsWorkMemoryUpdate } from "@/lib/work-memory/propose";
 import { wantsClientRequestReply } from "@/lib/client-requests/propose";
+import {
+  wantsClientRequestCreate,
+  clientRequestCreateSystemNote,
+  formatClientVaultCatalog,
+} from "@/lib/client-requests/proposeCreate";
 import type { AttachedVaultDocument } from "@/lib/vault/attachedDocument";
 import { isOrgStyleProfile, type GuardianProfileType } from "@/lib/profiles/types";
 import { collaboratorDisplayName } from "@/lib/profiles/collaboratorDisplay";
@@ -103,6 +108,7 @@ export async function loadWorkspaceContext(
     focusedWorkProject: Boolean(workProjectId),
   });
   const clientRequestReplyAgent = wantsClientRequestReply(question);
+  const clientRequestCreateAgent = wantsClientRequestCreate(question);
 
   const contextBuildStarted = Date.now();
   let embeddingDurationMs = 0;
@@ -197,6 +203,7 @@ export async function loadWorkspaceContext(
   const includeActiveRequests =
     clientProfileIds.length > 0 &&
     (clientRequestReplyAgent ||
+      clientRequestCreateAgent ||
       isOrgStyleProfile(activeProfile.profile_type) ||
       /\b(request|requests|ticket|client)\b/i.test(retrievalQuestion));
   const activeRequests = includeActiveRequests
@@ -340,6 +347,7 @@ Active vault in the UI: ${activeProfile.display_name}. Document search includes 
       dailyLogCaptureAgent,
       workMemoryUpdateAgent,
       clientRequestReplyAgent,
+      clientRequestCreateAgent,
       transcriptionMode,
       hasAttachedDocument: Boolean(attachedDoc),
       allVaultsNote,

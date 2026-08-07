@@ -129,6 +129,12 @@ import {
   stripProposedClientRequestReplySection,
   type ProposedClientRequestReply,
 } from "@/lib/client-requests/propose";
+import {
+  parseProposedClientRequestCreate,
+  proposedClientRequestCreateSummary,
+  stripProposedClientRequestCreateSection,
+  type ProposedClientRequestCreate,
+} from "@/lib/client-requests/proposeCreate";
 import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
 import { dispatchAwardsFromResponse } from "@/lib/awards/client";
 import {
@@ -635,6 +641,14 @@ export default function VaultChatPanel({
     () => new Set()
   );
   const [savingClientRequestReply, setSavingClientRequestReply] = useState(false);
+  const [confirmingClientRequestCreateId, setConfirmingClientRequestCreateId] =
+    useState<string | null>(null);
+  const [confirmedClientRequestCreateIds, setConfirmedClientRequestCreateIds] =
+    useState<Set<string>>(() => new Set());
+  const [createdClientRequestIds, setCreatedClientRequestIds] = useState<
+    Map<string, string>
+  >(() => new Map());
+  const [savingClientRequestCreate, setSavingClientRequestCreate] = useState(false);
   const [firstWin, setFirstWin] = useState<{
     fileName: string;
     summary: string | null;
@@ -2020,6 +2034,142 @@ export default function VaultChatPanel({
     }
   };
 
+  const resolveAssigneeUserId = async (
+    clientProfileId: string,
+    assigneeName: string
+  ): Promise<string | null> => {
+    const clientProfile = profiles.find((p) => p.id === clientProfileId);
+    const businessId = clientProfile?.parent_profile_id;
+    if (!businessId) return null;
+    const res = await fetch(
+      `/api/client-requests/assignees?profileId=${encodeURIComponent(businessId)}`
+    );
+    const body = (await res.json().catch(() => ({}))) as {
+      assignees?: { userId: string; name: string }[];
+    };
+    if (!res.ok) return null;
+    const needle = assigneeName.trim().toLowerCase();
+    const hit = (body.assignees ?? []).find((a) =>
+      a.name.trim().toLowerCase().includes(needle)
+    );
+    return hit?.userId ?? null;
+  };
+
+  const confirmProposedClientRequestCreate = async (
+    messageId: string,
+    proposal: ProposedClientRequestCreate
+  ) => {
+    if (
+      confirmingClientRequestCreateId ||
+      savingClientRequestCreate ||
+      vaultBusy ||
+      sending
+    ) {
+      return;
+    }
+    setConfirmingClientRequestCreateId(messageId);
+    setError(null);
+    try {
+      const createRes = await fetch("/api/client-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          profileId: proposal.profileId,
+          title: proposal.title,
+          description: proposal.description,
+        }),
+      });
+      const createBody = (await createRes.json().catch(() => ({}))) as {
+        error?: string;
+        request?: { id: string };
+      };
+      if (!createRes.ok || !createBody.request?.id) {
+        setError(createBody.error ?? "Couldn't create client request.");
+        return;
+      }
+      const requestId = createBody.request.id;
+
+      const threadMessage =
+        proposal.initialMessage?.trim() || proposal.description.trim();
+      if (threadMessage) {
+        const commentRes = await fetch(
+          `/api/client-requests/${encodeURIComponent(requestId)}/comments`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ content: threadMessage }),
+          }
+        );
+        const commentBody = (await commentRes.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        if (!commentRes.ok) {
+          setError(
+            commentBody.error ??
+              "Request created but the first message couldn't be posted."
+          );
+          return;
+        }
+      }
+
+      if (proposal.assignedToName) {
+        const assigneeUserId = await resolveAssigneeUserId(
+          proposal.profileId,
+          proposal.assignedToName
+        );
+        if (!assigneeUserId) {
+          setError(
+            `Request created, but couldn't find employee "${proposal.assignedToName}" to assign. Assign them from Requests.`
+          );
+          setConfirmedClientRequestCreateIds((prev) => new Set(prev).add(messageId));
+          setCreatedClientRequestIds((prev) =>
+            new Map(prev).set(messageId, requestId)
+          );
+          pushLocalNote(
+            `Client request created: ${proposedClientRequestCreateSummary(
+              proposal,
+              profiles.find((p) => p.id === proposal.profileId)?.display_name
+            )}`
+          );
+          return;
+        }
+        const assignRes = await fetch(
+          `/api/client-requests/${encodeURIComponent(requestId)}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ assignedToUserId: assigneeUserId }),
+          }
+        );
+        const assignBody = (await assignRes.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        if (!assignRes.ok) {
+          setError(
+            assignBody.error ??
+              "Request created but assignee couldn't be updated."
+          );
+          return;
+        }
+      }
+
+      setConfirmedClientRequestCreateIds((prev) => new Set(prev).add(messageId));
+      setCreatedClientRequestIds((prev) =>
+        new Map(prev).set(messageId, requestId)
+      );
+      pushLocalNote(
+        `Client request created: ${proposedClientRequestCreateSummary(
+          proposal,
+          profiles.find((p) => p.id === proposal.profileId)?.display_name
+        )}`
+      );
+    } catch {
+      setError("Couldn't create request. Check your connection and try again.");
+    } finally {
+      setConfirmingClientRequestCreateId(null);
+    }
+  };
+
   const saveInlineLog = async (e: FormEvent) => {
     e.preventDefault();
     const saveProfileId = profileId ?? lastWriteProfileIdRef.current;
@@ -2563,10 +2713,16 @@ export default function VaultChatPanel({
       m.content,
       requestedRequestId
     );
+    const proposedClientRequestCreate = parseProposedClientRequestCreate(
+      m.content,
+      active?.profile_type === "client" ? active.id : null
+    );
     const displayContent = stripProposedDailyLogSection(
-      stripProposedClientRequestReplySection(
-        stripProposedWorkMemoryUpdateSection(
-          stripProposedReminderSection(m.content)
+      stripProposedClientRequestCreateSection(
+        stripProposedClientRequestReplySection(
+          stripProposedWorkMemoryUpdateSection(
+            stripProposedReminderSection(m.content)
+          )
         )
       )
     );
@@ -2575,7 +2731,8 @@ export default function VaultChatPanel({
         (proposedReminder ||
         proposedDailyLog ||
         proposedWorkMemory ||
-        proposedClientRequest
+        proposedClientRequest ||
+        proposedClientRequestCreate
           ? ""
           : m.content)
     );
@@ -2605,6 +2762,13 @@ export default function VaultChatPanel({
     const confirmingWorkMemory = confirmingWorkMemoryId === m.id;
     const alreadyPostedClientRequest = confirmedClientRequestIds.has(m.id);
     const confirmingClientRequest = confirmingClientRequestId === m.id;
+    const alreadyCreatedClientRequest = confirmedClientRequestCreateIds.has(m.id);
+    const confirmingClientRequestCreate =
+      confirmingClientRequestCreateId === m.id;
+    const clientVaultName = proposedClientRequestCreate
+      ? profiles.find((p) => p.id === proposedClientRequestCreate.profileId)
+          ?.display_name
+      : null;
     const vaultScope = m.vaultScope;
     const showVaultScopeCard =
       vaultScope &&
@@ -2808,6 +2972,83 @@ export default function VaultChatPanel({
                   className="inline-flex items-center rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50"
                 >
                   Open in Work Memory
+                </Link>
+              </div>
+            )}
+          </div>
+        ) : null}
+        {proposedClientRequestCreate ? (
+          <div className="rounded-xl border border-teal-200 bg-teal-50/90 px-3 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-teal-900/70">
+              Proposed client request
+            </p>
+            <p className="mt-1 text-sm font-medium text-foreground">
+              {proposedClientRequestCreate.title}
+            </p>
+            {clientVaultName ? (
+              <p className="mt-0.5 text-xs text-ink-muted">
+                Client vault: {clientVaultName}
+              </p>
+            ) : null}
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
+              {proposedClientRequestCreate.description}
+            </p>
+            {proposedClientRequestCreate.initialMessage &&
+            proposedClientRequestCreate.initialMessage !==
+              proposedClientRequestCreate.description ? (
+              <p className="mt-2 text-xs text-ink-muted">
+                First message: {proposedClientRequestCreate.initialMessage}
+              </p>
+            ) : null}
+            {proposedClientRequestCreate.assignedToName ? (
+              <p className="mt-1 text-xs text-ink-muted">
+                Assign to teammate: {proposedClientRequestCreate.assignedToName}
+              </p>
+            ) : null}
+            {alreadyCreatedClientRequest ? (
+              <div className="mt-2 space-y-2">
+                <p className="text-xs font-medium text-emerald-800">
+                  Client request created.
+                </p>
+                {createdClientRequestIds.get(m.id) ? (
+                  <Link
+                    href={`/requests?id=${createdClientRequestIds.get(m.id)}`}
+                    className="inline-flex items-center rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50"
+                  >
+                    Open request
+                  </Link>
+                ) : null}
+              </div>
+            ) : (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={
+                    confirmingClientRequestCreate ||
+                    savingClientRequestCreate ||
+                    sending ||
+                    vaultBusy
+                  }
+                  onClick={() =>
+                    void confirmProposedClientRequestCreate(
+                      m.id,
+                      proposedClientRequestCreate
+                    )
+                  }
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand/90 disabled:opacity-60"
+                >
+                  {confirmingClientRequestCreate ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <MessageCircle className="h-3.5 w-3.5" />
+                  )}
+                  Create request
+                </button>
+                <Link
+                  href="/requests"
+                  className="inline-flex items-center rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50"
+                >
+                  Open Requests
                 </Link>
               </div>
             )}

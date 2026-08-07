@@ -10,6 +10,10 @@ import { VAULT_CHAT_SYSTEM } from "@/lib/vault/indexDocument";
 import { collectActionSystemNotes } from "@/lib/actions/runner";
 import type { ActionContext } from "@/lib/actions/types";
 import { AGENT_MODE_SYSTEM_NOTE } from "@/lib/agent-mode";
+import {
+  clientRequestCreateSystemNote,
+  formatClientVaultCatalog,
+} from "@/lib/client-requests/proposeCreate";
 import type { WorkspaceContextData } from "./types";
 
 /** Assemble Gideon's full system prompt from workspace context. */
@@ -36,6 +40,16 @@ export function buildGideonSystemPrompt(
   const actionNotes = actionContext
     ? collectActionSystemNotes(actionContext)
     : "";
+  const clientProfileIds = context.retrievalScopes
+    .filter((scope) => scope.profile_type === "client")
+    .map((scope) => scope.id);
+  const clientRequestCreateNote = context.promptOptions.clientRequestCreateAgent
+    ? `\n${clientRequestCreateSystemNote(
+        formatClientVaultCatalog(clientProfileIds, context.profileNames),
+        activeProfile.id,
+        activeProfile.profile_type
+      )}\n`
+    : "";
   const agentNote = agentMode ? `\n${AGENT_MODE_SYSTEM_NOTE}\n` : "";
   const transcriptionNote = transcriptionMode ? GIDEON_TRANSCRIPTION_NOTE : "";
   const attachedNote = hasAttachedDocument ? GIDEON_ATTACHED_DOCUMENT_NOTE : "";
@@ -52,6 +66,7 @@ ${pictureNote}
 ${vaultEmptyNote}
 ${fullLogNote}
 ${actionNotes}
+${clientRequestCreateNote}
 ${agentNote}
 ${transcriptionNote}
 ${attachedNote}
@@ -104,6 +119,7 @@ export function gideonMaxTokens(context: WorkspaceContextData): number {
     dailyLogCaptureAgent,
     workMemoryUpdateAgent,
     clientRequestReplyAgent,
+    clientRequestCreateAgent,
     transcriptionMode,
     agentMode,
     fullLogQuote,
@@ -113,7 +129,8 @@ export function gideonMaxTokens(context: WorkspaceContextData): number {
     reminderAgent ||
     dailyLogCaptureAgent ||
     workMemoryUpdateAgent ||
-    clientRequestReplyAgent
+    clientRequestReplyAgent ||
+    clientRequestCreateAgent
   ) {
     return 1100;
   }

@@ -4,13 +4,16 @@ import {
   stripProposedWorkMemoryUpdateSection,
 } from "@/lib/work-memory/propose";
 import { stripProposedClientRequestReplySection } from "@/lib/client-requests/propose";
+import { stripProposedClientRequestCreateSection } from "@/lib/client-requests/proposeCreate";
 import { parseGideonSections } from "@/lib/vault/gideon";
 
 function stripAssistantProposalSections(content: string): string {
   return stripProposedDailyLogSection(
-    stripProposedClientRequestReplySection(
-      stripProposedWorkMemoryUpdateSection(
-        stripProposedReminderSection(content)
+    stripProposedClientRequestCreateSection(
+      stripProposedClientRequestReplySection(
+        stripProposedWorkMemoryUpdateSection(
+          stripProposedReminderSection(content)
+        )
       )
     )
   );

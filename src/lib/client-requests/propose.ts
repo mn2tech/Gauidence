@@ -3,6 +3,7 @@ import {
   isClientRequestStatus,
   type ClientRequestStatus,
 } from "./types";
+import { wantsClientRequestCreate } from "./proposeCreate";
 
 export type ProposedClientRequestReply = {
   requestId: string;
@@ -14,7 +15,7 @@ const CLIENT_REQUEST_REPLY_INTENT =
   /\b(reply|respond|answer|message|tell|update)\b.{0,48}\b(client|request|requests|ticket|tickets|customer)\b/i;
 
 const CLIENT_REQUEST_STATUS_INTENT =
-  /\b(request|requests|ticket|tickets|client\s+request)\b/i;
+  /\b(status|update)\b.{0,32}\b(request|requests|ticket|tickets|client\s+request)\b/i;
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -23,7 +24,10 @@ const UUID_RE =
 export function wantsClientRequestReply(question: string): boolean {
   const q = question.trim();
   if (!q) return false;
-  return CLIENT_REQUEST_REPLY_INTENT.test(q) || CLIENT_REQUEST_STATUS_INTENT.test(q);
+  if (wantsClientRequestCreate(q)) return false;
+  return (
+    CLIENT_REQUEST_REPLY_INTENT.test(q) || CLIENT_REQUEST_STATUS_INTENT.test(q)
+  );
 }
 
 export function clientRequestReplySystemNote(): string {

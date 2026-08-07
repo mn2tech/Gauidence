@@ -14,6 +14,14 @@ describe("wantsClientRequestReply", () => {
     );
     assert.equal(wantsClientRequestReply("What's the weather?"), false);
   });
+
+  it("does not treat create intent as reply", () => {
+    assert.equal(wantsClientRequestReply("Create a client request for Aaron"), false);
+    assert.equal(
+      wantsClientRequestReply("Send Aaron a request about the invoice"),
+      false
+    );
+  });
 });
 
 describe("parseProposedClientRequestReply", () => {

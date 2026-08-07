@@ -50,6 +50,7 @@ export type WorkspacePromptOptions = {
   dailyLogCaptureAgent: boolean;
   workMemoryUpdateAgent: boolean;
   clientRequestReplyAgent: boolean;
+  clientRequestCreateAgent: boolean;
   transcriptionMode: boolean;
   hasAttachedDocument: boolean;
   allVaultsNote: string;
