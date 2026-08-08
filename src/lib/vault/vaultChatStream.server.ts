@@ -34,7 +34,7 @@ import { parseProposedReminder } from "@/lib/reminders/propose";
 import { withLlmUsage } from "@/lib/usage/record";
 import { recordChatEvent } from "@/lib/billing/quota";
 import { refreshUserAwards } from "@/lib/awards/grant";
-import { formatVaultChatError, GIDEON_EMPTY_ANSWER_FALLBACK } from "@/lib/vault/vaultChatErrors";
+import { formatVaultChatError, buildGideonEmptyAnswerFallback } from "@/lib/vault/vaultChatErrors";
 import {
   listActionTimeline,
   recordActionEvent,
@@ -81,6 +81,7 @@ export type VaultChatStreamArgs = {
   ) => Promise<void>;
   thinkingSteps?: string[];
   detectedActions?: { id: string; label: string }[];
+  explicitSpaceName?: string | null;
 };
 
 export function createVaultChatStreamResponse(
@@ -154,7 +155,10 @@ export function createVaultChatStreamResponse(
         );
 
         if (!answer) {
-          answer = GIDEON_EMPTY_ANSWER_FALLBACK;
+          answer = buildGideonEmptyAnswerFallback({
+            chunks: args.chunks,
+            explicitSpaceName: args.explicitSpaceName,
+          });
         }
 
         let selected = selectCitationsForAnswer(answer, args.chunks);

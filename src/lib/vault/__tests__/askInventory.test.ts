@@ -1,6 +1,10 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { buildAskVaultInventory, formatVaultFileListForGideon } from "../askInventory.ts";
+import {
+  buildAskVaultInventory,
+  formatVaultFileListForGideon,
+  wantsVaultFileInventory,
+} from "../askInventory.ts";
 
 describe("ask vault inventory", () => {
   it("splits photos from documents and previews names", () => {
@@ -60,5 +64,16 @@ describe("ask vault inventory", () => {
     assert.match(text, /Photos \(1\): logo\.png/);
     assert.match(text, /NM2TECH/);
     assert.match(text, /invoice\.pdf/);
+  });
+
+  it("detects inventory-style questions", () => {
+    assert.equal(
+      wantsVaultFileInventory(
+        "What do I have in my Personal space about Nolan?"
+      ),
+      true
+    );
+    assert.equal(wantsVaultFileInventory("What files are uploaded?"), true);
+    assert.equal(wantsVaultFileInventory("When is my passport due?"), false);
   });
 });

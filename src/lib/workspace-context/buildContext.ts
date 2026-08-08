@@ -59,6 +59,7 @@ import { formatProposalsForGideon } from "@/lib/proposals/retrieve";
 import { PROPOSAL_SELECT } from "@/lib/proposals/types";
 import { mapProposalRow } from "@/lib/proposals/server";
 import type { AttachedVaultDocument } from "@/lib/vault/attachedDocument";
+import { resolveExplicitSpaceScope } from "@/lib/vault/detectVaultScope";
 import { isOrgStyleProfile, type GuardianProfileType } from "@/lib/profiles/types";
 import { collaboratorDisplayName } from "@/lib/profiles/collaboratorDisplay";
 import { loadCollaboratorMemberAccounts } from "@/lib/profiles/collaboratorMembers";
@@ -81,6 +82,7 @@ export type LoadWorkspaceContextArgs = {
 export type WorkspaceContextResult = {
   context: WorkspaceContextData;
   chunks: RetrievedChunk[];
+  explicitSpaceName?: string | null;
 };
 
 /** Fetch retrieval results and formatted context blocks for Gideon. */
@@ -103,6 +105,21 @@ export async function loadWorkspaceContext(
   const fullLogQuote = wantsFullDailyLogQuote(question);
   const { activeProfile, retrievalScopes, searchProfileIds, profileNames } =
     meta;
+  const scopeCandidates = meta.accessibleProfiles.map((p) => ({
+    id: p.id,
+    display_name: p.display_name,
+  }));
+  const explicitSpace = resolveExplicitSpaceScope({
+    question: retrievalQuestion,
+    accessibleProfiles: scopeCandidates,
+  });
+  const effectiveSearchIds =
+    explicitSpace && searchProfileIds.includes(explicitSpace.id)
+      ? [explicitSpace.id]
+      : searchProfileIds;
+  const effectiveRetrievalScopes = explicitSpace
+    ? retrievalScopes.filter((scope) => scope.id === explicitSpace.id)
+    : retrievalScopes;
   const showPictures = wantsShowPictures(question);
   const transcriptionMode = wantsTranscription(question);
   const reminderAgent = wantsReminderAgent(question);
@@ -135,7 +152,7 @@ export async function loadWorkspaceContext(
   embeddingDurationMs = Date.now() - embeddingStarted;
 
   const matchCount = showPictures ? 10 : 8;
-  const rollupScopes: LinkedVaultProfile[] = retrievalScopes.map((scope) => ({
+  const rollupScopes: LinkedVaultProfile[] = effectiveRetrievalScopes.map((scope) => ({
     id: scope.id,
     display_name: scope.display_name,
     profile_type:
@@ -167,7 +184,7 @@ export async function loadWorkspaceContext(
   if (isKnowledgeEngineV2Enabled()) {
     const knowledge = await retrieveStructuredKnowledge(supabase, {
       question: retrievalQuestion,
-      profileIds: searchProfileIds,
+      profileIds: effectiveSearchIds,
     });
     knowledgeCandidateCount = knowledge.facts.length;
     structuredKnowledgeContext = formatKnowledgeForGideon(
@@ -180,11 +197,11 @@ export async function loadWorkspaceContext(
     supabase,
     {
       profileId: activeProfile.id,
-      profileIds: searchProfileIds,
+      profileIds: effectiveSearchIds,
       profileNames,
       question: retrievalQuestion,
       limit:
-        retrievalScopes.length > 1 ? (fullLogQuote ? 8 : 6) : fullLogQuote ? 6 : 4,
+        effectiveRetrievalScopes.length > 1 ? (fullLogQuote ? 8 : 6) : fullLogQuote ? 6 : 4,
     }
   );
   const logContext = formatDailyLogsForGideon(
@@ -193,7 +210,7 @@ export async function loadWorkspaceContext(
     authorNames
   );
 
-  const clientProfileIds = retrievalScopes
+  const clientProfileIds = effectiveRetrievalScopes
     .filter((scope) => scope.profile_type === "client")
     .map((scope) => scope.id);
   const { requests: clientRequests, authorNames: requestAuthorNames } =
@@ -201,7 +218,7 @@ export async function loadWorkspaceContext(
       clientProfileIds,
       profileNames,
       question: retrievalQuestion,
-      limit: retrievalScopes.length > 1 ? 6 : 4,
+      limit: effectiveRetrievalScopes.length > 1 ? 6 : 4,
     });
   const includeActiveRequests =
     clientProfileIds.length > 0 &&
@@ -213,13 +230,13 @@ export async function loadWorkspaceContext(
     ? await loadActiveClientRequestsForGideon(
         supabase,
         clientProfileIds,
-        retrievalScopes.length > 1 ? 8 : 6
+        effectiveRetrievalScopes.length > 1 ? 8 : 6
       )
     : [];
   const mergedRequests = mergeClientRequestsForGideon(
     clientRequests,
     activeRequests,
-    retrievalScopes.length > 1 ? 8 : 6
+    effectiveRetrievalScopes.length > 1 ? 8 : 6
   );
   const assigneeIds = [
     ...new Set(
@@ -265,17 +282,17 @@ export async function loadWorkspaceContext(
 
   const fileInventoryContext = await loadVaultFileInventoryContext(
     supabase,
-    searchProfileIds,
+    effectiveSearchIds,
     profileNames,
     retrievalQuestion
   );
 
   const upcomingAlerts = await retrieveUpcomingAlertsForGideon(supabase, {
-    profileIds: searchProfileIds,
+    profileIds: effectiveSearchIds,
     profileNames,
     question: retrievalQuestion,
     timeZone,
-    limit: retrievalScopes.length > 1 ? 12 : 10,
+    limit: effectiveRetrievalScopes.length > 1 ? 12 : 10,
   });
   const scheduleContext = formatAlertsForGideon(upcomingAlerts, {
     profileNames,
@@ -333,17 +350,21 @@ Active vault in the UI: ${activeProfile.display_name}. Document search includes 
       ].join("\n\n")
     : "";
 
-  const vaultEmptyNote =
-    !formatted.context.trim() &&
-    !attachedContext.trim() &&
-    !logContext.trim() &&
-    !clientRequestContext.trim() &&
-    !scheduleContext.trim() &&
-    !linkedContext.trim() &&
-    vaultMapContext.startsWith("(no vault") &&
-    fileInventoryContext.startsWith("(no documents")
-      ? "No vault excerpts, Daily Logs, client requests, upcoming schedule items, or linked profile structure matched this question (or the vault is empty). Do not invent vault facts. Use ## GENERAL KNOWLEDGE for general questions, and ## GIDEON'S SUGGESTION to upload documents when that would help."
-      : "";
+  const noDocumentExcerpts = !formatted.context.trim();
+  const noMatchedLogs =
+    !logContext.trim() || logContext.trim() === "(none)";
+  let vaultEmptyNote = "";
+  if (noDocumentExcerpts && !attachedContext.trim()) {
+    if (explicitSpace) {
+      vaultEmptyNote = `No document excerpts matched in ${explicitSpace.display_name}. Check RETRIEVED DAILY LOGS and VAULT FILE INVENTORY below for this space. If nothing matches the question (including names or topics mentioned), say clearly you could not find that in ${explicitSpace.display_name}. Do not invent facts. You must always reply in complete sentences — never return a blank response.`;
+    } else if (noMatchedLogs) {
+      vaultEmptyNote =
+        "No document excerpts or Daily Logs matched this question. If VAULT FILE INVENTORY lists relevant files, you may name them; otherwise say you could not find it. Do not invent facts. You must always reply — never return a blank response.";
+    } else {
+      vaultEmptyNote =
+        "No document excerpts matched this question. Use RETRIEVED DAILY LOGS if they answer it; otherwise say you could not find it in documents. You must always reply — never return a blank response.";
+    }
+  }
 
   const context: WorkspaceContextData = {
     ...meta,
@@ -396,5 +417,5 @@ Active vault in the UI: ${activeProfile.display_name}. Document search includes 
     knowledgeCandidateCount,
   });
 
-  return { context, chunks };
+  return { context, chunks, explicitSpaceName: explicitSpace?.display_name ?? null };
 }

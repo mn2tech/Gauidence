@@ -5,6 +5,7 @@ import {
   detectCrossVaultScope,
   detectMentionedVault,
   profileMentionedInQuestion,
+  resolveExplicitSpaceScope,
   resolveGideonWriteVault,
 } from "../detectVaultScope";
 
@@ -197,5 +198,31 @@ describe("chatScopedProfilePayload", () => {
         chatHomeProfileId: "personal",
       })
     ).toEqual({ profileId: "nolan", profileName: "Nolan" });
+  });
+
+  it("resolves an explicit space scope from the question", () => {
+    const scopedProfiles = [
+      { id: "personal", display_name: "Personal" },
+      { id: "nolan", display_name: "Nolan" },
+      { id: "biz", display_name: "NM2TECH" },
+    ];
+    expect(
+      resolveExplicitSpaceScope({
+        question: "What do I have in my Personal space about Nolan?",
+        accessibleProfiles: scopedProfiles,
+      })
+    ).toEqual({ id: "personal", display_name: "Personal" });
+    expect(
+      resolveExplicitSpaceScope({
+        question: "Show files in Nolan's space",
+        accessibleProfiles: scopedProfiles,
+      })
+    ).toEqual({ id: "nolan", display_name: "Nolan" });
+    expect(
+      resolveExplicitSpaceScope({
+        question: "What happened today?",
+        accessibleProfiles: scopedProfiles,
+      })
+    ).toBeNull();
   });
 });

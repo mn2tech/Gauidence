@@ -4,7 +4,7 @@ export const ASK_VAULT_NAME_PREVIEW = 6;
 export const RECENT_VAULT_FILE_PREVIEW = 5;
 
 const INVENTORY_QUESTION_PATTERN =
-  /\b(what(?:'s| is| are)?\s+(?:in\s+)?(?:the\s+)?(?:vault|uploaded|stored|files?|documents?|photos?)|list\s+(?:all\s+)?(?:files?|documents?|uploads?|photos?)|how\s+many\s+(?:files?|documents?|photos?|uploads?)|show\s+(?:me\s+)?(?:all\s+)?(?:files?|documents?|uploads?)|(?:count|browse|compare)\s+(?:files?|documents?|uploads?)|everything\s+(?:in|uploaded)|file\s+inventory)\b/i;
+  /\b(what(?:'s| is| are)?\s+(?:do\s+)?(?:i|we)\s+have\b|what(?:'s| is| are)?\s+(?:in\s+)?(?:the\s+)?(?:vault|space|workspace|uploaded|stored|files?|documents?|photos?)|list\s+(?:all\s+)?(?:files?|documents?|uploads?|photos?)|how\s+many\s+(?:files?|documents?|photos?|uploads?)|show\s+(?:me\s+)?(?:all\s+)?(?:files?|documents?|uploads?)|(?:count|browse|compare)\s+(?:files?|documents?|uploads?)|everything\s+(?:in|uploaded)|file\s+inventory)\b/i;
 
 /** True when the user is asking to list, count, browse, or compare vault files. */
 export function wantsVaultFileInventory(question: string): boolean {

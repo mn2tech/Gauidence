@@ -1212,7 +1212,8 @@ export async function POST(request: Request) {
         : null;
       attachedFileName = attachedDoc?.fileName;
 
-      const { chunks, context: workspaceContext } = await loadWorkspaceContext({
+      const { chunks, context: workspaceContext, explicitSpaceName } =
+        await loadWorkspaceContext({
         supabase,
         user,
         meta: workspaceMeta,
@@ -1260,6 +1261,7 @@ export async function POST(request: Request) {
         updateVaultChatRow,
         thinkingSteps,
         detectedActions,
+        explicitSpaceName,
       });
     } catch (err) {
       const { error, code, status } = formatVaultChatError(err);

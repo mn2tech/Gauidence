@@ -173,6 +173,36 @@ export function dominantRetrievalProfileId(
 }
 
 /**
+ * When the user scopes a question to a named space ("in my Personal space about Nolan"),
+ * return that profile if the name resolves unambiguously.
+ */
+export function resolveExplicitSpaceScope(args: {
+  question: string;
+  accessibleProfiles: VaultScopeCandidate[];
+}): VaultScopeCandidate | null {
+  const match = args.question.match(
+    /\bin\s+(?:my\s+)?(.+?)\s+(?:space|workspace)\b/i
+  );
+  if (!match) return null;
+
+  let nameHint = match[1]!.trim();
+  nameHint = nameHint.replace(/['']s$/i, "").trim();
+  if (!nameHint || /^(this|that|the|a|an)$/i.test(nameHint)) return null;
+
+  const exact = args.accessibleProfiles.filter(
+    (p) => p.display_name.trim().toLowerCase() === nameHint.toLowerCase()
+  );
+  if (exact.length === 1) return exact[0]!;
+
+  const loose = args.accessibleProfiles.filter((p) =>
+    profileMentionedInQuestion(nameHint, p.display_name)
+  );
+  if (loose.length === 1) return loose[0]!;
+
+  return null;
+}
+
+/**
  * Vault profiles Gideon searches when answering in a chat thread.
  * workspace = chat home (+ optional scoped vault); global = every accessible vault.
  */
