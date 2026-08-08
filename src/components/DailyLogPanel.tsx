@@ -383,6 +383,9 @@ export default function DailyLogPanel({
             onChange={(e) => setContent(e.target.value)}
             required
             rows={4}
+            spellCheck={true}
+            autoCorrect="on"
+            autoCapitalize="sentences"
             placeholder="What happened?"
             className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm outline-none ring-brand focus:ring-2"
           />
@@ -390,6 +393,9 @@ export default function DailyLogPanel({
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
+              spellCheck={true}
+              autoCorrect="on"
+              autoCapitalize="sentences"
               placeholder="Title (optional)"
               className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm"
             />
@@ -483,6 +489,9 @@ export default function DailyLogPanel({
                             setEditing({ ...editing, content: e.target.value })
                           }
                           rows={3}
+                          spellCheck={true}
+                          autoCorrect="on"
+                          autoCapitalize="sentences"
                           className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm"
                         />
                         <div className="flex flex-wrap gap-2">

@@ -4117,6 +4117,9 @@ export default function VaultChatPanel({
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleComposerKeyDown}
               disabled={sending || vaultBusy || loadingHistory || voiceListening}
+              spellCheck={true}
+              autoCorrect="on"
+              autoCapitalize="sentences"
               maxLength={2000}
               placeholder={
                 voiceListening
@@ -4322,6 +4325,9 @@ export default function VaultChatPanel({
               maxLength={200}
               value={logTitle}
               onChange={(e) => setLogTitle(e.target.value)}
+              spellCheck={true}
+              autoCorrect="on"
+              autoCapitalize="sentences"
               placeholder="School pickup"
               className="mt-1.5 w-full rounded-xl border border-stone-300 px-3 py-2.5 text-sm outline-none ring-brand focus:ring-2"
             />
@@ -4334,6 +4340,9 @@ export default function VaultChatPanel({
               onChange={(e) => setLogContent(e.target.value)}
               rows={4}
               required
+              spellCheck={true}
+              autoCorrect="on"
+              autoCapitalize="sentences"
               maxLength={8000}
               placeholder="What happened today?"
               className="mt-3 w-full rounded-xl border border-stone-300 px-3 py-2.5 text-sm outline-none ring-brand focus:ring-2"
@@ -4411,6 +4420,9 @@ export default function VaultChatPanel({
               maxLength={200}
               value={reminderTitle}
               onChange={(e) => setReminderTitle(e.target.value)}
+              spellCheck={true}
+              autoCorrect="on"
+              autoCapitalize="sentences"
               placeholder="Bible study"
               className="mt-1.5 w-full rounded-xl border border-stone-300 px-3 py-2.5 text-sm outline-none ring-brand focus:ring-2"
             />
