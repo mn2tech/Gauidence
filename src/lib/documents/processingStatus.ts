@@ -74,6 +74,11 @@ export function isAnalysisComplete(analysisStatus: string): boolean {
   );
 }
 
+/** Analysis + space matching done — safe to show filing UI without waiting for search indexing. */
+export function isAnalysisReadyForFiling(analysisStatus: string): boolean {
+  return isAnalysisComplete(analysisStatus);
+}
+
 export function isDocumentSearchable(doc: DocumentProcessingFields): boolean {
   return (
     isAnalysisComplete(doc.analysis_status) &&

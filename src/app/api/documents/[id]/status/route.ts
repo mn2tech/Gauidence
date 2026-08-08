@@ -11,6 +11,11 @@ import {
   processingProgressPercent,
   userFacingStatusLabel,
 } from "@/lib/documents/processingStatus";
+import {
+  buildProcessingTrace,
+  type ProcessingTrace,
+} from "@/lib/documents/processingTrace";
+import type { ProcessingDiagnostics } from "@/lib/documents/processingDiagnostics";
 
 const ACTIVE_STATUS_STALE_MS = {
   analyze_document: 90_000,
@@ -40,7 +45,7 @@ export async function GET(
   let { data: doc, error } = await supabase
     .from("documents")
     .select(
-      "id, file_name, analysis_status, indexing_status, knowledge_status, processing_step, processing_progress, last_processing_error, processing_started_at, processing_completed_at, profile_id"
+      "id, file_name, analysis_status, indexing_status, knowledge_status, processing_step, processing_progress, last_processing_error, processing_started_at, processing_completed_at, processing_diagnostics, profile_id"
     )
     .eq("id", id)
     .maybeSingle();
@@ -61,7 +66,7 @@ export async function GET(
       const refreshed = await supabase
         .from("documents")
         .select(
-          "id, file_name, analysis_status, indexing_status, knowledge_status, processing_step, processing_progress, last_processing_error, processing_started_at, processing_completed_at, profile_id"
+          "id, file_name, analysis_status, indexing_status, knowledge_status, processing_step, processing_progress, last_processing_error, processing_started_at, processing_completed_at, processing_diagnostics, profile_id"
         )
         .eq("id", id)
         .maybeSingle();
@@ -70,6 +75,14 @@ export async function GET(
       }
     }
   }
+
+  const { data: jobs } = await supabase
+    .from("document_processing_jobs")
+    .select(
+      "id, job_type, status, last_error, diagnostics, processing_started_at, processing_completed_at, created_at"
+    )
+    .eq("document_id", id)
+    .order("created_at", { ascending: true });
 
   const { data: job } = await supabase
     .from("document_processing_jobs")
@@ -102,6 +115,20 @@ export async function GET(
       )
     : null;
 
+  const processingTrace: ProcessingTrace = buildProcessingTrace({
+    doc,
+    jobs: (jobs ?? []).map((row) => ({
+      job_type: row.job_type,
+      status: row.status,
+      diagnostics: (row.diagnostics as ProcessingDiagnostics | null) ?? null,
+      processing_started_at: row.processing_started_at,
+      processing_completed_at: row.processing_completed_at,
+      created_at: row.created_at,
+    })),
+    documentDiagnostics:
+      (doc.processing_diagnostics as ProcessingDiagnostics | null) ?? null,
+  });
+
   return NextResponse.json({
     documentId: doc.id,
     fileName: doc.file_name,
@@ -127,5 +154,6 @@ export async function GET(
     title: extracted?.title ?? null,
     documentType: extracted?.document_type ?? null,
     organizationSuggestion,
+    processingTrace,
   });
 }

@@ -95,3 +95,16 @@ export async function resolveAddAnythingStagingProfileId(): Promise<string> {
   }
   return body.profileId;
 }
+
+/** Drain pending analyze/index/knowledge jobs after the UI moves on. */
+export async function kickDocumentProcessingJobs(limit = 3): Promise<void> {
+  try {
+    await fetch("/api/documents/process-jobs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ limit }),
+    });
+  } catch {
+    // Best-effort background drain.
+  }
+}

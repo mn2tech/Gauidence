@@ -147,7 +147,7 @@ export async function POST(request: Request) {
   });
 
   void processPendingDocumentJobs(supabase, user.id, {
-    limit: 1,
+    limit: 3,
     profileId: doc.profile_id,
   }).catch((err) => {
     console.error(

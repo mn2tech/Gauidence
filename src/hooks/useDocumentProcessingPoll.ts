@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { AnalysisStatus } from "@/lib/analysis/types";
 import type { DocumentProcessingStage } from "@/lib/documents/processingStatus";
 import type { OrganizationSuggestionPayload } from "@/lib/organization/types";
+import type { ProcessingTrace } from "@/lib/documents/processingTrace";
+import { kickDocumentProcessingJobs as kickJobs } from "@/lib/documents/clientProcessing";
 
 export type DocumentStatusSnapshot = {
   documentId: string;
@@ -22,31 +24,30 @@ export type DocumentStatusSnapshot = {
   documentType?: string | null;
   model?: string | null;
   organizationSuggestion?: OrganizationSuggestionPayload | null;
+  processingTrace?: ProcessingTrace | null;
 };
 
-const POLL_INTERVAL_MS = 3000;
+const POLL_INTERVAL_MS = 2000;
+const DEFAULT_KICK_LIMIT = 3;
 
-async function kickDocumentProcessingJobs(limit = 1): Promise<void> {
-  try {
-    await fetch("/api/documents/process-jobs", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ limit }),
-    });
-  } catch {
-    // Best-effort — status polling will continue.
-  }
+async function kickDocumentProcessingJobs(limit = DEFAULT_KICK_LIMIT): Promise<void> {
+  return kickJobs(limit);
 }
 
 export function useDocumentProcessingPoll(
   documentIds: string[],
-  options: { enabled?: boolean; kickProcessing?: boolean } = {}
+  options: {
+    enabled?: boolean;
+    kickProcessing?: boolean;
+    kickLimit?: number;
+  } = {}
 ) {
   const [statuses, setStatuses] = useState<
     Record<string, DocumentStatusSnapshot>
   >({});
   const activeIdsRef = useRef<Set<string>>(new Set());
   const kickProcessing = options.kickProcessing ?? false;
+  const kickLimit = options.kickLimit ?? DEFAULT_KICK_LIMIT;
 
   const fetchStatus = useCallback(async (documentId: string) => {
     const res = await fetch(`/api/documents/${documentId}/status`);
@@ -71,13 +72,14 @@ export function useDocumentProcessingPoll(
       documentType: body.documentType,
       model: body.model,
       organizationSuggestion: body.organizationSuggestion ?? null,
+      processingTrace: body.processingTrace ?? null,
     } satisfies DocumentStatusSnapshot;
   }, []);
 
   const pollOne = useCallback(
     async (documentId: string) => {
       if (kickProcessing) {
-        void kickDocumentProcessingJobs(1);
+        void kickDocumentProcessingJobs(kickLimit);
       }
       const snapshot = await fetchStatus(documentId);
       if (!snapshot) return;
@@ -88,7 +90,7 @@ export function useDocumentProcessingPoll(
         activeIdsRef.current.delete(documentId);
       }
     },
-    [fetchStatus, kickProcessing]
+    [fetchStatus, kickProcessing, kickLimit]
   );
 
   useEffect(() => {

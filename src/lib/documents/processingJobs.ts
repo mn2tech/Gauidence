@@ -254,6 +254,30 @@ async function markJobFailed(
   }
 }
 
+async function persistDocumentProcessingDiagnostics(
+  supabase: SupabaseClient,
+  documentId: string,
+  patch: ProcessingDiagnostics
+): Promise<void> {
+  const { data } = await supabase
+    .from("documents")
+    .select("processing_diagnostics")
+    .eq("id", documentId)
+    .maybeSingle();
+
+  const merged = mergeDiagnostics(
+    (data?.processing_diagnostics as ProcessingDiagnostics | null) ?? null,
+    patch
+  );
+
+  await supabase
+    .from("documents")
+    .update({ processing_diagnostics: merged })
+    .eq("id", documentId);
+
+  logProcessingDiagnostics(documentId, "persist", merged);
+}
+
 async function runAnalyzeJob(
   supabase: SupabaseClient,
   user: User,
@@ -279,6 +303,7 @@ async function runAnalyzeJob(
     .eq("id", profileId)
     .maybeSingle();
 
+  const orgStart = Date.now();
   await runOrganizationAfterAnalysisSafe(supabase, {
     userId: user.id,
     documentId,
@@ -287,6 +312,8 @@ async function runAnalyzeJob(
     analysis: result.analysis,
     classification: result.classification,
   });
+
+  diagnostics = recordDuration(diagnostics, "organization_ms", orgStart);
 
   await triggerLegacyKnowledgeEngines(supabase, {
     userId: user.id,
@@ -487,6 +514,12 @@ export async function processDocumentProcessingJob(
       })
       .eq("id", job.id);
 
+    await persistDocumentProcessingDiagnostics(
+      supabase,
+      job.document_id,
+      diagnostics
+    );
+
     await enqueueNextStage(supabase, {
       documentId: job.document_id,
       profileId: job.profile_id,
@@ -555,24 +588,8 @@ export async function processPendingDocumentJobs(
   userId: string,
   options: { limit?: number; profileId?: string } = {}
 ): Promise<{ processed: number; failed: number }> {
-  const limit = options.limit ?? processingConcurrencyLimit();
+  const maxJobs = options.limit ?? processingConcurrencyLimit();
   const now = new Date().toISOString();
-
-  let query = supabase
-    .from("document_processing_jobs")
-    .select("id, document_id, profile_id, job_type, attempts, status")
-    .eq("user_id", userId)
-    .in("status", ["pending", "retryable"])
-    .or(`next_retry_at.is.null,next_retry_at.lte.${now}`)
-    .order("created_at", { ascending: true })
-    .limit(limit);
-
-  if (options.profileId) {
-    query = query.eq("profile_id", options.profileId);
-  }
-
-  const { data: jobs } = await query;
-  if (!jobs?.length) return { processed: 0, failed: 0 };
 
   const {
     data: { user },
@@ -582,7 +599,24 @@ export async function processPendingDocumentJobs(
   let processed = 0;
   let failed = 0;
 
-  for (const job of jobs) {
+  for (let i = 0; i < maxJobs; i += 1) {
+    let query = supabase
+      .from("document_processing_jobs")
+      .select("id, document_id, profile_id, job_type, attempts, status")
+      .eq("user_id", userId)
+      .in("status", ["pending", "retryable"])
+      .or(`next_retry_at.is.null,next_retry_at.lte.${now}`)
+      .order("created_at", { ascending: true })
+      .limit(1);
+
+    if (options.profileId) {
+      query = query.eq("profile_id", options.profileId);
+    }
+
+    const { data: jobs } = await query;
+    const job = jobs?.[0];
+    if (!job) break;
+
     try {
       await processDocumentProcessingJob(supabase, user, {
         id: job.id,
@@ -592,11 +626,6 @@ export async function processPendingDocumentJobs(
         attempts: job.attempts ?? 0,
       });
       processed += 1;
-
-      void processPendingDocumentJobs(supabase, userId, {
-        limit: 1,
-        profileId: options.profileId,
-      }).catch(() => {});
     } catch {
       failed += 1;
     }

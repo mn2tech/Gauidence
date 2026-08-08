@@ -14,6 +14,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import ProfileSetupHub from "@/components/ProfileSetupHub";
+import ProcessingTracePanel from "@/components/add-anything/ProcessingTracePanel";
 import SmartUploadSuggestionCard from "@/components/SmartUploadSuggestionCard";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import { buildSmartUploadPresentation, shouldPromptSmartUpload } from "@/lib/actions/smartUpload";
@@ -31,7 +32,11 @@ import {
   VAULT_PASTE_MAX_CHARS,
 } from "@/lib/vault/clientUpload";
 import type { VaultUploadResult } from "@/lib/documents/clientProcessing";
-import { resolveAddAnythingStagingProfileId } from "@/lib/documents/clientProcessing";
+import {
+  kickDocumentProcessingJobs,
+  resolveAddAnythingStagingProfileId,
+} from "@/lib/documents/clientProcessing";
+import { isAnalysisReadyForFiling } from "@/lib/documents/processingStatus";
 import { useDocumentProcessingPoll, type DocumentStatusSnapshot } from "@/hooks/useDocumentProcessingPoll";
 import { documentsHref } from "@/lib/routes";
 import { ASK_GIDEON_PATH } from "@/lib/simple-home/routing";
@@ -100,8 +105,11 @@ export default function AddAnythingScreen() {
   const snapshot = processingDocId ? statuses[processingDocId] : undefined;
 
   const finishWithResult = useCallback(
-    (result: VaultUploadResult) => {
+    (result: VaultUploadResult, options?: { continueBackgroundJobs?: boolean }) => {
       if (!profile) return;
+      if (options?.continueBackgroundJobs) {
+        void kickDocumentProcessingJobs(3);
+      }
       pendingUploadRef.current = null;
       setProcessingSlow(false);
       const stagingProfileId = stagingProfileIdRef.current ?? profile.id;
@@ -128,7 +136,8 @@ export default function AddAnythingScreen() {
   const finishProcessingEarly = useCallback(() => {
     if (!snapshot || !pendingUploadRef.current) return;
     finishWithResult(
-      uploadResultFromSnapshot(snapshot, pendingUploadRef.current.fileName)
+      uploadResultFromSnapshot(snapshot, pendingUploadRef.current.fileName),
+      { continueBackgroundJobs: true }
     );
     setProcessingDocId(null);
   }, [snapshot, finishWithResult]);
@@ -138,7 +147,7 @@ export default function AddAnythingScreen() {
       setProcessingSlow(false);
       return;
     }
-    const timer = window.setTimeout(() => setProcessingSlow(true), 120_000);
+    const timer = window.setTimeout(() => setProcessingSlow(true), 60_000);
     return () => window.clearTimeout(timer);
   }, [stage, processingDocId]);
 
@@ -162,12 +171,22 @@ export default function AddAnythingScreen() {
       pendingUploadRef.current?.fileName ?? "Document"
     );
     const stagingProfileId = stagingProfileIdRef.current;
+    const analysisReady = isAnalysisReadyForFiling(
+      String(snapshot.analysisStatus)
+    );
+
     if (
       stagingProfileId &&
       pendingResult.organizationSuggestion &&
       shouldPromptSmartUpload(pendingResult, stagingProfileId)
     ) {
-      finishWithResult(pendingResult);
+      finishWithResult(pendingResult, { continueBackgroundJobs: true });
+      setProcessingDocId(null);
+      return;
+    }
+
+    if (analysisReady) {
+      finishWithResult(pendingResult, { continueBackgroundJobs: true });
       setProcessingDocId(null);
       return;
     }
@@ -182,7 +201,7 @@ export default function AddAnythingScreen() {
       setProcessingDocId(null);
       return;
     }
-    finishWithResult(pendingResult);
+    finishWithResult(pendingResult, { continueBackgroundJobs: true });
     setProcessingDocId(null);
   }, [snapshot, stage, finishWithResult]);
 
@@ -450,6 +469,9 @@ export default function AddAnythingScreen() {
             <li>Identifying people and entities</li>
             <li>Matching to your spaces</li>
           </ul>
+          {snapshot?.processingTrace ? (
+            <ProcessingTracePanel trace={snapshot.processingTrace} compact />
+          ) : null}
           {processingSlow ? (
             <div className="w-full space-y-2 border-t border-border-subtle pt-4">
               <p className="text-xs text-ink-muted">
@@ -525,7 +547,8 @@ export default function AddAnythingScreen() {
         <div className="simple-home-card space-y-4 p-6 text-center">
           <p className="text-lg font-semibold text-foreground">Saved!</p>
           <p className="text-sm text-ink-muted">
-            Guardian indexed your content and updated your Space Map.
+            Guardian saved your content. Search indexing may finish in the
+            background.
           </p>
           <div className="flex flex-wrap justify-center gap-2">
             {savedProfileId ? (

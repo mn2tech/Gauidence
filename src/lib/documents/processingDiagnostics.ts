@@ -7,6 +7,7 @@ export type ProcessingTimingKey =
   | "text_extraction_ms"
   | "ocr_ms"
   | "llm_analysis_ms"
+  | "organization_ms"
   | "chunking_ms"
   | "embedding_ms"
   | "knowledge_extraction_ms"
