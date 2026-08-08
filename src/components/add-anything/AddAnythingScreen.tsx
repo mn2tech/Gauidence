@@ -51,8 +51,12 @@ export default function AddAnythingScreen() {
   const router = useRouter();
   const { active, profiles, loading: profilesLoading } = useActiveProfile();
   const fileRef = useRef<HTMLInputElement>(null);
+  const pendingUploadRef = useRef<{ documentId: string; fileName: string } | null>(
+    null
+  );
   const [stage, setStage] = useState<Stage>("input");
   const [status, setStatus] = useState("");
+  const [processingSlow, setProcessingSlow] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pasteText, setPasteText] = useState("");
   const [showPaste, setShowPaste] = useState(false);
@@ -67,7 +71,10 @@ export default function AddAnythingScreen() {
 
   const { statuses } = useDocumentProcessingPoll(
     processingDocId ? [processingDocId] : [],
-    { enabled: Boolean(processingDocId) && stage === "processing" }
+    {
+      enabled: Boolean(processingDocId) && stage === "processing",
+      kickProcessing: true,
+    }
   );
 
   const snapshot = processingDocId ? statuses[processingDocId] : undefined;
@@ -75,6 +82,8 @@ export default function AddAnythingScreen() {
   const finishWithResult = useCallback(
     (result: VaultUploadResult) => {
       if (!profile) return;
+      pendingUploadRef.current = null;
+      setProcessingSlow(false);
       const card = buildSmartUploadPresentation(result, profile.display_name);
       if (card) {
         setPresentation(card);
@@ -86,6 +95,30 @@ export default function AddAnythingScreen() {
     },
     [profile]
   );
+
+  const finishProcessingEarly = useCallback(() => {
+    if (!snapshot || !pendingUploadRef.current) return;
+    finishWithResult({
+      documentId: snapshot.documentId,
+      fileName: pendingUploadRef.current.fileName,
+      analyzed:
+        snapshot.analysisStatus === "completed" ||
+        Boolean(snapshot.title || snapshot.summary),
+      title: snapshot.title,
+      documentType: snapshot.documentType,
+      summary: snapshot.summary,
+    });
+    setProcessingDocId(null);
+  }, [snapshot, finishWithResult]);
+
+  useEffect(() => {
+    if (stage !== "processing" || !processingDocId) {
+      setProcessingSlow(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setProcessingSlow(true), 120_000);
+    return () => window.clearTimeout(timer);
+  }, [stage, processingDocId]);
 
   useEffect(() => {
     if (!snapshot || stage !== "processing") return;
@@ -101,10 +134,11 @@ export default function AddAnythingScreen() {
     }
     finishWithResult({
       documentId: snapshot.documentId,
-      fileName: "Document",
+      fileName: pendingUploadRef.current?.fileName ?? "Document",
       analyzed: true,
       title: snapshot.title,
       documentType: snapshot.documentType,
+      summary: snapshot.summary,
     });
     setProcessingDocId(null);
   }, [snapshot, stage, finishWithResult]);
@@ -143,6 +177,10 @@ export default function AddAnythingScreen() {
         return;
       }
       if (result.queued && result.documentId) {
+        pendingUploadRef.current = {
+          documentId: result.documentId,
+          fileName: result.fileName,
+        };
         setProcessingDocId(result.documentId);
         setStatus("Analyzing content…");
         return;
@@ -335,6 +373,37 @@ export default function AddAnythingScreen() {
             <li>Identifying people and entities</li>
             <li>Matching to your spaces</li>
           </ul>
+          {processingSlow ? (
+            <div className="w-full space-y-2 border-t border-border-subtle pt-4">
+              <p className="text-xs text-ink-muted">
+                This is taking longer than usual. Your file is saved — you can
+                keep waiting or continue while analysis finishes in the
+                background.
+              </p>
+              <div className="flex flex-wrap justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => finishProcessingEarly()}
+                  className="rounded-xl border border-border-subtle px-4 py-2 text-sm font-semibold text-foreground hover:bg-stone-50"
+                >
+                  Continue anyway
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProcessingDocId(null);
+                    pendingUploadRef.current = null;
+                    setProcessingSlow(false);
+                    setStage("input");
+                    setStatus("");
+                  }}
+                  className="rounded-xl px-4 py-2 text-sm font-semibold text-ink-muted hover:bg-stone-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
 

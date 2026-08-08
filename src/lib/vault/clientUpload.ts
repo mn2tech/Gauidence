@@ -73,7 +73,7 @@ export async function uploadAndAnalyzeToVault(args: {
     throw new Error("Couldn't verify storage space. Please try again.");
   }
 
-  args.onStatus?.("Uploading to your vault…");
+  args.onStatus?.("Uploading to your space…");
   const safeName = args.file.name.replace(/[^\w.\- ]/g, "_");
   const storageOwner = args.ownerUserId || args.userId;
   const path = `${storageOwner}/${args.profileId}/${crypto.randomUUID()}-${safeName}`;

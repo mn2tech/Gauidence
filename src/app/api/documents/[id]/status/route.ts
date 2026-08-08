@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { recoverStaleProcessingJobs } from "@/lib/documents/processingJobs";
 import {
   deriveProcessingStage,
   documentReadiness,
@@ -8,6 +9,12 @@ import {
   processingProgressPercent,
   userFacingStatusLabel,
 } from "@/lib/documents/processingStatus";
+
+const ACTIVE_STATUS_STALE_MS = {
+  analyze_document: 90_000,
+  index_document: 120_000,
+  extract_knowledge: 120_000,
+} as const;
 
 export const runtime = "nodejs";
 
@@ -28,7 +35,7 @@ export async function GET(
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 
-  const { data: doc, error } = await supabase
+  let { data: doc, error } = await supabase
     .from("documents")
     .select(
       "id, file_name, analysis_status, indexing_status, knowledge_status, processing_step, processing_progress, last_processing_error, processing_started_at, processing_completed_at, profile_id"
@@ -41,6 +48,25 @@ export async function GET(
   }
   if (!doc) {
     return NextResponse.json({ error: "Document not found." }, { status: 404 });
+  }
+
+  const initialStage = deriveProcessingStage(doc);
+  if (isProcessingActive(initialStage)) {
+    const recovered = await recoverStaleProcessingJobs(supabase, {
+      olderThanMs: ACTIVE_STATUS_STALE_MS,
+    });
+    if (recovered > 0) {
+      const refreshed = await supabase
+        .from("documents")
+        .select(
+          "id, file_name, analysis_status, indexing_status, knowledge_status, processing_step, processing_progress, last_processing_error, processing_started_at, processing_completed_at, profile_id"
+        )
+        .eq("id", id)
+        .maybeSingle();
+      if (refreshed.data) {
+        doc = refreshed.data;
+      }
+    }
   }
 
   const { data: job } = await supabase

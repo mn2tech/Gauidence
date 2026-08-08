@@ -197,7 +197,8 @@ async function markJobFailed(
   supabase: SupabaseClient,
   job: { id: string; document_id: string; attempts: number; job_type: ProcessingJobType },
   message: string,
-  category: string
+  category: string,
+  options?: { immediateRetry?: boolean }
 ): Promise<void> {
   const retryable = (job.attempts ?? 0) < MAX_JOB_ATTEMPTS;
   await supabase
@@ -207,7 +208,9 @@ async function markJobFailed(
       last_error: message.slice(0, 500),
       error_category: category,
       next_retry_at: retryable
-        ? new Date(Date.now() + RETRY_DELAY_MS).toISOString()
+        ? options?.immediateRetry
+          ? new Date().toISOString()
+          : new Date(Date.now() + RETRY_DELAY_MS).toISOString()
         : null,
       updated_at: new Date().toISOString(),
     })
@@ -502,16 +505,22 @@ export async function processDocumentProcessingJob(
   }
 }
 
+export type RecoverStaleProcessingJobsOptions = {
+  olderThanMs?: Partial<Record<ProcessingJobType, number>>;
+};
+
 export async function recoverStaleProcessingJobs(
-  supabase: SupabaseClient
+  supabase: SupabaseClient,
+  options?: RecoverStaleProcessingJobsOptions
 ): Promise<number> {
   let recovered = 0;
   const now = Date.now();
 
-  for (const [jobType, timeoutMs] of Object.entries(STAGE_TIMEOUT_MS) as [
+  for (const [jobType, defaultTimeoutMs] of Object.entries(STAGE_TIMEOUT_MS) as [
     ProcessingJobType,
     number,
   ][]) {
+    const timeoutMs = options?.olderThanMs?.[jobType] ?? defaultTimeoutMs;
     const threshold = new Date(now - timeoutMs).toISOString();
     const { data: stale } = await supabase
       .from("document_processing_jobs")
@@ -528,10 +537,11 @@ export async function recoverStaleProcessingJobs(
           id: job.id,
           document_id: job.document_id,
           job_type: job.job_type as ProcessingJobType,
-          attempts: job.attempts ?? MAX_JOB_ATTEMPTS,
+          attempts: job.attempts ?? 0,
         },
         "Processing timed out",
-        "timeout"
+        "timeout",
+        { immediateRetry: true }
       );
       recovered += 1;
     }

@@ -24,14 +24,27 @@ export type DocumentStatusSnapshot = {
 
 const POLL_INTERVAL_MS = 3000;
 
+async function kickDocumentProcessingJobs(limit = 1): Promise<void> {
+  try {
+    await fetch("/api/documents/process-jobs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ limit }),
+    });
+  } catch {
+    // Best-effort — status polling will continue.
+  }
+}
+
 export function useDocumentProcessingPoll(
   documentIds: string[],
-  options: { enabled?: boolean } = {}
+  options: { enabled?: boolean; kickProcessing?: boolean } = {}
 ) {
   const [statuses, setStatuses] = useState<
     Record<string, DocumentStatusSnapshot>
   >({});
   const activeIdsRef = useRef<Set<string>>(new Set());
+  const kickProcessing = options.kickProcessing ?? false;
 
   const fetchStatus = useCallback(async (documentId: string) => {
     const res = await fetch(`/api/documents/${documentId}/status`);
@@ -60,6 +73,9 @@ export function useDocumentProcessingPoll(
 
   const pollOne = useCallback(
     async (documentId: string) => {
+      if (kickProcessing) {
+        void kickDocumentProcessingJobs(1);
+      }
       const snapshot = await fetchStatus(documentId);
       if (!snapshot) return;
       setStatuses((prev) => ({ ...prev, [documentId]: snapshot }));
@@ -69,7 +85,7 @@ export function useDocumentProcessingPoll(
         activeIdsRef.current.delete(documentId);
       }
     },
-    [fetchStatus]
+    [fetchStatus, kickProcessing]
   );
 
   useEffect(() => {
@@ -78,13 +94,12 @@ export function useDocumentProcessingPoll(
     if (ids.length === 0) return;
 
     for (const id of ids) {
+      activeIdsRef.current.add(id);
       void pollOne(id);
     }
 
     const timer = window.setInterval(() => {
-      const active = [...activeIdsRef.current];
-      if (active.length === 0) return;
-      for (const id of active) {
+      for (const id of ids) {
         void pollOne(id);
       }
     }, POLL_INTERVAL_MS);
@@ -92,10 +107,13 @@ export function useDocumentProcessingPoll(
     return () => window.clearInterval(timer);
   }, [documentIds.join(","), options.enabled, pollOne]);
 
-  const markActive = useCallback((documentId: string) => {
-    activeIdsRef.current.add(documentId);
-    void pollOne(documentId);
-  }, [pollOne]);
+  const markActive = useCallback(
+    (documentId: string) => {
+      activeIdsRef.current.add(documentId);
+      void pollOne(documentId);
+    },
+    [pollOne]
+  );
 
   return { statuses, markActive, refreshStatus: pollOne };
 }

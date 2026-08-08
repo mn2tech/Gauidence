@@ -76,7 +76,7 @@ export async function scheduleDocumentAnalysis(
       queued: false,
       documentId,
       error:
-        "Analysis couldn't be scheduled. The file is in your vault — retry from Documents.",
+        "Analysis couldn't be scheduled. The file is saved in your space — retry from Documents.",
     };
   }
 }
