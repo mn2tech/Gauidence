@@ -8,7 +8,13 @@ export const PROPOSALS_PATH = "/proposals";
 export const BUSINESS_ADVISOR_PATH = "/business-advisor";
 
 /** Header / nav label for {@link DOCUMENTS_PATH}. */
-export const VAULT_NAV_LABEL = "Vault";
+export const VAULT_NAV_LABEL = "Spaces";
+
+/** Primary ingestion flow — upload, paste, or capture anything. */
+export const ADD_ANYTHING_PATH = "/add";
+
+/** Daily memory capture — "Remember Today". */
+export const REMEMBER_TODAY_PATH = "/remember";
 
 export function documentsHref(profileId?: string | null): string {
   if (!profileId) return DOCUMENTS_PATH;

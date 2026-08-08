@@ -31,11 +31,11 @@ export default function ProfileSetupHub({
   return (
     <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm sm:p-8">
       <h2 className="text-xl font-bold tracking-tight">
-        What kind of vault do you need?
+        What would you like to create?
       </h2>
       <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-        Choose a starting vault. You can add more for family, business, school,
-        and more anytime from Manage vaults.
+        Choose a Space or Workspace to get started. You can add more anytime from
+        Manage spaces.
       </p>
       <p className="mt-3 text-sm text-ink-muted">
         Need a walkthrough?{" "}

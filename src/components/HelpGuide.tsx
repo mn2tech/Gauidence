@@ -29,17 +29,17 @@ import { DOCUMENTS_PATH, VAULT_NAV_LABEL } from "@/lib/routes";
 const HOW_TO = [
   {
     icon: Users,
-    title: "Vaults",
-    body: "Each vault keeps its own files, Daily Logs, alerts, and Gideon chats. Switch vaults from the header or Vault page.",
+    title: "Spaces & Workspaces",
+    body: "Each space keeps its own files, memories, alerts, and Gideon chats. Guardian organizes content for you — switch spaces from the header or Spaces page.",
     href: "/settings/profiles",
-    linkLabel: "Manage vaults",
+    linkLabel: "Manage spaces",
   },
   {
     icon: Users,
-    title: "Shared vaults",
-    body: "Invite another Guardian user as an Editor on a client, vehicle, home, pet, child, or student vault. They see only that vault's documents and Daily Logs — not your whole account. Gideon chats stay private to each person.",
+    title: "Shared spaces",
+    body: "Invite another Guardian user as an Editor on a client, vehicle, home, pet, child, or student space. They see only that space's documents and memories — not your whole account. Gideon chats stay private to each person.",
     href: "/settings/profiles",
-    linkLabel: "Manage vaults",
+    linkLabel: "Manage spaces",
   },
   {
     icon: Camera,
@@ -51,7 +51,7 @@ const HOW_TO = [
   {
     icon: NotebookPen,
     title: "Daily Logs",
-    body: "Jot notes and events for the active vault. Use the pencil icon to edit. Search can jump you straight to a matching log.",
+    body: "Jot notes and events. Use Remember Today from Home, or the Daily Log inside a space. Search can jump you straight to a matching memory.",
     href: DOCUMENTS_PATH,
     linkLabel: "Open Daily Log",
   },

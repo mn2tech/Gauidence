@@ -282,13 +282,13 @@ function VaultList({ onPicked }: { onPicked?: () => void }) {
   };
 
   if (loading && !active) {
-    return <p className="px-2 py-1 text-xs text-ink-muted">Loading vaults…</p>;
+    return <p className="px-2 py-1 text-xs text-ink-muted">Loading spaces…</p>;
   }
 
   if (topLevel.length === 0) {
     return (
       <p className="px-2 py-1 text-xs text-ink-muted">
-        No vaults yet.{" "}
+        No spaces yet.{" "}
         <Link
           href="/settings/profiles?add=1&return=%2Fask"
           className="font-medium text-brand hover:text-brand-dark"
@@ -364,7 +364,7 @@ export default function AskGideonSidebar({
   onImportChats,
   onSidebarAction,
 }: Props) {
-  const vaultLabel = activeVaultName?.trim() || "this vault";
+  const vaultLabel = activeVaultName?.trim() || "this space";
   const [vaultsOpen, setVaultsOpen] = useState(true);
   const [chatsOpen, setChatsOpen] = useState(true);
 
@@ -405,7 +405,7 @@ export default function AskGideonSidebar({
         }`}
       >
         <CollapsibleSection
-          title="Vaults"
+          title="Spaces"
           open={vaultsOpen}
           onToggle={() => setVaultsOpen((o) => !o)}
         >

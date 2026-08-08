@@ -404,11 +404,12 @@ export default function ProfileVaultMap({
           id="vault-map-heading"
           className="text-sm font-semibold text-foreground"
         >
-          Vault map
+          Space Map
         </h2>
         <p className="mt-0.5 text-xs text-ink-muted">
-          Tap a vault to switch. Right-click to add a sub-vault. Drag by the grip
-          handle onto Family, Business, or another space to reorganize.
+          See how Guardian has organized and connected your knowledge. Tap a space
+          to open it. Right-click to add a sub-space. Drag by the grip handle to
+          reorganize.
         </p>
       </div>
       <div className="flex flex-col items-center">

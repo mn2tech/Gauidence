@@ -4,16 +4,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
-  BellRing,
-  Brain,
-  Building2,
-  FileText,
   FolderOpen,
   MessageCircle,
   NotebookPen,
+  Plus,
   Sparkles,
-  UserPlus,
-  Users,
 } from "lucide-react";
 import ProfileAvatar from "@/components/ProfileAvatar";
 import ProfileSetupHub from "@/components/ProfileSetupHub";
@@ -24,10 +19,17 @@ import {
   greetingName,
   timeOfDayGreeting,
 } from "@/lib/simple-home/helpers";
-import { VAULTS_PATH } from "@/lib/simple-home/routing";
-import { DOCUMENTS_PATH, documentsHref, dailyLogHref, REQUESTS_PATH } from "@/lib/routes";
-import { profileTypeLabel } from "@/lib/profiles/types";
-import { clientBusinessLabel } from "@/lib/client-requests/helpers";
+import {
+  ADD_ANYTHING_PATH,
+  ASK_GIDEON_PATH,
+  REMEMBER_TODAY_PATH,
+  VAULTS_PATH,
+} from "@/lib/simple-home/routing";
+import { documentsHref } from "@/lib/routes";
+import {
+  getContainerLabel,
+  SPACES_AND_WORKSPACES_LABEL,
+} from "@/lib/profiles/types";
 
 function Section({
   title,
@@ -46,6 +48,30 @@ function Section({
   );
 }
 
+const PRIMARY_ACTIONS = [
+  {
+    href: ADD_ANYTHING_PATH,
+    label: "Add Anything",
+    description: "Upload, paste, or capture",
+    icon: Plus,
+    accent: true,
+  },
+  {
+    href: REMEMBER_TODAY_PATH,
+    label: "Remember Today",
+    description: "What happened today?",
+    icon: NotebookPen,
+    accent: false,
+  },
+  {
+    href: ASK_GIDEON_PATH,
+    label: "Ask Gideon",
+    description: "Search everything you know",
+    icon: Sparkles,
+    accent: false,
+  },
+] as const;
+
 export default function SimpleHomeScreen() {
   const router = useRouter();
   const { active, profiles, accountName, loading: profilesLoading, switchProfile } =
@@ -54,14 +80,35 @@ export default function SimpleHomeScreen() {
   const [question, setQuestion] = useState("");
 
   if (profilesLoading) {
-    return (
-      <p className="p-6 text-sm text-ink-muted">Loading your home…</p>
-    );
+    return <p className="p-6 text-sm text-ink-muted">Loading your home…</p>;
   }
 
   if (profiles.length === 0) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-8">
+        <div className="mb-8 text-center">
+          <h1 className="text-2xl font-semibold tracking-tight">Welcome to Guardian</h1>
+          <p className="mt-2 text-sm text-ink-muted">
+            Guardian becomes more useful as it remembers the things that matter to you.
+          </p>
+        </div>
+        <div className="mb-6 grid gap-3 sm:grid-cols-3">
+          {PRIMARY_ACTIONS.map((action) => {
+            const Icon = action.icon;
+            return (
+              <Link
+                key={action.href}
+                href={action.href}
+                className={`simple-home-card flex flex-col items-center gap-2 p-4 text-center transition hover:shadow-card ${
+                  action.accent ? "border-brand/30 bg-brand-light/20" : ""
+                }`}
+              >
+                <Icon className={`h-6 w-6 ${action.accent ? "text-brand" : "text-ink-muted"}`} />
+                <span className="text-sm font-semibold">{action.label}</span>
+              </Link>
+            );
+          })}
+        </div>
         <ProfileSetupHub returnTo="/home" />
       </div>
     );
@@ -69,135 +116,67 @@ export default function SimpleHomeScreen() {
 
   const greeting = timeOfDayGreeting();
   const name = greetingName(accountName, active?.display_name);
-  const category = data.category;
-  const businessLabel = clientBusinessLabel(profiles, active);
-  const showToday =
-    data.pendingCount > 0 ||
-    data.openRequestCount > 0 ||
-    data.todayDocuments.length > 0 ||
-    data.todayAlerts.length > 0;
-
-  const categoryQuickLinks = (() => {
-    switch (category) {
-      case "business":
-        return [
-          {
-            href: documentsHref(active?.id),
-            label: "Important work",
-            icon: Building2,
-          },
-          {
-            href: VAULTS_PATH,
-            label: "Clients",
-            icon: Users,
-          },
-          {
-            href: REQUESTS_PATH,
-            label: "Client requests",
-            icon: MessageCircle,
-          },
-          {
-            href: "/work-memory",
-            label: "Work Memory",
-            icon: Brain,
-          },
-          {
-            href: "/recruit",
-            label: "Recruit",
-            icon: UserPlus,
-          },
-        ];
-      case "client":
-        return [
-          {
-            href: documentsHref(active?.id),
-            label: "My documents",
-            icon: FileText,
-          },
-          {
-            href: REQUESTS_PATH,
-            label: "My requests",
-            icon: MessageCircle,
-          },
-          {
-            href: `${REQUESTS_PATH}?new=1`,
-            label: `Contact ${businessLabel}`,
-            icon: MessageCircle,
-          },
-        ];
-      case "family":
-        return [
-          {
-            href: documentsHref(active?.id),
-            label: "Files",
-            icon: FileText,
-          },
-          {
-            href: dailyLogHref(active?.id),
-            label: "Daily log",
-            icon: NotebookPen,
-          },
-        ];
-      default:
-        return [
-          {
-            href: documentsHref(active?.id),
-            label: "Files",
-            icon: FileText,
-          },
-          {
-            href: dailyLogHref(active?.id),
-            label: "Daily log",
-            icon: NotebookPen,
-          },
-        ];
-    }
-  })();
-
-  const chipClass =
-    category === "business"
-      ? "simple-chip-business"
-      : category === "family"
-        ? "simple-chip-warm"
-        : "bg-surface border-border-subtle";
 
   function handleAskSubmit(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = question.trim();
     if (trimmed) {
-      router.push(`/ask?draft=${encodeURIComponent(trimmed)}`);
+      router.push(`${ASK_GIDEON_PATH}?draft=${encodeURIComponent(trimmed)}`);
       return;
     }
-    router.push("/ask");
+    router.push(ASK_GIDEON_PATH);
   }
 
   return (
     <div className="simple-home-page mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-6 pb-28 sm:gap-7 sm:py-8">
       <header className="welcome-strip">
         <p className="text-2xl font-semibold tracking-tight text-foreground sm:text-[1.75rem] sm:leading-tight">
-          {greeting}, {name}.
+          {greeting}, {name}
         </p>
-        <p className="mt-1.5 text-sm text-ink-muted">
-          {active ? `${profileTypeLabel(active.profile_type)} vault` : "Guardian"}
-        </p>
+        <p className="mt-1.5 text-sm text-ink-muted">What would you like to do?</p>
       </header>
+
+      <div
+        className="grid gap-3 welcome-strip sm:grid-cols-3"
+        style={{ animationDelay: "0.05s" }}
+      >
+        {PRIMARY_ACTIONS.map((action) => {
+          const Icon = action.icon;
+          return (
+            <Link
+              key={action.href}
+              href={action.href}
+              className={`simple-home-card flex flex-col gap-3 p-4 transition hover:shadow-card ${
+                action.accent
+                  ? "border-brand/30 bg-gradient-to-br from-brand-light/50 to-white"
+                  : ""
+              }`}
+            >
+              <span
+                className={`flex h-10 w-10 items-center justify-center rounded-xl ${
+                  action.accent ? "bg-brand text-white shadow-sm" : "bg-brand-light text-brand"
+                }`}
+              >
+                <Icon className="h-5 w-5" aria-hidden />
+              </span>
+              <span>
+                <span className="block text-sm font-semibold text-foreground">
+                  {action.label}
+                </span>
+                <span className="mt-0.5 block text-xs text-ink-muted">
+                  {action.description}
+                </span>
+              </span>
+            </Link>
+          );
+        })}
+      </div>
 
       <form
         onSubmit={handleAskSubmit}
-        className="simple-gideon-hero welcome-strip p-5 sm:p-6"
-        style={{ animationDelay: "0.05s" }}
+        className="simple-gideon-hero welcome-strip p-4 sm:p-5"
+        style={{ animationDelay: "0.1s" }}
       >
-        <div className="mb-4 flex items-center gap-2">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand text-white shadow-sm">
-            <Sparkles className="h-4 w-4" aria-hidden />
-          </span>
-          <div>
-            <p className="text-sm font-semibold text-foreground">Ask Gideon</p>
-            <p className="text-xs text-ink-muted">
-              Your guide to everything in your vault
-            </p>
-          </div>
-        </div>
         <label htmlFor="home-ask-gideon" className="sr-only">
           Ask Gideon
         </label>
@@ -207,111 +186,39 @@ export default function SimpleHomeScreen() {
             type="text"
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
-            placeholder="What do you need help with?"
-            className="min-w-0 flex-1 rounded-xl border border-border-subtle bg-white px-4 py-3.5 text-sm text-foreground shadow-sm placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/25"
+            placeholder="Ask Gideon anything across your spaces…"
+            className="min-w-0 flex-1 rounded-xl border border-border-subtle bg-white px-4 py-3 text-sm text-foreground shadow-sm placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/25"
           />
           <button
             type="submit"
-            className="inline-flex shrink-0 items-center justify-center rounded-xl bg-brand px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-dark"
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-brand px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-dark"
           >
-            Ask Gideon
+            <MessageCircle className="h-4 w-4" />
+            Ask
           </button>
         </div>
+        <p className="mt-2 text-xs text-ink-muted">
+          Searching everything you have access to — no space selection needed.
+        </p>
       </form>
 
-      {categoryQuickLinks.length > 0 ? (
-        <div
-          className="flex flex-wrap gap-2 welcome-strip"
-          style={{ animationDelay: "0.1s" }}
-        >
-          {categoryQuickLinks.map((link) => {
-            const Icon = link.icon;
-            return (
-              <Link
-                key={link.label}
-                href={link.href}
-                className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-sm font-medium text-foreground shadow-sm transition hover:shadow-card ${chipClass}`}
-              >
-                <Icon className="h-4 w-4 text-brand" aria-hidden />
-                {link.label}
-              </Link>
-            );
-          })}
-        </div>
-      ) : null}
-
-      {showToday ? (
-        <Section title="Today">
+      {data.recentActivity.length > 0 ? (
+        <Section title="Recent activity">
           {loading ? (
             <p className="text-sm text-ink-muted">Loading…</p>
           ) : (
             <ul className="space-y-1">
-              {data.openRequestCount > 0 ? (
-                <li>
+              {data.recentActivity.map((item) => (
+                <li key={item.id}>
                   <Link
-                    href={REQUESTS_PATH}
-                    className="flex items-start gap-3 rounded-xl px-2 py-2.5 text-sm transition hover:bg-brand-light/40"
+                    href={item.href}
+                    className="flex items-start justify-between gap-3 rounded-xl px-2 py-2.5 text-sm transition hover:bg-brand-light/35"
                   >
-                    <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-light">
-                      <MessageCircle className="h-3.5 w-3.5 text-brand" />
+                    <span className="min-w-0 font-medium text-foreground">
+                      {item.title}
                     </span>
-                    <span>
-                      <span className="font-medium text-foreground">
-                        {data.openRequestCount === 1
-                          ? category === "business"
-                            ? "1 open client request"
-                            : "1 open request"
-                          : category === "business"
-                            ? `${data.openRequestCount} open client requests`
-                            : `${data.openRequestCount} open requests`}
-                      </span>
-                      <span className="mt-0.5 block text-xs text-ink-muted">
-                        {category === "business"
-                          ? "Review and reply in Requests"
-                          : "View your conversation"}
-                      </span>
-                    </span>
-                  </Link>
-                </li>
-              ) : null}
-              {data.todayAlerts.map((alert) => (
-                <li key={alert.id}>
-                  <Link
-                    href={documentsHref(active?.id)}
-                    className="flex items-start gap-3 rounded-xl px-2 py-2.5 text-sm transition hover:bg-brand-light/40"
-                  >
-                    <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-100">
-                      <BellRing className="h-3.5 w-3.5 text-amber-700" />
-                    </span>
-                    <span>
-                      <span className="font-medium text-foreground">
-                        {alert.title}
-                      </span>
-                      <span className="mt-0.5 block text-xs text-ink-muted">
-                        Due {alert.dueDate}
-                      </span>
-                    </span>
-                  </Link>
-                </li>
-              ))}
-              {data.todayDocuments.map((doc) => (
-                <li key={doc.id}>
-                  <Link
-                    href={`${DOCUMENTS_PATH}&documentId=${doc.id}${
-                      active?.id ? `#documents-${active.id}` : ""
-                    }`}
-                    className="flex items-start gap-3 rounded-xl px-2 py-2.5 text-sm transition hover:bg-brand-light/40"
-                  >
-                    <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-light">
-                      <FileText className="h-3.5 w-3.5 text-brand" />
-                    </span>
-                    <span>
-                      <span className="font-medium text-foreground">
-                        Recent document
-                      </span>
-                      <span className="mt-0.5 block truncate text-xs text-ink-muted">
-                        {doc.fileName}
-                      </span>
+                    <span className="shrink-0 text-xs text-ink-muted">
+                      {formatActivityWhen(item.occurredAt)}
                     </span>
                   </Link>
                 </li>
@@ -322,25 +229,25 @@ export default function SimpleHomeScreen() {
       ) : null}
 
       {data.recentVaults.length > 0 ? (
-        <Section title="Recent vaults">
+        <Section title={SPACES_AND_WORKSPACES_LABEL}>
           <ul className="space-y-1">
-            {data.recentVaults.map((vault) => (
-              <li key={vault.id}>
+            {data.recentVaults.map((space) => (
+              <li key={space.id}>
                 <button
                   type="button"
                   onClick={() => {
-                    void switchProfile(vault.id);
-                    router.push(documentsHref(vault.id));
+                    void switchProfile(space.id);
+                    router.push(documentsHref(space.id));
                   }}
                   className="flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left text-sm transition hover:bg-brand-light/35"
                 >
-                  <ProfileAvatar profile={vault} size="sm" />
+                  <ProfileAvatar profile={space} size="sm" />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-medium text-foreground">
-                      {vault.display_name}
+                      {space.display_name}
                     </span>
                     <span className="block truncate text-xs text-ink-muted">
-                      {profileTypeLabel(vault.profile_type)}
+                      {getContainerLabel(space.profile_type)}
                     </span>
                   </span>
                   <FolderOpen className="h-4 w-4 shrink-0 text-brand/70" />
@@ -352,30 +259,8 @@ export default function SimpleHomeScreen() {
             href={VAULTS_PATH}
             className="mt-3 inline-block text-sm font-semibold text-brand-dark hover:underline"
           >
-            View all
+            View all spaces
           </Link>
-        </Section>
-      ) : null}
-
-      {data.recentActivity.length > 0 ? (
-        <Section title="Recent activity">
-          <ul className="space-y-1">
-            {data.recentActivity.map((item) => (
-              <li key={item.id}>
-                <Link
-                  href={item.href}
-                  className="flex items-start justify-between gap-3 rounded-xl px-2 py-2.5 text-sm transition hover:bg-brand-light/35"
-                >
-                  <span className="min-w-0 font-medium text-foreground">
-                    {item.title}
-                  </span>
-                  <span className="shrink-0 text-xs text-ink-muted">
-                    {formatActivityWhen(item.occurredAt)}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
         </Section>
       ) : null}
     </div>

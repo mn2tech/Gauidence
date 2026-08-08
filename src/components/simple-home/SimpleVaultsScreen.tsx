@@ -10,8 +10,10 @@ import {
   canHaveLinkedClients,
   canManageProfileAccess,
   clientsOf,
+  getContainerLabel,
   nestedUnder,
-  profileTypeLabel,
+  profileContainerName,
+  SPACES_AND_WORKSPACES_LABEL,
   topLevelProfiles,
 } from "@/lib/profiles/types";
 import { DOCUMENTS_PATH } from "@/lib/routes";
@@ -25,7 +27,7 @@ export default function SimpleVaultsScreen() {
   const { profiles, loading, switchProfile } = useActiveProfile();
 
   if (loading) {
-    return <p className="p-6 text-sm text-ink-muted">Loading vaults…</p>;
+    return <p className="p-6 text-sm text-ink-muted">Loading spaces…</p>;
   }
 
   if (profiles.length === 0) {
@@ -42,43 +44,43 @@ export default function SimpleVaultsScreen() {
     <div className="simple-home-page mx-auto max-w-2xl px-4 py-6 pb-28 sm:py-8">
       <header className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-          Vaults
+          {SPACES_AND_WORKSPACES_LABEL}
         </h1>
         <p className="mt-1.5 text-sm text-ink-muted">
-          Your profiles and vaults in Guardian.
+          How Guardian has organized your knowledge.
         </p>
       </header>
 
       <ul className="space-y-3">
-        {topLevel.map((vault) => {
-          const children = nestedUnder(profiles, vault);
+        {topLevel.map((space) => {
+          const children = nestedUnder(profiles, space);
           const showClientsLink =
-            canHaveLinkedClients(vault.profile_type) &&
-            canManageProfileAccess(vault);
+            canHaveLinkedClients(space.profile_type) &&
+            canManageProfileAccess(space);
           const clientCount = showClientsLink
-            ? clientsOf(profiles, vault.id).length
+            ? clientsOf(profiles, space.id).length
             : 0;
           const nestedChildren = showClientsLink
             ? children.filter((child) => child.profile_type !== "client")
             : children;
 
           return (
-            <li key={vault.id} className="simple-home-card overflow-hidden">
+            <li key={space.id} className="simple-home-card overflow-hidden">
               <button
                 type="button"
                 onClick={() => {
-                  void switchProfile(vault.id);
-                  router.push(`${DOCUMENTS_PATH}#documents-${vault.id}`);
+                  void switchProfile(space.id);
+                  router.push(`${DOCUMENTS_PATH}#documents-${space.id}`);
                 }}
                 className="flex w-full items-center gap-3 px-4 py-4 text-left transition hover:bg-brand-light/30"
               >
-                <ProfileAvatar profile={vault} size="md" />
+                <ProfileAvatar profile={space} size="md" />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-semibold text-foreground">
-                    {vault.display_name}
+                    {profileContainerName(space)}
                   </span>
                   <span className="block truncate text-sm text-ink-muted">
-                    {profileTypeLabel(vault.profile_type)}
+                    {getContainerLabel(space.profile_type)}
                   </span>
                 </span>
               </button>
@@ -88,8 +90,8 @@ export default function SimpleVaultsScreen() {
                   <button
                     type="button"
                     onClick={() => {
-                      void switchProfile(vault.id);
-                      router.push(clientsSectionHref(vault.id));
+                      void switchProfile(space.id);
+                      router.push(clientsSectionHref(space.id));
                     }}
                     className="inline-flex w-full items-center justify-between gap-2 rounded-lg px-1 py-1 text-left text-sm font-medium text-brand-dark transition hover:bg-brand-light/35"
                   >
@@ -125,7 +127,7 @@ export default function SimpleVaultsScreen() {
                               {child.display_name}
                             </span>
                             <span className="block truncate text-xs text-ink-muted">
-                              {profileTypeLabel(child.profile_type)}
+                              {getContainerLabel(child.profile_type)}
                             </span>
                           </span>
                         </button>
@@ -153,7 +155,7 @@ export default function SimpleVaultsScreen() {
         href="/settings/profiles"
         className="mt-5 inline-block text-sm font-semibold text-brand-dark hover:underline"
       >
-        Manage vaults
+        Manage spaces
       </Link>
     </div>
   );

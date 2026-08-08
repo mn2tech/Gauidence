@@ -107,7 +107,11 @@ export default function WorkspaceContextBar({
     return () => document.removeEventListener("mousedown", onDoc);
   }, [menuOpen]);
 
-  const heading = display.mode === "searching" ? "Searching" : "Working in";
+  const heading = "Searching";
+  const scopeLabel =
+    showSearchScopeToggle && searchScope === "global"
+      ? searchScopeLabel("global")
+      : display.primaryName;
 
   return (
     <div
@@ -119,7 +123,7 @@ export default function WorkspaceContextBar({
         </p>
         <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
           <p className="text-sm font-semibold text-foreground">
-            {display.primaryName}
+            {scopeLabel}
           </p>
           {display.secondaryLabel ? (
             <p className="text-xs text-ink-muted">{display.secondaryLabel}</p>
@@ -190,7 +194,7 @@ export default function WorkspaceContextBar({
             type="button"
             onClick={onOpenSearch}
             className="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-medium text-brand hover:bg-brand-light/40"
-            aria-label="Search vault"
+            aria-label="Search spaces and content"
           >
             <Search className="h-3.5 w-3.5" />
             Search

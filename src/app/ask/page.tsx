@@ -11,7 +11,7 @@ import VaultChatPanel from "@/components/VaultChatPanel";
 export const metadata: Metadata = {
   title: "Ask Gideon — Guardian",
   description:
-    "Ask Gideon about your documents, dates, amounts, and what may need attention. Your AI guide to everything in your vault.",
+    "Ask Gideon about your documents, dates, amounts, and what may need attention. Your AI guide across all your spaces.",
 };
 
 export default async function AskGideonPage() {

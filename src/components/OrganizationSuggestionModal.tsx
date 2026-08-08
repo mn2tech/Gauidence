@@ -139,7 +139,7 @@ export default function OrganizationSuggestionModal({
               ) : null}
               {suggestion.vaultName ? (
                 <p className="text-ink-muted">
-                  Vault: <span className="font-semibold text-ink">{suggestion.vaultName}</span>
+                  Space: <span className="font-semibold text-ink">{suggestion.vaultName}</span>
                 </p>
               ) : null}
             </div>
@@ -160,7 +160,7 @@ export default function OrganizationSuggestionModal({
                     />
                   </label>
                   <label className="block text-xs text-ink-muted">
-                    Vault name
+                    Space name
                     <input
                       value={vaultName}
                       onChange={(e) => setVaultName(e.target.value)}
@@ -170,7 +170,7 @@ export default function OrganizationSuggestionModal({
                 </div>
               ) : (
                 <p className="mt-1 text-base font-semibold text-ink">
-                  {suggestion.profilePath ?? suggestion.vaultName ?? "Current vault"}
+                  {suggestion.profilePath ?? suggestion.vaultName ?? "Current space"}
                 </p>
               )}
             </div>
@@ -305,7 +305,7 @@ export default function OrganizationSuggestionModal({
               onClick={() => void resolve("create_suggested")}
               className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-stone-200 px-4 py-2.5 text-sm font-semibold text-ink hover:bg-stone-50"
             >
-              Create suggested vault
+              Create suggested space
             </button>
           ) : null}
 
@@ -322,7 +322,7 @@ export default function OrganizationSuggestionModal({
           {choosingLocation ? (
             <div className="w-full rounded-xl border border-stone-200 p-3">
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">
-                Pick a vault
+                Pick a space
               </p>
               <ul className="max-h-40 space-y-1 overflow-y-auto text-sm">
                 {topLevelProfiles(profiles).map((p) => (
@@ -349,7 +349,7 @@ export default function OrganizationSuggestionModal({
             onClick={() => void resolve("keep_current")}
             className="text-sm font-medium text-ink-muted hover:text-ink disabled:opacity-60"
           >
-            Keep in current vault
+            Keep in current space
           </button>
 
           {needsCreate ? (

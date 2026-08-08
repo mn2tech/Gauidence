@@ -16,7 +16,6 @@ import { useRouter } from "next/navigation";
 import ProfileSwitcher from "@/components/ProfileSwitcher";
 import GlobalVaultSearch from "@/components/GlobalVaultSearch";
 import SimpleNavigation from "@/components/simple-home/SimpleNavigation";
-import SimpleNewMenu from "@/components/simple-home/SimpleNewMenu";
 import SimpleSecondaryNavLinks from "@/components/simple-home/SimpleSecondaryNavLinks";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import { SIMPLE_HOME_PATH } from "@/lib/simple-home/routing";
@@ -30,7 +29,6 @@ export default function SimpleAppShell({
   const { active, profiles, loading: profilesLoading } = useActiveProfile();
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [newOpen, setNewOpen] = useState(false);
 
   const needsSetup = !profilesLoading && profiles.length === 0;
   const cameraHref = active
@@ -72,7 +70,7 @@ export default function SimpleAppShell({
                 <button
                   type="button"
                   onClick={() => setSearchOpen(true)}
-                  aria-label="Search vaults"
+                  aria-label="Search spaces and content"
                   className="rounded-full p-2 text-brand transition hover:bg-brand-light"
                 >
                   <Search className="h-5 w-5" />
@@ -163,11 +161,11 @@ export default function SimpleAppShell({
 
       {!needsSetup ? (
         <>
-          <SimpleNavigation onNewClick={() => setNewOpen(true)} />
-          <SimpleNewMenu open={newOpen} onClose={() => setNewOpen(false)} />
+          <SimpleNavigation />
           <GlobalVaultSearch
             open={searchOpen}
             onClose={() => setSearchOpen(false)}
+            defaultScope="global"
           />
         </>
       ) : null}

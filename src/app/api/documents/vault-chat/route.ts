@@ -620,7 +620,7 @@ export async function GET(request: Request) {
         askContextLabel: askGideonContextLabel(active),
         chatContextLabel: scopeMeta.chatContextLabel,
         vaultScopeNote: scopeMeta.vaultScopeNote,
-        searchScope: "workspace" as const,
+        searchScope: "global" as const,
         templateLabel: template.label,
         templateBadge: template.badge,
         actionTimeline,
@@ -931,7 +931,7 @@ export async function POST(request: Request) {
     }
     const initialSearchScope = isSearchScopeMode(setSearchScopeRaw)
       ? setSearchScopeRaw
-      : "workspace";
+      : "global";
     const { data: created, error: chatError } = await supabase
       .from("vault_chats")
       .insert({

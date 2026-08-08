@@ -5,7 +5,6 @@ import { createClient } from "@/lib/supabase/client";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import { calendarDateInUserZone } from "@/lib/timezone";
 import {
-  formatActivityWhen,
   readRecentVaultIds,
   simpleHomeProfileCategory,
   type SimpleHomeActivityItem,
@@ -18,6 +17,7 @@ import {
 } from "@/lib/routes";
 import {
   topLevelProfiles,
+  profileContainerName,
   isOrgStyleProfile,
   type GuardianProfile,
 } from "@/lib/profiles/types";
@@ -62,6 +62,14 @@ const EMPTY: SimpleHomeData = {
   pendingCount: 0,
 };
 
+function profileNameById(
+  profiles: GuardianProfile[],
+  profileId: string
+): string {
+  const profile = profiles.find((p) => p.id === profileId);
+  return profile ? profileContainerName(profile) : "a space";
+}
+
 export function useSimpleHomeData() {
   const { active, profiles, timeZone, loading: profilesLoading } =
     useActiveProfile();
@@ -69,7 +77,7 @@ export function useSimpleHomeData() {
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    if (!active || profiles.length === 0) {
+    if (profiles.length === 0) {
       setData(EMPTY);
       setLoading(false);
       return;
@@ -83,19 +91,22 @@ export function useSimpleHomeData() {
     }
 
     setLoading(true);
-    const category = simpleHomeProfileCategory(active.profile_type);
+    const category = active
+      ? simpleHomeProfileCategory(active.profile_type)
+      : "personal";
     const today = calendarDateInUserZone(new Date(), timeZone);
-    const profileId = active.id;
+    const profileIds = profiles.map((p) => p.id);
+    const activeId = active?.id ?? profileIds[0];
 
     const clientProfileIds =
-      isOrgStyleProfile(active.profile_type) && active.profile_type !== "client"
+      active && isOrgStyleProfile(active.profile_type)
         ? profiles
             .filter(
               (p) =>
                 p.parent_profile_id === active.id && p.profile_type === "client"
             )
             .map((p) => p.id)
-        : active.profile_type === "client"
+        : active?.profile_type === "client"
           ? [active.id]
           : [];
 
@@ -122,37 +133,40 @@ export function useSimpleHomeData() {
 
     const [alertsRes, docsRes, logsRes, chatsRes, profilesRes, requestsRes, clientLogsRes] =
       await Promise.all([
-        supabase
-          .from("alerts")
-          .select("id, title, due_date")
-          .eq("profile_id", profileId)
-          .is("dismissed_at", null)
-          .gte("due_date", today)
-          .order("due_date", { ascending: true })
-          .limit(5),
+        activeId
+          ? supabase
+              .from("alerts")
+              .select("id, title, due_date")
+              .eq("profile_id", activeId)
+              .is("dismissed_at", null)
+              .gte("due_date", today)
+              .order("due_date", { ascending: true })
+              .limit(5)
+          : Promise.resolve({ data: null, error: null }),
         supabase
           .from("documents")
-          .select("id, file_name, created_at")
-          .eq("profile_id", profileId)
+          .select("id, file_name, created_at, profile_id")
+          .in("profile_id", profileIds)
           .order("created_at", { ascending: false })
-          .limit(3),
+          .limit(8),
         supabase
           .from("daily_logs")
-          .select("id, title, created_at")
-          .eq("profile_id", profileId)
+          .select("id, title, created_at, profile_id")
+          .in("profile_id", profileIds)
           .order("created_at", { ascending: false })
-          .limit(3),
+          .limit(8),
         supabase
           .from("vault_chats")
-          .select("id, title, updated_at")
-          .eq("profile_id", profileId)
+          .select("id, title, updated_at, profile_id")
+          .in("profile_id", profileIds)
           .order("updated_at", { ascending: false })
-          .limit(3),
+          .limit(5),
         supabase
           .from("guardian_profiles")
           .select("id, display_name, profile_type, updated_at")
+          .in("id", profileIds)
           .order("updated_at", { ascending: false })
-          .limit(3),
+          .limit(5),
         requestsQuery ?? Promise.resolve({ data: null, error: null }),
         clientLogsQuery ?? Promise.resolve({ data: null, error: null }),
       ]);
@@ -180,31 +194,33 @@ export function useSimpleHomeData() {
     const activity: SimpleHomeActivityItem[] = [];
 
     for (const row of docsRes.data ?? []) {
+      const docProfileId = String(row.profile_id);
       activity.push({
         id: `doc-${row.id}`,
         kind: "document",
-        title: `Document uploaded: ${row.file_name}`,
+        title: `PDF added to ${profileNameById(profiles, docProfileId)}`,
         occurredAt: row.created_at,
-        href: `${DOCUMENTS_PATH}&documentId=${row.id}`,
+        href: `${DOCUMENTS_PATH}&documentId=${row.id}#documents-${docProfileId}`,
       });
     }
 
     for (const row of logsRes.data ?? []) {
+      const logProfileId = String(row.profile_id);
       activity.push({
         id: `log-${row.id}`,
         kind: "note",
-        title: `Note created: ${row.title?.trim() || "Daily log"}`,
+        title: `Daily memory in ${profileNameById(profiles, logProfileId)}`,
         occurredAt: row.created_at,
-        href: `${dailyLogHref(profileId)}&logId=${row.id}`,
+        href: `${dailyLogHref(logProfileId)}&logId=${row.id}`,
       });
     }
 
     for (const row of profilesRes.data ?? []) {
-      if (row.id === profileId) continue;
+      if (row.id === activeId) continue;
       activity.push({
-        id: `vault-${row.id}`,
+        id: `space-${row.id}`,
         kind: "vault",
-        title: `Vault updated: ${row.display_name}`,
+        title: `${profileNameById(profiles, row.id)} updated`,
         occurredAt: row.updated_at,
         href: documentsHref(row.id),
       });
@@ -214,7 +230,7 @@ export function useSimpleHomeData() {
       activity.push({
         id: `chat-${row.id}`,
         kind: "gideon",
-        title: `Gideon analysis: ${row.title?.trim() || "Conversation"}`,
+        title: `Gideon conversation: ${row.title?.trim() || "Chat"}`,
         occurredAt: row.updated_at,
         href: `/ask?chatId=${row.id}`,
       });
@@ -290,7 +306,7 @@ export function useSimpleHomeData() {
         if (recentVaults.length >= 5) break;
       }
     }
-    if (!recentVaults.some((p) => p.id === active.id)) {
+    if (active && !recentVaults.some((p) => p.id === active.id)) {
       recentVaults.unshift(active);
     }
 
@@ -301,7 +317,7 @@ export function useSimpleHomeData() {
       openRequestCount,
       openRequests,
       recentVaults: recentVaults.slice(0, 5),
-      recentActivity: activity.slice(0, 6),
+      recentActivity: activity.slice(0, 8),
       pendingCount: todayAlerts.length,
     });
     setLoading(false);

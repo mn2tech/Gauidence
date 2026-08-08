@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type React
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { MessageCircle, Search, ShieldCheck } from "lucide-react";
+import SpaceOverview from "@/components/space/SpaceOverview";
 import DocumentManager from "@/components/DocumentManager";
 import GlobalVaultSearch from "@/components/GlobalVaultSearch";
 import { VaultHeaderProfileSwitch } from "@/components/ProfileSwitcher";
@@ -66,8 +67,8 @@ function VaultStickyBar({
         <button
           type="button"
           onClick={onSearchOpen}
-          aria-label="Search vaults and content"
-          title="Search vaults, logs, and documents across every vault"
+          aria-label="Search spaces and content"
+          title="Search spaces, logs, and documents across everything you can access"
           className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-stone-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50 sm:px-3"
         >
           <Search className="h-3.5 w-3.5 text-brand" aria-hidden />
@@ -240,7 +241,7 @@ export default function DashboardVault({ userId }: { userId: string }) {
           href="/settings/profiles"
           className="font-medium text-brand hover:text-brand-dark"
         >
-          Manage vaults
+          Manage spaces
         </Link>{" "}
         to continue.
       </p>
@@ -347,6 +348,8 @@ export default function DashboardVault({ userId }: { userId: string }) {
   return (
     <div className="space-y-6">
       <GettingStartedStrip />
+
+      <SpaceOverview profile={active} allProfiles={profiles} />
 
       <VaultStickyBar
         onVaultSwitch={handleVaultSwitch}

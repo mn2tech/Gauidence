@@ -321,7 +321,7 @@ export default function ProfilesManager() {
             People & spaces
           </h1>
           <p className="mt-1 text-sm text-ink-muted">
-            One login, separate vaults for each person, business, or place.
+            One login, separate spaces and workspaces for each person, business, or place.
             Active:{" "}
             <span className="font-medium text-foreground">
               {active?.display_name ?? "—"}
@@ -351,10 +351,10 @@ export default function ProfilesManager() {
           {step === 1 ? (
             <>
               <h2 className="text-base font-semibold">
-                Who or what is this for?
+                What would you like to create?
               </h2>
               <p className="mt-1 text-sm text-ink-muted">
-                Start with Family, Business, School, or Other.
+                Personal Space, Family Space, Business Workspace, and more.
               </p>
               <ul className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                 {PROFILE_CREATE_GROUPS.map((g) => (

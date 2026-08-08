@@ -269,8 +269,8 @@ function ProfileMenu({
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search vaults…"
-              aria-label="Search vaults"
+              placeholder="Search spaces…"
+              aria-label="Search spaces"
               className="w-full rounded-lg border border-stone-200 bg-stone-50 py-2 pl-8 pr-3 text-sm outline-none placeholder:text-ink-muted focus:border-brand/40 focus:bg-white focus:ring-2 focus:ring-brand/20"
             />
           </div>
@@ -280,7 +280,7 @@ function ProfileMenu({
         {filteredProfiles ? (
           filteredProfiles.length === 0 ? (
             <li className="px-3 py-3 text-sm text-ink-muted">
-              No vaults match &ldquo;{query.trim()}&rdquo;.
+              No spaces match &ldquo;{query.trim()}&rdquo;.
             </li>
           ) : (
             filteredProfiles.map((profile) => (
@@ -345,7 +345,7 @@ function ProfileMenu({
           onClick={onClose}
           className="block px-3 py-2 text-sm text-ink-muted hover:bg-stone-50 hover:text-foreground"
         >
-          Manage vaults
+          Manage spaces
         </Link>
       </div>
     </div>

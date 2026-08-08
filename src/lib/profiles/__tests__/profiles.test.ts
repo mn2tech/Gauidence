@@ -105,27 +105,27 @@ describe("guardian profiles helpers", () => {
     );
   });
 
-  it("labels vaults clearly", () => {
+  it("labels spaces and workspaces clearly", () => {
     assert.match(vaultLabel(sample()), /Michael/);
     assert.equal(
       vaultLabel(
         sample({ profile_type: "business", display_name: "NM2TECH LLC" })
       ),
-      "NM2TECH LLC Vault"
+      "NM2TECH LLC Workspace"
     );
     assert.equal(
       vaultLabel(
         sample({ profile_type: "vehicle", display_name: "2019 Civic" })
       ),
-      "2019 Civic Vault"
+      "2019 Civic Space"
     );
     assert.equal(
       vaultLabel(sample({ profile_type: "home", display_name: "Oak Street" })),
-      "Oak Street Vault"
+      "Oak Street Space"
     );
     assert.equal(
       vaultLabel(sample({ profile_type: "pet", display_name: "Buddy" })),
-      "Buddy Vault"
+      "Buddy Space"
     );
   });
 

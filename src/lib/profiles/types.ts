@@ -175,13 +175,15 @@ export type VaultCreateCard = {
 };
 
 export const VAULT_CREATE_CARDS: VaultCreateCard[] = [
-  { id: "personal", label: "Personal", emoji: "👤", group: "other", optionId: "myself" },
-  { id: "family", label: "Family", emoji: "👨‍👩‍👧", group: "family", optionId: "my_family" },
-  { id: "teacher", label: "Teacher", emoji: "🏫", group: "student", optionId: "teacher" },
-  { id: "student", label: "Student", emoji: "🎓", group: "student", optionId: "student" },
-  { id: "business", label: "Business", emoji: "💼", group: "business", optionId: "business" },
-  { id: "learning", label: "Learning", emoji: "📚", group: "other", optionId: "hobby" },
-  { id: "custom", label: "Custom", emoji: "⚙️", group: "other", optionId: "other" },
+  { id: "personal", label: "Personal Space", emoji: "👤", group: "other", optionId: "myself" },
+  { id: "family", label: "Family Space", emoji: "👨‍👩‍👧", group: "family", optionId: "my_family" },
+  { id: "teacher", label: "Teacher Space", emoji: "🏫", group: "student", optionId: "teacher" },
+  { id: "student", label: "Student Space", emoji: "🎓", group: "student", optionId: "student" },
+  { id: "business", label: "Business Workspace", emoji: "💼", group: "business", optionId: "business" },
+  { id: "nonprofit", label: "Nonprofit Workspace", emoji: "💚", group: "business", optionId: "nonprofit" },
+  { id: "client", label: "Client Space", emoji: "🤝", group: "business", optionId: "client" },
+  { id: "learning", label: "Learning Space", emoji: "📚", group: "other", optionId: "hobby" },
+  { id: "custom", label: "Other", emoji: "⚙️", group: "other", optionId: "other" },
 ];
 
 export function vaultCreateHref(
@@ -393,37 +395,6 @@ export function profileCompanyContext(profile: GuardianProfile): string | null {
     profile.business_legal_name?.trim() ||
     null
   );
-}
-
-export function vaultLabel(profile: GuardianProfile): string {
-  const name = profile.display_name.trim() || "Profile";
-  const shared = isSharedGuardianProfile(profile)
-    ? profile.access_role === "viewer"
-      ? " (shared, view only)"
-      : " (shared)"
-    : "";
-  if (
-    isGroupStyleProfile(profile.profile_type) ||
-    isAssetStyleProfile(profile.profile_type)
-  ) {
-    return `${name} Vault${shared}`;
-  }
-  if (name.toLowerCase().endsWith("s")) return `${name}' Vault${shared}`;
-  return `${name}'s Vault${shared}`;
-}
-
-export function askGideonContextLabel(profile: GuardianProfile): string {
-  const name = profile.display_name.trim() || "this profile";
-  if (
-    isGroupStyleProfile(profile.profile_type) ||
-    isAssetStyleProfile(profile.profile_type)
-  ) {
-    return `Ask Gideon about ${name}`;
-  }
-  if (name.toLowerCase().endsWith("s")) {
-    return `Ask Gideon about ${name}' vault`;
-  }
-  return `Ask Gideon about ${name}'s vault`;
 }
 
 export function isOrgStyleProfile(type: GuardianProfileType): boolean {
@@ -1008,3 +979,16 @@ export function formatLinkedHobbiesForGideon(
   });
   return `${header}\n${lines.join("\n")}`;
 }
+
+export {
+  askGideonContextLabel,
+  getContainerLabel,
+  getContainerLabelPlural,
+  profileContainerName,
+  spaceCreateHref,
+  spaceMapTitle,
+  SPACES_AND_WORKSPACES_LABEL,
+  SPACES_NAV_LABEL,
+  SPACE_CREATE_OPTIONS,
+  vaultLabel,
+} from "./containerLabels";

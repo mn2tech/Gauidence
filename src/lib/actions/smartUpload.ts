@@ -6,7 +6,7 @@ export const UPLOAD_THINKING_STEPS = [
   "Reading document (OCR)",
   "Extracting entities",
   "Classifying document",
-  "Suggesting workspace",
+  "Suggesting space",
 ] as const;
 
 export type SmartUploadPresentation = {

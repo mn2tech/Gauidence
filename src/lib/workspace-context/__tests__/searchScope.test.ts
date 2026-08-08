@@ -47,7 +47,7 @@ describe("parseSearchScope", () => {
 
 describe("searchScopeLabel", () => {
   it("labels workspace and global scopes", () => {
-    assert.equal(searchScopeLabel("workspace"), "This workspace");
-    assert.equal(searchScopeLabel("global"), "Everywhere");
+    assert.equal(searchScopeLabel("workspace"), "This space");
+    assert.equal(searchScopeLabel("global"), "Everything");
   });
 });

@@ -10,6 +10,9 @@ type Props = {
   onSaved: (result: { movedToProfileId?: string | null; profilePath?: string | null }) => void;
   onKeepHere: () => void;
   onError?: (message: string) => void;
+  saveLabel?: string;
+  chooseAnotherLabel?: string;
+  onChooseAnother?: () => void;
 };
 
 function confidenceLabel(confidence: number): string {
@@ -21,6 +24,9 @@ export default function SmartUploadSuggestionCard({
   onSaved,
   onKeepHere,
   onError,
+  saveLabel: saveLabelProp,
+  chooseAnotherLabel,
+  onChooseAnother,
 }: Props) {
   const [busy, setBusy] = useState<"save" | "keep" | null>(null);
 
@@ -60,7 +66,7 @@ export default function SmartUploadSuggestionCard({
     onKeepHere();
   }
 
-  const saveLabel = presentation.needsCreate ? "Create & save" : "Save here";
+  const saveLabel = saveLabelProp ?? (presentation.needsCreate ? "Create & save" : "Save here");
 
   return (
     <div className="rounded-2xl border border-brand/25 bg-brand-light/30 px-3.5 py-3 shadow-sm">
@@ -70,7 +76,7 @@ export default function SmartUploadSuggestionCard({
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-xs font-medium uppercase tracking-wide text-brand">
-            Smart upload
+            Guardian recommendation
           </p>
           <p className="mt-0.5 text-sm font-semibold text-foreground">
             {presentation.title}
@@ -124,6 +130,16 @@ export default function SmartUploadSuggestionCard({
                 "Keep here"
               )}
             </button>
+            {onChooseAnother ? (
+              <button
+                type="button"
+                onClick={onChooseAnother}
+                disabled={busy !== null}
+                className="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-ink-muted hover:bg-stone-50 disabled:opacity-60"
+              >
+                {chooseAnotherLabel ?? "Choose another space"}
+              </button>
+            ) : null}
           </div>
         </div>
       </div>

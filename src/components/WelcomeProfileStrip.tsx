@@ -235,7 +235,7 @@ export default function WelcomeProfileStrip({
       <div>
         <div className="flex items-baseline justify-between gap-3">
           <p className="text-sm font-medium text-foreground">
-            Your vaults
+            Your spaces
           </p>
           <Link
             href="/settings/profiles"

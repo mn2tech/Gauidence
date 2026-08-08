@@ -3,9 +3,14 @@
 import Link from "next/link";
 import { FileUp, NotebookPen, MessageCircle, FolderPlus, X } from "lucide-react";
 import { useActiveProfile } from "@/components/ProfileProvider";
-import { dailyLogHref, REQUESTS_PATH } from "@/lib/routes";
+import { ADD_ANYTHING_PATH, REMEMBER_TODAY_PATH } from "@/lib/simple-home/routing";
+import { REQUESTS_PATH } from "@/lib/routes";
 import { clientBusinessLabel } from "@/lib/client-requests/helpers";
-import { canEditGuardianProfile, vaultCreateHref, VAULT_CREATE_CARDS } from "@/lib/profiles/types";
+import {
+  canEditGuardianProfile,
+  spaceCreateHref,
+  SPACE_CREATE_OPTIONS,
+} from "@/lib/profiles/types";
 
 type SimpleNewMenuProps = {
   open: boolean;
@@ -20,29 +25,26 @@ export default function SimpleNewMenu({ open, onClose }: SimpleNewMenuProps) {
   const businessLabel = clientBusinessLabel(profiles, active);
   const canEdit = active ? canEditGuardianProfile(active) : true;
 
-  const uploadHref = active
-    ? `/dashboard?camera=1#documents-${active.id}`
-    : "/dashboard?camera=1";
-  const noteHref = dailyLogHref(active?.id);
+  const noteHref = REMEMBER_TODAY_PATH;
   const requestHref =
     active?.profile_type === "client"
       ? `${REQUESTS_PATH}?new=1`
       : `/ask?draft=${encodeURIComponent("I need to request something.")}`;
-  const addVaultHref = vaultCreateHref(VAULT_CREATE_CARDS[0], "/home");
+  const addSpaceHref = spaceCreateHref(SPACE_CREATE_OPTIONS[0], "/home");
 
   const options = [
     ...(canEdit
       ? [
           {
-            href: uploadHref,
-            label: "Upload something",
-            description: "Add a document or photo to your vault",
+            href: ADD_ANYTHING_PATH,
+            label: "Add anything",
+            description: "Upload, paste, or capture something new",
             icon: FileUp,
           },
           {
             href: noteHref,
-            label: "Create a note",
-            description: "Write a daily log or quick note",
+            label: "Remember today",
+            description: "Capture what happened today",
             icon: NotebookPen,
           },
         ]
@@ -59,9 +61,9 @@ export default function SimpleNewMenu({ open, onClose }: SimpleNewMenuProps) {
     ...(canEdit
       ? [
           {
-            href: addVaultHref,
-            label: "Add a vault or profile",
-            description: "Create a new vault for someone or something",
+            href: addSpaceHref,
+            label: "Create a space",
+            description: "Add a new Space or Workspace",
             icon: FolderPlus,
           },
         ]

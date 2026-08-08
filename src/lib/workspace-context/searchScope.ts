@@ -78,7 +78,7 @@ export function profileIdsForSearchScope(
 }
 
 export function searchScopeLabel(mode: SearchScopeMode): string {
-  return mode === "global" ? "Everywhere" : "This workspace";
+  return mode === "global" ? "Everything" : "This space";
 }
 
 export function formatSearchConfidence(score: number): string {

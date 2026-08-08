@@ -2314,7 +2314,7 @@ export default function VaultChatPanel({
             ? { workProjectId: requestedWorkProjectId }
             : {}),
           ...(agentModeEnabled ? { agentMode: true } : {}),
-          searchScope: meta?.searchScope ?? "workspace",
+          searchScope: meta?.searchScope ?? (isPage ? "global" : "workspace"),
         },
         vaultProfileId ?? profileId
       );
@@ -3859,7 +3859,7 @@ export default function VaultChatPanel({
           onOpenSearch={
             isPage ? () => setVaultSearchOpen(true) : undefined
           }
-          searchScope={meta?.searchScope ?? "workspace"}
+          searchScope={meta?.searchScope ?? (isPage ? "global" : "workspace")}
           showSearchScopeToggle={
             profiles.length > 1 && workingInDisplay.mode !== "searching"
           }

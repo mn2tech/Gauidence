@@ -211,7 +211,7 @@ export default function GlobalVaultSearch({
       className="fixed inset-0 z-[100] flex items-stretch justify-center bg-stone-900/50 p-0 sm:items-start sm:p-6 sm:pt-[10vh]"
       role="dialog"
       aria-modal="true"
-      aria-label="Search your vaults"
+      aria-label="Search your spaces"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -290,7 +290,7 @@ export default function GlobalVaultSearch({
           flat.length === 0 &&
           !error ? (
             <p className="px-2 py-3 text-sm text-ink-muted">
-              No matches for &ldquo;{query.trim()}&rdquo; in your vaults.
+              No matches for &ldquo;{query.trim()}&rdquo; in your spaces.
             </p>
           ) : null}
 
