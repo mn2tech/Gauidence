@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import type { GuardianProfile } from "@/lib/profiles/types";
+import { createClient } from "@/lib/supabase/client";
 import { recordVaultAccess } from "@/lib/simple-home/helpers";
 import {
   GUARDIAN_TIME_ZONE,
@@ -115,7 +116,48 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    void refresh();
+    const supabase = createClient();
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadIfSignedIn = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (cancelled) return;
+      if (session) {
+        await refresh();
+      } else {
+        setLoading(false);
+      }
+    };
+
+    void loadIfSignedIn();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        void refresh();
+      } else {
+        setProfiles([]);
+        setActive(null);
+        setAccountName("You");
+        setTimeZone(GUARDIAN_TIME_ZONE);
+        setTimeZoneLabel("Eastern Time");
+        setTimeZoneSource("default");
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, [refresh]);
 
   const switchProfile = useCallback(async (profileId: string) => {

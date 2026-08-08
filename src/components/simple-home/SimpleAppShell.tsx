@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useState } from "react";
 import Link from "next/link";
 import {
@@ -14,7 +15,9 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import ProfileSwitcher from "@/components/ProfileSwitcher";
-import GlobalVaultSearch from "@/components/GlobalVaultSearch";
+const GlobalVaultSearch = dynamic(() => import("@/components/GlobalVaultSearch"), {
+  ssr: false,
+});
 import SimpleNavigation from "@/components/simple-home/SimpleNavigation";
 import SimpleSecondaryNavLinks from "@/components/simple-home/SimpleSecondaryNavLinks";
 import { useActiveProfile } from "@/components/ProfileProvider";
@@ -164,11 +167,13 @@ export default function SimpleAppShell({
       {!needsSetup ? (
         <>
           <SimpleNavigation />
-          <GlobalVaultSearch
-            open={searchOpen}
-            onClose={() => setSearchOpen(false)}
-            defaultScope="global"
-          />
+          {searchOpen ? (
+            <GlobalVaultSearch
+              open={searchOpen}
+              onClose={() => setSearchOpen(false)}
+              defaultScope="global"
+            />
+          ) : null}
         </>
       ) : null}
     </>

@@ -8,7 +8,7 @@ import { getActiveGuardianProfile } from "@/lib/profiles/server";
 import { EMPLOYEE_HUB_PATH } from "@/lib/employee-hub/routing";
 import { employeeGideonChatEnabled } from "@/lib/employee-hub/server";
 import SiteHeader from "@/components/SiteHeader";
-import VaultChatPanel from "@/components/VaultChatPanel";
+import VaultChatPanel from "@/components/VaultChatPanelLazy";
 
 export const metadata: Metadata = {
   title: "Ask Gideon — Employee Hub",

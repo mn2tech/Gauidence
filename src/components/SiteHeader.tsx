@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -7,7 +8,9 @@ import { Camera, LogOut, Menu, Search, ShieldCheck, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import ProfileSwitcher from "@/components/ProfileSwitcher";
 import { useActiveProfile } from "@/components/ProfileProvider";
-import GlobalVaultSearch from "@/components/GlobalVaultSearch";
+const GlobalVaultSearch = dynamic(() => import("@/components/GlobalVaultSearch"), {
+  ssr: false,
+});
 import { documentsHref, PROPOSALS_PATH, REQUESTS_PATH, VAULT_NAV_LABEL } from "@/lib/routes";
 import { useOnboardingProgress } from "@/hooks/useOnboardingProgress";
 import { useEmployeeHubEntitlements } from "@/hooks/useEmployeeHubEntitlements";
@@ -441,7 +444,7 @@ export default function SiteHeader() {
         </div>
       )}
     </header>
-      {signedIn && !needsSetup ? (
+      {signedIn && !needsSetup && searchOpen ? (
         <GlobalVaultSearch
           open={searchOpen}
           onClose={() => setSearchOpen(false)}

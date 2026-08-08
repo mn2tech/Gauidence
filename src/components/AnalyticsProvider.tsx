@@ -33,27 +33,35 @@ export default function AnalyticsProvider({
   children: React.ReactNode;
 }) {
   useEffect(() => {
-    initAnalytics();
     if (!isAnalyticsEnabled()) return;
 
-    const onClick = (event: MouseEvent) => {
-      const target = event.target;
-      if (!(target instanceof Element)) return;
+    let removeListener: (() => void) | undefined;
 
-      const tracked = target.closest<HTMLElement>("[data-analytics]");
-      if (!tracked) return;
+    void initAnalytics().then(() => {
+      const onClick = (event: MouseEvent) => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
 
-      const name = tracked.getAttribute("data-analytics")?.trim();
-      if (!name) return;
+        const tracked = target.closest<HTMLElement>("[data-analytics]");
+        if (!tracked) return;
 
-      trackButtonClick(name, {
-        path: window.location.pathname,
-        tag: tracked.tagName.toLowerCase(),
-      });
+        const name = tracked.getAttribute("data-analytics")?.trim();
+        if (!name) return;
+
+        trackButtonClick(name, {
+          path: window.location.pathname,
+          tag: tracked.tagName.toLowerCase(),
+        });
+      };
+
+      document.addEventListener("click", onClick, true);
+      removeListener = () =>
+        document.removeEventListener("click", onClick, true);
+    });
+
+    return () => {
+      removeListener?.();
     };
-
-    document.addEventListener("click", onClick, true);
-    return () => document.removeEventListener("click", onClick, true);
   }, []);
 
   return (

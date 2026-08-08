@@ -1,6 +1,7 @@
 import "server-only";
 
 import Stripe from "stripe";
+import { getAppBaseUrl } from "@/lib/url/appBaseUrl";
 import {
   isPaidPlanId,
   PLAN_PRODUCT_COPY,
@@ -94,12 +95,5 @@ export function resolvePlanFromSubscription(sub: Stripe.Subscription): PaidPlanI
 }
 
 export function appBaseUrl(request?: Request): string {
-  const env = process.env.NEXT_PUBLIC_APP_URL?.trim();
-  if (env) return env.replace(/\/$/, "");
-  if (request) {
-    const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
-    const proto = request.headers.get("x-forwarded-proto") ?? "https";
-    if (host) return `${proto}://${host}`;
-  }
-  return "https://guardian.nm2tech.com";
+  return getAppBaseUrl({ request });
 }

@@ -6,7 +6,7 @@ import { getActiveGuardianProfile } from "@/lib/profiles/server";
 import { isEmployeeHubProfile } from "@/lib/employee-hub/routing";
 import { getEmployeeHubEntitlements } from "@/lib/employee-hub/server";
 import SiteHeader from "@/components/SiteHeader";
-import VaultChatPanel from "@/components/VaultChatPanel";
+import VaultChatPanel from "@/components/VaultChatPanelLazy";
 
 export const metadata: Metadata = {
   title: "Ask Gideon — Guardian",

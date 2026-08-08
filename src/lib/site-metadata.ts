@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { getAppBaseUrl } from "@/lib/url/appBaseUrl";
 
 export const SITE_NAME = "Guardian";
 
@@ -9,10 +10,7 @@ export const SITE_DESCRIPTION =
   "Guardian helps you store, understand, and act on the documents that matter most. Private by default, protected by authenticated access.";
 
 export function getSiteUrl(): string {
-  const configured = process.env.NEXT_PUBLIC_APP_URL?.trim();
-  if (configured) return configured.replace(/\/$/, "");
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
-  return "https://guardian.nm2tech.com";
+  return getAppBaseUrl();
 }
 
 /** Social preview image — replace `public/og-image.png` (1200×630) when available. */

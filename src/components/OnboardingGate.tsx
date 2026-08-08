@@ -1,15 +1,26 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useActiveProfile } from "@/components/ProfileProvider";
-import GuardianCoachScreen from "@/components/GuardianCoachScreen";
 import {
   isEmployeeHubProfile,
   postLoginPathForProfile,
 } from "@/lib/employee-hub/routing";
 import { SIMPLE_HOME_PATH } from "@/lib/simple-home/routing";
 import type { GuardianProfile } from "@/lib/profiles/types";
+
+const GuardianCoachScreen = dynamic(
+  () => import("@/components/GuardianCoachScreen"),
+  {
+    loading: () => (
+      <div className="flex min-h-[40vh] items-center justify-center p-6 text-sm text-ink-muted">
+        Loading…
+      </div>
+    ),
+  }
+);
 
 /** Public / auth paths where the intent gate must not block. */
 const SKIP_PATH_PREFIXES = [

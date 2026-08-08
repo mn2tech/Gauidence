@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from "crypto";
 import { SHAREABLE_PROFILE_TYPES } from "./types";
+import { getAppBaseUrl } from "@/lib/url/appBaseUrl";
 
 export { SHAREABLE_PROFILE_TYPES };
 export const INVITE_TTL_DAYS = 7;
@@ -28,11 +29,7 @@ export function inviteExpiresAt(from = new Date()): string {
 }
 
 export function appBaseUrl(): string {
-  const configured =
-    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
-    process.env.APP_URL?.trim() ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "");
-  return configured.replace(/\/$/, "") || "https://guardian.nm2tech.com";
+  return getAppBaseUrl();
 }
 
 export function inviteAcceptUrl(token: string): string {

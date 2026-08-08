@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 import SignOutButton from "@/components/SignOutButton";
-import DashboardVault from "@/components/DashboardVault";
+import DashboardVault from "@/components/DashboardVaultLazy";
 import WelcomeProfileStrip from "@/components/WelcomeProfileStrip";
 import { hasDocumentsIntent } from "@/lib/routes";
 import {
