@@ -15,6 +15,10 @@ import {
   clientRequestCreateSystemNote,
   formatClientVaultCatalog,
 } from "@/lib/client-requests/proposeCreate";
+import {
+  spaceCreateSystemNote,
+  formatSpaceCreateCatalog,
+} from "@/lib/profiles/proposeCreate";
 import type { WorkspaceContextData } from "./types";
 
 /** Assemble Gideon's full system prompt from workspace context. */
@@ -51,6 +55,13 @@ export function buildGideonSystemPrompt(
         activeProfile.profile_type
       )}\n`
     : "";
+  const spaceCreateNote = context.promptOptions.spaceCreateAgent
+    ? `\n${spaceCreateSystemNote(
+        formatSpaceCreateCatalog(context.accessibleProfiles),
+        activeProfile.id,
+        activeProfile.display_name
+      )}\n`
+    : "";
   const agentNote = agentMode ? `\n${AGENT_MODE_SYSTEM_NOTE}\n` : "";
   const transcriptionNote = transcriptionMode ? GIDEON_TRANSCRIPTION_NOTE : "";
   const attachedNote = hasAttachedDocument ? GIDEON_ATTACHED_DOCUMENT_NOTE : "";
@@ -70,6 +81,7 @@ ${vaultEmptyNote}
 ${fullLogNote}
 ${actionNotes}
 ${clientRequestCreateNote}
+${spaceCreateNote}
 ${agentNote}
 ${transcriptionNote}
 ${attachedNote}
@@ -127,6 +139,7 @@ export function gideonMaxTokens(context: WorkspaceContextData): number {
     workMemoryUpdateAgent,
     clientRequestReplyAgent,
     clientRequestCreateAgent,
+    spaceCreateAgent,
     transcriptionMode,
     agentMode,
     fullLogQuote,
@@ -137,7 +150,8 @@ export function gideonMaxTokens(context: WorkspaceContextData): number {
     dailyLogCaptureAgent ||
     workMemoryUpdateAgent ||
     clientRequestReplyAgent ||
-    clientRequestCreateAgent
+    clientRequestCreateAgent ||
+    spaceCreateAgent
   ) {
     return 1100;
   }

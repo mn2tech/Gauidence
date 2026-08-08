@@ -55,6 +55,11 @@ import {
   clientRequestCreateSystemNote,
   formatClientVaultCatalog,
 } from "@/lib/client-requests/proposeCreate";
+import {
+  wantsSpaceCreate,
+  spaceCreateSystemNote,
+  formatSpaceCreateCatalog,
+} from "@/lib/profiles/proposeCreate";
 import { formatProposalsForGideon } from "@/lib/proposals/retrieve";
 import { PROPOSAL_SELECT } from "@/lib/proposals/types";
 import { mapProposalRow } from "@/lib/proposals/server";
@@ -130,6 +135,7 @@ export async function loadWorkspaceContext(
   });
   const clientRequestReplyAgent = wantsClientRequestReply(question);
   const clientRequestCreateAgent = wantsClientRequestCreate(question);
+  const spaceCreateAgent = wantsSpaceCreate(question);
 
   const contextBuildStarted = Date.now();
   let embeddingDurationMs = 0;
@@ -401,6 +407,7 @@ Active space in the UI: ${activeProfile.display_name}. Document search includes 
       workMemoryUpdateAgent,
       clientRequestReplyAgent,
       clientRequestCreateAgent,
+      spaceCreateAgent,
       transcriptionMode,
       hasAttachedDocument: Boolean(attachedDoc),
       allVaultsNote,

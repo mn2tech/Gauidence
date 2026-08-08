@@ -20,6 +20,7 @@ import {
   Camera,
   Bell,
   FileText,
+  FolderOpen,
   Info,
   Loader2,
   Menu,
@@ -135,6 +136,17 @@ import {
   stripProposedClientRequestCreateSection,
   type ProposedClientRequestCreate,
 } from "@/lib/client-requests/proposeCreate";
+import {
+  defaultParentChoice,
+  parseProposedSpaceCreate,
+  profileTypeRequiresParent,
+  proposedSpaceCreateSummary,
+  spaceCreatePlacementLabel,
+  stripProposedSpaceCreateSection,
+  validParentProfilesForChild,
+  type ProposedSpaceCreate,
+} from "@/lib/profiles/proposeCreate";
+import { getContainerLabel } from "@/lib/profiles/containerLabels";
 import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
 import { dispatchAwardsFromResponse } from "@/lib/awards/client";
 import {
@@ -674,6 +686,19 @@ export default function VaultChatPanel({
     Map<string, string>
   >(() => new Map());
   const [savingClientRequestCreate, setSavingClientRequestCreate] = useState(false);
+  const [confirmingSpaceCreateId, setConfirmingSpaceCreateId] = useState<
+    string | null
+  >(null);
+  const [confirmedSpaceCreateIds, setConfirmedSpaceCreateIds] = useState<
+    Set<string>
+  >(() => new Set());
+  const [createdSpaceProfileIds, setCreatedSpaceProfileIds] = useState<
+    Map<string, string>
+  >(() => new Map());
+  const [spaceCreateParentChoices, setSpaceCreateParentChoices] = useState<
+    Map<string, string | null>
+  >(() => new Map());
+  const [savingSpaceCreate, setSavingSpaceCreate] = useState(false);
   const [firstWin, setFirstWin] = useState<{
     fileName: string;
     summary: string | null;
@@ -2209,6 +2234,68 @@ export default function VaultChatPanel({
     }
   };
 
+  const confirmProposedSpaceCreate = async (
+    messageId: string,
+    proposal: ProposedSpaceCreate,
+    parentProfileId: string | null
+  ) => {
+    if (
+      confirmingSpaceCreateId ||
+      savingSpaceCreate ||
+      vaultBusy ||
+      sending
+    ) {
+      return;
+    }
+    if (
+      profileTypeRequiresParent(proposal.profileType) &&
+      !parentProfileId
+    ) {
+      setError("Choose a parent space for this type.");
+      return;
+    }
+    setConfirmingSpaceCreateId(messageId);
+    setError(null);
+    try {
+      const res = await fetch("/api/profiles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          optionId: proposal.optionId,
+          profileType: proposal.profileType,
+          displayName: proposal.displayName,
+          parentProfileId: parentProfileId ?? undefined,
+          switchTo: true,
+        }),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        profile?: { id?: string };
+      };
+      if (!res.ok || !body.profile?.id) {
+        setError(body.error ?? "Couldn't create space.");
+        return;
+      }
+      dispatchAwardsFromResponse(body);
+      await refresh();
+      window.dispatchEvent(new CustomEvent("guardian:profile-changed"));
+      setConfirmedSpaceCreateIds((prev) => new Set(prev).add(messageId));
+      setCreatedSpaceProfileIds((prev) =>
+        new Map(prev).set(messageId, body.profile!.id!)
+      );
+      const parentName = parentProfileId
+        ? profiles.find((p) => p.id === parentProfileId)?.display_name
+        : null;
+      pushLocalNote(
+        `Space created: ${proposedSpaceCreateSummary(proposal, parentName)}`
+      );
+    } catch {
+      setError("Couldn't create space. Check your connection and try again.");
+    } finally {
+      setConfirmingSpaceCreateId(null);
+    }
+  };
+
   const saveInlineLog = async (e: FormEvent) => {
     e.preventDefault();
     const saveProfileId = profileId ?? lastWriteProfileIdRef.current;
@@ -2765,11 +2852,14 @@ export default function VaultChatPanel({
       m.content,
       active?.profile_type === "client" ? active.id : null
     );
-    const displayContent = stripProposedDailyLogSection(
-      stripProposedClientRequestCreateSection(
-        stripProposedClientRequestReplySection(
-          stripProposedWorkMemoryUpdateSection(
-            stripProposedReminderSection(m.content)
+    const proposedSpaceCreate = parseProposedSpaceCreate(m.content);
+    const displayContent = stripProposedSpaceCreateSection(
+      stripProposedDailyLogSection(
+        stripProposedClientRequestCreateSection(
+          stripProposedClientRequestReplySection(
+            stripProposedWorkMemoryUpdateSection(
+              stripProposedReminderSection(m.content)
+            )
           )
         )
       )
@@ -2780,7 +2870,8 @@ export default function VaultChatPanel({
         proposedDailyLog ||
         proposedWorkMemory ||
         proposedClientRequest ||
-        proposedClientRequestCreate
+        proposedClientRequestCreate ||
+        proposedSpaceCreate
           ? ""
           : m.content)
     );
@@ -2817,6 +2908,18 @@ export default function VaultChatPanel({
       ? profiles.find((p) => p.id === proposedClientRequestCreate.profileId)
           ?.display_name
       : null;
+    const alreadyCreatedSpace = confirmedSpaceCreateIds.has(m.id);
+    const confirmingSpaceCreate = confirmingSpaceCreateId === m.id;
+    const spaceCreateParentChoice = proposedSpaceCreate
+      ? (spaceCreateParentChoices.get(m.id) ??
+        defaultParentChoice(proposedSpaceCreate, profiles, profileId))
+      : null;
+    const spaceCreateValidParents = proposedSpaceCreate
+      ? validParentProfilesForChild(profiles, proposedSpaceCreate.profileType)
+      : [];
+    const spaceCreateAllowsTopLevel = proposedSpaceCreate
+      ? !profileTypeRequiresParent(proposedSpaceCreate.profileType)
+      : false;
     const vaultScope = m.vaultScope;
     const showVaultScopeCard =
       vaultScope &&
@@ -3099,6 +3202,103 @@ export default function VaultChatPanel({
                 >
                   Open Requests
                 </Link>
+              </div>
+            )}
+          </div>
+        ) : null}
+        {proposedSpaceCreate ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50/90 px-3 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-900/70">
+              Proposed {getContainerLabel(proposedSpaceCreate.profileType)}
+            </p>
+            <p className="mt-1 text-sm font-medium text-foreground">
+              {proposedSpaceCreate.displayName}
+            </p>
+            <p className="mt-1 text-xs text-ink-muted">
+              {spaceCreatePlacementLabel(
+                proposedSpaceCreate,
+                spaceCreateParentChoice,
+                profiles
+              )}
+            </p>
+            {alreadyCreatedSpace ? (
+              <div className="mt-2 space-y-2">
+                <p className="text-xs font-medium text-emerald-800">
+                  Space created and switched.
+                </p>
+                {createdSpaceProfileIds.get(m.id) ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void switchProfile(createdSpaceProfileIds.get(m.id)!)
+                    }
+                    className="inline-flex items-center rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50"
+                  >
+                    Open space
+                  </button>
+                ) : null}
+              </div>
+            ) : (
+              <div className="mt-3 space-y-2">
+                <label className="block text-xs font-semibold text-amber-900/80">
+                  Where should this live?
+                </label>
+                <select
+                  value={
+                    spaceCreateParentChoice === null &&
+                    spaceCreateAllowsTopLevel
+                      ? "__top__"
+                      : spaceCreateParentChoice ?? ""
+                  }
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setSpaceCreateParentChoices((prev) =>
+                      new Map(prev).set(
+                        m.id,
+                        value === "__top__" ? null : value
+                      )
+                    );
+                  }}
+                  className="w-full rounded-lg border border-stone-300 bg-white px-2.5 py-2 text-sm text-foreground"
+                >
+                  {spaceCreateAllowsTopLevel ? (
+                    <option value="__top__">Top level (independent space)</option>
+                  ) : null}
+                  {spaceCreateValidParents.map((parent) => (
+                    <option key={parent.id} value={parent.id}>
+                      Under {parent.display_name} (
+                      {getContainerLabel(parent.profile_type).toLowerCase()})
+                    </option>
+                  ))}
+                </select>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <button
+                    type="button"
+                    disabled={
+                      confirmingSpaceCreate ||
+                      savingSpaceCreate ||
+                      sending ||
+                      vaultBusy ||
+                      (profileTypeRequiresParent(proposedSpaceCreate.profileType) &&
+                        !spaceCreateParentChoice)
+                    }
+                    onClick={() =>
+                      void confirmProposedSpaceCreate(
+                        m.id,
+                        proposedSpaceCreate,
+                        spaceCreateParentChoice
+                      )
+                    }
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand/90 disabled:opacity-60"
+                  >
+                    {confirmingSpaceCreate ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <FolderOpen className="h-3.5 w-3.5" />
+                    )}
+                    Create space
+                  </button>
+                </div>
               </div>
             )}
           </div>

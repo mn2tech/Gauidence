@@ -52,6 +52,7 @@ export type WorkspacePromptOptions = {
   workMemoryUpdateAgent: boolean;
   clientRequestReplyAgent: boolean;
   clientRequestCreateAgent: boolean;
+  spaceCreateAgent: boolean;
   transcriptionMode: boolean;
   hasAttachedDocument: boolean;
   allVaultsNote: string;
