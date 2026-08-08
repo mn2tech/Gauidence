@@ -186,7 +186,7 @@ export default function AddAnythingScreen() {
   }
 
   return (
-    <div className="simple-home-page mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-6 pb-28 sm:py-8">
+    <div className="simple-home-page mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-6 sm:py-8">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">
           Add Anything

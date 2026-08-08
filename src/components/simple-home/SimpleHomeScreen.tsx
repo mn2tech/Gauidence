@@ -128,7 +128,7 @@ export default function SimpleHomeScreen() {
   }
 
   return (
-    <div className="simple-home-page mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-6 pb-28 sm:gap-7 sm:py-8">
+    <div className="simple-home-page mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-6 sm:gap-7 sm:py-8">
       <header className="welcome-strip">
         <p className="text-2xl font-semibold tracking-tight text-foreground sm:text-[1.75rem] sm:leading-tight">
           {greeting}, {name}
@@ -257,7 +257,7 @@ export default function SimpleHomeScreen() {
           </ul>
           <Link
             href={VAULTS_PATH}
-            className="mt-3 inline-block text-sm font-semibold text-brand-dark hover:underline"
+            className="mt-3 mb-1 inline-flex min-h-11 items-center text-sm font-semibold text-brand-dark hover:underline"
           >
             View all spaces
           </Link>

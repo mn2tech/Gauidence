@@ -157,7 +157,9 @@ export default function SimpleAppShell({
         ) : null}
       </header>
 
-      <main className="min-h-[calc(100dvh-3.5rem)]">{children}</main>
+      <main className="min-h-[calc(100dvh-3.5rem)] pb-simple-nav-page">
+        {children}
+      </main>
 
       {!needsSetup ? (
         <>

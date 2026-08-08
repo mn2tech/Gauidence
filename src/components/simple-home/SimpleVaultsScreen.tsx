@@ -41,7 +41,7 @@ export default function SimpleVaultsScreen() {
   const topLevel = topLevelProfiles(profiles);
 
   return (
-    <div className="simple-home-page mx-auto max-w-2xl px-4 py-6 pb-28 sm:py-8">
+    <div className="simple-home-page mx-auto max-w-2xl px-4 py-6 sm:py-8">
       <header className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">
           {SPACES_AND_WORKSPACES_LABEL}

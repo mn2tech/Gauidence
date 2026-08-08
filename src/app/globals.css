@@ -86,7 +86,7 @@ html {
 }
 
 .pb-simple-nav-page {
-  padding-bottom: calc(7rem + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(6.5rem + env(safe-area-inset-bottom, 0px));
 }
 
 .simple-tools-panel {
