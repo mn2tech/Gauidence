@@ -72,6 +72,8 @@ export default function AddAnythingScreen() {
     null
   );
   const stagingProfileIdRef = useRef<string | null>(null);
+  const pastePanelRef = useRef<HTMLFormElement>(null);
+  const pasteTextareaRef = useRef<HTMLTextAreaElement>(null);
   const [stage, setStage] = useState<Stage>("input");
   const [status, setStatus] = useState("");
   const [processingSlow, setProcessingSlow] = useState(false);
@@ -139,6 +141,18 @@ export default function AddAnythingScreen() {
     const timer = window.setTimeout(() => setProcessingSlow(true), 120_000);
     return () => window.clearTimeout(timer);
   }, [stage, processingDocId]);
+
+  useEffect(() => {
+    if (!showPaste) return;
+    const frame = window.requestAnimationFrame(() => {
+      pastePanelRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+      pasteTextareaRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [showPaste]);
 
   useEffect(() => {
     if (!snapshot || stage !== "processing") return;
@@ -304,8 +318,11 @@ export default function AddAnythingScreen() {
             </button>
             <button
               type="button"
-              onClick={() => setShowPaste((v) => !v)}
-              className="simple-home-card flex flex-col items-start gap-3 p-5 text-left transition hover:border-brand/40 hover:shadow-card"
+              onClick={() => setShowPaste(true)}
+              aria-expanded={showPaste}
+              className={`simple-home-card flex flex-col items-start gap-3 p-5 text-left transition hover:border-brand/40 hover:shadow-card ${
+                showPaste ? "border-brand/50 ring-2 ring-brand/20" : ""
+              }`}
             >
               <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-light text-brand">
                 <Plus className="h-5 w-5" />
@@ -335,6 +352,49 @@ export default function AddAnythingScreen() {
                 </span>
               </span>
             </Link>
+          </div>
+
+          {showPaste ? (
+            <form
+              ref={pastePanelRef}
+              className="simple-home-card scroll-mt-24 space-y-3 p-5"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void handlePasteSubmit();
+              }}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <label htmlFor="paste-text" className="text-sm font-semibold">
+                  Paste your text
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowPaste(false)}
+                  className="text-xs font-medium text-ink-muted hover:text-foreground"
+                >
+                  Close
+                </button>
+              </div>
+              <textarea
+                ref={pasteTextareaRef}
+                id="paste-text"
+                value={pasteText}
+                onChange={(e) => setPasteText(e.target.value)}
+                rows={6}
+                placeholder="Paste anything Guardian should remember…"
+                className="w-full rounded-xl border border-border-subtle px-4 py-3 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/25"
+              />
+              <button
+                type="submit"
+                disabled={!pasteText.trim()}
+                className="rounded-xl bg-brand px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50"
+              >
+                Submit
+              </button>
+            </form>
+          ) : null}
+
+          <div className="grid gap-3 sm:grid-cols-2">
             {(
               [
                 { icon: Mic, label: "Voice note" },
@@ -361,35 +421,6 @@ export default function AddAnythingScreen() {
               </button>
             ))}
           </div>
-
-          {showPaste ? (
-            <form
-              className="simple-home-card space-y-3 p-5"
-              onSubmit={(e) => {
-                e.preventDefault();
-                void handlePasteSubmit();
-              }}
-            >
-              <label htmlFor="paste-text" className="text-sm font-semibold">
-                Paste your text
-              </label>
-              <textarea
-                id="paste-text"
-                value={pasteText}
-                onChange={(e) => setPasteText(e.target.value)}
-                rows={6}
-                placeholder="Paste anything Guardian should remember…"
-                className="w-full rounded-xl border border-border-subtle px-4 py-3 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/25"
-              />
-              <button
-                type="submit"
-                disabled={!pasteText.trim()}
-                className="rounded-xl bg-brand px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50"
-              >
-                Submit
-              </button>
-            </form>
-          ) : null}
 
           <input
             ref={fileRef}
