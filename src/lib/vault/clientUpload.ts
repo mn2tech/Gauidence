@@ -32,6 +32,19 @@ import {
 
 export type { VaultUploadResult };
 
+function resolveVaultFileMimeType(file: { type: string; name: string }): string {
+  const direct = file.type?.trim();
+  if (direct && VAULT_ACCEPTED_TYPES[direct]) return direct;
+
+  const lower = file.name.toLowerCase();
+  if (lower.endsWith(".txt")) return "text/plain";
+  if (lower.endsWith(".pdf")) return "application/pdf";
+  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+  if (lower.endsWith(".png")) return "image/png";
+  if (lower.endsWith(".webp")) return "image/webp";
+  return direct || "";
+}
+
 /**
  * Upload a file into the active profile vault and queue background analysis.
  */
@@ -50,7 +63,7 @@ export async function uploadAndAnalyzeToVault(args: {
     );
   }
 
-  if (!VAULT_ACCEPTED_TYPES[args.file.type]) {
+  if (!VAULT_ACCEPTED_TYPES[resolveVaultFileMimeType(args.file)]) {
     throw new Error(
       "That file type isn't supported. Upload a PDF, JPG, PNG, WebP, or paste text."
     );
@@ -74,13 +87,14 @@ export async function uploadAndAnalyzeToVault(args: {
   }
 
   args.onStatus?.("Uploading to your space…");
+  const mimeType = resolveVaultFileMimeType(args.file);
   const safeName = args.file.name.replace(/[^\w.\- ]/g, "_");
   const storageOwner = args.ownerUserId || args.userId;
   const path = `${storageOwner}/${args.profileId}/${crypto.randomUUID()}-${safeName}`;
 
   const { error: uploadError } = await supabase.storage
     .from("documents")
-    .upload(path, args.file, { contentType: args.file.type });
+    .upload(path, args.file, { contentType: mimeType });
   if (uploadError) {
     throw new Error(
       uploadError.message?.includes("Bucket not found")
@@ -96,7 +110,7 @@ export async function uploadAndAnalyzeToVault(args: {
       profile_id: args.profileId,
       file_name: args.file.name,
       file_path: path,
-      mime_type: args.file.type,
+      mime_type: mimeType,
       size_bytes: args.file.size,
       analysis_status: "uploaded",
     })

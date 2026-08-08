@@ -52,7 +52,7 @@ function uploadResultFromSnapshot(
 ): VaultUploadResult {
   const analyzed =
     snapshot.analysisStatus === "completed" ||
-    Boolean(snapshot.title || snapshot.summary);
+    Boolean(snapshot.title || snapshot.summary || snapshot.organizationSuggestion);
   return {
     documentId: snapshot.documentId,
     fileName,
@@ -173,7 +173,7 @@ export default function AddAnythingScreen() {
   }, [snapshot, stage, finishWithResult]);
 
   async function processFile(file: File) {
-    if (!profile) return;
+    if (profiles.length === 0) return;
     setError(null);
     setStage("processing");
     setStatus("Uploading…");
@@ -198,11 +198,12 @@ export default function AddAnythingScreen() {
       stagingProfileIdRef.current = stagingProfileId;
       const stagingProfile =
         profiles.find((p) => p.id === stagingProfileId) ?? profile;
+      const ownerUserId = stagingProfile?.owner_user_id ?? user.id;
 
       const result = await uploadAndAnalyzeToVault({
         userId: user.id,
         profileId: stagingProfileId,
-        ownerUserId: stagingProfile.owner_user_id,
+        ownerUserId,
         file,
         onStatus: setStatus,
       });
@@ -228,13 +229,19 @@ export default function AddAnythingScreen() {
 
   async function handlePasteSubmit() {
     const trimmed = pasteText.trim();
-    if (!trimmed || !profile) return;
+    if (!trimmed) return;
+    if (profiles.length === 0) {
+      setError("Set up a space before pasting text.");
+      return;
+    }
     if (trimmed.length > VAULT_PASTE_MAX_CHARS) {
       setError(
         `Text is too long (max ${VAULT_PASTE_MAX_CHARS.toLocaleString()} characters).`
       );
       return;
     }
+    setError(null);
+    setShowPaste(false);
     const file = buildPastedTextFile({ content: trimmed });
     await processFile(file);
   }
@@ -356,7 +363,13 @@ export default function AddAnythingScreen() {
           </div>
 
           {showPaste ? (
-            <div className="simple-home-card space-y-3 p-5">
+            <form
+              className="simple-home-card space-y-3 p-5"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void handlePasteSubmit();
+              }}
+            >
               <label htmlFor="paste-text" className="text-sm font-semibold">
                 Paste your text
               </label>
@@ -369,14 +382,13 @@ export default function AddAnythingScreen() {
                 className="w-full rounded-xl border border-border-subtle px-4 py-3 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/25"
               />
               <button
-                type="button"
-                onClick={() => void handlePasteSubmit()}
+                type="submit"
                 disabled={!pasteText.trim()}
                 className="rounded-xl bg-brand px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50"
               >
                 Submit
               </button>
-            </div>
+            </form>
           ) : null}
 
           <input

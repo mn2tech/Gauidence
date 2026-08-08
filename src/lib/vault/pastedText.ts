@@ -25,5 +25,9 @@ export function buildPastedTextFile(args: {
     ? `Pasted - ${safeFileName(title)}`
     : `Pasted text ${stamp}`;
   const fileName = base.toLowerCase().endsWith(".txt") ? base : `${base}.txt`;
-  return new File([text], fileName, { type: "text/plain" });
+  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+  return new File([blob], fileName, {
+    type: "text/plain",
+    lastModified: Date.now(),
+  });
 }
