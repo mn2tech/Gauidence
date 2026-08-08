@@ -128,13 +128,13 @@ export default function SiteHeader() {
         <nav className="hidden items-center gap-6 text-sm text-ink-muted sm:flex">
           {!showSimpleNav ? (
             <>
-          <Link href="/pricing" className="hover:text-foreground">
+          <Link href="/pricing" className="hover:text-foreground" data-analytics="nav_pricing">
             Pricing
           </Link>
-          <Link href="/security" className="hover:text-foreground">
+          <Link href="/security" className="hover:text-foreground" data-analytics="nav_security">
             Security Principles
           </Link>
-          <Link href="/help" className="hover:text-foreground">
+          <Link href="/help" className="hover:text-foreground" data-analytics="nav_help">
             Help
           </Link>
             </>
@@ -148,6 +148,7 @@ export default function SiteHeader() {
                     type="button"
                     onClick={() => setSearchOpen(true)}
                     aria-label="Search vaults"
+                    data-analytics="nav_search"
                     title="Search (Ctrl+K)"
                     className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-3 py-1.5 font-medium text-foreground transition hover:border-stone-400 hover:bg-stone-50"
                   >
@@ -160,6 +161,7 @@ export default function SiteHeader() {
                   <Link
                     href={cameraHref}
                     aria-label="Scan with camera"
+                    data-analytics="nav_scan"
                     title="Scan with camera"
                     className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-3 py-1.5 font-medium text-foreground transition hover:border-stone-400 hover:bg-stone-50"
                   >
@@ -169,7 +171,7 @@ export default function SiteHeader() {
                 </>
               ) : null}
               {showGideon ? (
-                <Link href={askHref} className="hover:text-foreground">
+                <Link href={askHref} className="hover:text-foreground" data-analytics="nav_ask_gideon">
                   Ask Gideon
                 </Link>
               ) : null}
