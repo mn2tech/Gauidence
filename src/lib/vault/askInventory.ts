@@ -142,6 +142,146 @@ export function formatVaultFileSummaryForGideon(
   return lines.join("\n");
 }
 
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Topic after "about …" in a scoped inventory question. */
+export function extractAboutTopic(question: string): string | null {
+  const match = question.match(/\babout\s+(.+?)(?:\?|\.|$)/i);
+  const topic = match?.[1]?.trim().replace(/[?.!]+$/, "").trim();
+  return topic || null;
+}
+
+function topicMentionedInText(text: string, topic: string): boolean {
+  const tokens = topic
+    .split(/[^a-z0-9]+/i)
+    .map((t) => t.trim())
+    .filter((t) => t.length >= 3);
+  if (tokens.length === 0) return false;
+  const hay = text.toLowerCase();
+  return tokens.some((token) =>
+    new RegExp(`\\b${escapeRegex(token)}`, "i").test(hay)
+  );
+}
+
+function parseInventoryFileNames(inventoryText: string): {
+  photos: string[];
+  documents: string[];
+} {
+  if (
+    inventoryText.startsWith("(no documents") ||
+    inventoryText.startsWith("(Summary only")
+  ) {
+    const recentMatch = inventoryText.match(
+      /Recent:\s*([^.]+?)(?:\s*\(\+\d+ more\))?\.?$/m
+    );
+    if (!recentMatch) return { photos: [], documents: [] };
+    const names = recentMatch[1]!
+      .split(/,\s*/)
+      .map((n) => n.trim())
+      .filter(Boolean);
+    return { photos: names, documents: [] };
+  }
+
+  const photos: string[] = [];
+  const documents: string[] = [];
+  for (const line of inventoryText.split(/\n/)) {
+    const docMatch = line.match(/^Documents \(\d+\): (.+)$/);
+    const photoMatch = line.match(/^Photos \(\d+\): (.+)$/);
+    if (docMatch) {
+      documents.push(
+        ...docMatch[1]!.split(/,\s*/).map((n) => n.trim()).filter(Boolean)
+      );
+    }
+    if (photoMatch) {
+      photos.push(
+        ...photoMatch[1]!.split(/,\s*/).map((n) => n.trim()).filter(Boolean)
+      );
+    }
+  }
+  return { photos, documents };
+}
+
+function formatNameList(names: string[], cap = 8): string {
+  if (names.length <= cap) return names.join(", ");
+  return `${names.slice(0, cap - 1).join(", ")}, and ${names.length - (cap - 1)} more`;
+}
+
+function countLabel(count: number, kind: string): string {
+  return `${count} ${kind}${count === 1 ? "" : "s"}`;
+}
+
+/**
+ * Rule-based answer for "what do I have in [space] about [topic]?" — avoids blank LLM replies.
+ */
+export function buildInventoryQuestionAnswer(args: {
+  question: string;
+  spaceDisplayName: string;
+  fileInventoryText: string;
+  dailyLogsText?: string;
+}): string | null {
+  if (!wantsVaultFileInventory(args.question.trim())) return null;
+
+  const space = args.spaceDisplayName.trim() || "this";
+  const topic = extractAboutTopic(args.question);
+  const logsText = args.dailyLogsText?.trim() ?? "";
+  const logsRelevant =
+    Boolean(topic) &&
+    logsText.length > 0 &&
+    logsText !== "(none)" &&
+    topicMentionedInText(logsText, topic!);
+
+  if (args.fileInventoryText.startsWith("(no documents")) {
+    if (logsRelevant) {
+      return `I found Daily Log notes in your ${space} space that mention ${topic}. Open Daily Logs for the full text, or ask me to quote a specific entry.`;
+    }
+    return topic
+      ? `I don't see any files in your ${space} space yet, so nothing about ${topic}.`
+      : `I don't see any files in your ${space} space yet.`;
+  }
+
+  const { photos, documents } = parseInventoryFileNames(args.fileInventoryText);
+  const allFiles = [...documents, ...photos];
+
+  if (topic) {
+    const matchingFiles = allFiles.filter((name) =>
+      topicMentionedInText(name, topic)
+    );
+    if (matchingFiles.length > 0) {
+      return `In your ${space} space, I found ${countLabel(matchingFiles.length, "file")} about ${topic}: ${formatNameList(matchingFiles)}.`;
+    }
+    if (logsRelevant) {
+      return `I don't see files in your ${space} space with ${topic} in the name, but Daily Logs there mention ${topic}. Ask me to summarize those log entries.`;
+    }
+    if (allFiles.length === 0) {
+      return `I don't see anything in your ${space} space about ${topic}.`;
+    }
+    const kind =
+      photos.length > 0 && documents.length === 0
+        ? countLabel(photos.length, "photo")
+        : countLabel(allFiles.length, "file");
+    const preview =
+      allFiles.length <= 6 ? ` (${formatNameList(allFiles, 6)})` : "";
+    return `I don't see anything in your ${space} space specifically about ${topic}. That space has ${kind}${preview}, but none appear to mention ${topic} in the file name.`;
+  }
+
+  if (allFiles.length === 0) {
+    return `I don't see any files in your ${space} space yet.`;
+  }
+
+  const parts: string[] = [];
+  if (documents.length > 0) {
+    parts.push(
+      `${countLabel(documents.length, "document")}: ${formatNameList(documents)}`
+    );
+  }
+  if (photos.length > 0) {
+    parts.push(`${countLabel(photos.length, "photo")}: ${formatNameList(photos)}`);
+  }
+  return `In your ${space} space: ${parts.join("; ")}.`;
+}
+
 /** Split vault files into documents vs photos and preview names for Ask welcome. */
 export function buildAskVaultInventory(
   files: AskVaultFileRow[],

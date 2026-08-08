@@ -9,7 +9,7 @@ import {
 import { generateVaultChatTitle } from "@/lib/chat/generateVaultChatTitle";
 import { shouldGenerateVaultChatTitle } from "@/lib/chat/vaultChatTitle";
 import { isVaultEmbeddingConfigured } from "@/lib/vault/embeddings";
-import { buildAskVaultInventory } from "@/lib/vault/askInventory";
+import { buildAskVaultInventory, buildInventoryQuestionAnswer, wantsVaultFileInventory } from "@/lib/vault/askInventory";
 import { enqueueMissingVaultIndexing } from "@/lib/vault/ensureIndexed";
 import {
   buildGideonSuggestions,
@@ -1238,31 +1238,45 @@ export async function POST(request: Request) {
         label: action.label,
       }));
 
-      return createVaultChatStreamResponse({
-        supabase,
-        userId: user.id,
-        chatId,
-        active: { id: active.id, display_name: active.display_name },
-        chatHomeProfileId,
-        chatScopedProfileId,
-        userMsg: userMsg as ChatMessageRow,
-        question,
-        history,
-        system,
-        maxTokens: gideonMaxTokens(workspaceContext),
-        chunks,
-        attachedDoc,
-        showPictures,
-        accessibleProfiles: scopeCandidates,
-        isFirstExchange,
-        attachedFileName,
-        userTz,
-        listChats,
-        updateVaultChatRow,
-        thinkingSteps,
-        detectedActions,
-        explicitSpaceName,
-      });
+      const inventoryAnswer =
+        wantsVaultFileInventory(question) && explicitSpaceName
+          ? buildInventoryQuestionAnswer({
+              question,
+              spaceDisplayName: explicitSpaceName,
+              fileInventoryText: workspaceContext.blocks.fileInventory,
+              dailyLogsText: workspaceContext.blocks.dailyLogs,
+            })
+          : null;
+
+      if (inventoryAnswer) {
+        answer = inventoryAnswer;
+      } else {
+        return createVaultChatStreamResponse({
+          supabase,
+          userId: user.id,
+          chatId,
+          active: { id: active.id, display_name: active.display_name },
+          chatHomeProfileId,
+          chatScopedProfileId,
+          userMsg: userMsg as ChatMessageRow,
+          question,
+          history,
+          system,
+          maxTokens: gideonMaxTokens(workspaceContext),
+          chunks,
+          attachedDoc,
+          showPictures,
+          accessibleProfiles: scopeCandidates,
+          isFirstExchange,
+          attachedFileName,
+          userTz,
+          listChats,
+          updateVaultChatRow,
+          thinkingSteps,
+          detectedActions,
+          explicitSpaceName,
+        });
+      }
     } catch (err) {
       const { error, code, status } = formatVaultChatError(err);
       console.error("Vault chat failed:", error);

@@ -154,6 +154,28 @@ export function createVaultChatStreamResponse(
           }
         );
 
+        if (!answer.trim()) {
+          answer = await runChatCompletionStream(client, {
+            system: `${args.system}\n\nCRITICAL: You must reply with at least one complete sentence. Never return a blank response.`,
+            model: CHAT_MODEL,
+            maxTokens: Math.min(args.maxTokens, 700),
+            messages: [
+              ...args.history,
+              { role: "user", content: args.question },
+            ],
+            ...(args.attachedDoc?.isImage && args.attachedDoc.imageBase64
+              ? {
+                  attachedImage: {
+                    mimeType: args.attachedDoc.mimeType,
+                    base64: args.attachedDoc.imageBase64,
+                    fileName: args.attachedDoc.fileName,
+                  },
+                }
+              : {}),
+            onDelta: (text) => write({ type: "delta", text }),
+          });
+        }
+
         if (!answer) {
           answer = buildGideonEmptyAnswerFallback({
             chunks: args.chunks,

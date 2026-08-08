@@ -14,9 +14,11 @@ export function buildGideonEmptyAnswerFallback(args: {
   chunks: { profile_id?: string }[];
   explicitSpaceName?: string | null;
 }): string {
-  if (args.chunks.length > 0) return GIDEON_EMPTY_ANSWER_FALLBACK;
   if (args.explicitSpaceName?.trim()) {
     return `I couldn't find anything in ${args.explicitSpaceName.trim()} that matches that question. Try adding a document or Daily Log there, or switch search scope to Everything if it might be in another space.`;
+  }
+  if (args.chunks.length > 0) {
+    return "I found some related material but couldn't finish the answer. Please try asking again in one sentence.";
   }
   return "I couldn't find anything in your spaces that matches that question. Try rephrasing, adding a document or Daily Log, or switch search scope to Everything if it might be in another space.";
 }

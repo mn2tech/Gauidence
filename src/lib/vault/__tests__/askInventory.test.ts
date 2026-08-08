@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   buildAskVaultInventory,
+  buildInventoryQuestionAnswer,
   formatVaultFileListForGideon,
   wantsVaultFileInventory,
 } from "../askInventory.ts";
@@ -75,5 +76,29 @@ describe("ask vault inventory", () => {
     );
     assert.equal(wantsVaultFileInventory("What files are uploaded?"), true);
     assert.equal(wantsVaultFileInventory("When is my passport due?"), false);
+  });
+
+  it("builds a scoped inventory answer about a topic", () => {
+    const answer = buildInventoryQuestionAnswer({
+      question: "What do I have in my Personal space about Nolan?",
+      spaceDisplayName: "Michael Kola",
+      fileInventoryText: `Michael Kola:
+Photos (9): spider-man.png, license.jpg, wedding.jpg, tickets.png, screen1.png, screen2.png, screen3.png, screen4.png, screen5.png`,
+    });
+    assert.ok(answer);
+    assert.match(answer!, /Michael Kola/);
+    assert.match(answer!, /Nolan/i);
+    assert.match(answer!, /don't see|do not see|nothing/i);
+  });
+
+  it("lists matching files when the topic appears in file names", () => {
+    const answer = buildInventoryQuestionAnswer({
+      question: "What do I have about Nolan?",
+      spaceDisplayName: "Nolan Kola",
+      fileInventoryText: `Nolan Kola:
+Documents (2): Nolan report.pdf, homework.pdf
+Photos (1): summer.jpg`,
+    });
+    assert.match(answer!, /Nolan report\.pdf/);
   });
 });

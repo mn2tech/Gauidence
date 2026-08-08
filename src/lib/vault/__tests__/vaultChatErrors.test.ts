@@ -15,12 +15,11 @@ describe("vault chat errors", () => {
     assert.notEqual(scoped, GIDEON_EMPTY_ANSWER_FALLBACK);
   });
 
-  it("keeps the generic fallback when excerpts exist but the model was blank", () => {
-    assert.equal(
-      buildGideonEmptyAnswerFallback({
-        chunks: [{ profile_id: "personal" }],
-      }),
-      GIDEON_EMPTY_ANSWER_FALLBACK
-    );
+  it("keeps a helpful fallback when excerpts exist but the model was blank", () => {
+    const fallback = buildGideonEmptyAnswerFallback({
+      chunks: [{ profile_id: "personal" }],
+    });
+    assert.match(fallback, /couldn't finish the answer/i);
+    assert.notEqual(fallback, GIDEON_EMPTY_ANSWER_FALLBACK);
   });
 });
