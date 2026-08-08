@@ -206,13 +206,13 @@ export function formatDailyLogsForGideon(
           : "";
       const title = log.title?.trim() ? ` | title: ${log.title.trim()}` : "";
       const cat = log.category ? ` | category: ${log.category}` : "";
-      const vaultLabel =
+      const spaceLabel =
         profileNames?.[log.profile_id]?.trim() ||
-        (profileNames ? "linked vault" : "");
-      const vault = vaultLabel ? ` | vault: ${vaultLabel}` : "";
+        (profileNames ? "linked space" : "");
+      const spaceTag = spaceLabel ? ` | space: ${spaceLabel}` : "";
       const author = authorNames?.[log.owner_user_id]?.trim();
       const addedBy = author ? ` | added by: ${author}` : "";
-      return `[Daily Log ${log.log_date}${vault}${addedBy}${title}${cat}${tags}]\n${log.content}`;
+      return `[Daily Log ${log.log_date}${spaceTag}${addedBy}${title}${cat}${tags}]\n${log.content}`;
     })
     .join("\n\n---\n\n");
 }

@@ -119,16 +119,16 @@ export function formatAlertsForGideon(
 
   return alerts
     .map((alert) => {
-      const vault =
+      const spaceName =
         args.profileNames?.[alert.profile_id]?.trim() ||
-        (args.profileNames ? "linked vault" : "");
-      const vaultLabel = vault ? ` | vault: ${vault}` : "";
+        (args.profileNames ? "linked space" : "");
+      const spaceTag = spaceName ? ` | space: ${spaceName}` : "";
       const when = formatReminderWhen(
         alert.due_at,
         alert.due_date,
         args.timeZone
       );
-      return `[${alertKind(alert)}${vaultLabel} | due: ${when}]\n${alert.title.trim()}`;
+      return `[${alertKind(alert)}${spaceTag} | due: ${when}]\n${alert.title.trim()}`;
     })
     .join("\n\n---\n\n");
 }

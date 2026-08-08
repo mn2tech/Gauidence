@@ -333,7 +333,7 @@ export async function loadWorkspaceContext(
     : workMemoryBody;
 
   const explicitScopeNote = explicitSpace
-    ? `This question is scoped to the ${explicitSpace.display_name} space only. Use RETRIEVED EXCERPTS, DAILY LOGS, and VAULT FILE INVENTORY for that space.${
+    ? `This question is scoped to the ${explicitSpace.display_name} space only. Use RETRIEVED EXCERPTS, DAILY LOGS, and SPACE FILE INVENTORY for that space.${
         /\babout\b/i.test(retrievalQuestion)
           ? " Filter to the topic named in the question — do not dump full file lists from other spaces; one brief redirect sentence is enough if nothing matches."
           : ""
@@ -366,10 +366,10 @@ Active space in the UI: ${activeProfile.display_name}. Document search includes 
   let vaultEmptyNote = "";
   if (noDocumentExcerpts && !attachedContext.trim()) {
     if (explicitSpace) {
-      vaultEmptyNote = `No document excerpts matched in ${explicitSpace.display_name}. Check RETRIEVED DAILY LOGS and VAULT FILE INVENTORY below for this space. If nothing matches the question (including names or topics mentioned), say clearly you could not find that in ${explicitSpace.display_name}. Do not invent facts. You must always reply in complete sentences — never return a blank response.`;
+      vaultEmptyNote = `No document excerpts matched in ${explicitSpace.display_name}. Check RETRIEVED DAILY LOGS and SPACE FILE INVENTORY below for this space. If nothing matches the question (including names or topics mentioned), say clearly you could not find that in ${explicitSpace.display_name}. Do not invent facts. You must always reply in complete sentences — never return a blank response.`;
     } else if (noMatchedLogs) {
       vaultEmptyNote =
-        "No document excerpts or Daily Logs matched this question. If VAULT FILE INVENTORY lists relevant files, you may name them; otherwise say you could not find it. Do not invent facts. You must always reply — never return a blank response.";
+        "No document excerpts or Daily Logs matched this question. If SPACE FILE INVENTORY lists relevant files, you may name them; otherwise say you could not find it. Do not invent facts. You must always reply — never return a blank response.";
     } else {
       vaultEmptyNote =
         "No document excerpts matched this question. Use RETRIEVED DAILY LOGS if they answer it; otherwise say you could not find it in documents. You must always reply — never return a blank response.";

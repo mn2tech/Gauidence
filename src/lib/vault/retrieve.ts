@@ -44,8 +44,8 @@ export function formatRetrievalContext(chunks: RetrievedChunk[]): {
       fileName: c.file_name,
       profileName: c.profile_name,
     });
-    const vault = c.profile_name?.trim()
-      ? ` | vault:${c.profile_name.trim()}`
+    const spaceTag = c.profile_name?.trim()
+      ? ` | space:${c.profile_name.trim()}`
       : "";
     const label = c.profile_name?.trim()
       ? `${c.profile_name.trim()} · ${c.file_name}`
@@ -56,7 +56,7 @@ export function formatRetrievalContext(chunks: RetrievedChunk[]): {
         : ` | sim:${c.similarity.toFixed(3)}`;
     const sourceMeta = c.match_source ? ` | match:${c.match_source}` : "";
     blocks.push(
-      `[Source: ${label}${vault} | doc:${c.document_id} | chunk:${c.chunk_index}${rankMeta}${sourceMeta}]\n${trimChunkContent(c.content)}`
+      `[Source: ${label}${spaceTag} | doc:${c.document_id} | chunk:${c.chunk_index}${rankMeta}${sourceMeta}]\n${trimChunkContent(c.content)}`
     );
   }
 

@@ -113,7 +113,7 @@ describe("vault retrieval formatting", () => {
       },
     ]);
     assert.match(context, /Maya · iep\.pdf/);
-    assert.match(context, /vault:Maya/);
+    assert.match(context, /space:Maya/);
   });
 
   it("only cites documents named in the answer", () => {

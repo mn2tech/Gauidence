@@ -259,10 +259,10 @@ export function formatClientRequestsForGideon(
   if (requests.length === 0) return "";
   return requests
     .map((request) => {
-      const vaultLabel =
+      const spaceLabel =
         profileNames?.[request.profile_id]?.trim() ||
-        (profileNames ? "linked client vault" : "");
-      const vault = vaultLabel ? ` | vault: ${vaultLabel}` : "";
+        (profileNames ? "linked client space" : "");
+      const spaceTag = spaceLabel ? ` | space: ${spaceLabel}` : "";
       const author = authorNames?.[request.created_by]?.trim();
       const submittedBy = author ? ` | submitted by: ${author}` : "";
       const assignee = request.assigned_to_user_id
@@ -282,7 +282,7 @@ export function formatClientRequestsForGideon(
               })
               .join("\n")}`
           : "";
-      return `[Client Request${vault}${submittedBy}${assignedLine}${idLine} | status: ${status} | updated: ${request.updated_at.slice(0, 10)}]\nTitle: ${request.title}\nDescription: ${request.description}${commentBlock}`;
+      return `[Client Request${spaceTag}${submittedBy}${assignedLine}${idLine} | status: ${status} | updated: ${request.updated_at.slice(0, 10)}]\nTitle: ${request.title}\nDescription: ${request.description}${commentBlock}`;
     })
     .join("\n\n---\n\n");
 }

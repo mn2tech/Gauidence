@@ -18,8 +18,8 @@ export function formatKnowledgeForGideon(
   if (result.facts.length > 0) {
     blocks.push("STRUCTURED FACTS (cite source document when using these):");
     for (const fact of result.facts) {
-      const vault = profileNames[fact.profileId]?.trim();
-      const vaultLabel = vault ? ` | vault:${vault}` : "";
+      const space = profileNames[fact.profileId]?.trim();
+      const spaceLabel = space ? ` | space:${space}` : "";
       const value = formatFactValue(fact);
       const source = fact.sourceFileName
         ? ` | source:${fact.sourceFileName} | doc:${fact.sourceDocumentId}`
@@ -28,7 +28,7 @@ export function formatKnowledgeForGideon(
         ? `\n  Excerpt: "${fact.sourceExcerpt.slice(0, 200)}"`
         : "";
       blocks.push(
-        `- ${fact.subjectName} → ${fact.predicate} → ${value}${vaultLabel}${source} | confidence:${fact.confidence.toFixed(2)} | status:${fact.reviewStatus}${excerpt}`
+        `- ${fact.subjectName} → ${fact.predicate} → ${value}${spaceLabel}${source} | confidence:${fact.confidence.toFixed(2)} | status:${fact.reviewStatus}${excerpt}`
       );
     }
   }

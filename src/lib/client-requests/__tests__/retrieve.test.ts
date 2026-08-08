@@ -69,7 +69,7 @@ describe("formatClientRequestsForGideon", () => {
       { "profile-client": "crossroadconnect" },
       { "user-aaron": "Aaron Miller" }
     );
-    assert.match(formatted, /vault: crossroadconnect/);
+    assert.match(formatted, /space: crossroadconnect/);
     assert.match(formatted, /submitted by: Aaron Miller/);
     assert.match(formatted, /status: Open/);
     assert.match(formatted, /Need updated W-9/);

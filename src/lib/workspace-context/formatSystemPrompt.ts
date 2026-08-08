@@ -7,6 +7,7 @@ import {
   withVaultPersonality,
 } from "@/lib/vault/gideon";
 import { VAULT_CHAT_SYSTEM } from "@/lib/vault/indexDocument";
+import { getContainerLabel } from "@/lib/profiles/containerLabels";
 import { collectActionSystemNotes } from "@/lib/actions/runner";
 import type { ActionContext } from "@/lib/actions/types";
 import { AGENT_MODE_SYSTEM_NOTE } from "@/lib/agent-mode";
@@ -59,7 +60,9 @@ export function buildGideonSystemPrompt(
 
   return `${withVaultPersonality(VAULT_CHAT_SYSTEM, profileKind)}
 
-Active profile: ${activeProfile.display_name} (${activeProfile.profile_type}).
+USER-FACING TERMINOLOGY (strict): In every reply to the user, say "space" or "workspace" — never "vault". Source tags like space:Name below are internal metadata only.
+
+Active ${getContainerLabel(activeProfile.profile_type).toLowerCase()}: ${activeProfile.display_name}.
 ${buildGideonTodayNote(new Date(), timeZone)}
 ${allVaultsNote}
 ${pictureNote}
@@ -75,9 +78,9 @@ ${attachedNote}
 ${blocks.excerpts}
 --- END EXCERPTS ---
 
---- VAULT FILE INVENTORY (complete list of uploaded files in scope; use for "what's uploaded" questions) ---
+--- SPACE FILE INVENTORY (complete list of uploaded files in scope; use for "what's uploaded" questions) ---
 ${blocks.fileInventory}
---- END VAULT FILE INVENTORY ---
+--- END SPACE FILE INVENTORY ---
 
 --- ATTACHED DOCUMENT (user sent with this message) ---
 ${blocks.attachedDocument}
@@ -87,11 +90,11 @@ ${blocks.attachedDocument}
 ${blocks.dailyLogs}
 --- END DAILY LOGS ---
 
---- CLIENT REQUESTS (structured issues/requirements from client vaults; includes recent replies) ---
+--- CLIENT REQUESTS (structured issues/requirements from client spaces; includes recent replies) ---
 ${blocks.clientRequests}
 --- END CLIENT REQUESTS ---
 
---- PROPOSALS (business quotes and estimates for client vaults) ---
+--- PROPOSALS (business quotes and estimates for client spaces) ---
 ${blocks.proposals}
 --- END PROPOSALS ---
 
@@ -103,9 +106,9 @@ ${blocks.schedule}
 ${blocks.linkedProfiles}
 --- END LINKED PROFILE STRUCTURE ---
 
---- VAULT MAP STRUCTURE (account hierarchy; use for Space Map / parent-child questions) ---
+--- SPACE MAP STRUCTURE (account hierarchy; use for Space Map / parent-child questions) ---
 ${blocks.vaultMap}
---- END VAULT MAP STRUCTURE ---
+--- END SPACE MAP STRUCTURE ---
 
 --- WORK MEMORY (user's active projects and recent sessions) ---
 ${blocks.workMemory}

@@ -69,7 +69,7 @@ export function wantsDailyLogCapture(
 }
 
 export const DAILY_LOG_CAPTURE_SYSTEM_NOTE = `Daily log capture mode:
-The user wants to save a note to their vault (Daily Log). Acknowledge briefly, then propose what to save.
+The user wants to save a note to their space (Daily Log). Acknowledge briefly, then propose what to save.
 
 If they refer to "this", "that", "the list", or something from the current chat, use the relevant content from the conversation (including your previous reply) as the note body — do not ask them to paste it again.
 
@@ -82,7 +82,7 @@ log_date: YYYY-MM-DD
 
 Use today's date if no date is given. Never invent facts not in the user's message or this conversation. If you cannot determine what to save, omit the PROPOSED DAILY LOG section and ask what to remember. Do not save the log yourself — the user will confirm in the app. Never tell them to open Daily Log or New Entry in the app manually.
 
-If RETRIEVED DAILY LOGS already contains this note, or you already proposed a Daily Log in this thread and the user affirmed or saved it, acknowledge it is in the vault — do NOT emit another PROPOSED DAILY LOG. The app has Save to vault / Edit first buttons; the user does not need a second proposal.`;
+If RETRIEVED DAILY LOGS already contains this note, or you already proposed a Daily Log in this thread and the user affirmed or saved it, acknowledge it is saved in their space — do NOT emit another PROPOSED DAILY LOG. The app has Save to space / Edit first buttons; the user does not need a second proposal.`;
 
 const SECTION_START = /^#{1,3}\s*PROPOSED DAILY LOG\s*$/i;
 

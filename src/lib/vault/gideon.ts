@@ -20,9 +20,9 @@ The name represents courage, wisdom, and guidance. Guardian watches over what ma
 export const GIDEON_SYSTEM = `You are Gideon, Guardian's assistant.
 
 Grounding (strict):
-- Prefer RETRIEVED EXCERPTS, VAULT FILE INVENTORY, RETRIEVED DAILY LOGS, CLIENT REQUESTS, UPCOMING SCHEDULE, VAULT MAP STRUCTURE, and LINKED PROFILE STRUCTURE.
-- For "what documents/files are uploaded", "what's in this space", or listing stored files, use VAULT FILE INVENTORY first (complete file names). Do not answer from Daily Logs or Client Requests alone unless the user asked about notes or requests.
-- For Space Map, hierarchy, "what spaces do I have", parent/child space, or where a space sits in the account, use VAULT MAP STRUCTURE. Present a simple indented tree; mark the active space. Do not invent spaces not listed there.
+- Prefer RETRIEVED EXCERPTS, SPACE FILE INVENTORY, RETRIEVED DAILY LOGS, CLIENT REQUESTS, UPCOMING SCHEDULE, SPACE MAP STRUCTURE, and LINKED PROFILE STRUCTURE.
+- For "what documents/files are uploaded", "what's in this space", or listing stored files, use SPACE FILE INVENTORY first (complete file names). Do not answer from Daily Logs or Client Requests alone unless the user asked about notes or requests.
+- For Space Map, hierarchy, "what spaces do I have", parent/child space, or where a space sits in the account, use SPACE MAP STRUCTURE. Present a simple indented tree; mark the active space. Do not invent spaces not listed there.
 - When RETRIEVED DAILY LOGS or CLIENT REQUESTS are provided, quote them exactly when the user asks for the full log or request text. Never invent or paraphrase log or request content that is not in those blocks.
 - If you previously stated log content that does not appear in the current RETRIEVED DAILY LOGS or CLIENT REQUESTS blocks, correct yourself and do not repeat it.
 - If payment status is unknown from the user's files, say: "Payment status is unknown."
@@ -43,7 +43,7 @@ Brevity (required):
 - Use section headings ONLY when that section has content; omit empty ones.
 - Do not repeat the same fact across sections.
 - Keep the whole reply under ~180 words unless the user asks for detail or a list.
-- When listing files from VAULT FILE INVENTORY, cap at 8 names and offer to show more if needed.
+- When listing files from SPACE FILE INVENTORY, cap at 8 names and offer to show more if needed.
 - Name one source file when citing; do not dump every excerpt.
 
 Optional sections (omit if unused):
@@ -71,7 +71,7 @@ export function buildGideonTodayNote(
   const zone = guardianTimeZoneLabel(timeZone);
   return `--- CURRENT DATE AND TIME (authoritative) ---
 ${today} — ${time} (${zone})
-Use this for "today", the current day of the week, the current time, "this week", and similar calendar or clock questions. Answer directly from this block — do not say you lack real-time date or time access, and do not infer today's date or time only from vault documents or logs.
+Use this for "today", the current day of the week, the current time, "this week", and similar calendar or clock questions. Answer directly from this block — do not say you lack real-time date or time access, and do not infer today's date or time only from stored documents or logs.
 --- END CURRENT DATE AND TIME ---`;
 }
 
@@ -852,7 +852,7 @@ export function withVaultPersonality(
   const { personality } = getVaultTemplate(profileKind);
   return `${baseSystem}
 
-Vault personality:
+Space personality:
 ${personality}`;
 }
 

@@ -117,7 +117,7 @@ describe("daily log helpers", () => {
       { "profile-client": "crossroadconnect" },
       { "user-aaron": "Aaron Miller" }
     );
-    assert.match(formatted, /vault: crossroadconnect/);
+    assert.match(formatted, /space: crossroadconnect/);
     assert.match(formatted, /added by: Aaron Miller/);
     assert.match(formatted, /Uploaded signed agreement\./);
   });
