@@ -125,7 +125,8 @@ export default function WorkspaceContextBar({
           <p className="text-sm font-semibold text-foreground">
             {scopeLabel}
           </p>
-          {display.secondaryLabel ? (
+          {display.secondaryLabel &&
+          !(showSearchScopeToggle && searchScope === "global") ? (
             <p className="text-xs text-ink-muted">{display.secondaryLabel}</p>
           ) : null}
         </div>

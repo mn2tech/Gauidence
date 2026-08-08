@@ -30,7 +30,7 @@ describe("Gideon helpers", () => {
     assert.match(GIDEON_SYSTEM, /You are Gideon/);
     assert.match(GIDEON_SYSTEM, /Payment status is unknown/);
     assert.match(GIDEON_SYSTEM, /GENERAL KNOWLEDGE/);
-    assert.match(GIDEON_SYSTEM, /general knowledge rather than the user's vault/i);
+    assert.match(GIDEON_SYSTEM, /general knowledge rather than the user's Guardian spaces/i);
     assert.match(GIDEON_SYSTEM, /CURRENT DATE AND TIME is provided/i);
     assert.equal(
       GIDEON_BRAND_LINE,
@@ -153,26 +153,29 @@ describe("Gideon helpers", () => {
     );
     assert.equal(
       gideonChatContextLabel("child", "Nolan"),
-      "You are chatting with Gideon in Nolan's vault"
+      "You are chatting with Gideon in Nolan's space"
     );
     assert.equal(
       gideonChatContextLabel("child", "James"),
-      "You are chatting with Gideon in James' vault"
+      "You are chatting with Gideon in James' space"
     );
     assert.equal(
       gideonChatContextLabel("family", "Smith Family"),
       "You are chatting with Gideon · Smith Family"
     );
-    assert.equal(VAULT_SCOPE_NOTE, "Searching all your vaults.");
+    assert.equal(
+      VAULT_SCOPE_NOTE,
+      "Searching Everything across your spaces and workspaces."
+    );
     assert.equal(
       buildVaultScopeNote({ displayName: "Nolan", profileKind: "child" }),
-      "Searching only Nolan's vault."
+      "Searching only Nolan's space."
     );
     assert.equal(
       buildVaultScopeNote({
         allVaultNames: ["Personal", "Business", "Nolan"],
       }),
-      "Searching all 3 vaults: Personal, Business, Nolan."
+      "Searching all 3 spaces: Personal, Business, Nolan."
     );
     assert.equal(
       buildVaultScopeNote({
@@ -190,7 +193,7 @@ describe("Gideon helpers", () => {
         ],
         chatScopedProfileName: "NM2TECH - Next Move",
       }),
-      "Answers may use all 4 vaults · Chat saved in NM2TECH - Next Move."
+      "Answers may use all 4 spaces · Chat saved in NM2TECH - Next Move."
     );
     assert.equal(
       buildVaultScopeNote({
@@ -211,7 +214,7 @@ describe("Gideon helpers", () => {
         searchVaultNames: ["crossroadconnect", "CROSSROADS"],
         chatScopedProfileName: "CROSSROADS",
       }),
-      "Searching 2 vaults for this chat: crossroadconnect, CROSSROADS (12 vaults available)."
+      "Searching 2 spaces for this chat: crossroadconnect, CROSSROADS (12 spaces available)."
     );
     assert.equal(
       buildVaultScopeNote({
@@ -219,7 +222,15 @@ describe("Gideon helpers", () => {
         profileKind: "family",
         linkedMemberNames: ["Nolan", "Ava"],
       }),
-      "Searching this vault and linked members: Nolan, Ava."
+      "Searching this space and linked members: Nolan, Ava."
+    );
+    assert.equal(
+      buildVaultScopeNote({
+        allVaultNames: ["Personal", "Business", "Nolan"],
+        searchVaultNames: ["Personal", "Business", "Nolan"],
+        searchScope: "global",
+      }),
+      "Searching Everything: Personal, Business, Nolan."
     );
   });
 

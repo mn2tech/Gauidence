@@ -7,7 +7,7 @@ const GENERIC_VAULT_CHAT_ERROR =
 
 /** Shown when the model returns no text (not when facts need verification). */
 export const GIDEON_EMPTY_ANSWER_FALLBACK =
-  "I couldn't put together an answer just now. Try rephrasing your question, or switch search scope to Everywhere if the information might be in another vault.";
+  "I couldn't put together an answer just now. Try rephrasing your question, or switch search scope to Everything if the information might be in another space.";
 
 export function formatVaultChatError(err: unknown): {
   error: string;

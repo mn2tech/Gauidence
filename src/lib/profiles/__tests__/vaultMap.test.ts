@@ -170,8 +170,8 @@ describe("vault map tree", () => {
     ];
 
     const text = formatVaultMapForGideon(profiles, "Danny", "cl1");
-    assert.match(text, /Active vault path: Danny → Acme Co → Big Client/);
-    assert.match(text, /Big Client \(Client\) ← active vault/);
+    assert.match(text, /Active space path: Danny → Acme Co → Big Client/);
+    assert.match(text, /Big Client \(Client\) ← active space/);
     assert.match(text, /Active clients:/);
     assert.match(text, /Acme Co \(Business\)/);
   });

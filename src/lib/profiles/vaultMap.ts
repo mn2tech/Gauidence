@@ -168,7 +168,7 @@ function profileMapLine(
 ): string {
   const type = profileTypeLabel(profile.profile_type);
   const active =
-    activeProfileId && profile.id === activeProfileId ? " ← active vault" : "";
+    activeProfileId && profile.id === activeProfileId ? " ← active space" : "";
   return `${indent(depth)}- ${profile.display_name} (${type})${active}`;
 }
 
@@ -243,18 +243,18 @@ export function formatVaultMapForGideon(
 ): string {
   const tree = buildVaultMapTree(profiles, ownerLabel);
   if (!tree) {
-    return "(no vault structure — create a person or space in Guardian first)";
+    return "(no space structure — create a person or space in Guardian first)";
   }
 
   const lines: string[] = [
-    "This is Guardian's vault hierarchy (same structure as Settings → Vault map).",
+    "This is Guardian's space hierarchy (same structure as Settings → Space Map).",
     `Account root: ${tree.ownerLabel}`,
   ];
 
   if (activeProfileId) {
     const path = vaultMapPathToProfile(profiles, tree.ownerLabel, activeProfileId);
     if (path) {
-      lines.push(`Active vault path: ${path}`);
+      lines.push(`Active space path: ${path}`);
     }
   }
 

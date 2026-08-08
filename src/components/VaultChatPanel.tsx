@@ -1245,7 +1245,7 @@ export default function VaultChatPanel({
   useEffect(() => {
     if (!sending && !vaultBusy && !savingLog) return;
     if (savingLog) {
-      setLoadingLabel("Saving to your vault…");
+      setLoadingLabel("Saving to your space…");
       return;
     }
     if (vaultBusy && vaultStatus) {
@@ -1419,11 +1419,11 @@ export default function VaultChatPanel({
 
   const uploadVaultFile = async (file: File) => {
     if (!profileId) {
-      throw new Error("Choose a vault before uploading.");
+      throw new Error("Choose a space before uploading.");
     }
     setError(null);
     setVaultBusy(true);
-    setVaultStatus("Uploading to your vault…");
+    setVaultStatus("Uploading to your space…");
 
     try {
       const supabase = createClient();
@@ -1593,7 +1593,7 @@ export default function VaultChatPanel({
 
       if (!result.analyzed) {
         pushLocalNote(
-          `I added "${result.fileName}" to your vault, but analysis didn't finish${
+          `I added "${result.fileName}" to your space, but analysis didn't finish${
             result.analysisError ? `: ${result.analysisError}` : "."
           }`
         );
@@ -2679,7 +2679,7 @@ export default function VaultChatPanel({
 
         if (!result.analyzed) {
           pushLocalNote(
-            `I added "${result.fileName}" to your vault, but analysis didn't finish${
+            `I added "${result.fileName}" to your space, but analysis didn't finish${
               result.analysisError ? `: ${result.analysisError}` : "."
             }`
           );
@@ -2958,7 +2958,7 @@ export default function VaultChatPanel({
                   ) : (
                     <NotebookPen className="h-3.5 w-3.5" />
                   )}
-                  Save to vault
+                  Save to space
                 </button>
                 <button
                   type="button"
@@ -3156,11 +3156,11 @@ export default function VaultChatPanel({
         {showVaultScopeCard ? (
           <div className="rounded-xl border border-sky-200 bg-sky-50/90 px-3 py-3">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-sky-900/70">
-              Answered from another vault
+              Answered from another space
             </p>
             <p className="mt-1 text-sm text-foreground">
               This came from <span className="font-medium">{vaultScope.profileName}</span>
-              &apos;s vault. You&apos;re still in{" "}
+              &apos;s space. You&apos;re still in{" "}
               <span className="font-medium">{vaultScope.activeProfileName}</span>.
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -3178,7 +3178,7 @@ export default function VaultChatPanel({
                   className="inline-flex items-center gap-1.5 rounded-lg border border-sky-300 bg-white px-3 py-1.5 text-xs font-semibold text-sky-900 transition hover:bg-sky-50 disabled:opacity-60"
                 >
                   <PanelRightOpen className="h-3.5 w-3.5" />
-                  Open {vaultScope.profileName}&apos;s vault here
+                  Open {vaultScope.profileName}&apos;s space here
                 </button>
               ) : null}
               <button
@@ -3198,7 +3198,7 @@ export default function VaultChatPanel({
                 ) : (
                   <ArrowRightLeft className="h-3.5 w-3.5" />
                 )}
-                Continue in {vaultScope.profileName}&apos;s vault
+                Continue in {vaultScope.profileName}&apos;s space
               </button>
               <button
                 type="button"
@@ -3363,7 +3363,7 @@ export default function VaultChatPanel({
                 <p className="text-sm font-semibold text-foreground">
                   {emptyVault
                     ? (meta?.guidance?.headline ?? WELCOME_AI_MEMORY_TITLE)
-                    : (meta?.guidance?.headline ?? "Welcome to your vault")}
+                    : (meta?.guidance?.headline ?? "Welcome to your space")}
                 </p>
                 {templateBadge ? (
                   <span className="inline-flex items-center rounded-full border border-stone-300 bg-white px-2.5 py-0.5 text-[11px] font-medium text-foreground">
@@ -3561,8 +3561,8 @@ export default function VaultChatPanel({
             <>
               <p className="text-sm leading-relaxed text-ink-muted">
                 {logsOnly
-                  ? "I'll check this profile's Daily Logs first. For other questions I can use general knowledge and clearly say when it's not from your vault."
-                  : "I'll search your vault first. If something isn't there, I can answer with general knowledge and label it clearly. What would you like to know?"}
+                  ? "I'll check this profile's Daily Logs first. For other questions I can use general knowledge and clearly say when it's not from your space."
+                  : "I'll search your spaces first. If something isn't there, I can answer with general knowledge and label it clearly. What would you like to know?"}
               </p>
               <div className="flex flex-wrap gap-2">
                 <button
@@ -3745,7 +3745,7 @@ export default function VaultChatPanel({
             ? (() => {
                 const presentation = buildSmartUploadPresentation(
                   pendingSmartUpload.result,
-                  active?.display_name ?? meta?.profileName ?? "your vault"
+                  active?.display_name ?? meta?.profileName ?? "your space"
                 );
                 if (!presentation) return null;
                 return (
@@ -3783,7 +3783,7 @@ export default function VaultChatPanel({
             <div className="flex items-center gap-2 text-xs text-ink-muted">
               <GideonAvatar size={40} variant="portrait" pulse />
               {savingLog
-                ? "Saving to your vault…"
+                ? "Saving to your space…"
                 : vaultBusy && vaultStatus
                   ? vaultStatus
                   : loadingLabel}
@@ -3940,7 +3940,7 @@ export default function VaultChatPanel({
                 onClick={() => setPlusOpen((o) => !o)}
                 aria-expanded={plusOpen}
                 aria-haspopup="menu"
-                aria-label="Add to vault"
+                aria-label="Add to space"
                 disabled={vaultBusy || sending || !profileId || !canEditVault}
                 className={`inline-flex h-9 w-9 items-center justify-center rounded-full border transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50 ${
                   emptyVault
@@ -4400,7 +4400,7 @@ export default function VaultChatPanel({
           <button
             type="button"
             className="rounded-full p-2 text-ink-muted hover:bg-stone-100 md:hidden"
-            aria-label="Open vaults and chats"
+            aria-label="Open spaces and chats"
             onClick={() => setSidebarOpen(true)}
           >
             <Menu className="h-5 w-5" />
@@ -4425,7 +4425,7 @@ export default function VaultChatPanel({
             <p className="truncate text-[11px] text-ink-muted">
               {meta?.chatContextLabel ??
                 meta?.askContextLabel ??
-                "Your AI guide to everything in your vault."}
+                "Your AI guide to everything in your spaces."}
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">

@@ -103,7 +103,7 @@ ${blocks.schedule}
 ${blocks.linkedProfiles}
 --- END LINKED PROFILE STRUCTURE ---
 
---- VAULT MAP STRUCTURE (account hierarchy; use for vault map / parent-child questions) ---
+--- VAULT MAP STRUCTURE (account hierarchy; use for Space Map / parent-child questions) ---
 ${blocks.vaultMap}
 --- END VAULT MAP STRUCTURE ---
 
