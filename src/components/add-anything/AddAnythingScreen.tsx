@@ -163,7 +163,7 @@ export default function AddAnythingScreen() {
       );
       return;
     }
-    const file = buildPastedTextFile(trimmed);
+    const file = buildPastedTextFile({ content: trimmed });
     await processFile(file);
   }
 

@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Home, MessageCircle, LayoutGrid, Plus } from "lucide-react";
-import { useActiveProfile } from "@/components/ProfileProvider";
 import { SPACES_NAV_LABEL } from "@/lib/profiles/types";
 import {
   ADD_ANYTHING_PATH,
@@ -11,8 +10,6 @@ import {
   SIMPLE_HOME_PATH,
   VAULTS_PATH,
 } from "@/lib/simple-home/routing";
-
-type SimpleNavigationProps = Record<string, never>;
 
 const STATIC_ITEMS = [
   { id: "home", href: SIMPLE_HOME_PATH, label: "Home", icon: Home, exact: true },
@@ -30,7 +27,7 @@ function isPathActive(pathname: string, href: string, exact: boolean) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export default function SimpleNavigation(_props: SimpleNavigationProps) {
+export default function SimpleNavigation() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const spacesActive =

@@ -13,7 +13,6 @@ import { useOnboardingProgress } from "@/hooks/useOnboardingProgress";
 import { useEmployeeHubEntitlements } from "@/hooks/useEmployeeHubEntitlements";
 import { useSimpleHomeEnabled } from "@/hooks/useSimpleHomeEnabled";
 import SimpleNavigation from "@/components/simple-home/SimpleNavigation";
-import SimpleNewMenu from "@/components/simple-home/SimpleNewMenu";
 import SimpleSecondaryNavLinks from "@/components/simple-home/SimpleSecondaryNavLinks";
 import { employeeShowsPowerNav } from "@/lib/employee-hub/entitlements";
 import { employeeGideonHref } from "@/lib/employee-hub/routing";
@@ -28,7 +27,6 @@ export default function SiteHeader() {
   const [signedIn, setSignedIn] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [newOpen, setNewOpen] = useState(false);
   const { enabled: simpleHomeEnabled } = useSimpleHomeEnabled();
 
   useEffect(() => {
@@ -447,12 +445,7 @@ export default function SiteHeader() {
           onClose={() => setSearchOpen(false)}
         />
       ) : null}
-      {showSimpleNav ? (
-        <>
-          <SimpleNavigation onNewClick={() => setNewOpen(true)} />
-          <SimpleNewMenu open={newOpen} onClose={() => setNewOpen(false)} />
-        </>
-      ) : null}
+      {showSimpleNav ? <SimpleNavigation /> : null}
     </>
   );
 }
