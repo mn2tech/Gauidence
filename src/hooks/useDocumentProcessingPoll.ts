@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AnalysisStatus } from "@/lib/analysis/types";
 import type { DocumentProcessingStage } from "@/lib/documents/processingStatus";
+import type { OrganizationSuggestionPayload } from "@/lib/organization/types";
 
 export type DocumentStatusSnapshot = {
   documentId: string;
@@ -20,6 +21,7 @@ export type DocumentStatusSnapshot = {
   title?: string | null;
   documentType?: string | null;
   model?: string | null;
+  organizationSuggestion?: OrganizationSuggestionPayload | null;
 };
 
 const POLL_INTERVAL_MS = 3000;
@@ -68,6 +70,7 @@ export function useDocumentProcessingPoll(
       title: body.title,
       documentType: body.documentType,
       model: body.model,
+      organizationSuggestion: body.organizationSuggestion ?? null,
     } satisfies DocumentStatusSnapshot;
   }, []);
 

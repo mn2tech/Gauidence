@@ -80,3 +80,18 @@ export async function scheduleDocumentAnalysis(
     };
   }
 }
+
+/** Neutral staging space for Add Anything before Guardian suggests a destination. */
+export async function resolveAddAnythingStagingProfileId(): Promise<string> {
+  const res = await fetch("/api/organization/staging-profile");
+  const body = (await res.json().catch(() => ({}))) as {
+    profileId?: string;
+    error?: string;
+  };
+  if (!res.ok || !body.profileId) {
+    throw new Error(
+      body.error ?? "Couldn't prepare a staging space for your upload."
+    );
+  }
+  return body.profileId;
+}

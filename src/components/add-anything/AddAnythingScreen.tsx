@@ -16,7 +16,7 @@ import {
 import ProfileSetupHub from "@/components/ProfileSetupHub";
 import SmartUploadSuggestionCard from "@/components/SmartUploadSuggestionCard";
 import { useActiveProfile } from "@/components/ProfileProvider";
-import { buildSmartUploadPresentation } from "@/lib/actions/smartUpload";
+import { buildSmartUploadPresentation, shouldPromptSmartUpload } from "@/lib/actions/smartUpload";
 import { createClient } from "@/lib/supabase/client";
 import {
   profileContainerName,
@@ -31,7 +31,8 @@ import {
   VAULT_PASTE_MAX_CHARS,
 } from "@/lib/vault/clientUpload";
 import type { VaultUploadResult } from "@/lib/documents/clientProcessing";
-import { useDocumentProcessingPoll } from "@/hooks/useDocumentProcessingPoll";
+import { resolveAddAnythingStagingProfileId } from "@/lib/documents/clientProcessing";
+import { useDocumentProcessingPoll, type DocumentStatusSnapshot } from "@/hooks/useDocumentProcessingPoll";
 import { documentsHref } from "@/lib/routes";
 import { ASK_GIDEON_PATH } from "@/lib/simple-home/routing";
 
@@ -42,9 +43,25 @@ function stagingProfile(
   active: GuardianProfile | null
 ): GuardianProfile | null {
   if (active) return active;
-  const personal = profiles.find((p) => p.profile_type === "personal");
-  if (personal) return personal;
   return topLevelProfiles(profiles)[0] ?? null;
+}
+
+function uploadResultFromSnapshot(
+  snapshot: DocumentStatusSnapshot,
+  fileName: string
+): VaultUploadResult {
+  const analyzed =
+    snapshot.analysisStatus === "completed" ||
+    Boolean(snapshot.title || snapshot.summary);
+  return {
+    documentId: snapshot.documentId,
+    fileName,
+    analyzed,
+    title: snapshot.title,
+    documentType: snapshot.documentType,
+    summary: snapshot.summary,
+    organizationSuggestion: snapshot.organizationSuggestion ?? null,
+  };
 }
 
 export default function AddAnythingScreen() {
@@ -54,6 +71,7 @@ export default function AddAnythingScreen() {
   const pendingUploadRef = useRef<{ documentId: string; fileName: string } | null>(
     null
   );
+  const stagingProfileIdRef = useRef<string | null>(null);
   const [stage, setStage] = useState<Stage>("input");
   const [status, setStatus] = useState("");
   const [processingSlow, setProcessingSlow] = useState(false);
@@ -84,13 +102,22 @@ export default function AddAnythingScreen() {
       if (!profile) return;
       pendingUploadRef.current = null;
       setProcessingSlow(false);
-      const card = buildSmartUploadPresentation(result, profile.display_name);
+      const stagingProfileId = stagingProfileIdRef.current ?? profile.id;
+      const shouldRecommend = shouldPromptSmartUpload(result, stagingProfileId);
+      const card = shouldRecommend
+        ? buildSmartUploadPresentation(result, profile.display_name)
+        : null;
       if (card) {
         setPresentation(card);
         setStage("recommend");
         return;
       }
-      setSavedProfileId(profile.id);
+      setSavedProfileId(
+        result.organizationSuggestion?.suggestedVaultId ??
+          result.organizationSuggestion?.suggestedProfileId ??
+          stagingProfileId
+      );
+      stagingProfileIdRef.current = null;
       setStage("done");
     },
     [profile]
@@ -98,16 +125,9 @@ export default function AddAnythingScreen() {
 
   const finishProcessingEarly = useCallback(() => {
     if (!snapshot || !pendingUploadRef.current) return;
-    finishWithResult({
-      documentId: snapshot.documentId,
-      fileName: pendingUploadRef.current.fileName,
-      analyzed:
-        snapshot.analysisStatus === "completed" ||
-        Boolean(snapshot.title || snapshot.summary),
-      title: snapshot.title,
-      documentType: snapshot.documentType,
-      summary: snapshot.summary,
-    });
+    finishWithResult(
+      uploadResultFromSnapshot(snapshot, pendingUploadRef.current.fileName)
+    );
     setProcessingDocId(null);
   }, [snapshot, finishWithResult]);
 
@@ -122,6 +142,22 @@ export default function AddAnythingScreen() {
 
   useEffect(() => {
     if (!snapshot || stage !== "processing") return;
+
+    const pendingResult = uploadResultFromSnapshot(
+      snapshot,
+      pendingUploadRef.current?.fileName ?? "Document"
+    );
+    const stagingProfileId = stagingProfileIdRef.current;
+    if (
+      stagingProfileId &&
+      pendingResult.organizationSuggestion &&
+      shouldPromptSmartUpload(pendingResult, stagingProfileId)
+    ) {
+      finishWithResult(pendingResult);
+      setProcessingDocId(null);
+      return;
+    }
+
     if (snapshot.active) {
       setStatus(snapshot.processingLabel || "Analyzing content…");
       return;
@@ -132,14 +168,7 @@ export default function AddAnythingScreen() {
       setProcessingDocId(null);
       return;
     }
-    finishWithResult({
-      documentId: snapshot.documentId,
-      fileName: pendingUploadRef.current?.fileName ?? "Document",
-      analyzed: true,
-      title: snapshot.title,
-      documentType: snapshot.documentType,
-      summary: snapshot.summary,
-    });
+    finishWithResult(pendingResult);
     setProcessingDocId(null);
   }, [snapshot, stage, finishWithResult]);
 
@@ -165,10 +194,15 @@ export default function AddAnythingScreen() {
     }
 
     try {
+      const stagingProfileId = await resolveAddAnythingStagingProfileId();
+      stagingProfileIdRef.current = stagingProfileId;
+      const stagingProfile =
+        profiles.find((p) => p.id === stagingProfileId) ?? profile;
+
       const result = await uploadAndAnalyzeToVault({
         userId: user.id,
-        profileId: profile.id,
-        ownerUserId: profile.owner_user_id,
+        profileId: stagingProfileId,
+        ownerUserId: stagingProfile.owner_user_id,
         file,
         onStatus: setStatus,
       });

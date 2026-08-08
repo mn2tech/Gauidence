@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { recoverStaleProcessingJobs } from "@/lib/documents/processingJobs";
+import { toOrganizationSuggestionPayload } from "@/lib/organization/payload";
+import type { OrganizationSuggestionRow } from "@/lib/organization/types";
 import {
   deriveProcessingStage,
   documentReadiness,
@@ -84,8 +86,21 @@ export async function GET(
     .eq("document_id", id)
     .maybeSingle();
 
+  const { data: orgRow } = await supabase
+    .from("organization_suggestions")
+    .select("*")
+    .eq("document_id", id)
+    .eq("status", "pending")
+    .maybeSingle();
+
   const stage = deriveProcessingStage(doc);
   const active = isProcessingActive(stage);
+  const organizationSuggestion = orgRow
+    ? toOrganizationSuggestionPayload(
+        orgRow as OrganizationSuggestionRow,
+        null
+      )
+    : null;
 
   return NextResponse.json({
     documentId: doc.id,
@@ -111,5 +126,6 @@ export async function GET(
     model: extracted?.model ?? null,
     title: extracted?.title ?? null,
     documentType: extracted?.document_type ?? null,
+    organizationSuggestion,
   });
 }
