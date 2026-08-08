@@ -214,6 +214,19 @@ describe("chatScopedProfilePayload", () => {
     ).toEqual({ id: "personal", display_name: "Personal" });
     expect(
       resolveExplicitSpaceScope({
+        question: "What do I have in my Personal space about Nolan?",
+        accessibleProfiles: [
+          { id: "mk-personal", display_name: "Michael Kola", profile_type: "personal" },
+          { id: "nolan", display_name: "Nolan Kola", profile_type: "child" },
+        ],
+      })
+    ).toEqual({
+      id: "mk-personal",
+      display_name: "Michael Kola",
+      profile_type: "personal",
+    });
+    expect(
+      resolveExplicitSpaceScope({
         question: "Show files in Nolan's space",
         accessibleProfiles: scopedProfiles,
       })

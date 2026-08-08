@@ -71,7 +71,7 @@ export function formatVaultFileListForGideon(
   profileNames: Record<string, string>
 ): string {
   if (files.length === 0) {
-    return "(no documents or photos uploaded in the active vault scope)";
+    return "(no documents or photos uploaded in the active space scope)";
   }
 
   const byProfile = new Map<string, VaultFileInventoryRow[]>();
@@ -83,7 +83,7 @@ export function formatVaultFileListForGideon(
 
   const blocks: string[] = [];
   for (const [profileId, rows] of byProfile) {
-    const vaultName = profileNames[profileId]?.trim() || "Vault";
+    const spaceName = profileNames[profileId]?.trim() || "Space";
     const photos = rows.filter(isPhoto);
     const documents = rows.filter((row) => !isPhoto(row));
     const lines: string[] = [];
@@ -97,7 +97,7 @@ export function formatVaultFileListForGideon(
         `Photos (${photos.length}): ${photos.map((p) => p.file_name).join(", ")}`
       );
     }
-    blocks.push(`${vaultName}:\n${lines.join("\n")}`);
+    blocks.push(`${spaceName}:\n${lines.join("\n")}`);
   }
 
   return blocks.join("\n\n");
@@ -111,7 +111,7 @@ export function formatVaultFileSummaryForGideon(
 ): string {
   const total = files.length;
   if (total === 0) {
-    return "(no documents or photos uploaded in the active vault scope)";
+    return "(no documents or photos uploaded in the active space scope)";
   }
 
   const byProfile = new Map<string, VaultFileInventoryRow[]>();
@@ -126,7 +126,7 @@ export function formatVaultFileSummaryForGideon(
   ];
 
   for (const [profileId, rows] of byProfile) {
-    const vaultName = profileNames[profileId]?.trim() || "Vault";
+    const spaceName = profileNames[profileId]?.trim() || "Space";
     const totalInVault = countsByProfile[profileId] ?? rows.length;
     const recent = rows
       .slice(0, RECENT_VAULT_FILE_PREVIEW)
@@ -136,7 +136,7 @@ export function formatVaultFileSummaryForGideon(
       totalInVault > RECENT_VAULT_FILE_PREVIEW
         ? ` (+${totalInVault - RECENT_VAULT_FILE_PREVIEW} more)`
         : "";
-    lines.push(`${vaultName}: ${totalInVault} file(s). Recent: ${recent}${more}`);
+    lines.push(`${spaceName}: ${totalInVault} file(s). Recent: ${recent}${more}`);
   }
 
   return lines.join("\n");

@@ -83,7 +83,7 @@ ${blocks.fileInventory}
 ${blocks.attachedDocument}
 --- END ATTACHED DOCUMENT ---
 
---- RETRIEVED DAILY LOGS (user-entered notes; vault owner labeled when linked) ---
+--- RETRIEVED DAILY LOGS (user-entered notes; space owner labeled when linked) ---
 ${blocks.dailyLogs}
 --- END DAILY LOGS ---
 
@@ -95,7 +95,7 @@ ${blocks.clientRequests}
 ${blocks.proposals}
 --- END PROPOSALS ---
 
---- UPCOMING SCHEDULE (saved reminders and document deadlines; vault owner labeled when linked) ---
+--- UPCOMING SCHEDULE (saved reminders and document deadlines; space owner labeled when linked) ---
 ${blocks.schedule}
 --- END UPCOMING SCHEDULE ---
 

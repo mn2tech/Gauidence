@@ -108,6 +108,7 @@ export async function loadWorkspaceContext(
   const scopeCandidates = meta.accessibleProfiles.map((p) => ({
     id: p.id,
     display_name: p.display_name,
+    profile_type: p.profile_type,
   }));
   const explicitSpace = resolveExplicitSpaceScope({
     question: retrievalQuestion,
@@ -331,14 +332,23 @@ export async function loadWorkspaceContext(
     ? `The user clicked "Continue with Gideon" to resume this project. Prioritize this project's mission, step, blockers, and recent sessions.\n\n${workMemoryBody}`
     : workMemoryBody;
 
+  const explicitScopeNote = explicitSpace
+    ? `This question is scoped to the ${explicitSpace.display_name} space only. Use RETRIEVED EXCERPTS, DAILY LOGS, and VAULT FILE INVENTORY for that space.${
+        /\babout\b/i.test(retrievalQuestion)
+          ? " Filter to the topic named in the question — do not dump full file lists from other spaces; one brief redirect sentence is enough if nothing matches."
+          : ""
+      }\n\n`
+    : "";
+
   const allVaultsNote =
-    meta.searchScope === "global" && retrievalScopes.length > 1
+    explicitScopeNote +
+    (meta.searchScope === "global" && retrievalScopes.length > 1
       ? `${GIDEON_CROSS_VAULT_NOTE}
 
-Active vault in the UI: ${activeProfile.display_name}. Document search includes all ${retrievalScopes.length} vaults you can access (${retrievalScopes.map((s) => s.display_name).join(", ")}).`
+Active space in the UI: ${activeProfile.display_name}. Document search includes all ${retrievalScopes.length} spaces and workspaces you can access (${retrievalScopes.map((s) => s.display_name).join(", ")}).`
       : retrievalScopes.length > 1
-        ? `Search includes ${retrievalScopes.map((s) => s.display_name).join(", ")} for this chat. Attribute facts to the correct vault.`
-        : "Search this vault's documents, Daily Logs, client requests, and upcoming schedule; use GENERAL KNOWLEDGE when the vault does not contain the answer.";
+        ? `Search includes ${retrievalScopes.map((s) => s.display_name).join(", ")} for this chat. Attribute facts to the correct space.`
+        : "Search this space's documents, Daily Logs, client requests, and upcoming schedule; use GENERAL KNOWLEDGE when the space does not contain the answer.");
 
   const attachedTextLimit = transcriptionMode ? 30_000 : 12_000;
   const attachedContext = attachedDoc

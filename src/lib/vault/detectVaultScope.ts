@@ -1,9 +1,11 @@
 import type { GuardianProfileType } from "@/lib/profiles/types";
+import { PROFILE_TYPE_LABELS } from "@/lib/profiles/types";
 import type { SearchScopeMode } from "@/lib/workspace-context/searchScope";
 
 export type VaultScopeCandidate = {
   id: string;
   display_name: string;
+  profile_type?: GuardianProfileType;
 };
 
 function escapeRegex(value: string): string {
@@ -172,6 +174,37 @@ export function dominantRetrievalProfileId(
   return null;
 }
 
+const SPACE_HINT_TYPES: Record<string, GuardianProfileType[]> = {
+  personal: ["personal"],
+  family: ["family"],
+  business: ["business"],
+  nonprofit: ["non_profit"],
+  "non-profit": ["non_profit"],
+  "non profit": ["non_profit"],
+  employee: ["employee"],
+  client: ["client"],
+  child: ["child"],
+  student: ["student"],
+  teacher: ["teacher"],
+  vehicle: ["vehicle", "vehicles"],
+  home: ["home"],
+  pet: ["pet"],
+  hobby: ["hobby"],
+};
+
+function profileTypesForSpaceHint(hint: string): GuardianProfileType[] | null {
+  const key = hint.trim().toLowerCase();
+  if (SPACE_HINT_TYPES[key]) return SPACE_HINT_TYPES[key]!;
+
+  for (const [type, label] of Object.entries(PROFILE_TYPE_LABELS)) {
+    const normalized = label.toLowerCase();
+    if (normalized === key || normalized.startsWith(`${key} `)) {
+      return [type as GuardianProfileType];
+    }
+  }
+  return null;
+}
+
 /**
  * When the user scopes a question to a named space ("in my Personal space about Nolan"),
  * return that profile if the name resolves unambiguously.
@@ -198,6 +231,14 @@ export function resolveExplicitSpaceScope(args: {
     profileMentionedInQuestion(nameHint, p.display_name)
   );
   if (loose.length === 1) return loose[0]!;
+
+  const hintedTypes = profileTypesForSpaceHint(nameHint);
+  if (hintedTypes) {
+    const typed = args.accessibleProfiles.filter(
+      (p) => p.profile_type && hintedTypes.includes(p.profile_type)
+    );
+    if (typed.length === 1) return typed[0]!;
+  }
 
   return null;
 }
