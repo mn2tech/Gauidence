@@ -4222,6 +4222,16 @@ export default function VaultChatPanel({
                     <FileUp className="h-4 w-4 text-brand" />
                     Import ChatGPT / Claude
                   </button>
+                  <div className="my-1 border-t border-stone-100" role="separator" />
+                  <Link
+                    href="/settings/profiles?add=1&return=%2Fask"
+                    role="menuitem"
+                    onClick={() => setPlusOpen(false)}
+                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-medium text-foreground hover:bg-stone-50"
+                  >
+                    <FolderOpen className="h-4 w-4 text-brand" />
+                    New space
+                  </Link>
                 </div>
               )}
             </div>
