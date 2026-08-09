@@ -36,7 +36,7 @@ const KIND_META: Record<
   SearchResultKind,
   { label: string; icon: typeof Search }
 > = {
-  profile: { label: "People & spaces", icon: UserRound },
+  profile: { label: "Your spaces", icon: UserRound },
   daily_log: { label: "Daily Logs", icon: NotebookPen },
   document: { label: "Documents", icon: FileText },
   chat: { label: "Gideon conversations", icon: MessageCircle },

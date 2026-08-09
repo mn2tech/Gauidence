@@ -7,7 +7,7 @@ import SiteFooter from "@/components/SiteFooter";
 import ProfilesManager from "./ProfilesManager";
 
 export const metadata: Metadata = {
-  title: "People & spaces — Guardian",
+  title: "Your spaces — Guardian",
 };
 
 export default async function ProfilesSettingsPage() {

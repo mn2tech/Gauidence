@@ -299,6 +299,17 @@ export function defaultParentChoice(
   return null;
 }
 
+/** True when the user must pick where the space lives (multiple valid parents). */
+export function spaceCreateNeedsPlacementPicker(
+  proposal: ProposedSpaceCreate,
+  profiles: Pick<GuardianProfile, "id" | "display_name" | "profile_type">[]
+): boolean {
+  if (profileTypeRequiresParent(proposal.profileType)) {
+    return validParentProfilesForChild(profiles, proposal.profileType).length > 1;
+  }
+  return proposal.parentPlacement === "under_parent";
+}
+
 export function spaceCreatePlacementLabel(
   proposal: ProposedSpaceCreate,
   parentId: string | null,

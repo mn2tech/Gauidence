@@ -1,5 +1,6 @@
 "use client";
 
+import AnalyticsProvider from "@/components/AnalyticsProvider";
 import { ProfileProvider } from "@/components/ProfileProvider";
 import GideonNudge from "@/components/GideonNudge";
 import AwardToast from "@/components/AwardToast";
@@ -12,13 +13,15 @@ export default function AppProviders({
   children: React.ReactNode;
 }) {
   return (
-    <ProfileProvider>
-      <OnboardingGate>
-        {children}
+    <AnalyticsProvider>
+      <ProfileProvider>
+        <OnboardingGate>
+          {children}
         <GideonNudge />
         <AwardToast />
         <RetentionWelcomeTrigger />
-      </OnboardingGate>
-    </ProfileProvider>
+        </OnboardingGate>
+      </ProfileProvider>
+    </AnalyticsProvider>
   );
 }

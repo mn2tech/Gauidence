@@ -141,6 +141,7 @@ import {
   parseProposedSpaceCreate,
   profileTypeRequiresParent,
   proposedSpaceCreateSummary,
+  spaceCreateNeedsPlacementPicker,
   spaceCreatePlacementLabel,
   stripProposedSpaceCreateSection,
   validParentProfilesForChild,
@@ -2920,6 +2921,9 @@ export default function VaultChatPanel({
     const spaceCreateAllowsTopLevel = proposedSpaceCreate
       ? !profileTypeRequiresParent(proposedSpaceCreate.profileType)
       : false;
+    const spaceCreateNeedsPicker = proposedSpaceCreate
+      ? spaceCreateNeedsPlacementPicker(proposedSpaceCreate, profiles)
+      : false;
     const vaultScope = m.vaultScope;
     const showVaultScopeCard =
       vaultScope &&
@@ -3240,37 +3244,43 @@ export default function VaultChatPanel({
               </div>
             ) : (
               <div className="mt-3 space-y-2">
-                <label className="block text-xs font-semibold text-amber-900/80">
-                  Where should this live?
-                </label>
-                <select
-                  value={
-                    spaceCreateParentChoice === null &&
-                    spaceCreateAllowsTopLevel
-                      ? "__top__"
-                      : spaceCreateParentChoice ?? ""
-                  }
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setSpaceCreateParentChoices((prev) =>
-                      new Map(prev).set(
-                        m.id,
-                        value === "__top__" ? null : value
-                      )
-                    );
-                  }}
-                  className="w-full rounded-lg border border-stone-300 bg-white px-2.5 py-2 text-sm text-foreground"
-                >
-                  {spaceCreateAllowsTopLevel ? (
-                    <option value="__top__">Top level (independent space)</option>
-                  ) : null}
-                  {spaceCreateValidParents.map((parent) => (
-                    <option key={parent.id} value={parent.id}>
-                      Under {parent.display_name} (
-                      {getContainerLabel(parent.profile_type).toLowerCase()})
-                    </option>
-                  ))}
-                </select>
+                {spaceCreateNeedsPicker ? (
+                  <>
+                    <label className="block text-xs font-semibold text-amber-900/80">
+                      Where should this live?
+                    </label>
+                    <select
+                      value={
+                        spaceCreateParentChoice === null &&
+                        spaceCreateAllowsTopLevel
+                          ? "__top__"
+                          : spaceCreateParentChoice ?? ""
+                      }
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setSpaceCreateParentChoices((prev) =>
+                          new Map(prev).set(
+                            m.id,
+                            value === "__top__" ? null : value
+                          )
+                        );
+                      }}
+                      className="w-full rounded-lg border border-stone-300 bg-white px-2.5 py-2 text-sm text-foreground"
+                    >
+                      {spaceCreateAllowsTopLevel ? (
+                        <option value="__top__">
+                          Top level (independent space)
+                        </option>
+                      ) : null}
+                      {spaceCreateValidParents.map((parent) => (
+                        <option key={parent.id} value={parent.id}>
+                          Under {parent.display_name} (
+                          {getContainerLabel(parent.profile_type).toLowerCase()})
+                        </option>
+                      ))}
+                    </select>
+                  </>
+                ) : null}
                 <div className="flex flex-wrap gap-2 pt-1">
                   <button
                     type="button"
@@ -3470,10 +3480,8 @@ export default function VaultChatPanel({
   const showMinimalWelcome = !showExpandedWelcome;
   const logsOnly = fileCount === 0 && logCount > 0;
   const greetName = meta?.firstName;
-  const showCreateAnotherVault =
-    fileCount > 0 ||
-    onboardingProgress.hasDocument ||
-    topLevelProfiles(profiles).length > 1;
+  const hasOtherSpaces = topLevelProfiles(profiles).length > 1;
+  const showCreateSpaceShortcuts = showExpandedWelcome || hasOtherSpaces;
   const uploadCtaLabel = uploadCtaForProfileKind(active?.profile_type);
   const exampleUploads = (
     meta?.guidance?.suggestedUploads?.length
@@ -3817,10 +3825,10 @@ export default function VaultChatPanel({
             </div>
           ) : null}
 
-          {showExpandedWelcome && showCreateAnotherVault ? (
+          {showCreateSpaceShortcuts ? (
             <div className="rounded-xl border border-stone-200 bg-stone-50/80 px-3 py-3">
               <p className="text-xs font-semibold text-foreground">
-                Create another Vault
+                {hasOtherSpaces ? "Create another space" : "Create a space"}
               </p>
               <p className="mt-1 text-xs leading-relaxed text-ink-muted">
                 Keep every part of your life completely separate while using one

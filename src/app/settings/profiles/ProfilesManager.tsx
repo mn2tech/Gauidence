@@ -9,6 +9,7 @@ import ProfileOrganizeList from "@/components/ProfileOrganizeList";
 import ProfileVaultMap from "@/components/ProfileVaultMap";
 import {
   PROFILE_CREATE_GROUPS,
+  VAULT_CREATE_CARDS,
   canAttachChildToParent,
   optionsForCreateGroup,
   topLevelProfiles,
@@ -31,6 +32,7 @@ export default function ProfilesManager() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<GuardianProfile | null>(null);
+  const [showAllTypes, setShowAllTypes] = useState(false);
 
   const groupOptions = useMemo(
     () => (groupId ? optionsForCreateGroup(groupId) : []),
@@ -72,6 +74,15 @@ export default function ProfilesManager() {
     setDisplayName("");
     setExtra({});
     setError(null);
+    setShowAllTypes(false);
+  };
+
+  const pickCreateCard = (card: (typeof VAULT_CREATE_CARDS)[number]) => {
+    setGroupId(card.group);
+    setOptionId(card.optionId ?? null);
+    setDisplayName("");
+    setExtra({});
+    setStep(card.optionId ? 3 : 2);
   };
 
   /** If there's exactly one matching container, nest new people/assets under it. */
@@ -318,10 +329,10 @@ export default function ProfilesManager() {
             Settings
           </Link>
           <h1 className="mt-2 text-2xl font-bold tracking-tight">
-            People & spaces
+            Your spaces
           </h1>
           <p className="mt-1 text-sm text-ink-muted">
-            One login, separate spaces and workspaces for each person, business, or place.
+            One login, separate spaces for each person, business, or place.
             Active:{" "}
             <span className="font-medium text-foreground">
               {active?.display_name ?? "—"}
@@ -335,7 +346,7 @@ export default function ProfilesManager() {
             className="inline-flex items-center gap-2 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark"
           >
             <Plus className="h-4 w-4" />
-            Add someone or something
+            New space
           </button>
         )}
       </div>
@@ -350,32 +361,60 @@ export default function ProfilesManager() {
         <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
           {step === 1 ? (
             <>
-              <h2 className="text-base font-semibold">
-                What would you like to create?
-              </h2>
+              <h2 className="text-base font-semibold">New space</h2>
               <p className="mt-1 text-sm text-ink-muted">
-                Personal Space, Family Space, Business Workspace, and more.
+                Pick a type, name it, and you&apos;re in.
               </p>
-              <ul className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                {PROFILE_CREATE_GROUPS.map((g) => (
-                  <li key={g.id}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setGroupId(g.id);
-                        setOptionId(null);
-                        setStep(2);
-                      }}
-                      className="flex h-full w-full flex-col rounded-xl border border-stone-200 px-3 py-3 text-left transition hover:border-brand hover:bg-brand-light/40"
-                    >
-                      <span className="text-sm font-semibold">{g.label}</span>
-                      <span className="mt-1 text-xs text-ink-muted">
-                        {g.description}
-                      </span>
-                    </button>
-                  </li>
+              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {VAULT_CREATE_CARDS.map((card) => (
+                  <button
+                    key={card.id}
+                    type="button"
+                    onClick={() => pickCreateCard(card)}
+                    className="flex items-center gap-2 rounded-lg border border-stone-200 bg-white px-2.5 py-2 text-left text-xs font-medium text-foreground transition hover:border-brand hover:bg-brand-light/40"
+                  >
+                    <span className="shrink-0" aria-hidden>
+                      {card.emoji}
+                    </span>
+                    {card.label}
+                  </button>
                 ))}
-              </ul>
+              </div>
+              {!showAllTypes ? (
+                <button
+                  type="button"
+                  onClick={() => setShowAllTypes(true)}
+                  className="mt-4 text-sm font-medium text-brand hover:text-brand-dark"
+                >
+                  More types…
+                </button>
+              ) : (
+                <>
+                  <p className="mt-5 text-xs font-semibold uppercase tracking-wide text-ink-muted">
+                    All categories
+                  </p>
+                  <ul className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                    {PROFILE_CREATE_GROUPS.map((g) => (
+                      <li key={g.id}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setGroupId(g.id);
+                            setOptionId(null);
+                            setStep(2);
+                          }}
+                          className="flex h-full w-full flex-col rounded-xl border border-stone-200 px-3 py-3 text-left transition hover:border-brand hover:bg-brand-light/40"
+                        >
+                          <span className="text-sm font-semibold">{g.label}</span>
+                          <span className="mt-1 text-xs text-ink-muted">
+                            {g.description}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
               <button
                 type="button"
                 onClick={() => setAdding(false)}
@@ -425,7 +464,7 @@ export default function ProfilesManager() {
           ) : (
             <>
               <h2 className="text-base font-semibold">
-                {option?.label ?? "New profile"}
+                {option?.label ?? "Name your space"}
               </h2>
               {suggestedParentId ? (
                 <p className="mt-1 text-xs text-ink-muted">

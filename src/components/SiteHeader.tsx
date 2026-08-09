@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -7,7 +8,9 @@ import { Camera, LogOut, Menu, Search, ShieldCheck, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import ProfileSwitcher from "@/components/ProfileSwitcher";
 import { useActiveProfile } from "@/components/ProfileProvider";
-import GlobalVaultSearch from "@/components/GlobalVaultSearch";
+const GlobalVaultSearch = dynamic(() => import("@/components/GlobalVaultSearch"), {
+  ssr: false,
+});
 import { documentsHref, PROPOSALS_PATH, REQUESTS_PATH, VAULT_NAV_LABEL } from "@/lib/routes";
 import { useOnboardingProgress } from "@/hooks/useOnboardingProgress";
 import { useEmployeeHubEntitlements } from "@/hooks/useEmployeeHubEntitlements";
@@ -128,13 +131,13 @@ export default function SiteHeader() {
         <nav className="hidden items-center gap-6 text-sm text-ink-muted sm:flex">
           {!showSimpleNav ? (
             <>
-          <Link href="/pricing" className="hover:text-foreground">
+          <Link href="/pricing" className="hover:text-foreground" data-analytics="nav_pricing">
             Pricing
           </Link>
-          <Link href="/security" className="hover:text-foreground">
+          <Link href="/security" className="hover:text-foreground" data-analytics="nav_security">
             Security Principles
           </Link>
-          <Link href="/help" className="hover:text-foreground">
+          <Link href="/help" className="hover:text-foreground" data-analytics="nav_help">
             Help
           </Link>
             </>
@@ -148,6 +151,7 @@ export default function SiteHeader() {
                     type="button"
                     onClick={() => setSearchOpen(true)}
                     aria-label="Search vaults"
+                    data-analytics="nav_search"
                     title="Search (Ctrl+K)"
                     className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-3 py-1.5 font-medium text-foreground transition hover:border-stone-400 hover:bg-stone-50"
                   >
@@ -160,6 +164,7 @@ export default function SiteHeader() {
                   <Link
                     href={cameraHref}
                     aria-label="Scan with camera"
+                    data-analytics="nav_scan"
                     title="Scan with camera"
                     className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-3 py-1.5 font-medium text-foreground transition hover:border-stone-400 hover:bg-stone-50"
                   >
@@ -169,7 +174,7 @@ export default function SiteHeader() {
                 </>
               ) : null}
               {showGideon ? (
-                <Link href={askHref} className="hover:text-foreground">
+                <Link href={askHref} className="hover:text-foreground" data-analytics="nav_ask_gideon">
                   Ask Gideon
                 </Link>
               ) : null}
@@ -439,7 +444,7 @@ export default function SiteHeader() {
         </div>
       )}
     </header>
-      {signedIn && !needsSetup ? (
+      {signedIn && !needsSetup && searchOpen ? (
         <GlobalVaultSearch
           open={searchOpen}
           onClose={() => setSearchOpen(false)}

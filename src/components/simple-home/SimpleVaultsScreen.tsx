@@ -151,12 +151,20 @@ export default function SimpleVaultsScreen() {
         })}
       </ul>
 
-      <Link
-        href="/settings/profiles"
-        className="mt-5 inline-block text-sm font-semibold text-brand-dark hover:underline"
-      >
-        Manage spaces
-      </Link>
+      <div className="mt-5 flex flex-wrap items-center gap-4">
+        <Link
+          href="/settings/profiles?add=1"
+          className="text-sm font-semibold text-brand-dark hover:underline"
+        >
+          New space
+        </Link>
+        <Link
+          href="/settings/profiles"
+          className="text-sm font-semibold text-brand-dark hover:underline"
+        >
+          Manage all spaces
+        </Link>
+      </div>
     </div>
   );
 }

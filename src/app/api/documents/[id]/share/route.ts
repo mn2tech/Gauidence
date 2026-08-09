@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import type { User, SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { requireOwnedGuardianProfile } from "@/lib/profiles/server";
+import { getAppBaseUrl } from "@/lib/url/appBaseUrl";
 
 export const runtime = "nodejs";
 
@@ -139,16 +140,12 @@ export async function POST(request: Request, ctx: Ctx) {
     );
   }
 
-  const origin =
-    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
-    (process.env.VERCEL_PROJECT_PRODUCTION_URL
-      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-      : null);
+  const origin = getAppBaseUrl({ preferProduction: true });
 
   return NextResponse.json(
     {
       share,
-      url: origin ? `${origin}/share/${share.token}` : `/share/${share.token}`,
+      url: `${origin}/share/${share.token}`,
     },
     { status: 201 }
   );

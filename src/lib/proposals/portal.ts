@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createHash, randomBytes } from "node:crypto";
+import { getAppBaseUrl } from "@/lib/url/appBaseUrl";
 
 const TOKEN_BYTES = 32;
 
@@ -14,12 +15,7 @@ export function hashProposalPortalToken(token: string): string {
 }
 
 export function proposalPortalUrl(token: string): string {
-  const base =
-    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ??
-    process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : "http://localhost:3000";
-  return `${base}/proposal/${token}`;
+  return `${getAppBaseUrl()}/proposal/${token}`;
 }
 
 export function defaultPortalExpiry(days = 30): string {

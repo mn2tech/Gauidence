@@ -34,8 +34,14 @@ export default function ProfileSetupHub({
         What would you like to create?
       </h2>
       <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-        Choose a Space or Workspace to get started. You can add more anytime from
-        Manage spaces.
+        Choose a space to get started. You can add more anytime from{" "}
+        <Link
+          href="/settings/profiles"
+          className="font-semibold text-brand hover:text-brand-dark"
+        >
+          Manage all spaces
+        </Link>
+        .
       </p>
       <p className="mt-3 text-sm text-ink-muted">
         Need a walkthrough?{" "}

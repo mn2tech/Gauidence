@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
-import ClientRequestsScreen from "@/components/client-requests/ClientRequestsScreen";
+import ClientRequestsScreen from "@/components/client-requests/ClientRequestsScreenLazy";
 
 export const metadata: Metadata = {
   title: "Requests — Guardian",
