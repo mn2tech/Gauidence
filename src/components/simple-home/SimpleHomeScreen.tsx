@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
   FolderOpen,
+  FolderPlus,
   MessageCircle,
   NotebookPen,
   Plus,
@@ -171,6 +172,22 @@ export default function SimpleHomeScreen() {
           );
         })}
       </div>
+
+      <Link
+        href="/settings/profiles?add=1&return=%2Fhome"
+        className="simple-home-card welcome-strip flex items-center gap-3 p-4 transition hover:shadow-card"
+        style={{ animationDelay: "0.08s" }}
+      >
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-light text-brand">
+          <FolderPlus className="h-5 w-5" aria-hidden />
+        </span>
+        <span className="min-w-0">
+          <span className="block text-sm font-semibold text-foreground">New space</span>
+          <span className="mt-0.5 block text-xs text-ink-muted">
+            Family, business, personal, and more
+          </span>
+        </span>
+      </Link>
 
       <form
         onSubmit={handleAskSubmit}

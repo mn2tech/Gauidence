@@ -27,12 +27,13 @@ function isPathActive(pathname: string, href: string, exact: boolean) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export default function SimpleNavigation() {
+export default function SimpleNavigation({ onAddClick }: { onAddClick?: () => void }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const spacesActive =
     pathname === VAULTS_PATH ||
     (pathname === "/dashboard" && searchParams.has("docs"));
+  const addActive = pathname === ADD_ANYTHING_PATH;
 
   return (
     <nav aria-label="Primary" className="simple-nav-bar fixed inset-x-0 bottom-0 z-40">
@@ -74,19 +75,32 @@ export default function SimpleNavigation() {
           </span>
           <span className="truncate text-[10px] font-semibold">{SPACES_NAV_LABEL}</span>
         </Link>
-        <Link
-          href={ADD_ANYTHING_PATH}
-          className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 transition ${
-            pathname === ADD_ANYTHING_PATH
-              ? "text-brand"
-              : "text-ink-muted hover:text-foreground"
-          }`}
-        >
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand text-white shadow-sm ring-4 ring-brand-light/80">
-            <Plus className="h-4 w-4" aria-hidden />
-          </span>
-          <span className="truncate text-[10px] font-semibold">Add</span>
-        </Link>
+        {onAddClick ? (
+          <button
+            type="button"
+            onClick={onAddClick}
+            className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 transition ${
+              addActive ? "text-brand" : "text-ink-muted hover:text-foreground"
+            }`}
+          >
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand text-white shadow-sm ring-4 ring-brand-light/80">
+              <Plus className="h-4 w-4" aria-hidden />
+            </span>
+            <span className="truncate text-[10px] font-semibold">Add</span>
+          </button>
+        ) : (
+          <Link
+            href={ADD_ANYTHING_PATH}
+            className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 transition ${
+              addActive ? "text-brand" : "text-ink-muted hover:text-foreground"
+            }`}
+          >
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand text-white shadow-sm ring-4 ring-brand-light/80">
+              <Plus className="h-4 w-4" aria-hidden />
+            </span>
+            <span className="truncate text-[10px] font-semibold">Add</span>
+          </Link>
+        )}
       </div>
     </nav>
   );

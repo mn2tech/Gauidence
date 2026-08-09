@@ -1,16 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { FileUp, NotebookPen, MessageCircle, FolderPlus, X } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { FileUp, FolderPlus, NotebookPen, MessageCircle, X } from "lucide-react";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import { ADD_ANYTHING_PATH, REMEMBER_TODAY_PATH } from "@/lib/simple-home/routing";
 import { REQUESTS_PATH } from "@/lib/routes";
 import { clientBusinessLabel } from "@/lib/client-requests/helpers";
-import {
-  canEditGuardianProfile,
-  spaceCreateHref,
-  SPACE_CREATE_OPTIONS,
-} from "@/lib/profiles/types";
+import { canEditGuardianProfile } from "@/lib/profiles/types";
 
 type SimpleNewMenuProps = {
   open: boolean;
@@ -18,19 +15,22 @@ type SimpleNewMenuProps = {
 };
 
 export default function SimpleNewMenu({ open, onClose }: SimpleNewMenuProps) {
+  const pathname = usePathname();
   const { active, profiles } = useActiveProfile();
 
   if (!open) return null;
 
   const businessLabel = clientBusinessLabel(profiles, active);
   const canEdit = active ? canEditGuardianProfile(active) : true;
+  const returnTo =
+    pathname?.startsWith("/") && !pathname.startsWith("//") ? pathname : "/home";
+  const newSpaceHref = `/settings/profiles?add=1&return=${encodeURIComponent(returnTo)}`;
 
   const noteHref = REMEMBER_TODAY_PATH;
   const requestHref =
     active?.profile_type === "client"
       ? `${REQUESTS_PATH}?new=1`
       : `/ask?draft=${encodeURIComponent("I need to request something.")}`;
-  const addSpaceHref = spaceCreateHref(SPACE_CREATE_OPTIONS[0], "/home");
 
   const options = [
     ...(canEdit
@@ -61,9 +61,9 @@ export default function SimpleNewMenu({ open, onClose }: SimpleNewMenuProps) {
     ...(canEdit
       ? [
           {
-            href: addSpaceHref,
-            label: "Create a space",
-            description: "Add a new Space or Workspace",
+            href: newSpaceHref,
+            label: "New space",
+            description: "Family, business, personal, and more",
             icon: FolderPlus,
           },
         ]

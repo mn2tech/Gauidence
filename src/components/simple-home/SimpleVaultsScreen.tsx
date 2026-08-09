@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronRight, Users } from "lucide-react";
+import { ChevronRight, FolderPlus, Users } from "lucide-react";
 import ProfileAvatar from "@/components/ProfileAvatar";
 import ProfileSetupHub from "@/components/ProfileSetupHub";
 import { useActiveProfile } from "@/components/ProfileProvider";
@@ -49,6 +49,13 @@ export default function SimpleVaultsScreen() {
         <p className="mt-1.5 text-sm text-ink-muted">
           How Guardian has organized your knowledge.
         </p>
+        <Link
+          href="/settings/profiles?add=1&return=%2Fvaults"
+          className="mt-4 inline-flex items-center gap-2 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark"
+        >
+          <FolderPlus className="h-4 w-4" aria-hidden />
+          New space
+        </Link>
       </header>
 
       <ul className="space-y-3">
