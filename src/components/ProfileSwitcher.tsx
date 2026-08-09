@@ -338,14 +338,14 @@ function ProfileMenu({
           className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-brand hover:bg-stone-50"
         >
           <Plus className="h-4 w-4" />
-          Add a vault
+          New space
         </Link>
         <Link
           href="/settings/profiles"
           onClick={onClose}
           className="block px-3 py-2 text-sm text-ink-muted hover:bg-stone-50 hover:text-foreground"
         >
-          Manage spaces
+          Manage all spaces
         </Link>
       </div>
     </div>

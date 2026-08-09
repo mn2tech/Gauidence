@@ -140,7 +140,7 @@ export default function OnboardingIntentScreen({ onComplete }: Props) {
               School — which fits best?
             </h1>
             <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-              We&apos;ll create a vault tailored for classroom or student life.
+              We&apos;ll create a space tailored for classroom or student life.
             </p>
             <ul className="mt-6 grid gap-2.5">
               {SCHOOL_INTENT_OPTIONS.map((opt) => (

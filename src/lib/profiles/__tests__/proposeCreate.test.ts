@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   parseProposedSpaceCreate,
+  spaceCreateNeedsPlacementPicker,
   stripProposedSpaceCreateSection,
   wantsSpaceCreate,
   proposedSpaceCreateSummary,
@@ -78,5 +79,62 @@ describe("proposedSpaceCreateSummary", () => {
     });
     assert.match(summary, /Acme/);
     assert.match(summary, /top level/i);
+  });
+});
+
+describe("spaceCreateNeedsPlacementPicker", () => {
+  const biz = {
+    id: "11111111-1111-4111-8111-111111111111",
+    display_name: "Acme",
+    profile_type: "business" as const,
+  };
+  const biz2 = {
+    id: "22222222-2222-4222-8222-222222222222",
+    display_name: "Beta Co",
+    profile_type: "business" as const,
+  };
+
+  it("skips picker for top-level business spaces", () => {
+    assert.equal(
+      spaceCreateNeedsPlacementPicker(
+        {
+          displayName: "Acme LLC",
+          profileType: "business",
+          parentPlacement: "top_level",
+        },
+        [biz]
+      ),
+      false
+    );
+  });
+
+  it("shows picker when multiple parent options exist", () => {
+    assert.equal(
+      spaceCreateNeedsPlacementPicker(
+        {
+          displayName: "Jane",
+          profileType: "client",
+          parentPlacement: "under_parent",
+          parentProfileId: biz.id,
+        },
+        [biz, biz2]
+      ),
+      true
+    );
+  });
+
+  it("skips picker when only one valid parent exists", () => {
+    assert.equal(
+      spaceCreateNeedsPlacementPicker(
+        {
+          displayName: "Jane",
+          profileType: "client",
+          parentPlacement: "under_parent",
+          parentProfileId: biz.id,
+        },
+        [biz]
+      ),
+      false
+    );
   });
 });
