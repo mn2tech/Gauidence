@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronRight, FolderPlus, Users } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ChevronDown, ChevronRight, FolderPlus, Users } from "lucide-react";
 import ProfileAvatar from "@/components/ProfileAvatar";
 import ProfileSetupHub from "@/components/ProfileSetupHub";
 import { useActiveProfile } from "@/components/ProfileProvider";
@@ -24,7 +25,34 @@ function clientsSectionHref(profileId: string) {
 
 export default function SimpleVaultsScreen() {
   const router = useRouter();
-  const { profiles, loading, switchProfile } = useActiveProfile();
+  const { profiles, active, loading, switchProfile } = useActiveProfile();
+  const [expandedParents, setExpandedParents] = useState<Set<string>>(
+    () => new Set()
+  );
+
+  useEffect(() => {
+    if (!active?.parent_profile_id) return;
+    setExpandedParents((prev) => {
+      if (prev.has(active.parent_profile_id!)) return prev;
+      const next = new Set(prev);
+      next.add(active.parent_profile_id!);
+      return next;
+    });
+  }, [active?.id, active?.parent_profile_id]);
+
+  const toggleParent = (parentId: string) => {
+    setExpandedParents((prev) => {
+      const next = new Set(prev);
+      if (next.has(parentId)) next.delete(parentId);
+      else next.add(parentId);
+      return next;
+    });
+  };
+
+  const openSpace = (profileId: string) => {
+    void switchProfile(profileId);
+    router.push(`${DOCUMENTS_PATH}#documents-${profileId}`);
+  };
 
   if (loading) {
     return <p className="p-6 text-sm text-ink-muted">Loading spaces…</p>;
@@ -70,29 +98,53 @@ export default function SimpleVaultsScreen() {
           const nestedChildren = showClientsLink
             ? children.filter((child) => child.profile_type !== "client")
             : children;
+          const hasSubItems = showClientsLink || nestedChildren.length > 0;
+          const expanded = !hasSubItems || expandedParents.has(space.id);
+          const subItemCount =
+            nestedChildren.length + (showClientsLink ? clientCount : 0);
 
           return (
             <li key={space.id} className="simple-home-card overflow-hidden">
-              <button
-                type="button"
-                onClick={() => {
-                  void switchProfile(space.id);
-                  router.push(`${DOCUMENTS_PATH}#documents-${space.id}`);
-                }}
-                className="flex w-full items-center gap-3 px-4 py-4 text-left transition hover:bg-brand-light/30"
-              >
-                <ProfileAvatar profile={space} size="md" />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-semibold text-foreground">
-                    {profileContainerName(space)}
+              <div className="flex items-stretch">
+                {hasSubItems ? (
+                  <button
+                    type="button"
+                    onClick={() => toggleParent(space.id)}
+                    aria-expanded={expanded}
+                    aria-label={`${expanded ? "Collapse" : "Expand"} ${profileContainerName(space)}`}
+                    className="flex shrink-0 items-center self-stretch rounded-l-xl px-3 text-ink-muted transition hover:bg-brand-light/30"
+                  >
+                    <ChevronDown
+                      className={`h-4 w-4 transition-transform ${
+                        expanded ? "" : "-rotate-90"
+                      }`}
+                      aria-hidden
+                    />
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => openSpace(space.id)}
+                  className={`flex min-w-0 flex-1 items-center gap-3 py-4 text-left transition hover:bg-brand-light/30 ${
+                    hasSubItems ? "pr-4 pl-1" : "px-4"
+                  }`}
+                >
+                  <ProfileAvatar profile={space} size="md" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-semibold text-foreground">
+                      {profileContainerName(space)}
+                    </span>
+                    <span className="block truncate text-sm text-ink-muted">
+                      {getContainerLabel(space.profile_type)}
+                      {hasSubItems && !expanded && subItemCount > 0
+                        ? ` · ${subItemCount} nested`
+                        : ""}
+                    </span>
                   </span>
-                  <span className="block truncate text-sm text-ink-muted">
-                    {getContainerLabel(space.profile_type)}
-                  </span>
-                </span>
-              </button>
+                </button>
+              </div>
 
-              {showClientsLink ? (
+              {expanded && showClientsLink ? (
                 <div className="border-t border-border-subtle px-4 py-2.5">
                   <button
                     type="button"
@@ -115,17 +167,14 @@ export default function SimpleVaultsScreen() {
                 </div>
               ) : null}
 
-              {nestedChildren.length > 0 ? (
+              {expanded && nestedChildren.length > 0 ? (
                 <ul className="border-t border-border-subtle px-2 pb-2">
                   {nestedChildren.map((child) => (
                     <li key={child.id}>
                       <div className="flex items-center gap-2 rounded-xl px-1 py-1 transition hover:bg-brand-light/35">
                         <button
                           type="button"
-                          onClick={() => {
-                            void switchProfile(child.id);
-                            router.push(`${DOCUMENTS_PATH}#documents-${child.id}`);
-                          }}
+                          onClick={() => openSpace(child.id)}
                           className="flex min-w-0 flex-1 items-center gap-3 px-2 py-2 text-left text-sm"
                         >
                           <ProfileAvatar profile={child} size="sm" />
