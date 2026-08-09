@@ -13,6 +13,7 @@ import {
   ChevronRight,
   FolderPlus,
   GripVertical,
+  Network,
   Users,
 } from "lucide-react";
 import ProfileAvatar from "@/components/ProfileAvatar";
@@ -35,6 +36,7 @@ import {
   type GuardianProfile,
 } from "@/lib/profiles/types";
 import { DOCUMENTS_PATH } from "@/lib/routes";
+import { VAULT_MAP_PATH } from "@/lib/simple-home/routing";
 
 function clientsSectionHref(profileId: string) {
   return `${DOCUMENTS_PATH}&profileId=${profileId}#clients-${profileId}`;
@@ -221,15 +223,26 @@ export default function SimpleVaultsScreen() {
             >
               Done
             </button>
-          ) : desktopDrag ? (
-            <button
-              type="button"
-              onClick={enterOrganizeMode}
-              className="shrink-0 rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-stone-50"
-            >
-              Organize
-            </button>
-          ) : null}
+          ) : (
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              <Link
+                href={VAULT_MAP_PATH}
+                className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-stone-50"
+              >
+                <Network className="h-4 w-4 text-brand" aria-hidden />
+                Map
+              </Link>
+              {desktopDrag ? (
+                <button
+                  type="button"
+                  onClick={enterOrganizeMode}
+                  className="rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-stone-50"
+                >
+                  Organize
+                </button>
+              ) : null}
+            </div>
+          )}
         </div>
         {!organizeMode ? (
           <Link

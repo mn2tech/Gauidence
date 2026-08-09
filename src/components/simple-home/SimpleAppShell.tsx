@@ -19,7 +19,6 @@ const GlobalVaultSearch = dynamic(() => import("@/components/GlobalVaultSearch")
   ssr: false,
 });
 import SimpleNavigation from "@/components/simple-home/SimpleNavigation";
-import SimpleNewMenu from "@/components/simple-home/SimpleNewMenu";
 import SimpleSecondaryNavLinks from "@/components/simple-home/SimpleSecondaryNavLinks";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import { SIMPLE_HOME_PATH } from "@/lib/simple-home/routing";
@@ -33,7 +32,6 @@ export default function SimpleAppShell({
   const { active, profiles, loading: profilesLoading } = useActiveProfile();
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [newMenuOpen, setNewMenuOpen] = useState(false);
 
   const needsSetup = !profilesLoading && profiles.length === 0;
   const cameraHref = active
@@ -168,8 +166,7 @@ export default function SimpleAppShell({
 
       {!needsSetup ? (
         <>
-          <SimpleNavigation onAddClick={() => setNewMenuOpen(true)} />
-          <SimpleNewMenu open={newMenuOpen} onClose={() => setNewMenuOpen(false)} />
+          <SimpleNavigation />
           {searchOpen ? (
             <GlobalVaultSearch
               open={searchOpen}
