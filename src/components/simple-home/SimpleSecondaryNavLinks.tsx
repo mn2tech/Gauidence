@@ -6,7 +6,7 @@ import { useEmployeeHubEntitlements } from "@/hooks/useEmployeeHubEntitlements";
 import { employeeShowsPowerNav } from "@/lib/employee-hub/entitlements";
 import { isOrgStyleProfile } from "@/lib/profiles/types";
 import { COMMAND_CENTER_PATH } from "@/lib/simple-home/routing";
-import { PROPOSALS_PATH } from "@/lib/routes";
+import { LEADS_PATH, PROPOSALS_PATH } from "@/lib/routes";
 
 type SimpleSecondaryNavLinksProps = {
   onNavigate?: () => void;
@@ -20,6 +20,7 @@ const DEFAULT_LINK_CLASS =
 
 const BUSINESS_TOOL_LINKS = [
   { href: "/work-memory", label: "Work Memory" },
+  { href: LEADS_PATH, label: "Leads" },
   { href: "/recruit", label: "Recruit" },
   { href: "/business-advisor", label: "Business Advisor" },
   { href: "/proposals", label: "Proposals" },
