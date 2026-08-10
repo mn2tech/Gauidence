@@ -99,8 +99,8 @@ export default function LeadsScreen() {
   const [savingStatus, setSavingStatus] = useState(false);
   const [duplicateBusy, setDuplicateBusy] = useState(false);
   const [pendingDuplicates, setPendingDuplicates] = useState<
-    Array<{ lead: BusinessLead; reasons: string[] }>
-  > | null>(null);
+    Array<{ lead: BusinessLead; reasons: string[] }> | null
+  >(null);
   const [pendingCreatePayload, setPendingCreatePayload] = useState<
     Record<string, unknown> | null
   >(null);

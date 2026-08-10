@@ -41,8 +41,8 @@ export default function LeadImportModal({
   const [mapping, setMapping] = useState<Partial<Record<LeadImportField, number>>>({});
   const [importSource, setImportSource] = useState("Excel Import");
   const [duplicateRows, setDuplicateRows] = useState<
-    Array<{ lead: BusinessLead; reasons: string[] }>
-  > | null>(null);
+    Array<{ lead: BusinessLead; reasons: string[] }> | null
+  >(null);
 
   function reset() {
     setStep("upload");
