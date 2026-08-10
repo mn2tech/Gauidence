@@ -38,6 +38,8 @@ type Props = {
   onSubmit: (values: LeadFormValues) => Promise<void>;
   onCancel?: () => void;
   submitLabel?: string;
+  /** Quick add: only essentials; full form available via expand. */
+  quick?: boolean;
 };
 
 export default function LeadForm({
@@ -45,6 +47,7 @@ export default function LeadForm({
   onSubmit,
   onCancel,
   submitLabel = "Save lead",
+  quick = false,
 }: Props) {
   const [values, setValues] = useState<LeadFormValues>({
     ...EMPTY_VALUES,
@@ -52,6 +55,14 @@ export default function LeadForm({
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showDetails, setShowDetails] = useState(
+    !quick || Boolean(
+      initialValues?.jobTitle ||
+        initialValues?.email ||
+        initialValues?.phone ||
+        initialValues?.website
+    )
+  );
 
   function setField<K extends keyof LeadFormValues>(key: K, value: LeadFormValues[K]) {
     setValues((prev) => ({ ...prev, [key]: value }));
@@ -78,6 +89,14 @@ export default function LeadForm({
 
   return (
     <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
+      {quick ? (
+        <p className="text-sm text-ink-muted">
+          Add one person or company. For a whole list, use{" "}
+          <strong className="font-medium text-foreground">Import Excel/CSV</strong>.
+          Only a company name or contact name is required — add more later.
+        </p>
+      ) : null}
+
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label className="text-sm font-medium">Company name</label>
@@ -97,6 +116,48 @@ export default function LeadForm({
             className={`mt-1 ${inputClass}`}
           />
         </div>
+      </div>
+
+      {quick && !showDetails ? (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className="text-sm font-medium">Source</label>
+            <select
+              value={values.source}
+              onChange={(e) => setField("source", e.target.value)}
+              className={`mt-1 ${inputClass}`}
+            >
+              <option value="">Select source…</option>
+              {LEAD_SOURCES.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-sm font-medium">Where we met</label>
+            <input
+              value={values.sourceDetail}
+              onChange={(e) => setField("sourceDetail", e.target.value)}
+              placeholder="Olney National Night Out"
+              className={`mt-1 ${inputClass}`}
+            />
+          </div>
+        </div>
+      ) : null}
+
+      {quick && !showDetails ? (
+        <button
+          type="button"
+          onClick={() => setShowDetails(true)}
+          className="text-sm font-medium text-brand hover:underline"
+        >
+          + Add email, phone, and other details
+        </button>
+      ) : null}
+
+      {(!quick || showDetails) ? (
+        <>
+      <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label className="text-sm font-medium">Job title</label>
           <input
@@ -182,6 +243,8 @@ export default function LeadForm({
           className={`mt-1 ${inputClass}`}
         />
       </div>
+        </>
+      ) : null}
 
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
 

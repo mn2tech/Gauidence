@@ -532,14 +532,23 @@ export default function LeadsScreen() {
         </div>
       ) : null}
 
-      <div className="mt-6 flex flex-wrap gap-3">
+      <p className="mt-4 text-sm text-ink-muted">
+        <strong className="font-medium text-foreground">One contact:</strong> Add Lead or scan a card.
+        <strong className="font-medium text-foreground"> Many contacts:</strong> Import Excel/CSV.
+      </p>
+
+      <div className="mt-4 flex flex-wrap gap-3">
         <button
           type="button"
-          onClick={() => setShowAddForm(true)}
+          onClick={() => {
+            setShowAddForm(true);
+            setShowScanModal(false);
+            setShowImportModal(false);
+          }}
           className={buttonPrimary}
         >
           <Plus className="h-4 w-4" />
-          Add Lead
+          Add one lead
         </button>
         <button
           type="button"
@@ -561,12 +570,13 @@ export default function LeadsScreen() {
 
       {showAddForm ? (
         <div className={`mt-6 ${cardClass}`}>
-          <h2 className="font-semibold">Add lead</h2>
+          <h2 className="font-semibold">Add one lead</h2>
           <div className="mt-4">
             <LeadForm
+              quick
               onSubmit={handleCreateLead}
               onCancel={() => setShowAddForm(false)}
-              submitLabel="Create lead"
+              submitLabel="Save lead"
             />
           </div>
         </div>
@@ -638,7 +648,7 @@ export default function LeadsScreen() {
               className={buttonPrimary}
             >
               <Plus className="h-4 w-4" />
-              Add Lead
+              Add one lead
             </button>
           </div>
         </div>
