@@ -12,6 +12,8 @@ import {
   leadDisplayName,
   type BusinessLead,
 } from "../types";
+import { findDuplicateReasons } from "../duplicates";
+import { suggestColumnMapping, mapRowToLead } from "../importMap";
 
 describe("leads validators", () => {
   it("parseUuid accepts valid uuid", () => {
@@ -110,5 +112,67 @@ describe("leads types", () => {
     assert.equal(s.interested, 1);
     assert.equal(s.proposal, 1);
     assert.equal(s.won, 1);
+  });
+});
+
+describe("leads duplicates", () => {
+  const existing: BusinessLead = {
+    id: "1",
+    business_profile_id: "bp",
+    company_name: "ABC Co",
+    contact_name: "John Smith",
+    email: "john@abc.com",
+    phone: "301-555-0100",
+    website: "abc.com",
+    job_title: null,
+    address: null,
+    source: null,
+    source_detail: null,
+    notes: null,
+    status: "new",
+    lead_score: null,
+    recommended_service: null,
+    opportunity_summary: null,
+    conversation_angle: null,
+    next_action: null,
+    last_activity_at: null,
+    proposal_id: null,
+    document_id: null,
+    created_by: "u",
+    created_at: "2026-01-01",
+    updated_at: "2026-01-01",
+  };
+
+  it("matches email", () => {
+    const reasons = findDuplicateReasons({ email: "john@abc.com" }, existing);
+    assert.ok(reasons.includes("email"));
+  });
+
+  it("matches company and contact together", () => {
+    const reasons = findDuplicateReasons(
+      { companyName: "ABC Co", contactName: "John Smith" },
+      existing
+    );
+    assert.ok(reasons.includes("company_and_contact"));
+  });
+});
+
+describe("leads import mapping", () => {
+  it("suggests column mapping from headers", () => {
+    const mapping = suggestColumnMapping(["Company Name", "Contact", "Email"]);
+    assert.equal(mapping.company, 0);
+    assert.equal(mapping.contact, 1);
+    assert.equal(mapping.email, 2);
+  });
+
+  it("maps row values using mapping", () => {
+    const mapped = mapRowToLead(["ABC", "John", "john@abc.com"], {
+      company: 0,
+      contact: 1,
+      email: 2,
+    });
+    assert.equal(mapped.companyName, "ABC");
+    assert.equal(mapped.contactName, "John");
+    assert.equal(mapped.email, "john@abc.com");
   });
 });

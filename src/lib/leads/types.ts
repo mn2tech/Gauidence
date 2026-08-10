@@ -58,6 +58,16 @@ export const LEAD_ACTIVITY_LABELS: Record<LeadActivityType, string> = {
   proposal_created: "Proposal created",
 };
 
+export type ExtractedBusinessCard = {
+  contactName: string | null;
+  companyName: string | null;
+  jobTitle: string | null;
+  email: string | null;
+  phone: string | null;
+  website: string | null;
+  address: string | null;
+};
+
 export type BusinessLead = {
   id: string;
   business_profile_id: string;

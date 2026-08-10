@@ -18,6 +18,9 @@ import LeadForm, {
   resolveSourceForApi,
   type LeadFormValues,
 } from "@/components/leads/LeadForm";
+import LeadCardScanModal from "@/components/leads/LeadCardScanModal";
+import LeadDuplicateDialog from "@/components/leads/LeadDuplicateDialog";
+import LeadImportModal from "@/components/leads/LeadImportModal";
 import LeadStatusBadge from "@/components/leads/LeadStatusBadge";
 import {
   computeLeadSummary,
@@ -90,8 +93,17 @@ export default function LeadsScreen() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<LeadStatus | "all">("all");
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showScanModal, setShowScanModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [editing, setEditing] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
+  const [duplicateBusy, setDuplicateBusy] = useState(false);
+  const [pendingDuplicates, setPendingDuplicates] = useState<
+    Array<{ lead: BusinessLead; reasons: string[] }>
+  > | null>(null);
+  const [pendingCreatePayload, setPendingCreatePayload] = useState<
+    Record<string, unknown> | null
+  >(null);
 
   const summary = useMemo(() => computeLeadSummary(leads), [leads]);
 
@@ -142,31 +154,76 @@ export default function LeadsScreen() {
     }
   }, [selectedId, loadDetail]);
 
-  async function handleCreateLead(values: LeadFormValues) {
+  async function submitCreateLead(
+    payload: Record<string, unknown>,
+    forceCreate = false
+  ) {
     if (!businessProfileId) return;
     const res = await fetch("/api/leads", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        businessProfileId,
-        companyName: values.companyName.trim() || null,
-        contactName: values.contactName.trim() || null,
-        jobTitle: values.jobTitle.trim() || null,
-        email: values.email.trim() || null,
-        phone: values.phone.trim() || null,
-        website: values.website.trim() || null,
-        source: resolveSourceForApi(values),
-        sourceDetail: values.sourceDetail.trim() || null,
-        notes: values.notes.trim() || null,
-      }),
+      body: JSON.stringify({ ...payload, forceCreate }),
     });
     const body = await res.json();
+
+    if (res.status === 409 && body.duplicates) {
+      setPendingCreatePayload(payload);
+      setPendingDuplicates(body.duplicates as Array<{
+        lead: BusinessLead;
+        reasons: string[];
+      }>);
+      return null;
+    }
+
     if (!res.ok || !body.lead) {
       throw new Error(body.error ?? "Couldn't create lead.");
     }
+
     setShowAddForm(false);
     setLeads((prev) => [body.lead, ...prev]);
     router.push(`${LEADS_PATH}?id=${body.lead.id}`);
+    return body.lead as BusinessLead;
+  }
+
+  async function handleCreateLead(values: LeadFormValues) {
+    if (!businessProfileId) return;
+    const payload = {
+      businessProfileId,
+      companyName: values.companyName.trim() || null,
+      contactName: values.contactName.trim() || null,
+      jobTitle: values.jobTitle.trim() || null,
+      email: values.email.trim() || null,
+      phone: values.phone.trim() || null,
+      website: values.website.trim() || null,
+      source: resolveSourceForApi(values),
+      sourceDetail: values.sourceDetail.trim() || null,
+      notes: values.notes.trim() || null,
+    };
+    await submitCreateLead(payload);
+  }
+
+  async function handleForceCreate() {
+    if (!pendingCreatePayload) return;
+    setDuplicateBusy(true);
+    try {
+      await submitCreateLead(pendingCreatePayload, true);
+      setPendingDuplicates(null);
+      setPendingCreatePayload(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't create lead.");
+    } finally {
+      setDuplicateBusy(false);
+    }
+  }
+
+  function handleScanDuplicate(args: {
+    payload: Record<string, unknown>;
+    duplicates: Array<{ lead: unknown; reasons: string[] }>;
+  }) {
+    setPendingCreatePayload(args.payload);
+    setPendingDuplicates(
+      args.duplicates as Array<{ lead: BusinessLead; reasons: string[] }>
+    );
   }
 
   async function handleUpdateLead(values: LeadFormValues) {
@@ -221,6 +278,52 @@ export default function LeadsScreen() {
     }
   }
 
+  function renderOverlayModals() {
+    return (
+      <>
+        {businessProfileId ? (
+          <>
+            <LeadCardScanModal
+              businessProfileId={businessProfileId}
+              ownerUserId={active?.owner_user_id}
+              open={showScanModal}
+              onClose={() => setShowScanModal(false)}
+              onCreated={(lead) => {
+                const l = lead as BusinessLead;
+                setLeads((prev) => [l, ...prev]);
+                router.push(`${LEADS_PATH}?id=${l.id}`);
+              }}
+              onDuplicate={handleScanDuplicate}
+            />
+            <LeadImportModal
+              businessProfileId={businessProfileId}
+              open={showImportModal}
+              onClose={() => setShowImportModal(false)}
+              onImported={() => void loadLeads()}
+            />
+          </>
+        ) : null}
+
+        {pendingDuplicates && pendingDuplicates.length > 0 ? (
+          <LeadDuplicateDialog
+            duplicates={pendingDuplicates}
+            busy={duplicateBusy}
+            onUseExisting={(leadId) => {
+              setPendingDuplicates(null);
+              setPendingCreatePayload(null);
+              router.push(`${LEADS_PATH}?id=${leadId}`);
+            }}
+            onCreateAnyway={() => void handleForceCreate()}
+            onCancel={() => {
+              setPendingDuplicates(null);
+              setPendingCreatePayload(null);
+            }}
+          />
+        ) : null}
+      </>
+    );
+  }
+
   if (!isBusiness) {
     return (
       <div className={cardClass}>
@@ -238,6 +341,7 @@ export default function LeadsScreen() {
   if (selectedId && (detailLoading || selectedLead)) {
     const lead = selectedLead;
     return (
+      <>
       <div>
         <Link
           href={LEADS_PATH}
@@ -392,10 +496,13 @@ export default function LeadsScreen() {
           </div>
         ) : null}
       </div>
+      {renderOverlayModals()}
+    </>
     );
   }
 
   return (
+    <>
     <div>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -434,11 +541,19 @@ export default function LeadsScreen() {
           <Plus className="h-4 w-4" />
           Add Lead
         </button>
-        <button type="button" disabled className={buttonSecondary}>
+        <button
+          type="button"
+          onClick={() => setShowScanModal(true)}
+          className={buttonSecondary}
+        >
           <CreditCard className="h-4 w-4" />
           Scan Business Card
         </button>
-        <button type="button" disabled className={buttonSecondary}>
+        <button
+          type="button"
+          onClick={() => setShowImportModal(true)}
+          className={buttonSecondary}
+        >
           <FileSpreadsheet className="h-4 w-4" />
           Import Excel/CSV
         </button>
@@ -501,11 +616,19 @@ export default function LeadsScreen() {
             next.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <button type="button" disabled className={buttonSecondary}>
+            <button
+              type="button"
+              onClick={() => setShowScanModal(true)}
+              className={buttonSecondary}
+            >
               <CreditCard className="h-4 w-4" />
               Scan Business Card
             </button>
-            <button type="button" disabled className={buttonSecondary}>
+            <button
+              type="button"
+              onClick={() => setShowImportModal(true)}
+              className={buttonSecondary}
+            >
               <FileSpreadsheet className="h-4 w-4" />
               Import Business List
             </button>
@@ -578,5 +701,8 @@ export default function LeadsScreen() {
         </div>
       )}
     </div>
+
+    {renderOverlayModals()}
+  </>
   );
 }

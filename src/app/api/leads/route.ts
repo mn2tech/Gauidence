@@ -5,6 +5,7 @@ import {
   requireLeadUser,
   resolveBusinessProfile,
 } from "@/lib/leads/auth";
+import { findPotentialDuplicates } from "@/lib/leads/duplicates";
 import { recordLeadActivity, listBusinessLeads } from "@/lib/leads/server";
 import { LEAD_SELECT } from "@/lib/leads/types";
 import {
@@ -102,6 +103,30 @@ export async function POST(request: Request) {
   }
 
   const status = parseLeadStatus(body.status) ?? "new";
+  const forceCreate = body.forceCreate === true;
+  const documentId = parseUuid(body.documentId ?? body.document_id);
+
+  const candidate = {
+    email: parseOptionalText(body.email),
+    companyName: names.companyName,
+    contactName: names.contactName,
+    phone: parseOptionalText(body.phone),
+    website: parseOptionalText(body.website),
+  };
+
+  if (!forceCreate) {
+    const duplicates = await findPotentialDuplicates(
+      supabase,
+      business.id,
+      candidate
+    );
+    if (duplicates.length > 0) {
+      return NextResponse.json({
+        status: "duplicate_found",
+        duplicates,
+      }, { status: 409 });
+    }
+  }
 
   const { data, error } = await supabase
     .from("business_leads")
@@ -110,9 +135,9 @@ export async function POST(request: Request) {
       company_name: names.companyName,
       contact_name: names.contactName,
       job_title: parseOptionalText(body.jobTitle ?? body.job_title),
-      email: parseOptionalText(body.email),
-      phone: parseOptionalText(body.phone),
-      website: parseOptionalText(body.website),
+      email: candidate.email,
+      phone: candidate.phone,
+      website: candidate.website,
       address: parseOptionalText(body.address),
       source: parseOptionalText(body.source),
       source_detail: parseOptionalText(
@@ -120,6 +145,7 @@ export async function POST(request: Request) {
       ),
       notes: parseOptionalText(body.notes),
       status,
+      document_id: documentId,
       created_by: user.id,
       last_activity_at: new Date().toISOString(),
     })

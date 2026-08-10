@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --require ./scripts/stub-server-only.cjs --test src/lib/analysis/__tests__/*.test.ts src/lib/vault/__tests__/*.test.ts src/lib/profiles/__tests__/*.test.ts src/lib/location/__tests__/*.test.ts src/lib/logs/__tests__/*.test.ts src/lib/client-requests/__tests__/*.test.ts src/lib/proposals/__tests__/*.test.ts src/lib/business-advisor/__tests__/*.test.ts src/lib/onboarding/__tests__/*.test.ts src/lib/reminders/__tests__/*.test.ts src/lib/research/__tests__/*.test.ts src/lib/search/__tests__/*.test.ts src/lib/help/__tests__/*.test.ts src/lib/billing/__tests__/*.test.ts src/lib/voice/__tests__/*.test.ts src/lib/awards/__tests__/*.test.ts src/lib/retention/__tests__/*.test.ts src/lib/sms/__tests__/*.test.ts src/lib/work-memory/__tests__/*.test.ts src/lib/organization/__tests__/*.test.ts src/lib/experts/__tests__/*.test.ts src/lib/knowledge/__tests__/*.test.ts src/lib/payroll/__tests__/*.test.ts src/lib/share/__tests__/*.test.ts src/lib/employee-hub/__tests__/*.test.ts src/lib/simple-home/__tests__/*.test.ts src/lib/workspace-context/__tests__/*.test.ts src/lib/actions/__tests__/*.test.ts src/lib/agent-mode/__tests__/*.test.ts src/lib/chat/import/__tests__/*.test.ts src/lib/documents/__tests__/*.test.ts src/lib/url/__tests__/*.test.ts",
+    "test": "tsx --require ./scripts/stub-server-only.cjs --test src/lib/analysis/__tests__/*.test.ts src/lib/vault/__tests__/*.test.ts src/lib/profiles/__tests__/*.test.ts src/lib/location/__tests__/*.test.ts src/lib/logs/__tests__/*.test.ts src/lib/client-requests/__tests__/*.test.ts src/lib/proposals/__tests__/*.test.ts src/lib/business-advisor/__tests__/*.test.ts src/lib/onboarding/__tests__/*.test.ts src/lib/reminders/__tests__/*.test.ts src/lib/research/__tests__/*.test.ts src/lib/search/__tests__/*.test.ts src/lib/help/__tests__/*.test.ts src/lib/billing/__tests__/*.test.ts src/lib/voice/__tests__/*.test.ts src/lib/awards/__tests__/*.test.ts src/lib/retention/__tests__/*.test.ts src/lib/sms/__tests__/*.test.ts src/lib/work-memory/__tests__/*.test.ts src/lib/organization/__tests__/*.test.ts src/lib/experts/__tests__/*.test.ts src/lib/knowledge/__tests__/*.test.ts src/lib/payroll/__tests__/*.test.ts src/lib/share/__tests__/*.test.ts src/lib/employee-hub/__tests__/*.test.ts src/lib/leads/__tests__/*.test.ts src/lib/simple-home/__tests__/*.test.ts src/lib/workspace-context/__tests__/*.test.ts src/lib/actions/__tests__/*.test.ts src/lib/agent-mode/__tests__/*.test.ts src/lib/chat/import/__tests__/*.test.ts src/lib/documents/__tests__/*.test.ts src/lib/url/__tests__/*.test.ts",
     "validate:experts": "tsx scripts/validate-experts.ts",
     "announce:gideon-attachments": "tsx --require ./scripts/stub-server-only.cjs scripts/send-gideon-attachments-email.ts",
     "compare:analyzers": "tsx --require ./scripts/stub-server-only.cjs scripts/compare-analyzers.ts",
@@ -35,6 +35,7 @@
     "stripe": "^22.3.2",
     "unpdf": "^1.6.2",
     "web-push": "^3.6.7",
+    "xlsx": "^0.18.5",
     "zod": "^4.4.3"
   },
   "devDependencies": {
