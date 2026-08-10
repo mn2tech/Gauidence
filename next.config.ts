@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: __dirname,
   },
-  serverExternalPackages: ["unpdf", "@napi-rs/canvas"],
+  serverExternalPackages: ["unpdf", "@napi-rs/canvas", "xlsx"],
   async redirects() {
     return [
       {

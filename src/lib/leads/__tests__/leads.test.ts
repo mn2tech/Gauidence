@@ -175,4 +175,14 @@ describe("leads import mapping", () => {
     assert.equal(mapped.contactName, "John");
     assert.equal(mapped.email, "john@abc.com");
   });
+
+  it("combines first and last name columns", () => {
+    const mapped = mapRowToLead(["ABC", "John", "Smith"], {
+      company: 0,
+      firstName: 1,
+      lastName: 2,
+    });
+    assert.equal(mapped.companyName, "ABC");
+    assert.equal(mapped.contactName, "John Smith");
+  });
 });

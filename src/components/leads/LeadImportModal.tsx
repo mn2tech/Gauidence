@@ -44,6 +44,8 @@ export default function LeadImportModal({
     Array<{ lead: BusinessLead; reasons: string[] }> | null
   >(null);
 
+  const [importMessage, setImportMessage] = useState<string | null>(null);
+
   function reset() {
     setStep("upload");
     setBusy(false);
@@ -52,6 +54,7 @@ export default function LeadImportModal({
     setMapping({});
     setImportSource("Excel Import");
     setDuplicateRows(null);
+    setImportMessage(null);
   }
 
   function handleClose() {
@@ -70,8 +73,12 @@ export default function LeadImportModal({
         method: "POST",
         body: form,
       });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? "Couldn't read file.");
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          typeof body.error === "string" ? body.error : "Couldn't read file."
+        );
+      }
       setPreview(body as PreviewResponse);
       setMapping(body.suggestedMapping ?? {});
       setStep("map");
@@ -100,9 +107,11 @@ export default function LeadImportModal({
           skipDuplicates: options?.skipDuplicates ?? false,
         }),
       });
-      const body = await res.json();
-      if (!res.ok && res.status !== 200) {
-        throw new Error(body.error ?? "Import failed.");
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          typeof body.error === "string" ? body.error : "Import failed."
+        );
       }
 
       if (body.status === "duplicates_found") {
@@ -118,8 +127,20 @@ export default function LeadImportModal({
         return;
       }
 
-      onImported(body.createdCount ?? 0);
-      handleClose();
+      const createdCount = body.createdCount ?? 0;
+      const skippedCount = body.skippedCount ?? 0;
+      onImported(createdCount);
+      if (createdCount > 0) {
+        setImportMessage(
+          `Imported ${createdCount} lead${createdCount === 1 ? "" : "s"}${
+            skippedCount > 0 ? ` (${skippedCount} skipped)` : ""
+          }.`
+        );
+        setTimeout(() => handleClose(), 1200);
+      } else {
+        setError("No leads were imported. Check your column mapping.");
+        setStep("map");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Import failed.");
       setStep("map");
@@ -187,6 +208,11 @@ export default function LeadImportModal({
                   {preview.truncated
                     ? ` (importing up to ${preview.importCap})`
                     : ""}
+                </p>
+                <p className="text-sm text-ink-muted">
+                  Map at least <strong className="font-medium">Company</strong> or{" "}
+                  <strong className="font-medium">Contact</strong> for each row.
+                  Use First name + Last name if your sheet splits names across columns.
                 </p>
 
                 <div>
@@ -273,6 +299,9 @@ export default function LeadImportModal({
               </p>
             ) : null}
 
+            {importMessage ? (
+              <p className="mt-3 text-sm font-medium text-emerald-700">{importMessage}</p>
+            ) : null}
             {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
           </div>
         </div>

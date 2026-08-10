@@ -54,7 +54,18 @@ export async function POST(request: Request) {
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const parsed = parseLeadImportFile(buffer, file.name, file.type);
+
+  let parsed;
+  try {
+    parsed = parseLeadImportFile(buffer, file.name, file.type);
+  } catch (err) {
+    const detail =
+      err instanceof Error ? err.message : "Couldn't parse the spreadsheet.";
+    return NextResponse.json(
+      { error: `Couldn't read the file. ${detail}` },
+      { status: 400 }
+    );
+  }
 
   if (parsed.headers.length === 0 || parsed.rows.length === 0) {
     return NextResponse.json(

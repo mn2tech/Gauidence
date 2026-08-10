@@ -9,6 +9,12 @@ const HEADER_ALIASES: Record<LeadImportField, string[]> = {
     "organization",
     "org",
     "employer",
+    "account",
+    "account name",
+    "firm",
+    "vendor",
+    "client",
+    "client name",
   ],
   contact: [
     "contact",
@@ -16,26 +22,53 @@ const HEADER_ALIASES: Record<LeadImportField, string[]> = {
     "name",
     "full name",
     "person",
-    "first name",
     "contact person",
+    "owner",
+    "representative",
   ],
-  title: ["title", "job title", "position", "role"],
-  email: ["email", "e-mail", "email address"],
-  phone: ["phone", "telephone", "mobile", "cell", "phone number"],
-  website: ["website", "web", "url", "site", "domain"],
-  notes: ["notes", "note", "comments", "description", "memo"],
-  source: ["source", "lead source", "origin"],
+  firstName: ["first name", "firstname", "first", "given name"],
+  lastName: ["last name", "lastname", "last", "surname", "family name"],
+  title: [
+    "title",
+    "job title",
+    "position",
+    "role",
+    "job",
+    "job position",
+  ],
+  email: ["email", "e-mail", "email address", "e-mail address", "mail"],
+  phone: [
+    "phone",
+    "telephone",
+    "mobile",
+    "cell",
+    "phone number",
+    "tel",
+    "work phone",
+    "office phone",
+  ],
+  website: ["website", "web", "url", "site", "domain", "web site"],
+  notes: ["notes", "note", "comments", "description", "memo", "remarks"],
+  source: ["source", "lead source", "origin", "referral"],
 };
 
-export function suggestColumnMapping(headers: string[]): Partial<Record<LeadImportField, number>> {
-  const mapping: Partial<Record<LeadImportField, number>> = {};
-  const normalized = headers.map((h) => h.trim().toLowerCase());
+function normalizeHeader(header: string): string {
+  return header.trim().toLowerCase().replace(/\s+/g, " ");
+}
 
-  for (const [field, aliases] of Object.entries(HEADER_ALIASES) as [
-    LeadImportField,
-    string[],
-  ][]) {
-    const idx = normalized.findIndex((h) => aliases.includes(h));
+function headerMatches(field: LeadImportField, header: string): boolean {
+  const h = normalizeHeader(header);
+  if (!h) return false;
+  return HEADER_ALIASES[field].includes(h);
+}
+
+export function suggestColumnMapping(
+  headers: string[]
+): Partial<Record<LeadImportField, number>> {
+  const mapping: Partial<Record<LeadImportField, number>> = {};
+
+  for (const field of Object.keys(HEADER_ALIASES) as LeadImportField[]) {
+    const idx = headers.findIndex((header) => headerMatches(field, header));
     if (idx >= 0 && mapping[field] === undefined) {
       mapping[field] = idx;
     }
@@ -64,9 +97,14 @@ export function mapRowToLead(
     return v ? v : null;
   };
 
+  const firstName = cell("firstName");
+  const lastName = cell("lastName");
+  const contactFromParts = [firstName, lastName].filter(Boolean).join(" ").trim();
+  const contactName = cell("contact") ?? (contactFromParts || null);
+
   return {
     companyName: cell("company"),
-    contactName: cell("contact"),
+    contactName,
     jobTitle: cell("title"),
     email: cell("email"),
     phone: cell("phone"),

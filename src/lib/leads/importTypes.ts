@@ -1,6 +1,8 @@
 export type LeadImportField =
   | "company"
   | "contact"
+  | "firstName"
+  | "lastName"
   | "title"
   | "email"
   | "phone"
@@ -11,6 +13,8 @@ export type LeadImportField =
 export const LEAD_IMPORT_FIELDS: LeadImportField[] = [
   "company",
   "contact",
+  "firstName",
+  "lastName",
   "title",
   "email",
   "phone",
@@ -21,7 +25,9 @@ export const LEAD_IMPORT_FIELDS: LeadImportField[] = [
 
 export const LEAD_IMPORT_FIELD_LABELS: Record<LeadImportField, string> = {
   company: "Company",
-  contact: "Contact",
+  contact: "Contact (full name)",
+  firstName: "First name",
+  lastName: "Last name",
   title: "Title",
   email: "Email",
   phone: "Phone",

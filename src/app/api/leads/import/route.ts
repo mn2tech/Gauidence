@@ -84,6 +84,7 @@ export async function POST(request: Request) {
     data: Record<string, string | null>;
   }> = [];
   const skipped: number[] = [];
+  let lastInsertError: string | null = null;
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
@@ -162,6 +163,7 @@ export async function POST(request: Request) {
       .single();
 
     if (error || !data) {
+      if (error?.message) lastInsertError = error.message;
       skipped.push(i);
       continue;
     }
@@ -179,6 +181,25 @@ export async function POST(request: Request) {
     }
 
     created.push(data);
+  }
+
+  if (created.length === 0 && duplicateRows.length === 0) {
+    const mappedCompany = mapping.company != null;
+    const mappedContact =
+      mapping.contact != null ||
+      mapping.firstName != null ||
+      mapping.lastName != null;
+    let hint = "No leads were imported.";
+    if (!mappedCompany && !mappedContact) {
+      hint =
+        "Map at least a Company or Contact column before importing.";
+    } else if (lastInsertError) {
+      hint = `Import failed: ${lastInsertError}`;
+    } else if (skipped.length > 0) {
+      hint =
+        "No rows had a company or contact name. Check your column mapping.";
+    }
+    return NextResponse.json({ error: hint }, { status: 400 });
   }
 
   if (duplicateRows.length > 0 && !forceCreate && !skipDuplicates) {
