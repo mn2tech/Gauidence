@@ -1,3 +1,5 @@
+import type { LeadOpportunityBrief } from "@/lib/leads/opportunity";
+
 export const LEAD_STATUSES = [
   "new",
   "researched",
@@ -90,6 +92,7 @@ export type BusinessLead = {
   last_activity_at: string | null;
   proposal_id: string | null;
   document_id: string | null;
+  opportunity_brief?: LeadOpportunityBrief | Record<string, unknown> | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -110,7 +113,7 @@ export type LeadWithActivities = BusinessLead & {
 };
 
 export const LEAD_SELECT =
-  "id,business_profile_id,company_name,contact_name,job_title,email,phone,website,address,source,source_detail,notes,status,lead_score,recommended_service,opportunity_summary,conversation_angle,next_action,last_activity_at,proposal_id,document_id,created_by,created_at,updated_at";
+  "id,business_profile_id,company_name,contact_name,job_title,email,phone,website,address,source,source_detail,notes,status,lead_score,recommended_service,opportunity_summary,conversation_angle,next_action,last_activity_at,proposal_id,document_id,opportunity_brief,created_by,created_at,updated_at";
 
 export const LEAD_ACTIVITY_SELECT =
   "id,lead_id,activity_type,description,metadata,created_by,created_at";

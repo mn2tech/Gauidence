@@ -10,7 +10,6 @@ import {
   Loader2,
   Plus,
   Search,
-  Sparkles,
   UserPlus,
 } from "lucide-react";
 import { useActiveProfile } from "@/components/ProfileProvider";
@@ -21,6 +20,7 @@ import LeadForm, {
 import LeadCardScanModal from "@/components/leads/LeadCardScanModal";
 import LeadDuplicateDialog from "@/components/leads/LeadDuplicateDialog";
 import LeadImportModal from "@/components/leads/LeadImportModal";
+import LeadOpportunityBriefCard from "@/components/leads/LeadOpportunityBriefCard";
 import LeadStatusBadge from "@/components/leads/LeadStatusBadge";
 import {
   computeLeadSummary,
@@ -97,6 +97,8 @@ export default function LeadsScreen() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [editing, setEditing] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
+  const [analyzingOpportunity, setAnalyzingOpportunity] = useState(false);
+  const [opportunityError, setOpportunityError] = useState<string | null>(null);
   const [duplicateBusy, setDuplicateBusy] = useState(false);
   const [pendingDuplicates, setPendingDuplicates] = useState<
     Array<{ lead: BusinessLead; reasons: string[] }> | null
@@ -252,6 +254,41 @@ export default function LeadsScreen() {
     setLeads((prev) =>
       prev.map((l) => (l.id === body.lead.id ? body.lead : l))
     );
+  }
+
+  async function handleFindOpportunity() {
+    if (!selectedId) return;
+    setAnalyzingOpportunity(true);
+    setOpportunityError(null);
+    try {
+      const res = await fetch(`/api/leads/${selectedId}/analyze`, {
+        method: "POST",
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          typeof body.error === "string"
+            ? body.error
+            : "Couldn't analyze this lead."
+        );
+      }
+      if (body.lead) {
+        setSelectedLead(body.lead as LeadWithActivities);
+        setLeads((prev) =>
+          prev.map((l) =>
+            l.id === body.lead.id ? (body.lead as BusinessLead) : l
+          )
+        );
+      } else {
+        await loadDetail(selectedId);
+      }
+    } catch (err) {
+      setOpportunityError(
+        err instanceof Error ? err.message : "Couldn't analyze this lead."
+      );
+    } finally {
+      setAnalyzingOpportunity(false);
+    }
   }
 
   async function handleStatusChange(status: LeadStatus) {
@@ -453,26 +490,14 @@ export default function LeadsScreen() {
               )}
             </div>
 
-            {!editing && (
-              <div className={cardClass}>
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-5 w-5 text-brand" />
-                  <h2 className="font-semibold">AI Opportunity Brief</h2>
-                </div>
-                <p className="mt-3 text-sm text-ink-muted">
-                  Use Find Opportunity to let Gideon research this company and suggest
-                  what to do next. Coming in Phase 3.
-                </p>
-                <button
-                  type="button"
-                  disabled
-                  className={`mt-4 ${buttonSecondary}`}
-                >
-                  <Sparkles className="h-4 w-4" />
-                  Find Opportunity
-                </button>
-              </div>
-            )}
+            {!editing && selectedLead ? (
+              <LeadOpportunityBriefCard
+                lead={selectedLead}
+                analyzing={analyzingOpportunity}
+                error={opportunityError}
+                onAnalyze={() => void handleFindOpportunity()}
+              />
+            ) : null}
 
             {!editing && lead.activities.length > 0 ? (
               <div className={cardClass}>
