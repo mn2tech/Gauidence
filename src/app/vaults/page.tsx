@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -32,7 +33,9 @@ export default async function SimpleVaultsPage() {
 
   return (
     <SimpleAppShell>
-      <SimpleVaultsScreen />
+      <Suspense fallback={<p className="p-6 text-sm text-ink-muted">Loading spaces…</p>}>
+        <SimpleVaultsScreen />
+      </Suspense>
     </SimpleAppShell>
   );
 }

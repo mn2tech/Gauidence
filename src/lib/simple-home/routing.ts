@@ -8,7 +8,20 @@ import {
 export const SIMPLE_HOME_PATH = "/home";
 export const ASK_GIDEON_PATH = "/ask";
 export const VAULTS_PATH = "/vaults";
+/** @deprecated Use vaultsHref("map") — map is now a view on /vaults */
 export const VAULT_MAP_PATH = "/vaults/map";
+
+export type SpacesView = "list" | "map";
+
+export function vaultsHref(view: SpacesView = "list"): string {
+  return view === "map" ? `${VAULTS_PATH}?view=map` : VAULTS_PATH;
+}
+
+export function spacesViewFromParam(
+  value: string | null | undefined
+): SpacesView {
+  return value === "map" ? "map" : "list";
+}
 export const COMMAND_CENTER_PATH = "/command-center";
 export const ADD_ANYTHING_PATH = "/add";
 export const REMEMBER_TODAY_PATH = "/remember";

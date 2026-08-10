@@ -9,7 +9,7 @@ import {
   simpleHomeProfileCategory,
   timeOfDayGreeting,
 } from "@/lib/simple-home/helpers";
-import { signedInLandingPath } from "@/lib/simple-home/routing";
+import { signedInLandingPath, vaultsHref, spacesViewFromParam } from "@/lib/simple-home/routing";
 
 describe("guardian simple home feature flag", () => {
   const original = process.env.GUARDIAN_SIMPLE_HOME_FLAG;
@@ -86,5 +86,12 @@ describe("simple home routing", () => {
       signedInLandingPath({ profile_type: "personal", parent_profile_id: null }),
       "/ask"
     );
+  });
+
+  it("builds spaces list and map hrefs", () => {
+    assert.equal(vaultsHref("list"), "/vaults");
+    assert.equal(vaultsHref("map"), "/vaults?view=map");
+    assert.equal(spacesViewFromParam("map"), "map");
+    assert.equal(spacesViewFromParam(null), "list");
   });
 });

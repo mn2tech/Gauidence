@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
-  FolderOpen,
+  ArrowRight,
   FolderPlus,
   MessageCircle,
   NotebookPen,
@@ -24,13 +24,9 @@ import {
   ADD_ANYTHING_PATH,
   ASK_GIDEON_PATH,
   REMEMBER_TODAY_PATH,
-  VAULTS_PATH,
 } from "@/lib/simple-home/routing";
 import { documentsHref } from "@/lib/routes";
-import {
-  getContainerLabel,
-  SPACES_AND_WORKSPACES_LABEL,
-} from "@/lib/profiles/types";
+import { getContainerLabel } from "@/lib/profiles/types";
 
 function Section({
   title,
@@ -245,40 +241,27 @@ export default function SimpleHomeScreen() {
         </Section>
       ) : null}
 
-      {data.recentVaults.length > 0 ? (
-        <Section title={SPACES_AND_WORKSPACES_LABEL}>
-          <ul className="space-y-1">
-            {data.recentVaults.map((space) => (
-              <li key={space.id}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    void switchProfile(space.id);
-                    router.push(documentsHref(space.id));
-                  }}
-                  className="flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left text-sm transition hover:bg-brand-light/35"
-                >
-                  <ProfileAvatar profile={space} size="sm" />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium text-foreground">
-                      {space.display_name}
-                    </span>
-                    <span className="block truncate text-xs text-ink-muted">
-                      {getContainerLabel(space.profile_type)}
-                    </span>
-                  </span>
-                  <FolderOpen className="h-4 w-4 shrink-0 text-brand/70" />
-                </button>
-              </li>
-            ))}
-          </ul>
-          <Link
-            href={VAULTS_PATH}
-            className="mt-3 mb-1 inline-flex min-h-11 items-center text-sm font-semibold text-brand-dark hover:underline"
-          >
-            View all spaces
-          </Link>
-        </Section>
+      {active ? (
+        <button
+          type="button"
+          onClick={() => {
+            void switchProfile(active.id);
+            router.push(documentsHref(active.id));
+          }}
+          className="simple-home-card welcome-strip flex w-full items-center gap-3 p-4 text-left transition hover:shadow-card"
+          style={{ animationDelay: "0.12s" }}
+        >
+          <ProfileAvatar profile={active} size="md" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold text-foreground">
+              Continue in {active.display_name}
+            </span>
+            <span className="mt-0.5 block text-xs text-ink-muted">
+              {getContainerLabel(active.profile_type)}
+            </span>
+          </span>
+          <ArrowRight className="h-4 w-4 shrink-0 text-brand" aria-hidden />
+        </button>
       ) : null}
     </div>
   );

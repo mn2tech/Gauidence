@@ -2,12 +2,11 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Home, MessageCircle, LayoutGrid, Network } from "lucide-react";
+import { Home, MessageCircle, LayoutGrid } from "lucide-react";
 import { SPACES_NAV_LABEL } from "@/lib/profiles/types";
 import {
   ASK_GIDEON_PATH,
   SIMPLE_HOME_PATH,
-  VAULT_MAP_PATH,
   VAULTS_PATH,
 } from "@/lib/simple-home/routing";
 
@@ -32,8 +31,8 @@ export default function SimpleNavigation() {
   const searchParams = useSearchParams();
   const spacesActive =
     pathname === VAULTS_PATH ||
+    pathname.startsWith(`${VAULTS_PATH}/`) ||
     (pathname === "/dashboard" && searchParams.has("docs"));
-  const mapActive = pathname === VAULT_MAP_PATH;
 
   return (
     <nav aria-label="Primary" className="simple-nav-bar fixed inset-x-0 bottom-0 z-40">
@@ -74,21 +73,6 @@ export default function SimpleNavigation() {
             <LayoutGrid className="h-5 w-5" aria-hidden />
           </span>
           <span className="truncate text-[10px] font-semibold">{SPACES_NAV_LABEL}</span>
-        </Link>
-        <Link
-          href={VAULT_MAP_PATH}
-          className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 transition ${
-            mapActive ? "text-brand" : "text-ink-muted hover:text-foreground"
-          }`}
-        >
-          <span
-            className={`flex h-8 w-14 items-center justify-center rounded-2xl transition ${
-              mapActive ? "bg-brand-light" : ""
-            }`}
-          >
-            <Network className="h-5 w-5" aria-hidden />
-          </span>
-          <span className="truncate text-[10px] font-semibold">Map</span>
         </Link>
       </div>
     </nav>

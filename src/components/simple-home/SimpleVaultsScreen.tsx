@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   useCallback,
   useEffect,
@@ -13,11 +13,12 @@ import {
   ChevronRight,
   FolderPlus,
   GripVertical,
-  Network,
   Users,
 } from "lucide-react";
 import ProfileAvatar from "@/components/ProfileAvatar";
 import ProfileSetupHub from "@/components/ProfileSetupHub";
+import ProfileVaultMap from "@/components/ProfileVaultMap";
+import SpacesViewToggle from "@/components/simple-home/SpacesViewToggle";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import { useDesktopDrag } from "@/hooks/useDesktopDrag";
 import {
@@ -36,7 +37,7 @@ import {
   type GuardianProfile,
 } from "@/lib/profiles/types";
 import { DOCUMENTS_PATH } from "@/lib/routes";
-import { VAULT_MAP_PATH } from "@/lib/simple-home/routing";
+import { spacesViewFromParam } from "@/lib/simple-home/routing";
 
 function clientsSectionHref(profileId: string) {
   return `${DOCUMENTS_PATH}&profileId=${profileId}#clients-${profileId}`;
@@ -51,8 +52,10 @@ function isDropContainer(profile: GuardianProfile): boolean {
 
 export default function SimpleVaultsScreen() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const view = spacesViewFromParam(searchParams.get("view"));
   const desktopDrag = useDesktopDrag();
-  const { profiles, active, loading, switchProfile, refresh } =
+  const { profiles, active, accountName, loading, switchProfile, refresh } =
     useActiveProfile();
   const [expandedParents, setExpandedParents] = useState<Set<string>>(
     () => new Set()
@@ -63,7 +66,7 @@ export default function SimpleVaultsScreen() {
   const [movingId, setMovingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const dragEnabled = organizeMode && desktopDrag;
+  const dragEnabled = organizeMode && desktopDrag && view === "list";
   const dragged = dragId
     ? profiles.find((p) => p.id === dragId) ?? null
     : null;
@@ -210,12 +213,14 @@ export default function SimpleVaultsScreen() {
               {SPACES_AND_WORKSPACES_LABEL}
             </h1>
             <p className="mt-1.5 text-sm text-ink-muted">
-              {organizeMode
-                ? "Drag spaces onto a parent to nest them, or drop on Top level to unnest."
-                : "How Guardian has organized your knowledge."}
+              {view === "map"
+                ? "How your spaces connect — tap to open, drag to reorganize on desktop."
+                : organizeMode
+                  ? "Drag spaces onto a parent to nest them, or drop on Top level to unnest."
+                  : "How Guardian has organized your knowledge."}
             </p>
           </div>
-          {organizeMode ? (
+          {view === "list" && organizeMode ? (
             <button
               type="button"
               onClick={exitOrganizeMode}
@@ -223,42 +228,34 @@ export default function SimpleVaultsScreen() {
             >
               Done
             </button>
-          ) : (
-            <div className="flex shrink-0 flex-wrap items-center gap-2">
-              <Link
-                href={VAULT_MAP_PATH}
-                className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-stone-50"
-              >
-                <Network className="h-4 w-4 text-brand" aria-hidden />
-                Map
-              </Link>
-              {desktopDrag ? (
-                <button
-                  type="button"
-                  onClick={enterOrganizeMode}
-                  className="rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-stone-50"
-                >
-                  Organize
-                </button>
-              ) : null}
-            </div>
-          )}
+          ) : view === "list" && desktopDrag ? (
+            <button
+              type="button"
+              onClick={enterOrganizeMode}
+              className="shrink-0 rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-stone-50"
+            >
+              Organize
+            </button>
+          ) : null}
         </div>
-        {!organizeMode ? (
-          <Link
-            href="/settings/profiles?add=1&return=%2Fvaults"
-            className="mt-4 inline-flex items-center gap-2 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark"
-          >
-            <FolderPlus className="h-4 w-4" aria-hidden />
-            New space
-          </Link>
-        ) : null}
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <SpacesViewToggle view={view} />
+          {!organizeMode && view === "list" ? (
+            <Link
+              href="/settings/profiles?add=1&return=%2Fvaults"
+              className="inline-flex items-center gap-2 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark"
+            >
+              <FolderPlus className="h-4 w-4" aria-hidden />
+              New space
+            </Link>
+          ) : null}
+        </div>
         {error ? (
           <p className="mt-3 text-sm text-red-700" role="alert">
             {error}
           </p>
         ) : null}
-        {organizeMode && !desktopDrag ? (
+        {organizeMode && !desktopDrag && view === "list" ? (
           <p className="mt-3 text-sm text-ink-muted">
             Drag to organize works on larger screens.{" "}
             <Link href="/settings/profiles" className="font-semibold text-brand">
@@ -269,6 +266,20 @@ export default function SimpleVaultsScreen() {
         ) : null}
       </header>
 
+      {view === "map" ? (
+        <ProfileVaultMap
+          profiles={profiles}
+          ownerLabel={accountName}
+          activeId={active?.id}
+          busy={movingId !== null}
+          onSwitch={(profileId) => {
+            void switchProfile(profileId);
+            router.push(`${DOCUMENTS_PATH}#documents-${profileId}`);
+          }}
+          onMoveUnder={moveUnder}
+        />
+      ) : (
+        <>
       {dragEnabled && dragged?.parent_profile_id ? (
         <div
           className={`mb-3 rounded-xl border-2 border-dashed px-4 py-3 text-center text-sm transition ${
@@ -520,6 +531,8 @@ export default function SimpleVaultsScreen() {
           </Link>
         </div>
       ) : null}
+        </>
+      )}
     </div>
   );
 }
