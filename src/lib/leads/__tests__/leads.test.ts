@@ -14,6 +14,7 @@ import {
 } from "../types";
 import { findDuplicateReasons } from "../duplicates";
 import { suggestColumnMapping, mapRowToLead } from "../importMap";
+import { parseOutreachDraft } from "../outreach";
 
 describe("leads validators", () => {
   it("parseUuid accepts valid uuid", () => {
@@ -156,6 +157,30 @@ describe("leads duplicates", () => {
       existing
     );
     assert.ok(reasons.includes("company_and_contact"));
+  });
+});
+
+describe("leads outreach", () => {
+  it("parseOutreachDraft extracts subject and body from JSON", () => {
+    const draft = parseOutreachDraft(
+      '{"subject":"Quick follow-up","body":"Hi John, great meeting you."}'
+    );
+    assert.equal(draft?.subject, "Quick follow-up");
+    assert.equal(draft?.body, "Hi John, great meeting you.");
+    assert.ok(draft?.createdAt);
+  });
+
+  it("parseOutreachDraft handles markdown fences", () => {
+    const draft = parseOutreachDraft(
+      '```json\n{"subject":"Hello","body":"Test"}\n```'
+    );
+    assert.equal(draft?.subject, "Hello");
+    assert.equal(draft?.body, "Test");
+  });
+
+  it("parseOutreachDraft rejects incomplete JSON", () => {
+    assert.equal(parseOutreachDraft('{"subject":"Only subject"}'), null);
+    assert.equal(parseOutreachDraft("not json"), null);
   });
 });
 

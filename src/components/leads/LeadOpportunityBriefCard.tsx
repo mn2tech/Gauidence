@@ -1,6 +1,8 @@
 "use client";
 
-import { Loader2, Sparkles } from "lucide-react";
+import Link from "next/link";
+import { FileText, Loader2, Sparkles } from "lucide-react";
+import { PROPOSALS_PATH } from "@/lib/routes";
 import {
   EVIDENCE_KIND_LABELS,
   type LeadOpportunityBrief,
@@ -44,6 +46,9 @@ type Props = {
   analyzing: boolean;
   error: string | null;
   onAnalyze: () => void;
+  creatingProposal?: boolean;
+  proposalError?: string | null;
+  onCreateProposal?: () => void;
 };
 
 export default function LeadOpportunityBriefCard({
@@ -51,6 +56,9 @@ export default function LeadOpportunityBriefCard({
   analyzing,
   error,
   onAnalyze,
+  creatingProposal = false,
+  proposalError = null,
+  onCreateProposal,
 }: Props) {
   const brief = parseBriefFromLead(lead);
   const hasBrief =
@@ -152,20 +160,49 @@ export default function LeadOpportunityBriefCard({
       )}
 
       {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
+      {proposalError ? (
+        <p className="mt-3 text-sm text-red-600">{proposalError}</p>
+      ) : null}
 
-      <button
-        type="button"
-        disabled={analyzing}
-        onClick={onAnalyze}
-        className={`mt-4 ${buttonSecondary}`}
-      >
-        {analyzing ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <Sparkles className="h-4 w-4" />
-        )}
-        {hasBrief ? "Refresh opportunity" : "Find Opportunity"}
-      </button>
+      <div className="mt-4 flex flex-wrap gap-3">
+        <button
+          type="button"
+          disabled={analyzing}
+          onClick={onAnalyze}
+          className={buttonSecondary}
+        >
+          {analyzing ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Sparkles className="h-4 w-4" />
+          )}
+          {hasBrief ? "Refresh opportunity" : "Find Opportunity"}
+        </button>
+
+        {lead.proposal_id ? (
+          <Link
+            href={`${PROPOSALS_PATH}?id=${lead.proposal_id}`}
+            className={buttonSecondary}
+          >
+            <FileText className="h-4 w-4" />
+            Open proposal
+          </Link>
+        ) : hasBrief && onCreateProposal ? (
+          <button
+            type="button"
+            disabled={creatingProposal}
+            onClick={onCreateProposal}
+            className={buttonSecondary}
+          >
+            {creatingProposal ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <FileText className="h-4 w-4" />
+            )}
+            Create proposal
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }

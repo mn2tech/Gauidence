@@ -21,6 +21,7 @@ import LeadCardScanModal from "@/components/leads/LeadCardScanModal";
 import LeadDuplicateDialog from "@/components/leads/LeadDuplicateDialog";
 import LeadImportModal from "@/components/leads/LeadImportModal";
 import LeadOpportunityBriefCard from "@/components/leads/LeadOpportunityBriefCard";
+import LeadOutreachPanel from "@/components/leads/LeadOutreachPanel";
 import LeadStatusBadge from "@/components/leads/LeadStatusBadge";
 import {
   computeLeadSummary,
@@ -34,7 +35,7 @@ import {
   type LeadWithActivities,
 } from "@/lib/leads/types";
 import { isOrgStyleProfile } from "@/lib/profiles/types";
-import { LEADS_PATH } from "@/lib/routes";
+import { LEADS_PATH, PROPOSALS_PATH } from "@/lib/routes";
 
 const cardClass = "rounded-2xl border border-stone-200 bg-white p-5 shadow-sm";
 const inputClass =
@@ -99,6 +100,10 @@ export default function LeadsScreen() {
   const [savingStatus, setSavingStatus] = useState(false);
   const [analyzingOpportunity, setAnalyzingOpportunity] = useState(false);
   const [opportunityError, setOpportunityError] = useState<string | null>(null);
+  const [draftingOutreach, setDraftingOutreach] = useState(false);
+  const [outreachError, setOutreachError] = useState<string | null>(null);
+  const [creatingProposal, setCreatingProposal] = useState(false);
+  const [proposalError, setProposalError] = useState<string | null>(null);
   const [duplicateBusy, setDuplicateBusy] = useState(false);
   const [pendingDuplicates, setPendingDuplicates] = useState<
     Array<{ lead: BusinessLead; reasons: string[] }> | null
@@ -254,6 +259,81 @@ export default function LeadsScreen() {
     setLeads((prev) =>
       prev.map((l) => (l.id === body.lead.id ? body.lead : l))
     );
+  }
+
+  async function handleDraftOutreach() {
+    if (!selectedId) return;
+    setDraftingOutreach(true);
+    setOutreachError(null);
+    try {
+      const res = await fetch(`/api/leads/${selectedId}/draft-outreach`, {
+        method: "POST",
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          typeof body.error === "string"
+            ? body.error
+            : "Couldn't draft outreach."
+        );
+      }
+      if (body.lead) {
+        setSelectedLead(body.lead as LeadWithActivities);
+        setLeads((prev) =>
+          prev.map((l) =>
+            l.id === body.lead.id ? (body.lead as BusinessLead) : l
+          )
+        );
+      } else {
+        await loadDetail(selectedId);
+      }
+    } catch (err) {
+      setOutreachError(
+        err instanceof Error ? err.message : "Couldn't draft outreach."
+      );
+    } finally {
+      setDraftingOutreach(false);
+    }
+  }
+
+  async function handleCreateProposal() {
+    if (!selectedId) return;
+    setCreatingProposal(true);
+    setProposalError(null);
+    try {
+      const res = await fetch(`/api/leads/${selectedId}/proposal`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          typeof body.error === "string"
+            ? body.error
+            : "Couldn't create proposal."
+        );
+      }
+      if (body.lead) {
+        setSelectedLead(body.lead as LeadWithActivities);
+        setLeads((prev) =>
+          prev.map((l) =>
+            l.id === body.lead.id ? (body.lead as BusinessLead) : l
+          )
+        );
+      } else {
+        await loadDetail(selectedId);
+      }
+      if (body.proposalId) {
+        router.push(`${PROPOSALS_PATH}?id=${body.proposalId}`);
+      }
+    } catch (err) {
+      setProposalError(
+        err instanceof Error ? err.message : "Couldn't create proposal."
+      );
+    } finally {
+      setCreatingProposal(false);
+    }
   }
 
   async function handleFindOpportunity() {
@@ -491,12 +571,23 @@ export default function LeadsScreen() {
             </div>
 
             {!editing && selectedLead ? (
-              <LeadOpportunityBriefCard
-                lead={selectedLead}
-                analyzing={analyzingOpportunity}
-                error={opportunityError}
-                onAnalyze={() => void handleFindOpportunity()}
-              />
+              <>
+                <LeadOpportunityBriefCard
+                  lead={selectedLead}
+                  analyzing={analyzingOpportunity}
+                  error={opportunityError}
+                  onAnalyze={() => void handleFindOpportunity()}
+                  creatingProposal={creatingProposal}
+                  proposalError={proposalError}
+                  onCreateProposal={() => void handleCreateProposal()}
+                />
+                <LeadOutreachPanel
+                  lead={selectedLead}
+                  drafting={draftingOutreach}
+                  error={outreachError}
+                  onDraft={() => void handleDraftOutreach()}
+                />
+              </>
             ) : null}
 
             {!editing && lead.activities.length > 0 ? (
