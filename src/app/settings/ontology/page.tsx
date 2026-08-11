@@ -26,7 +26,7 @@ export default async function OntologySettingsPage() {
   if (!user) redirect("/login?next=/settings/ontology");
   if (!isPlatformAdmin(user.email)) redirect("/settings");
 
-  const profile = await getActiveGuardianProfile(supabase, user.id);
+  const profile = await getActiveGuardianProfile(supabase, user);
   if (!profile) redirect("/settings/profiles");
 
   return (
