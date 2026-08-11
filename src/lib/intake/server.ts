@@ -105,6 +105,10 @@ export async function listIntakeRequests(
       documentName: sub?.document_id
         ? docNameMap.get(sub.document_id) ?? null
         : null,
+      employmentKind: sub?.employment_kind ?? null,
+      legalName: sub?.legal_name ?? null,
+      contactPhone: sub?.contact_phone ?? null,
+      locationAddress: sub?.location_address ?? null,
     };
   });
 }

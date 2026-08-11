@@ -7,6 +7,7 @@ import {
   isGuardianProfileAccessRole,
   isGuardianProfileType,
   isClientStatus,
+  isEmploymentKind,
   GUARDIAN_PROFILE_SELECT,
   type GuardianProfile,
   type GuardianProfileAccessRole,
@@ -43,6 +44,12 @@ function asProfile(
     is_default: Boolean(row.is_default),
     created_at: String(row.created_at ?? ""),
     updated_at: String(row.updated_at ?? ""),
+    employment_kind: isEmploymentKind(row.employment_kind)
+      ? row.employment_kind
+      : null,
+    legal_name: (row.legal_name as string | null) ?? null,
+    contact_email: (row.contact_email as string | null) ?? null,
+    contact_phone: (row.contact_phone as string | null) ?? null,
     client_status: isClientStatus(row.client_status) ? row.client_status : null,
     access_role: accessRole,
   };

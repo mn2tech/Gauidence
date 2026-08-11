@@ -28,6 +28,7 @@ export async function createIntakeRequestRecord(
     purpose: "ssn_clearance" | "w9" | "onboarding";
     requireEmailVerification: boolean;
     optionalMessage?: string;
+    defaultEmploymentKind?: "employee" | "contractor";
     createdBy: string;
   }
 ): Promise<{
@@ -56,6 +57,7 @@ export async function createIntakeRequestRecord(
       require_email_verification: args.requireEmailVerification,
       expires_at: expiresAt,
       optional_message: args.optionalMessage?.trim() || null,
+      default_employment_kind: args.defaultEmploymentKind ?? null,
       created_by: args.createdBy,
     })
     .select("id")

@@ -260,9 +260,20 @@ export function sharedProfileAccessBadge(
   return null;
 }
 
+export const EMPLOYMENT_KINDS = ["employee", "contractor"] as const;
+export type EmploymentKind = (typeof EMPLOYMENT_KINDS)[number];
+
+export function isEmploymentKind(v: unknown): v is EmploymentKind {
+  return v === "employee" || v === "contractor";
+}
+
+export function employmentKindLabel(kind: EmploymentKind): string {
+  return kind === "contractor" ? "Contractor" : "Employee";
+}
+
 /** Columns returned when loading guardian profiles from the API. */
 export const GUARDIAN_PROFILE_SELECT =
-  "id, owner_user_id, profile_type, display_name, relationship, avatar_url, date_of_birth, school_name, grade_level, business_legal_name, industry, website, description, location_address, job_title, department, organization_name, parent_profile_id, is_default, created_at, updated_at, client_status";
+  "id, owner_user_id, profile_type, display_name, relationship, avatar_url, date_of_birth, school_name, grade_level, business_legal_name, industry, website, description, location_address, job_title, department, organization_name, parent_profile_id, is_default, created_at, updated_at, client_status, employment_kind, legal_name, contact_email, contact_phone";
 
 export type GuardianProfile = {
   id: string;
@@ -287,6 +298,11 @@ export type GuardianProfile = {
   is_default: boolean;
   created_at: string;
   updated_at: string;
+  /** For employee vaults: W-2 employee vs 1099 contractor. */
+  employment_kind?: EmploymentKind | null;
+  legal_name?: string | null;
+  contact_email?: string | null;
+  contact_phone?: string | null;
   /** For client vaults: active (current) or inactive. */
   client_status?: ClientStatus | null;
   /** Present when loaded for the current user (owned or shared). */

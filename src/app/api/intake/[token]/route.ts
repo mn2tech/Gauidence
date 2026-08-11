@@ -100,5 +100,7 @@ export async function GET(request: Request, context: RouteContext) {
     purpose: intakeRequest.purpose,
     optionalMessage: intakeRequest.optional_message,
     expiresAt: intakeRequest.expires_at,
+    defaultEmploymentKind: intakeRequest.default_employment_kind,
+    recipientEmail: intakeRequest.recipient_email,
   });
 }

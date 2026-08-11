@@ -1,4 +1,7 @@
+import type { EmploymentKind } from "@/lib/profiles/types";
+
 export type IntakePurpose = "ssn_clearance" | "w9" | "onboarding";
+export type { EmploymentKind };
 
 export type IntakeRequestStatus =
   | "pending"
@@ -23,6 +26,7 @@ export type ContractorIntakeRequest = {
   expires_at: string;
   revoked_at: string | null;
   optional_message: string | null;
+  default_employment_kind: EmploymentKind | null;
   created_by: string;
   created_at: string;
   opened_at: string | null;
@@ -38,6 +42,11 @@ export type ContractorIntakeSubmission = {
   ssn_encrypted: string | null;
   ssn_last_four: string | null;
   document_id: string | null;
+  legal_name: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  location_address: string | null;
+  employment_kind: EmploymentKind | null;
   created_at: string;
 };
 
@@ -56,6 +65,10 @@ export type IntakeRequestSummary = {
   ssnMasked: string | null;
   documentId: string | null;
   documentName: string | null;
+  employmentKind: EmploymentKind | null;
+  legalName: string | null;
+  contactPhone: string | null;
+  locationAddress: string | null;
 };
 
 export const INTAKE_TTL_DAYS = 14;

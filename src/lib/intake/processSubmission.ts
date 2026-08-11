@@ -6,10 +6,17 @@ import { encryptSsn } from "./encryption";
 import { normalizeSsnInput, ssnLastFour } from "./ssn";
 import type {
   ContractorIntakeRequest,
+  EmploymentKind,
   IntakeSubmissionType,
 } from "./types";
 import { INTAKE_ACCEPTED_TYPES, INTAKE_MAX_BYTES } from "./types";
 import { logIntakeAccess } from "./external";
+import { normalizeContactEmail, normalizeContactPhone } from "./contact";
+import { isEmploymentKind } from "@/lib/profiles/types";
+import {
+  applyEmploymentKindEntitlements,
+  syncEmployeeProfileFromIntake,
+} from "./employmentKind";
 
 function safeFileName(name: string): string {
   return name.replace(/[^\w.\- ]/g, "_").trim() || "document";
@@ -29,6 +36,11 @@ function resolveMimeType(file: { type: string; name: string }): string {
 export type ProcessSubmissionArgs = {
   request: ContractorIntakeRequest;
   admin: SupabaseClient;
+  legalName?: string | null;
+  contactEmail?: string | null;
+  contactPhone?: string | null;
+  locationAddress?: string | null;
+  employmentKind?: string | null;
   ssnRaw?: string | null;
   file?: File | null;
   ipAddress?: string;
@@ -39,6 +51,50 @@ export async function processIntakeSubmission(
   args: ProcessSubmissionArgs
 ): Promise<{ ok: true } | { ok: false; error: string; status?: number }> {
   const { request, admin } = args;
+
+  const legalName = args.legalName?.trim() ?? "";
+  if (!legalName || legalName.length < 2) {
+    return {
+      ok: false,
+      status: 400,
+      error: "Enter your full legal name.",
+    };
+  }
+
+  const contactEmail = args.contactEmail
+    ? normalizeContactEmail(args.contactEmail)
+    : null;
+  if (!contactEmail) {
+    return {
+      ok: false,
+      status: 400,
+      error: "Enter a valid email address.",
+    };
+  }
+
+  const employmentKindRaw = args.employmentKind?.trim();
+  if (!isEmploymentKind(employmentKindRaw)) {
+    return {
+      ok: false,
+      status: 400,
+      error: "Select whether you are an employee or contractor.",
+    };
+  }
+  const employmentKind = employmentKindRaw as EmploymentKind;
+
+  const contactPhone = args.contactPhone?.trim()
+    ? normalizeContactPhone(args.contactPhone)
+    : null;
+  if (args.contactPhone?.trim() && !contactPhone) {
+    return {
+      ok: false,
+      status: 400,
+      error: "Enter a valid phone number (10 digits).",
+    };
+  }
+
+  const locationAddress = args.locationAddress?.trim() || null;
+
   const ssnDigits = args.ssnRaw ? normalizeSsnInput(args.ssnRaw) : null;
   const file = args.file;
 
@@ -151,6 +207,11 @@ export async function processIntakeSubmission(
     ssn_encrypted: ssnDigits ? encryptSsn(ssnDigits) : null,
     ssn_last_four: ssnDigits ? ssnLastFour(ssnDigits) : null,
     document_id: documentId,
+    legal_name: legalName,
+    contact_email: contactEmail,
+    contact_phone: contactPhone,
+    location_address: locationAddress,
+    employment_kind: employmentKind,
   });
 
   if (subError) {
@@ -169,6 +230,21 @@ export async function processIntakeSubmission(
     return { ok: false, status: 502, error: "Couldn't save submission." };
   }
 
+  await syncEmployeeProfileFromIntake(admin, request.employee_profile_id, {
+    legalName,
+    contactEmail,
+    contactPhone,
+    locationAddress,
+    employmentKind,
+  });
+
+  await applyEmploymentKindEntitlements(
+    admin,
+    request.profile_id,
+    request.employee_profile_id,
+    employmentKind
+  );
+
   const now = new Date().toISOString();
   await admin
     .from("contractor_intake_requests")
@@ -182,13 +258,14 @@ export async function processIntakeSubmission(
   await logIntakeAccess(admin, {
     requestId: request.id,
     action: "submitted",
-    recipientEmail: request.recipient_email,
+    recipientEmail: contactEmail,
     ipAddress: args.ipAddress,
     userAgent: args.userAgent,
     details: {
       submission_type: submissionType,
       has_document: Boolean(documentId),
       has_ssn: Boolean(ssnDigits),
+      employment_kind: employmentKind,
     },
   });
 

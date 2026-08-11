@@ -8,6 +8,7 @@ export const createIntakeRequestSchema = z.object({
   optionalMessage: z.string().max(2000).optional(),
   requireEmailVerification: z.boolean().default(true),
   sendEmail: z.boolean().default(true),
+  defaultEmploymentKind: z.enum(["employee", "contractor"]).optional(),
 });
 
 export const submitIntakeSsnSchema = z.object({

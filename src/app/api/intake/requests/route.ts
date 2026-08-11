@@ -132,6 +132,7 @@ export async function POST(request: Request) {
     purpose: parsed.data.purpose,
     requireEmailVerification: parsed.data.requireEmailVerification,
     optionalMessage: parsed.data.optionalMessage,
+    defaultEmploymentKind: parsed.data.defaultEmploymentKind,
     createdBy: auth.user.id,
   });
 

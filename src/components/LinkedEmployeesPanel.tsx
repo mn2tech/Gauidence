@@ -7,6 +7,7 @@ import { useActiveProfile } from "@/components/ProfileProvider";
 import {
   canManageProfileAccess,
   canEditGuardianProfile,
+  employmentKindLabel,
   employeesOf,
   type GuardianProfile,
 } from "@/lib/profiles/types";
@@ -183,7 +184,17 @@ export default function LinkedEmployeesPanel({ parent }: Props) {
                   <p className="text-xs text-ink-muted">
                     {[emp.job_title, emp.department].filter(Boolean).join(" · ") ||
                       "Employee"}
+                    {emp.employment_kind ? (
+                      <span className="ml-1.5 rounded-full bg-stone-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-muted ring-1 ring-stone-200">
+                        {employmentKindLabel(emp.employment_kind)}
+                      </span>
+                    ) : null}
                   </p>
+                  {emp.contact_email || emp.contact_phone ? (
+                    <p className="mt-0.5 text-[11px] text-ink-muted">
+                      {[emp.contact_email, emp.contact_phone].filter(Boolean).join(" · ")}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   {canEditGuardianProfile(parent) ? (

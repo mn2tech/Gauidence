@@ -11,6 +11,8 @@ import {
   XCircle,
 } from "lucide-react";
 import type { IntakeRequestSummary } from "@/lib/intake/types";
+import type { EmploymentKind } from "@/lib/profiles/types";
+import { employmentKindLabel } from "@/lib/profiles/types";
 
 type Props = {
   businessProfileId: string;
@@ -66,6 +68,9 @@ export default function ContractorIntakePanel({
   };
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
+  const [defaultEmploymentKind, setDefaultEmploymentKind] = useState<
+    EmploymentKind | ""
+  >("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [requests, setRequests] = useState<IntakeRequestSummary[]>([]);
@@ -86,7 +91,7 @@ export default function ContractorIntakePanel({
     } finally {
       setLoading(false);
     }
-  }, [employeeProfileId]);
+  }, [employeeProfileId, businessProfileId]);
 
   useEffect(() => {
     void loadRequests();
@@ -110,6 +115,7 @@ export default function ContractorIntakePanel({
             recipientName: employeeName,
             purpose: "ssn_clearance",
             optionalMessage: message.trim() || undefined,
+            defaultEmploymentKind: defaultEmploymentKind || undefined,
             sendEmail: true,
           }),
         }
@@ -123,6 +129,7 @@ export default function ContractorIntakePanel({
       setLastUrl(body.intakeUrl ?? null);
       setEmail("");
       setMessage("");
+      setDefaultEmploymentKind("");
       setOpen(false);
     } finally {
       setBusy(false);
@@ -232,6 +239,24 @@ export default function ContractorIntakePanel({
             />
           </label>
           <label className="block text-xs">
+            <span className="text-ink-muted">Expected role (optional hint)</span>
+            <select
+              value={defaultEmploymentKind}
+              onChange={(e) =>
+                setDefaultEmploymentKind(
+                  e.target.value === "employee" || e.target.value === "contractor"
+                    ? e.target.value
+                    : ""
+                )
+              }
+              className="mt-1 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none ring-brand focus:ring-2"
+            >
+              <option value="">Let them choose</option>
+              <option value="employee">Employee (W-2)</option>
+              <option value="contractor">Contractor (1099)</option>
+            </select>
+          </label>
+          <label className="block text-xs">
             <span className="text-ink-muted">Note (optional)</span>
             <input
               value={message}
@@ -290,6 +315,23 @@ export default function ContractorIntakePanel({
               </div>
               {r.status === "submitted" ? (
                 <div className="mt-2 space-y-1 text-xs text-ink-muted">
+                  {r.employmentKind ? (
+                    <p>
+                      Role:{" "}
+                      <span className="text-foreground">
+                        {employmentKindLabel(r.employmentKind)}
+                      </span>
+                    </p>
+                  ) : null}
+                  {r.legalName ? (
+                    <p>Legal name: <span className="text-foreground">{r.legalName}</span></p>
+                  ) : null}
+                  {r.contactPhone ? (
+                    <p>Phone: <span className="text-foreground">{r.contactPhone}</span></p>
+                  ) : null}
+                  {r.locationAddress ? (
+                    <p>Address: <span className="text-foreground">{r.locationAddress}</span></p>
+                  ) : null}
                   {r.ssnMasked ? (
                     <p>
                       SSN:{" "}

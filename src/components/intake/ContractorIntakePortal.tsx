@@ -9,7 +9,8 @@ import {
   Upload,
 } from "lucide-react";
 import IntakeVerificationForm from "./IntakeVerificationForm";
-import { INTAKE_ACCEPTED_TYPES } from "@/lib/intake/types";
+import { INTAKE_ACCEPTED_TYPES, type EmploymentKind } from "@/lib/intake/types";
+import { formatPhoneInput } from "@/lib/intake/contact";
 
 type PortalMeta = {
   businessName: string;
@@ -17,6 +18,8 @@ type PortalMeta = {
   purpose: string;
   optionalMessage: string | null;
   expiresAt: string;
+  defaultEmploymentKind: EmploymentKind | null;
+  recipientEmail: string;
 };
 
 type Props = {
@@ -33,6 +36,11 @@ export default function ContractorIntakePortal({ token }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [ssn, setSsn] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [legalName, setLegalName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [employmentKind, setEmploymentKind] = useState<EmploymentKind | "">("");
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   async function loadPortal() {
@@ -56,7 +64,14 @@ export default function ContractorIntakePortal({ token }: Props) {
         purpose: body.purpose,
         optionalMessage: body.optionalMessage,
         expiresAt: body.expiresAt,
+        defaultEmploymentKind: body.defaultEmploymentKind ?? null,
+        recipientEmail: body.recipientEmail ?? "",
       });
+      setLegalName(body.recipientName ?? "");
+      setEmail(body.recipientEmail ?? "");
+      if (body.defaultEmploymentKind === "employee" || body.defaultEmploymentKind === "contractor") {
+        setEmploymentKind(body.defaultEmploymentKind);
+      }
       setRequiresVerification(false);
     } catch {
       setError("Couldn't load this form.");
@@ -104,6 +119,18 @@ export default function ContractorIntakePortal({ token }: Props) {
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     const ssnDigits = ssn.replace(/\D/g, "");
+    if (!legalName.trim()) {
+      setSubmitError("Enter your full legal name.");
+      return;
+    }
+    if (!email.trim()) {
+      setSubmitError("Enter your email address.");
+      return;
+    }
+    if (!employmentKind) {
+      setSubmitError("Select employee or contractor.");
+      return;
+    }
     if (!ssnDigits && !file) {
       setSubmitError("Enter your SSN or upload a document (or both).");
       return;
@@ -112,6 +139,11 @@ export default function ContractorIntakePortal({ token }: Props) {
     setSubmitError(null);
     try {
       const formData = new FormData();
+      formData.set("legalName", legalName.trim());
+      formData.set("email", email.trim());
+      if (phone.trim()) formData.set("phone", phone.trim());
+      if (address.trim()) formData.set("address", address.trim());
+      formData.set("employmentKind", employmentKind);
       if (ssnDigits) formData.set("ssn", ssnDigits);
       if (file) formData.set("file", file);
 
@@ -202,6 +234,88 @@ export default function ContractorIntakePortal({ token }: Props) {
         onSubmit={onSubmit}
         className="space-y-5 rounded-2xl border border-stone-700 bg-stone-900 p-6"
       >
+        <div>
+          <label className="block text-sm font-medium text-stone-200">
+            I am a
+          </label>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            {(["employee", "contractor"] as EmploymentKind[]).map((kind) => (
+              <button
+                key={kind}
+                type="button"
+                onClick={() => setEmploymentKind(kind)}
+                className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition ${
+                  employmentKind === kind
+                    ? "border-emerald-500 bg-emerald-950/40 text-emerald-300"
+                    : "border-stone-600 bg-stone-800 text-stone-300 hover:border-stone-500"
+                }`}
+              >
+                {kind === "contractor" ? "Contractor (1099)" : "Employee (W-2)"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-stone-200">
+            Full legal name
+          </label>
+          <input
+            type="text"
+            required
+            value={legalName}
+            onChange={(e) => setLegalName(e.target.value)}
+            placeholder="First Middle Last"
+            className="mt-2 w-full rounded-xl border border-stone-600 bg-stone-800 px-4 py-3 text-stone-100 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30"
+          />
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className="block text-sm font-medium text-stone-200">
+              Email
+            </label>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="mt-2 w-full rounded-xl border border-stone-600 bg-stone-800 px-4 py-3 text-stone-100 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-stone-200">
+              Phone <span className="text-stone-500">(optional)</span>
+            </label>
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(formatPhoneInput(e.target.value))}
+              placeholder="(555) 555-5555"
+              className="mt-2 w-full rounded-xl border border-stone-600 bg-stone-800 px-4 py-3 text-stone-100 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-stone-200">
+            Address <span className="text-stone-500">(optional)</span>
+          </label>
+          <input
+            type="text"
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            placeholder="Street, city, state, ZIP"
+            className="mt-2 w-full rounded-xl border border-stone-600 bg-stone-800 px-4 py-3 text-stone-100 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30"
+          />
+        </div>
+
+        <div className="border-t border-stone-700 pt-5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+            Clearance verification
+          </p>
+        </div>
+
         <div>
           <label className="block text-sm font-medium text-stone-200">
             Social Security number
