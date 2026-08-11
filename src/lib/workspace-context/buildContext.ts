@@ -14,8 +14,11 @@ import {
   logRetrievalDiagnostics,
 } from "@/lib/vault/retrievalDiagnostics";
 import { isKnowledgeEngineV2Enabled } from "@/lib/features/knowledge-engine-v2";
+import { isGuardianOntologyEnabled } from "@/lib/features/ontology";
 import { retrieveStructuredKnowledge } from "@/lib/knowledge/v2/retrieve";
 import { formatKnowledgeForGideon } from "@/lib/knowledge/v2/formatForGideon";
+import { getOntologyContext } from "@/lib/ontology/context";
+import { formatOntologyForGideon } from "@/lib/ontology/formatForGideon";
 import {
   formatClientRequestsForGideon,
   loadActiveClientRequestsForGideon,
@@ -198,6 +201,27 @@ export async function loadWorkspaceContext(
       knowledge,
       profileNames
     );
+  }
+
+  let ontologyContext = "(none)";
+  if (isGuardianOntologyEnabled()) {
+    const ontologySpaceId =
+      explicitSpace?.id ??
+      meta.chatScopedProfileId ??
+      activeProfile.id;
+    try {
+      const ontology = await getOntologyContext(supabase, {
+        spaceId: ontologySpaceId,
+        query: retrievalQuestion,
+      });
+      ontologyContext = formatOntologyForGideon(ontology);
+    } catch (err) {
+      console.warn(
+        "Ontology context for Gideon failed; continuing without it:",
+        err instanceof Error ? err.message : "error"
+      );
+      ontologyContext = "(none)";
+    }
   }
 
   const { logs: dailyLogs, authorNames } = await retrieveRelevantDailyLogs(
@@ -398,6 +422,7 @@ Active space in the UI: ${activeProfile.display_name}. Document search includes 
         workMemoryContext.trim() ||
         "(none — user has no active work projects)",
       structuredKnowledge: structuredKnowledgeContext,
+      ontology: ontologyContext,
     },
     promptOptions: {
       timeZone,

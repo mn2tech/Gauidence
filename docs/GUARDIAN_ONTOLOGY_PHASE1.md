@@ -148,15 +148,21 @@ Set `GUARDIAN_ONTOLOGY_ENABLED=false` to disable without rollback.
 ## Known limitations (Phase 1)
 
 - One-hop graph traversal only
-- No Gideon prompt injection yet (`getOntologyContext` prepared in `src/lib/ontology/context.ts`)
 - Events table exists but minimal integration
 - No graph visualization library (list/tree view only)
 - Fuzzy matching limited to organizations/projects
 - Admin Explorer uses active Space profile
 
-## Phase 2 recommendations
+## Gideon integration (Phase 2 start)
 
-- Inject `getOntologyContext()` into Gideon vault chat
+When `GUARDIAN_ONTOLOGY_ENABLED=true`, Ask Gideon loads one-hop ontology context for the active/explicit Space via `getOntologyContext()` and injects an `--- ONTOLOGY ---` block into the system prompt (`loadWorkspaceContext` → `formatOntologyForGideon`).
+
+- Failures are caught; chat continues without ontology
+- Does not replace RAG excerpts — complements them for entity/relationship questions
+
+## Phase 2 recommendations (remaining)
+
+- Visual graph / map in Ontology Explorer
 - Multi-hop graph reasoning
 - Review queue for low-confidence extractions
 - Customer-facing entity management

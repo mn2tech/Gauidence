@@ -41,6 +41,7 @@ export type WorkspaceContextBlocks = {
   vaultMap: string;
   workMemory: string;
   structuredKnowledge: string;
+  ontology: string;
 };
 
 /** Options that modify how the system prompt is assembled. */

@@ -1,0 +1,58 @@
+import type { OntologyContext } from "./types";
+
+/**
+ * Compact one-hop ontology block for Gideon's system prompt.
+ * Returns "(none)" when empty so the prompt section stays stable.
+ */
+export function formatOntologyForGideon(ctx: OntologyContext): string {
+  if (
+    ctx.matchedEntities.length === 0 &&
+    ctx.relationships.length === 0 &&
+    ctx.evidence.length === 0
+  ) {
+    return "(none)";
+  }
+
+  const nameOf = (id: string) => ctx.entityNames[id] ?? "Unknown entity";
+  const blocks: string[] = [];
+
+  if (ctx.matchedEntities.length > 0) {
+    blocks.push("MATCHED ENTITIES:");
+    for (const entity of ctx.matchedEntities.slice(0, 5)) {
+      const conf =
+        entity.confidence != null
+          ? ` | confidence:${Number(entity.confidence).toFixed(2)}`
+          : "";
+      const desc = entity.description
+        ? ` — ${entity.description.slice(0, 120)}`
+        : "";
+      blocks.push(
+        `- ${entity.name} (${entity.entity_type})${desc}${conf}`
+      );
+    }
+  }
+
+  if (ctx.relationships.length > 0) {
+    blocks.push("", "RELATIONSHIPS (one-hop):");
+    for (const rel of ctx.relationships.slice(0, 10)) {
+      const conf =
+        rel.confidence != null
+          ? ` | confidence:${Number(rel.confidence).toFixed(2)}`
+          : "";
+      blocks.push(
+        `- ${nameOf(rel.source_entity_id)} —[${rel.relationship_type}]→ ${nameOf(rel.target_entity_id)}${conf}`
+      );
+    }
+  }
+
+  if (ctx.evidence.length > 0) {
+    blocks.push("", "EVIDENCE (cite when using ontology facts):");
+    for (const ev of ctx.evidence.slice(0, 5)) {
+      const text = (ev.evidence_text ?? "").trim().slice(0, 120);
+      if (!text) continue;
+      blocks.push(`- "${text}"`);
+    }
+  }
+
+  return blocks.length ? blocks.join("\n") : "(none)";
+}

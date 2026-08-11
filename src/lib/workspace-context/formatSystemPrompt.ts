@@ -128,7 +128,11 @@ ${blocks.workMemory}
 
 --- STRUCTURED KNOWLEDGE (verified facts from the knowledge graph; always cite the source document named here — do not state facts without source provenance) ---
 ${blocks.structuredKnowledge}
---- END STRUCTURED KNOWLEDGE ---`;
+--- END STRUCTURED KNOWLEDGE ---
+
+--- ONTOLOGY (business entities and one-hop relationships from this space; prefer for who/what is connected questions; cite EVIDENCE when using these facts) ---
+${blocks.ontology}
+--- END ONTOLOGY ---`;
 }
 
 /** Suggested max tokens based on prompt options. */

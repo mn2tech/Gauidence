@@ -132,6 +132,8 @@ export type OntologyContext = {
   matchedEntities: OntologyEntity[];
   relationships: OntologyRelationship[];
   evidence: OntologyEvidence[];
+  /** Display names for entity ids referenced in relationships. */
+  entityNames: Record<string, string>;
 };
 
 export type OntologyPersistStats = {

@@ -20,7 +20,8 @@ The name represents courage, wisdom, and guidance. Guardian watches over what ma
 export const GIDEON_SYSTEM = `You are Gideon, Guardian's assistant.
 
 Grounding (strict):
-- Prefer RETRIEVED EXCERPTS, SPACE FILE INVENTORY, RETRIEVED DAILY LOGS, CLIENT REQUESTS, UPCOMING SCHEDULE, SPACE MAP STRUCTURE, and LINKED PROFILE STRUCTURE.
+- Prefer RETRIEVED EXCERPTS, SPACE FILE INVENTORY, RETRIEVED DAILY LOGS, CLIENT REQUESTS, UPCOMING SCHEDULE, SPACE MAP STRUCTURE, LINKED PROFILE STRUCTURE, STRUCTURED KNOWLEDGE, and ONTOLOGY.
+- When ONTOLOGY lists entities or relationships, use them for questions about organizations, people, projects, contracts, invoices, and how they connect. Cite EVIDENCE quotes or source documents when stating ontology facts. Do not invent relationships not listed there.
 - For "what documents/files are uploaded", "what's in this space", or listing stored files, use SPACE FILE INVENTORY first (complete file names). Do not answer from Daily Logs or Client Requests alone unless the user asked about notes or requests.
 - For Space Map, hierarchy, "what spaces do I have", parent/child space, or where a space sits in the account, use SPACE MAP STRUCTURE. Present a simple indented tree; mark the active space. Do not invent spaces not listed there.
 - When RETRIEVED DAILY LOGS or CLIENT REQUESTS are provided, quote them exactly when the user asks for the full log or request text. Never invent or paraphrase log or request content that is not in those blocks.
@@ -53,6 +54,7 @@ Optional sections (omit if unused):
 ## FROM CLIENT REQUESTS
 ## FROM YOUR PROFILES
 ## FROM YOUR WORK MEMORY
+## FROM YOUR ONTOLOGY
 ## CALCULATED
 ## GENERAL KNOWLEDGE
 ## GIDEON'S SUGGESTION
@@ -989,6 +991,7 @@ export type GideonSectionKind =
   | "calculated"
   | "general_knowledge"
   | "from_work_memory"
+  | "from_ontology"
   | "suggestion"
   | "needs_verification"
   | "body";
@@ -1030,6 +1033,11 @@ const SECTION_MAP: { match: RegExp; kind: GideonSectionKind; title: string }[] =
       match: /^#{1,3}\s*FROM YOUR WORK MEMORY\s*$/i,
       kind: "from_work_memory",
       title: "From your Work Memory",
+    },
+    {
+      match: /^#{1,3}\s*FROM YOUR ONTOLOGY\s*$/i,
+      kind: "from_ontology",
+      title: "From your Ontology",
     },
     {
       match: /^#{1,3}\s*GIDEON'?S SUGGESTION\s*$/i,

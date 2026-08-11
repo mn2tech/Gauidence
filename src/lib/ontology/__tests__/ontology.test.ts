@@ -7,6 +7,7 @@ import {
   normalizeEntityName,
 } from "../normalize";
 import { parseOntologyExtraction } from "../schema";
+import { formatOntologyForGideon } from "../formatForGideon";
 
 describe("normalizeEntityName", () => {
   it("lowercases and trims", () => {
@@ -143,5 +144,84 @@ describe("failed extraction isolation", () => {
     ];
     assert.ok(!ontologyStatuses.includes("uploaded"));
     assert.ok(ontologyStatuses.includes("failed"));
+  });
+});
+
+describe("formatOntologyForGideon", () => {
+  it("returns (none) for empty context", () => {
+    assert.equal(
+      formatOntologyForGideon({
+        matchedEntities: [],
+        relationships: [],
+        evidence: [],
+        entityNames: {},
+      }),
+      "(none)"
+    );
+  });
+
+  it("formats entities, relationships, and evidence for the prompt", () => {
+    const text = formatOntologyForGideon({
+      matchedEntities: [
+        {
+          id: "e1",
+          profile_id: "p1",
+          entity_type: "organization",
+          name: "NM2TECH LLC",
+          canonical_name: "nm2tech llc",
+          description: "Technology consulting company",
+          properties: {},
+          confidence: 0.98,
+          source_type: "document",
+          source_id: "d1",
+          created_by: null,
+          created_at: "2026-01-01T00:00:00Z",
+          updated_at: "2026-01-01T00:00:00Z",
+        },
+      ],
+      relationships: [
+        {
+          id: "r1",
+          profile_id: "p1",
+          source_entity_id: "e1",
+          relationship_type: "SUBCONTRACTOR_TO",
+          target_entity_id: "e2",
+          properties: {},
+          confidence: 0.94,
+          source_document_id: "d1",
+          created_by: null,
+          created_at: "2026-01-01T00:00:00Z",
+          updated_at: "2026-01-01T00:00:00Z",
+        },
+      ],
+      evidence: [
+        {
+          id: "ev1",
+          profile_id: "p1",
+          entity_id: "e1",
+          relationship_id: "r1",
+          source_type: "document",
+          source_id: "d1",
+          document_id: "d1",
+          chunk_id: null,
+          evidence_text:
+            "NM2TECH provides subcontracting services through Onyx Government Services.",
+          page_number: null,
+          confidence: 0.94,
+          created_at: "2026-01-01T00:00:00Z",
+        },
+      ],
+      entityNames: {
+        e1: "NM2TECH LLC",
+        e2: "Onyx Government Services",
+      },
+    });
+
+    assert.match(text, /MATCHED ENTITIES/);
+    assert.match(text, /NM2TECH LLC \(organization\)/);
+    assert.match(text, /SUBCONTRACTOR_TO/);
+    assert.match(text, /Onyx Government Services/);
+    assert.match(text, /EVIDENCE/);
+    assert.match(text, /subcontracting services/);
   });
 });

@@ -476,6 +476,7 @@ const SECTION_STYLES: Record<string, string> = {
   from_daily_log: "border-emerald-200 bg-emerald-50/80",
   from_profiles: "border-teal-200 bg-teal-50/80",
   from_work_memory: "border-indigo-200 bg-indigo-50/70",
+  from_ontology: "border-cyan-200 bg-cyan-50/70",
   calculated: "border-sky-200 bg-sky-50/80",
   general_knowledge: "border-stone-200 bg-stone-50/90",
   suggestion: "border-violet-200 bg-violet-50/70",
