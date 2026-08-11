@@ -8,6 +8,7 @@ import {
 } from "../normalize";
 import { parseOntologyExtraction } from "../schema";
 import { formatOntologyForGideon, buildOntologyAnswerFallback } from "../formatForGideon";
+import { reviewStatusForConfidence } from "../types";
 
 describe("normalizeEntityName", () => {
   it("lowercases and trims", () => {
@@ -155,6 +156,7 @@ describe("formatOntologyForGideon", () => {
         relationships: [],
         evidence: [],
         entityNames: {},
+        paths: [],
       }),
       "(none)"
     );
@@ -215,12 +217,24 @@ describe("formatOntologyForGideon", () => {
         e1: "NM2TECH LLC",
         e2: "Onyx Government Services",
       },
+      paths: [
+        {
+          hops: 2,
+          nodeIds: ["e1", "e3", "e2"],
+          nodeNames: ["NM2TECH LLC", "Prime Contract", "Onyx Government Services"],
+          edges: [],
+          label:
+            "NM2TECH LLC —[WORKS_ON]→ Prime Contract —[AWARDED_TO]→ Onyx Government Services",
+        },
+      ],
     });
 
     assert.match(text, /MATCHED ENTITIES/);
     assert.match(text, /NM2TECH LLC \(organization\)/);
     assert.match(text, /SUBCONTRACTOR_TO/);
     assert.match(text, /Onyx Government Services/);
+    assert.match(text, /PATHS \(up to 2-hop\)/);
+    assert.match(text, /WORKS_ON/);
     assert.match(text, /EVIDENCE/);
     assert.match(text, /subcontracting services/);
   });
@@ -264,11 +278,20 @@ describe("formatOntologyForGideon", () => {
         e1: "NM2TECH LLC",
         e2: "Onyx Government Services",
       },
+      paths: [],
     });
     const fallback = buildOntologyAnswerFallback(block);
     assert.ok(fallback);
     assert.match(fallback!, /FROM YOUR ONTOLOGY/);
     assert.match(fallback!, /Onyx Government Services/);
     assert.match(fallback!, /SUBCONTRACTOR_TO/);
+  });
+});
+
+describe("reviewStatusForConfidence", () => {
+  it("confirms manual and high-confidence rows", () => {
+    assert.equal(reviewStatusForConfidence(0.5, "manual"), "confirmed");
+    assert.equal(reviewStatusForConfidence(0.95, "document"), "confirmed");
+    assert.equal(reviewStatusForConfidence(0.7, "document"), "pending");
   });
 });

@@ -147,26 +147,44 @@ Set `GUARDIAN_ONTOLOGY_ENABLED=false` to disable without rollback.
 
 ## Known limitations (Phase 1)
 
-- One-hop graph traversal only
 - Events table exists but minimal integration
 - Fuzzy matching limited to organizations/projects
 - Admin Explorer uses active Space profile
 
 ## Ontology map (Phase 2)
 
-Admin Ontology Explorer includes a lightweight **one-hop SVG map** (no graph DB / no React Flow). Click a connected node to open that entity.
+Admin Ontology Explorer includes a lightweight **one-hop SVG map** (no graph DB / no React Flow). Click a connected node to open that entity. Entity details also list **up to 2-hop paths** from the selected node.
+
+## Multi-hop reasoning (Phase 2)
+
+`getEntityPaths` BFS (max 2 hops) powers:
+
+- Gideon context: `PATHS (up to 2-hop)` via `getPathsBetweenMatchedEntities`
+- Entity graph: `paths` on `getEntityGraph`
+- API: `GET /api/ontology/paths?profileId=&from=&to=&maxHops=2`
+
+Rejected review items are excluded from path traversal.
+
+## Review queue (Phase 2)
+
+Migration `0076_ontology_review_multihop.sql` adds `review_status` (`pending` | `confirmed` | `rejected`) on entities and relationships.
+
+- AI extractions with confidence &lt; 0.9 → `pending`
+- Manual creates and confidence ≥ 0.9 → `confirmed`
+- Stats `needsReview` counts pending entities + relationships
+- Admin Explorer **Needs review** tab: Confirm / Reject
+- API: `GET` / `PATCH /api/ontology/review`
+- Rejected rows are hidden from search, Gideon, and graph paths
 
 ## Gideon integration (Phase 2)
 
-When `GUARDIAN_ONTOLOGY_ENABLED=true`, Ask Gideon loads one-hop ontology context for the active/explicit Space via `getOntologyContext()` and injects an `--- ONTOLOGY ---` block into the system prompt (`loadWorkspaceContext` → `formatOntologyForGideon`).
+When `GUARDIAN_ONTOLOGY_ENABLED=true`, Ask Gideon loads one-/two-hop ontology context for the active/explicit Space via `getOntologyContext()` and injects an `--- ONTOLOGY ---` block into the system prompt (`loadWorkspaceContext` → `formatOntologyForGideon`).
 
 - Failures are caught; chat continues without ontology
 - Does not replace RAG excerpts — complements them for entity/relationship questions
 
 ## Phase 2 recommendations (remaining)
 
-- Multi-hop graph reasoning
-- Review queue for low-confidence extractions
 - Customer-facing entity management
 - Connector sources (`api`, `connector` source types)
 - Dedicated `ontology.nm2tech.com` admin UI (same database)

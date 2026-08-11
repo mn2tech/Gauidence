@@ -7,6 +7,7 @@ import type {
   OntologyExtractionResult,
   OntologyPersistStats,
 } from "./types";
+import { reviewStatusForConfidence } from "./types";
 
 export type PersistOntologyInput = {
   userId: string;
@@ -229,6 +230,7 @@ async function upsertRelationship(
       relationship_type: args.relationshipType,
       target_entity_id: args.targetEntityId,
       confidence: args.confidence,
+      review_status: reviewStatusForConfidence(args.confidence, "document"),
       source_document_id: args.documentId,
       created_by: args.createdBy,
     })

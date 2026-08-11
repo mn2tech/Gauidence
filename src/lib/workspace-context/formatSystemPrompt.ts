@@ -135,7 +135,7 @@ ${blocks.workMemory}
 ${blocks.structuredKnowledge}
 --- END STRUCTURED KNOWLEDGE ---
 
---- ONTOLOGY (business entities and one-hop relationships from this space; prefer for who/what is connected questions; cite EVIDENCE when using these facts) ---
+--- ONTOLOGY (business entities, one-hop relationships, and up to two-hop paths from this space; prefer for who/what is connected questions; cite EVIDENCE when using these facts) ---
 ${blocks.ontology}
 --- END ONTOLOGY ---`;
 }

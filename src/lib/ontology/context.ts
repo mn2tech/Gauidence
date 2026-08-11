@@ -2,16 +2,18 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { normalizeEntityName } from "./normalize";
+import { getPathsBetweenMatchedEntities } from "./paths";
 import type { OntologyContext, OntologyEntity } from "./types";
 import {
   ONTOLOGY_ENTITY_SELECT,
   ONTOLOGY_EVIDENCE_SELECT,
   ONTOLOGY_RELATIONSHIP_SELECT,
+  ONTOLOGY_VISIBLE_REVIEW_STATUSES,
 } from "./types";
 
 /**
- * Load one-hop ontology context for Gideon (or other consumers).
- * Optimized for chat latency: parallel queries, no exact counts, small limits.
+ * Load ontology context for Gideon (1-hop + optional 2-hop paths).
+ * Excludes rejected review items. Optimized for chat latency.
  */
 export async function getOntologyContext(
   supabase: SupabaseClient,
@@ -22,12 +24,12 @@ export async function getOntologyContext(
     relationships: [],
     evidence: [],
     entityNames: {},
+    paths: [],
   };
 
   const trimmed = args.query.trim();
   if (!trimmed) return empty;
 
-  // Prefer distinctive tokens for matching (skip tiny words).
   const tokens = normalizeEntityName(trimmed)
     .split(" ")
     .filter((t) => t.length >= 3)
@@ -45,6 +47,7 @@ export async function getOntologyContext(
       .from("ontology_entities")
       .select(ONTOLOGY_ENTITY_SELECT)
       .eq("profile_id", args.spaceId)
+      .in("review_status", ONTOLOGY_VISIBLE_REVIEW_STATUSES)
       .or(`name.ilike.%${term}%,canonical_name.ilike.%${term}%`)
       .limit(5)
   );
@@ -81,7 +84,8 @@ export async function getOntologyContext(
     const { data: aliasEntities } = await supabase
       .from("ontology_entities")
       .select(ONTOLOGY_ENTITY_SELECT)
-      .in("id", aliasIds.slice(0, 5));
+      .in("id", aliasIds.slice(0, 5))
+      .in("review_status", ONTOLOGY_VISIBLE_REVIEW_STATUSES);
     for (const row of (aliasEntities as OntologyEntity[] | null) ?? []) {
       byId.set(row.id, row);
     }
@@ -96,11 +100,12 @@ export async function getOntologyContext(
     entityNames[entity.id] = entity.name;
   }
 
-  const [relationshipsRes, evidenceRes] = await Promise.all([
+  const [relationshipsRes, evidenceRes, paths] = await Promise.all([
     supabase
       .from("ontology_relationships")
       .select(ONTOLOGY_RELATIONSHIP_SELECT)
       .eq("profile_id", args.spaceId)
+      .in("review_status", ONTOLOGY_VISIBLE_REVIEW_STATUSES)
       .or(
         `source_entity_id.in.(${entityIds.join(",")}),target_entity_id.in.(${entityIds.join(",")})`
       )
@@ -112,6 +117,7 @@ export async function getOntologyContext(
       .in("entity_id", entityIds)
       .order("created_at", { ascending: false })
       .limit(6),
+    getPathsBetweenMatchedEntities(supabase, args.spaceId, entityIds, 6),
   ]);
 
   const relationships = relationshipsRes.data ?? [];
@@ -125,7 +131,8 @@ export async function getOntologyContext(
     const { data: extras } = await supabase
       .from("ontology_entities")
       .select(ONTOLOGY_ENTITY_SELECT)
-      .in("id", [...missingIds]);
+      .in("id", [...missingIds])
+      .in("review_status", ONTOLOGY_VISIBLE_REVIEW_STATUSES);
     for (const entity of (extras as OntologyEntity[] | null) ?? []) {
       entityNames[entity.id] = entity.name;
     }
@@ -136,5 +143,6 @@ export async function getOntologyContext(
     relationships,
     evidence: evidenceRes.data ?? [],
     entityNames,
+    paths,
   };
 }

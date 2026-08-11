@@ -6,7 +6,9 @@ import {
   ONTOLOGY_ENTITY_SELECT,
   ONTOLOGY_EVIDENCE_SELECT,
   ONTOLOGY_RELATIONSHIP_SELECT,
+  ONTOLOGY_VISIBLE_REVIEW_STATUSES,
 } from "./types";
+import { getEntityPaths } from "./paths";
 
 export async function getEntityGraph(
   supabase: SupabaseClient,
@@ -16,13 +18,14 @@ export async function getEntityGraph(
     .from("ontology_entities")
     .select(ONTOLOGY_ENTITY_SELECT)
     .eq("id", entityId)
+    .neq("review_status", "rejected")
     .maybeSingle();
 
   if (!entity) return null;
 
   const typedEntity = entity as OntologyEntity;
 
-  const [aliasesRes, outgoingRes, incomingRes] = await Promise.all([
+  const [aliasesRes, outgoingRes, incomingRes, paths] = await Promise.all([
     supabase
       .from("ontology_entity_aliases")
       .select("id, profile_id, entity_id, alias, normalized_alias, created_at")
@@ -30,11 +33,19 @@ export async function getEntityGraph(
     supabase
       .from("ontology_relationships")
       .select(ONTOLOGY_RELATIONSHIP_SELECT)
-      .eq("source_entity_id", entityId),
+      .eq("source_entity_id", entityId)
+      .in("review_status", ONTOLOGY_VISIBLE_REVIEW_STATUSES),
     supabase
       .from("ontology_relationships")
       .select(ONTOLOGY_RELATIONSHIP_SELECT)
-      .eq("target_entity_id", entityId),
+      .eq("target_entity_id", entityId)
+      .in("review_status", ONTOLOGY_VISIBLE_REVIEW_STATUSES),
+    getEntityPaths(supabase, {
+      spaceId: typedEntity.profile_id,
+      fromEntityId: entityId,
+      maxHops: 2,
+      limit: 10,
+    }),
   ]);
 
   const outgoing = outgoingRes.data ?? [];
@@ -54,7 +65,8 @@ export async function getEntityGraph(
     const { data } = await supabase
       .from("ontology_entities")
       .select(ONTOLOGY_ENTITY_SELECT)
-      .in("id", [...connectedIds]);
+      .in("id", [...connectedIds])
+      .neq("review_status", "rejected");
     connectedEntities = (data as OntologyEntity[]) ?? [];
   }
 
@@ -122,6 +134,7 @@ export async function getEntityGraph(
     })).filter((r) => r.sourceEntity),
     connectedEntities,
     evidence,
+    paths,
   };
 }
 

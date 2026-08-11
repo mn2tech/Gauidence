@@ -8,7 +8,8 @@ export function formatOntologyForGideon(ctx: OntologyContext): string {
   if (
     ctx.matchedEntities.length === 0 &&
     ctx.relationships.length === 0 &&
-    ctx.evidence.length === 0
+    ctx.evidence.length === 0 &&
+    ctx.paths.length === 0
   ) {
     return "(none)";
   }
@@ -45,6 +46,13 @@ export function formatOntologyForGideon(ctx: OntologyContext): string {
     }
   }
 
+  if (ctx.paths.length > 0) {
+    blocks.push("", "PATHS (up to 2-hop):");
+    for (const path of ctx.paths.slice(0, 6)) {
+      blocks.push(`- ${path.label}`);
+    }
+  }
+
   if (ctx.evidence.length > 0) {
     blocks.push("", "EVIDENCE (cite when using ontology facts):");
     for (const ev of ctx.evidence.slice(0, 5)) {
@@ -66,7 +74,8 @@ export function buildOntologyAnswerFallback(ontologyBlock: string): string | nul
 
   const entityLines: string[] = [];
   const relationshipLines: string[] = [];
-  let section: "none" | "entities" | "relationships" | "evidence" = "none";
+  let section: "none" | "entities" | "relationships" | "paths" | "evidence" =
+    "none";
 
   for (const raw of trimmed.split("\n")) {
     const line = raw.trim();
@@ -79,6 +88,10 @@ export function buildOntologyAnswerFallback(ontologyBlock: string): string | nul
       section = "relationships";
       continue;
     }
+    if (line.startsWith("PATHS")) {
+      section = "paths";
+      continue;
+    }
     if (line.startsWith("EVIDENCE")) {
       section = "evidence";
       continue;
@@ -88,7 +101,7 @@ export function buildOntologyAnswerFallback(ontologyBlock: string): string | nul
     if (section === "entities") {
       const name = item.replace(/\s*\|.*$/, "").trim();
       if (name) entityLines.push(name);
-    } else if (section === "relationships") {
+    } else if (section === "relationships" || section === "paths") {
       const clean = item.replace(/\s*\|.*$/, "").trim();
       if (clean) relationshipLines.push(clean);
     }

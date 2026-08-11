@@ -32,7 +32,16 @@ export async function createManualEntity(
   if (args.properties && Object.keys(args.properties).length) {
     await supabase
       .from("ontology_entities")
-      .update({ properties: args.properties, source_type: "manual" })
+      .update({
+        properties: args.properties,
+        source_type: "manual",
+        review_status: "confirmed",
+      })
+      .eq("id", result.entity.id);
+  } else if (result.entity.review_status !== "confirmed") {
+    await supabase
+      .from("ontology_entities")
+      .update({ review_status: "confirmed", source_type: "manual" })
       .eq("id", result.entity.id);
   }
 
@@ -70,6 +79,7 @@ export async function createManualRelationship(
       target_entity_id: args.targetEntityId,
       properties: args.properties ?? {},
       confidence: 1,
+      review_status: "confirmed",
       created_by: args.userId,
     })
     .select("id")
@@ -111,31 +121,39 @@ export async function getOntologySpaceStats(
   evidenceCount: number;
   needsReview: number;
 }> {
-  const [entities, relationships, evidence, lowConfidence] = await Promise.all([
-    supabase
-      .from("ontology_entities")
-      .select("id", { count: "exact", head: true })
-      .eq("profile_id", profileId),
-    supabase
-      .from("ontology_relationships")
-      .select("id", { count: "exact", head: true })
-      .eq("profile_id", profileId),
-    supabase
-      .from("ontology_evidence")
-      .select("id", { count: "exact", head: true })
-      .eq("profile_id", profileId),
-    supabase
-      .from("ontology_entities")
-      .select("id", { count: "exact", head: true })
-      .eq("profile_id", profileId)
-      .lt("confidence", 0.7),
-  ]);
+  const [entities, relationships, evidence, pendingEntities, pendingRels] =
+    await Promise.all([
+      supabase
+        .from("ontology_entities")
+        .select("id", { count: "exact", head: true })
+        .eq("profile_id", profileId)
+        .neq("review_status", "rejected"),
+      supabase
+        .from("ontology_relationships")
+        .select("id", { count: "exact", head: true })
+        .eq("profile_id", profileId)
+        .neq("review_status", "rejected"),
+      supabase
+        .from("ontology_evidence")
+        .select("id", { count: "exact", head: true })
+        .eq("profile_id", profileId),
+      supabase
+        .from("ontology_entities")
+        .select("id", { count: "exact", head: true })
+        .eq("profile_id", profileId)
+        .eq("review_status", "pending"),
+      supabase
+        .from("ontology_relationships")
+        .select("id", { count: "exact", head: true })
+        .eq("profile_id", profileId)
+        .eq("review_status", "pending"),
+    ]);
 
   return {
     entityCount: entities.count ?? 0,
     relationshipCount: relationships.count ?? 0,
     evidenceCount: evidence.count ?? 0,
-    needsReview: lowConfidence.count ?? 0,
+    needsReview: (pendingEntities.count ?? 0) + (pendingRels.count ?? 0),
   };
 }
 

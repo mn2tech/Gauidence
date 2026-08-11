@@ -3,7 +3,10 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { normalizeEntityName } from "./normalize";
 import type { OntologyEntity } from "./types";
-import { ONTOLOGY_ENTITY_SELECT } from "./types";
+import {
+  ONTOLOGY_ENTITY_SELECT,
+  ONTOLOGY_VISIBLE_REVIEW_STATUSES,
+} from "./types";
 
 export type OntologySearchResult = {
   entities: OntologyEntity[];
@@ -24,6 +27,7 @@ export async function searchOntology(
       .from("ontology_entities")
       .select(ONTOLOGY_ENTITY_SELECT, { count: "exact" })
       .eq("profile_id", spaceId)
+      .in("review_status", ONTOLOGY_VISIBLE_REVIEW_STATUSES)
       .order("updated_at", { ascending: false })
       .limit(limit);
 
@@ -53,6 +57,7 @@ export async function searchOntology(
     .from("ontology_entities")
     .select(ONTOLOGY_ENTITY_SELECT, { count: "exact" })
     .eq("profile_id", spaceId)
+    .in("review_status", ONTOLOGY_VISIBLE_REVIEW_STATUSES)
     .or(`name.ilike.%${escaped}%,description.ilike.%${escaped}%`)
     .order("updated_at", { ascending: false })
     .limit(limit);
@@ -71,7 +76,8 @@ export async function searchOntology(
     const { data } = await supabase
       .from("ontology_entities")
       .select(ONTOLOGY_ENTITY_SELECT)
-      .in("id", extraIds.slice(0, limit));
+      .in("id", extraIds.slice(0, limit))
+      .in("review_status", ONTOLOGY_VISIBLE_REVIEW_STATUSES);
     extraEntities = (data as OntologyEntity[]) ?? [];
   }
 

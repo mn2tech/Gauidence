@@ -1,3 +1,6 @@
+/** Review status for ontology entities and relationships. */
+export type OntologyReviewStatus = "pending" | "confirmed" | "rejected";
+
 /** Supported ontology entity types for Phase 1. */
 export const ONTOLOGY_ENTITY_TYPES = [
   "person",
@@ -29,6 +32,7 @@ export type OntologyEntity = {
   description: string | null;
   properties: Record<string, unknown>;
   confidence: number | null;
+  review_status?: OntologyReviewStatus;
   source_type: string | null;
   source_id: string | null;
   created_by: string | null;
@@ -53,6 +57,7 @@ export type OntologyRelationship = {
   target_entity_id: string;
   properties: Record<string, unknown>;
   confidence: number | null;
+  review_status?: OntologyReviewStatus;
   source_document_id: string | null;
   created_by: string | null;
   created_at: string;
@@ -126,6 +131,23 @@ export type EntityGraph = {
   })[];
   connectedEntities: OntologyEntity[];
   evidence: (OntologyEvidence & { documentName?: string | null })[];
+  paths?: OntologyPath[];
+};
+
+export type OntologyPathHop = {
+  relationshipId: string;
+  relationshipType: string;
+  fromEntityId: string;
+  toEntityId: string;
+  confidence: number | null;
+};
+
+export type OntologyPath = {
+  hops: number;
+  nodeIds: string[];
+  nodeNames: string[];
+  edges: OntologyPathHop[];
+  label: string;
 };
 
 export type OntologyContext = {
@@ -134,6 +156,7 @@ export type OntologyContext = {
   evidence: OntologyEvidence[];
   /** Display names for entity ids referenced in relationships. */
   entityNames: Record<string, string>;
+  paths: OntologyPath[];
 };
 
 export type OntologyPersistStats = {
@@ -145,10 +168,25 @@ export type OntologyPersistStats = {
 };
 
 export const ONTOLOGY_ENTITY_SELECT =
-  "id, profile_id, entity_type, name, canonical_name, description, properties, confidence, source_type, source_id, created_by, created_at, updated_at";
+  "id, profile_id, entity_type, name, canonical_name, description, properties, confidence, review_status, source_type, source_id, created_by, created_at, updated_at";
 
 export const ONTOLOGY_RELATIONSHIP_SELECT =
-  "id, profile_id, source_entity_id, relationship_type, target_entity_id, properties, confidence, source_document_id, created_by, created_at, updated_at";
+  "id, profile_id, source_entity_id, relationship_type, target_entity_id, properties, confidence, review_status, source_document_id, created_by, created_at, updated_at";
 
 export const ONTOLOGY_EVIDENCE_SELECT =
   "id, profile_id, entity_id, relationship_id, source_type, source_id, document_id, chunk_id, evidence_text, page_number, confidence, created_at";
+
+/** Statuses visible to Gideon and default graph views (excludes rejected). */
+export const ONTOLOGY_VISIBLE_REVIEW_STATUSES: OntologyReviewStatus[] = [
+  "confirmed",
+  "pending",
+];
+
+export function reviewStatusForConfidence(
+  confidence: number | null | undefined,
+  sourceType?: string | null
+): OntologyReviewStatus {
+  if (sourceType === "manual") return "confirmed";
+  if (confidence != null && confidence >= 0.9) return "confirmed";
+  return "pending";
+}

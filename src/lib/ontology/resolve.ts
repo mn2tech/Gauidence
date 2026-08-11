@@ -12,7 +12,7 @@ import type {
   OntologyEntity,
   OntologySourceType,
 } from "./types";
-import { ONTOLOGY_ENTITY_SELECT } from "./types";
+import { ONTOLOGY_ENTITY_SELECT, reviewStatusForConfidence } from "./types";
 import { ontologyFuzzyMatchThreshold } from "@/lib/features/ontology";
 
 export type ResolveOntologyEntityInput = {
@@ -39,6 +39,7 @@ async function findByCanonicalName(
     .eq("profile_id", profileId)
     .eq("entity_type", entityType)
     .eq("canonical_name", normalized)
+    .neq("review_status", "rejected")
     .maybeSingle();
 
   return (data as OntologyEntity | null) ?? null;
@@ -62,6 +63,7 @@ async function findByAlias(
     .from("ontology_entities")
     .select(ONTOLOGY_ENTITY_SELECT)
     .eq("id", aliasRow.entity_id)
+    .neq("review_status", "rejected")
     .maybeSingle();
 
   return (data as OntologyEntity | null) ?? null;
@@ -82,6 +84,7 @@ async function findByFuzzyMatch(
     .select(ONTOLOGY_ENTITY_SELECT)
     .eq("profile_id", profileId)
     .eq("entity_type", entityType)
+    .neq("review_status", "rejected")
     .limit(50);
 
   if (!candidates?.length) return null;
@@ -118,6 +121,10 @@ async function createEntity(
       canonical_name: normalized,
       description: input.description ?? null,
       confidence: input.confidence ?? null,
+      review_status: reviewStatusForConfidence(
+        input.confidence,
+        input.sourceType
+      ),
       source_type: input.sourceType ?? null,
       source_id: input.sourceId ?? null,
       created_by: input.createdBy ?? null,
