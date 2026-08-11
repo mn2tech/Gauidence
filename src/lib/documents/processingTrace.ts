@@ -11,6 +11,7 @@ import {
 export type ProcessingJobType =
   | "analyze_document"
   | "index_document"
+  | "extract_ontology"
   | "extract_knowledge";
 
 export type ProcessingTraceStageStatus =
@@ -45,6 +46,7 @@ export const PROCESSING_TIMING_LABELS: Record<ProcessingTimingKey, string> = {
   organization_ms: "Space matching",
   chunking_ms: "Chunking",
   embedding_ms: "Search indexing",
+  ontology_extraction_ms: "Ontology extraction",
   knowledge_extraction_ms: "Knowledge graph",
   total_to_searchable_ms: "Total to searchable",
   total_to_knowledge_ready_ms: "Total to knowledge ready",
@@ -53,12 +55,14 @@ export const PROCESSING_TIMING_LABELS: Record<ProcessingTimingKey, string> = {
 const STAGE_ORDER: ProcessingJobType[] = [
   "analyze_document",
   "index_document",
+  "extract_ontology",
   "extract_knowledge",
 ];
 
 const STAGE_LABELS: Record<ProcessingJobType, string> = {
   analyze_document: "Reading & analyzing",
   index_document: "Making searchable",
+  extract_ontology: "Extracting entities",
   extract_knowledge: "Building knowledge",
 };
 
@@ -101,6 +105,11 @@ function mapJobStatus(
         if (indexing === "skipped") return "skipped";
         if (indexing === "failed") return "failed";
       }
+      if (stageId === "extract_ontology") {
+        const ontology = doc.ontology_status ?? "pending";
+        if (ontology === "skipped") return "skipped";
+        if (ontology === "failed") return "failed";
+      }
       if (stageId === "extract_knowledge") {
         const knowledge = doc.knowledge_status ?? "pending";
         if (knowledge === "skipped") return "skipped";
@@ -124,6 +133,7 @@ export function buildProcessingTrace(args: {
     processing_started_at?: string | null;
     processing_completed_at?: string | null;
     indexing_status?: string | null;
+    ontology_status?: string | null;
     knowledge_status?: string | null;
     analysis_status?: string;
   };
@@ -150,6 +160,12 @@ export function buildProcessingTrace(args: {
     let status = mapJobStatus(job, args.doc, id);
 
     if (id === "index_document" && (args.doc.indexing_status ?? "") === "skipped") {
+      status = "skipped";
+    }
+    if (
+      id === "extract_ontology" &&
+      (args.doc.ontology_status ?? "") === "skipped"
+    ) {
       status = "skipped";
     }
     if (

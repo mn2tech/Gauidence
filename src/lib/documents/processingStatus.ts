@@ -10,6 +10,14 @@ export type IndexingStatus =
   | "retryable"
   | "skipped";
 
+export type OntologyStatus =
+  | "pending"
+  | "processing"
+  | "completed"
+  | "failed"
+  | "retryable"
+  | "skipped";
+
 export type KnowledgeStatus =
   | "pending"
   | "processing"
@@ -65,6 +73,7 @@ export const PROCESSING_STEP_LABELS: Record<string, string> = {
 export type DocumentProcessingFields = {
   analysis_status: string;
   indexing_status?: string | null;
+  ontology_status?: string | null;
   knowledge_status?: string | null;
   processing_step?: string | null;
 };
