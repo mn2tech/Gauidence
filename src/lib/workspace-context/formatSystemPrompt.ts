@@ -68,6 +68,10 @@ export function buildGideonSystemPrompt(
   const fullLogNote = fullLogQuote
     ? `The user asked for the full Daily Log or client request text. Quote the complete matching entry verbatim from RETRIEVED DAILY LOGS or CLIENT REQUESTS below. Do not paraphrase, shorten, or invent log content. If no matching entry is present in those blocks, say so clearly.`
     : "";
+  const ontologyNote =
+    blocks.ontology.trim() && blocks.ontology.trim() !== "(none)"
+      ? `When ONTOLOGY has matches, always answer using those entities and relationships — including when the user sends a short name or keyword (for example "Onyx"). Summarize the match and key connections in 2–5 sentences. Never return a blank reply when ONTOLOGY is non-empty.`
+      : "";
 
   return `${withVaultPersonality(VAULT_CHAT_SYSTEM, profileKind)}
 
@@ -79,6 +83,7 @@ ${allVaultsNote}
 ${pictureNote}
 ${vaultEmptyNote}
 ${fullLogNote}
+${ontologyNote}
 ${actionNotes}
 ${clientRequestCreateNote}
 ${spaceCreateNote}

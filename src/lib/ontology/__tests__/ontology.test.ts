@@ -7,7 +7,7 @@ import {
   normalizeEntityName,
 } from "../normalize";
 import { parseOntologyExtraction } from "../schema";
-import { formatOntologyForGideon } from "../formatForGideon";
+import { formatOntologyForGideon, buildOntologyAnswerFallback } from "../formatForGideon";
 
 describe("normalizeEntityName", () => {
   it("lowercases and trims", () => {
@@ -223,5 +223,52 @@ describe("formatOntologyForGideon", () => {
     assert.match(text, /Onyx Government Services/);
     assert.match(text, /EVIDENCE/);
     assert.match(text, /subcontracting services/);
+  });
+
+  it("builds a spoken fallback when the model returns blank", () => {
+    const block = formatOntologyForGideon({
+      matchedEntities: [
+        {
+          id: "e2",
+          profile_id: "p1",
+          entity_type: "organization",
+          name: "Onyx Government Services",
+          canonical_name: "onyx government services",
+          description: null,
+          properties: {},
+          confidence: 0.97,
+          source_type: "document",
+          source_id: "d1",
+          created_by: null,
+          created_at: "2026-01-01T00:00:00Z",
+          updated_at: "2026-01-01T00:00:00Z",
+        },
+      ],
+      relationships: [
+        {
+          id: "r1",
+          profile_id: "p1",
+          source_entity_id: "e1",
+          relationship_type: "SUBCONTRACTOR_TO",
+          target_entity_id: "e2",
+          properties: {},
+          confidence: 0.94,
+          source_document_id: "d1",
+          created_by: null,
+          created_at: "2026-01-01T00:00:00Z",
+          updated_at: "2026-01-01T00:00:00Z",
+        },
+      ],
+      evidence: [],
+      entityNames: {
+        e1: "NM2TECH LLC",
+        e2: "Onyx Government Services",
+      },
+    });
+    const fallback = buildOntologyAnswerFallback(block);
+    assert.ok(fallback);
+    assert.match(fallback!, /FROM YOUR ONTOLOGY/);
+    assert.match(fallback!, /Onyx Government Services/);
+    assert.match(fallback!, /SUBCONTRACTOR_TO/);
   });
 });

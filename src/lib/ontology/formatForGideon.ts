@@ -56,3 +56,60 @@ export function formatOntologyForGideon(ctx: OntologyContext): string {
 
   return blocks.length ? blocks.join("\n") : "(none)";
 }
+
+/**
+ * User-facing answer when the LLM returns blank but ontology matched.
+ */
+export function buildOntologyAnswerFallback(ontologyBlock: string): string | null {
+  const trimmed = ontologyBlock.trim();
+  if (!trimmed || trimmed === "(none)") return null;
+
+  const entityLines: string[] = [];
+  const relationshipLines: string[] = [];
+  let section: "none" | "entities" | "relationships" | "evidence" = "none";
+
+  for (const raw of trimmed.split("\n")) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (line.startsWith("MATCHED ENTITIES")) {
+      section = "entities";
+      continue;
+    }
+    if (line.startsWith("RELATIONSHIPS")) {
+      section = "relationships";
+      continue;
+    }
+    if (line.startsWith("EVIDENCE")) {
+      section = "evidence";
+      continue;
+    }
+    if (!line.startsWith("- ")) continue;
+    const item = line.slice(2).trim();
+    if (section === "entities") {
+      const name = item.replace(/\s*\|.*$/, "").trim();
+      if (name) entityLines.push(name);
+    } else if (section === "relationships") {
+      const clean = item.replace(/\s*\|.*$/, "").trim();
+      if (clean) relationshipLines.push(clean);
+    }
+  }
+
+  if (!entityLines.length && !relationshipLines.length) return null;
+
+  const parts: string[] = ["## FROM YOUR ONTOLOGY", ""];
+  if (entityLines.length) {
+    parts.push("Matching entities:");
+    for (const e of entityLines.slice(0, 5)) parts.push(`- ${e}`);
+  }
+  if (relationshipLines.length) {
+    if (entityLines.length) parts.push("");
+    parts.push("Connections:");
+    for (const r of relationshipLines.slice(0, 8)) parts.push(`- ${r}`);
+  }
+  parts.push("");
+  parts.push(
+    "Ask a full question if you want me to pull more detail from your documents."
+  );
+  return parts.join("\n");
+}
+

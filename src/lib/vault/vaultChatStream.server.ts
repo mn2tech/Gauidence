@@ -35,6 +35,7 @@ import { withLlmUsage } from "@/lib/usage/record";
 import { recordChatEvent } from "@/lib/billing/quota";
 import { refreshUserAwards } from "@/lib/awards/grant";
 import { formatVaultChatError, buildGideonEmptyAnswerFallback } from "@/lib/vault/vaultChatErrors";
+import { buildOntologyAnswerFallback } from "@/lib/ontology/formatForGideon";
 import {
   listActionTimeline,
   recordActionEvent,
@@ -82,6 +83,8 @@ export type VaultChatStreamArgs = {
   thinkingSteps?: string[];
   detectedActions?: { id: string; label: string }[];
   explicitSpaceName?: string | null;
+  /** Formatted ontology block from workspace context; used if the model returns blank. */
+  ontologyBlock?: string | null;
 };
 
 export function createVaultChatStreamResponse(
@@ -176,11 +179,13 @@ export function createVaultChatStreamResponse(
           });
         }
 
-        if (!answer) {
-          answer = buildGideonEmptyAnswerFallback({
-            chunks: args.chunks,
-            explicitSpaceName: args.explicitSpaceName,
-          });
+        if (!answer.trim()) {
+          answer =
+            buildOntologyAnswerFallback(args.ontologyBlock ?? "") ??
+            buildGideonEmptyAnswerFallback({
+              chunks: args.chunks,
+              explicitSpaceName: args.explicitSpaceName,
+            });
         }
 
         let selected = selectCitationsForAnswer(answer, args.chunks);

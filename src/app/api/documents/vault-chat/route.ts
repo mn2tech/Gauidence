@@ -1275,6 +1275,7 @@ export async function POST(request: Request) {
           thinkingSteps,
           detectedActions,
           explicitSpaceName,
+          ontologyBlock: workspaceContext.blocks.ontology,
         });
       }
     } catch (err) {
