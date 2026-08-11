@@ -297,15 +297,18 @@ export async function loadWorkspaceContext(
     }),
     loadLinkedOrgContext(supabase, user.id, activeProfile),
     workProjectId
-      ? loadWorkMemoryProjectForGideon(supabase, user.id, workProjectId).then(
-          (focused) =>
-            focused
-              ? { focused: true as const, bundle: focused }
-              : loadWorkMemoryForGideon(supabase, user.id).then((bundle) => ({
-                  focused: false as const,
-                  bundle,
-                }))
-        )
+      ? (async () => {
+          const focused = await loadWorkMemoryProjectForGideon(
+            supabase,
+            user.id,
+            workProjectId
+          );
+          if (focused) {
+            return { focused: true as const, bundle: focused };
+          }
+          const bundle = await loadWorkMemoryForGideon(supabase, user.id);
+          return { focused: false as const, bundle };
+        })()
       : loadWorkMemoryForGideon(supabase, user.id).then((bundle) => ({
           focused: false as const,
           bundle,
