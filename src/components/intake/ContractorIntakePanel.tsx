@@ -16,6 +16,8 @@ type Props = {
   businessProfileId: string;
   employeeProfileId: string;
   employeeName: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 };
 
 function statusLabel(status: IntakeRequestSummary["status"]): string {
@@ -53,8 +55,15 @@ export default function ContractorIntakePanel({
   businessProfileId,
   employeeProfileId,
   employeeName,
+  open: openProp,
+  onOpenChange,
 }: Props) {
-  const [open, setOpen] = useState(false);
+  const [openInternal, setOpenInternal] = useState(false);
+  const open = openProp ?? openInternal;
+  const setOpen = (value: boolean) => {
+    if (onOpenChange) onOpenChange(value);
+    else setOpenInternal(value);
+  };
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -161,6 +170,11 @@ export default function ContractorIntakePanel({
     }
   };
 
+  const hasVisibleContent = open || requests.length > 0 || lastUrl;
+  if (onOpenChange && !hasVisibleContent) {
+    return null;
+  }
+
   return (
     <div className="mt-3 w-full rounded-xl border border-stone-200 bg-stone-50/80 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -168,7 +182,7 @@ export default function ContractorIntakePanel({
           <Shield className="h-3.5 w-3.5 text-brand" />
           SSN / clearance intake
         </div>
-        {!open ? (
+        {!open && !onOpenChange ? (
           <button
             type="button"
             onClick={() => setOpen(true)}

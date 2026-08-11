@@ -6,6 +6,7 @@ import { Loader2, Plus, Users } from "lucide-react";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
   canManageProfileAccess,
+  canEditGuardianProfile,
   employeesOf,
   type GuardianProfile,
 } from "@/lib/profiles/types";
@@ -25,6 +26,7 @@ export default function LinkedEmployeesPanel({ parent }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [openingId, setOpeningId] = useState<string | null>(null);
+  const [intakeEmployeeId, setIntakeEmployeeId] = useState<string | null>(null);
 
   const employees = useMemo(
     () => employeesOf(profiles, parent.id),
@@ -184,6 +186,23 @@ export default function LinkedEmployeesPanel({ parent }: Props) {
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
+                  {canEditGuardianProfile(parent) ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setIntakeEmployeeId(
+                          intakeEmployeeId === emp.id ? null : emp.id
+                        )
+                      }
+                      className={`rounded-full border px-3 py-1.5 text-xs font-medium hover:bg-stone-50 ${
+                        intakeEmployeeId === emp.id
+                          ? "border-brand bg-brand-light text-brand-dark"
+                          : "border-stone-300"
+                      }`}
+                    >
+                      Request SSN
+                    </button>
+                  ) : null}
                   {canManageProfileAccess(emp) ? (
                     <Link
                       href={`/settings/profiles/${emp.id}/collaborators`}
@@ -209,11 +228,15 @@ export default function LinkedEmployeesPanel({ parent }: Props) {
                   initial={null}
                 />
               ) : null}
-              {canManageProfileAccess(parent) ? (
+              {canEditGuardianProfile(parent) ? (
                 <ContractorIntakePanel
                   businessProfileId={parent.id}
                   employeeProfileId={emp.id}
                   employeeName={emp.display_name}
+                  open={intakeEmployeeId === emp.id}
+                  onOpenChange={(next) =>
+                    setIntakeEmployeeId(next ? emp.id : null)
+                  }
                 />
               ) : null}
             </li>
