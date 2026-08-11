@@ -57,6 +57,7 @@ export const PROCESSING_STEP_LABELS: Record<string, string> = {
   analyzing: "Extracting important information",
   validating: "Checking dates and amounts",
   indexing: "Making document searchable",
+  ontology: "Extracting business entities",
   knowledge: "Building connected knowledge",
   ready: "Ready to ask Gideon",
 };

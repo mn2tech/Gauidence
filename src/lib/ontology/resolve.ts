@@ -1,0 +1,234 @@
+import "server-only";
+
+import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  isAmbiguousPersonName,
+  isFuzzyMatchAllowed,
+  nameSimilarity,
+  normalizeEntityName,
+} from "./normalize";
+import type {
+  EntityResolutionResult,
+  OntologyEntity,
+  OntologySourceType,
+} from "./types";
+import { ONTOLOGY_ENTITY_SELECT } from "./types";
+import { ontologyFuzzyMatchThreshold } from "@/lib/features/ontology";
+
+export type ResolveOntologyEntityInput = {
+  spaceId: string;
+  entityType: string;
+  name: string;
+  aliases?: string[];
+  confidence?: number;
+  sourceType?: OntologySourceType;
+  sourceId?: string;
+  createdBy?: string;
+  description?: string;
+};
+
+async function findByCanonicalName(
+  supabase: SupabaseClient,
+  profileId: string,
+  entityType: string,
+  normalized: string
+): Promise<OntologyEntity | null> {
+  const { data } = await supabase
+    .from("ontology_entities")
+    .select(ONTOLOGY_ENTITY_SELECT)
+    .eq("profile_id", profileId)
+    .eq("entity_type", entityType)
+    .eq("canonical_name", normalized)
+    .maybeSingle();
+
+  return (data as OntologyEntity | null) ?? null;
+}
+
+async function findByAlias(
+  supabase: SupabaseClient,
+  profileId: string,
+  normalized: string
+): Promise<OntologyEntity | null> {
+  const { data: aliasRow } = await supabase
+    .from("ontology_entity_aliases")
+    .select("entity_id")
+    .eq("profile_id", profileId)
+    .eq("normalized_alias", normalized)
+    .maybeSingle();
+
+  if (!aliasRow?.entity_id) return null;
+
+  const { data } = await supabase
+    .from("ontology_entities")
+    .select(ONTOLOGY_ENTITY_SELECT)
+    .eq("id", aliasRow.entity_id)
+    .maybeSingle();
+
+  return (data as OntologyEntity | null) ?? null;
+}
+
+async function findByFuzzyMatch(
+  supabase: SupabaseClient,
+  profileId: string,
+  entityType: string,
+  normalized: string,
+  displayName: string
+): Promise<OntologyEntity | null> {
+  if (!isFuzzyMatchAllowed(entityType)) return null;
+  if (entityType === "person" && isAmbiguousPersonName(displayName)) return null;
+
+  const { data: candidates } = await supabase
+    .from("ontology_entities")
+    .select(ONTOLOGY_ENTITY_SELECT)
+    .eq("profile_id", profileId)
+    .eq("entity_type", entityType)
+    .limit(50);
+
+  if (!candidates?.length) return null;
+
+  const threshold = ontologyFuzzyMatchThreshold();
+  let best: OntologyEntity | null = null;
+  let bestScore = 0;
+
+  for (const candidate of candidates as OntologyEntity[]) {
+    const score = nameSimilarity(
+      normalized,
+      candidate.canonical_name ?? candidate.name
+    );
+    if (score >= threshold && score > bestScore) {
+      bestScore = score;
+      best = candidate;
+    }
+  }
+
+  return best;
+}
+
+async function createEntity(
+  supabase: SupabaseClient,
+  input: ResolveOntologyEntityInput,
+  normalized: string
+): Promise<OntologyEntity> {
+  const { data, error } = await supabase
+    .from("ontology_entities")
+    .insert({
+      profile_id: input.spaceId,
+      entity_type: input.entityType,
+      name: input.name.trim(),
+      canonical_name: normalized,
+      description: input.description ?? null,
+      confidence: input.confidence ?? null,
+      source_type: input.sourceType ?? null,
+      source_id: input.sourceId ?? null,
+      created_by: input.createdBy ?? null,
+    })
+    .select(ONTOLOGY_ENTITY_SELECT)
+    .single();
+
+  if (error || !data) {
+    throw new Error(error?.message ?? "Failed to create ontology entity");
+  }
+
+  return data as OntologyEntity;
+}
+
+async function ensureAliases(
+  supabase: SupabaseClient,
+  profileId: string,
+  entityId: string,
+  aliases: string[],
+  canonicalNormalized: string
+): Promise<void> {
+  const unique = new Set<string>();
+  for (const alias of aliases) {
+    const normalized = normalizeEntityName(alias);
+    if (!normalized || normalized === canonicalNormalized) continue;
+    unique.add(normalized);
+  }
+
+  if (!unique.size) return;
+
+  const rows = [...unique].map((normalized) => ({
+    profile_id: profileId,
+    entity_id: entityId,
+    alias: aliases.find((a) => normalizeEntityName(a) === normalized) ?? normalized,
+    normalized_alias: normalized,
+  }));
+
+  await supabase
+    .from("ontology_entity_aliases")
+    .upsert(rows, { onConflict: "profile_id,normalized_alias", ignoreDuplicates: true });
+}
+
+/**
+ * Resolve an ontology entity within a Space (profile).
+ * Checks canonical name → aliases → conservative fuzzy match → create new.
+ */
+export async function resolveOntologyEntity(
+  supabase: SupabaseClient,
+  input: ResolveOntologyEntityInput
+): Promise<EntityResolutionResult> {
+  const normalized = normalizeEntityName(input.name);
+  if (!normalized) {
+    throw new Error("Entity name is required");
+  }
+
+  const canonical = await findByCanonicalName(
+    supabase,
+    input.spaceId,
+    input.entityType,
+    normalized
+  );
+  if (canonical) {
+    if (input.aliases?.length) {
+      await ensureAliases(
+        supabase,
+        input.spaceId,
+        canonical.id,
+        input.aliases,
+        normalized
+      );
+    }
+    return { entity: canonical, created: false, matchType: "canonical" };
+  }
+
+  const byAlias = await findByAlias(supabase, input.spaceId, normalized);
+  if (byAlias) {
+    if (input.aliases?.length) {
+      await ensureAliases(
+        supabase,
+        input.spaceId,
+        byAlias.id,
+        input.aliases,
+        byAlias.canonical_name ?? normalized
+      );
+    }
+    return { entity: byAlias, created: false, matchType: "alias" };
+  }
+
+  const fuzzy = await findByFuzzyMatch(
+    supabase,
+    input.spaceId,
+    input.entityType,
+    normalized,
+    input.name
+  );
+  if (fuzzy) {
+    if (input.aliases?.length) {
+      await ensureAliases(
+        supabase,
+        input.spaceId,
+        fuzzy.id,
+        [input.name, ...input.aliases],
+        fuzzy.canonical_name ?? normalized
+      );
+    }
+    return { entity: fuzzy, created: false, matchType: "fuzzy" };
+  }
+
+  const entity = await createEntity(supabase, input, normalized);
+  const allAliases = [input.name, ...(input.aliases ?? [])];
+  await ensureAliases(supabase, input.spaceId, entity.id, allAliases, normalized);
+
+  return { entity, created: true, matchType: "created" };
+}

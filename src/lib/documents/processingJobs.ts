@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { User } from "@supabase/supabase-js";
 import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
 import { isKnowledgeEngineV2Enabled } from "@/lib/features/knowledge-engine-v2";
+import { isGuardianOntologyEnabled } from "@/lib/features/ontology";
 import { isVaultEmbeddingConfigured } from "@/lib/vault/embeddings";
 import {
   createDiagnostics,
@@ -25,6 +26,7 @@ export const RETRY_DELAY_MS = 5 * 60 * 1000;
 export type ProcessingJobType =
   | "analyze_document"
   | "index_document"
+  | "extract_ontology"
   | "extract_knowledge";
 
 export type ProcessingJobStatus =
@@ -37,6 +39,7 @@ export type ProcessingJobStatus =
 const STAGE_TIMEOUT_MS: Record<ProcessingJobType, number> = {
   analyze_document: 10 * 60 * 1000,
   index_document: 5 * 60 * 1000,
+  extract_ontology: 5 * 60 * 1000,
   extract_knowledge: 5 * 60 * 1000,
 };
 
@@ -168,29 +171,59 @@ async function enqueueNextStage(
   }
 
   if (completedStage === "index_document") {
-    if (!isKnowledgeEngineV2Enabled()) {
+    if (isGuardianOntologyEnabled()) {
       await supabase
         .from("documents")
         .update({
-          knowledge_status: "skipped",
-          processing_step: "ready",
-          processing_completed_at: new Date().toISOString(),
+          ontology_status: "pending",
+          processing_step: "ontology",
         })
         .eq("id", args.documentId);
+      await enqueueDocumentProcessingJob(supabase, {
+        ...args,
+        jobType: "extract_ontology",
+      });
       return;
     }
+    await enqueueKnowledgeOrReady(supabase, args);
+    return;
+  }
+
+  if (completedStage === "extract_ontology") {
+    await enqueueKnowledgeOrReady(supabase, args);
+  }
+}
+
+async function enqueueKnowledgeOrReady(
+  supabase: SupabaseClient,
+  args: {
+    documentId: string;
+    profileId: string;
+    userId: string;
+  }
+): Promise<void> {
+  if (!isKnowledgeEngineV2Enabled()) {
     await supabase
       .from("documents")
       .update({
-        knowledge_status: "pending",
-        processing_step: "knowledge",
+        knowledge_status: "skipped",
+        processing_step: "ready",
+        processing_completed_at: new Date().toISOString(),
       })
       .eq("id", args.documentId);
-    await enqueueDocumentProcessingJob(supabase, {
-      ...args,
-      jobType: "extract_knowledge",
-    });
+    return;
   }
+  await supabase
+    .from("documents")
+    .update({
+      knowledge_status: "pending",
+      processing_step: "knowledge",
+    })
+    .eq("id", args.documentId);
+  await enqueueDocumentProcessingJob(supabase, {
+    ...args,
+    jobType: "extract_knowledge",
+  });
 }
 
 async function markJobFailed(
@@ -232,6 +265,13 @@ async function markJobFailed(
         indexing_status: retryable ? "retryable" : "failed",
         last_processing_error: message.slice(0, 500),
         processing_step: retryable ? "indexing" : "failed",
+      })
+      .eq("id", job.document_id);
+  } else if (job.job_type === "extract_ontology") {
+    await supabase
+      .from("documents")
+      .update({
+        ontology_status: retryable ? "retryable" : "failed",
       })
       .eq("id", job.document_id);
   } else {
@@ -390,7 +430,7 @@ async function runIndexJob(
     .from("documents")
     .update({
       indexing_status: "completed",
-      processing_step: "knowledge",
+      processing_step: isGuardianOntologyEnabled() ? "ontology" : "knowledge",
     })
     .eq("id", documentId);
 
@@ -398,6 +438,44 @@ async function runIndexJob(
   diagnostics = mergeDiagnostics(diagnostics, {
     total_to_searchable_ms: Date.now() - indexStart,
   });
+  return diagnostics;
+}
+
+async function runOntologyJob(
+  supabase: SupabaseClient,
+  userId: string,
+  documentId: string,
+  profileId: string,
+  diagnostics: ProcessingDiagnostics
+): Promise<ProcessingDiagnostics> {
+  const ontologyStart = Date.now();
+  await supabase
+    .from("documents")
+    .update({
+      ontology_status: "processing",
+      processing_step: "ontology",
+    })
+    .eq("id", documentId);
+
+  try {
+    const { processOntologyExtraction } = await import(
+      "@/lib/ontology/processJob"
+    );
+    await processOntologyExtraction(supabase, userId, documentId, profileId);
+    await supabase
+      .from("documents")
+      .update({ ontology_status: "completed" })
+      .eq("id", documentId);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Ontology extraction failed";
+    console.error("Ontology extraction failed (non-blocking):", documentId, message);
+    await supabase
+      .from("documents")
+      .update({ ontology_status: "failed" })
+      .eq("id", documentId);
+  }
+
+  diagnostics = recordDuration(diagnostics, "ontology_extraction_ms", ontologyStart);
   return diagnostics;
 }
 
@@ -487,6 +565,14 @@ export async function processDocumentProcessingJob(
       );
     } else if (job.job_type === "index_document") {
       diagnostics = await runIndexJob(
+        supabase,
+        user.id,
+        job.document_id,
+        job.profile_id,
+        diagnostics
+      );
+    } else if (job.job_type === "extract_ontology") {
+      diagnostics = await runOntologyJob(
         supabase,
         user.id,
         job.document_id,
@@ -702,6 +788,11 @@ export async function retryDocumentProcessing(
     await supabase
       .from("documents")
       .update({ knowledge_status: "pending", last_processing_error: null })
+      .eq("id", args.documentId);
+  } else if (stage === "extract_ontology") {
+    await supabase
+      .from("documents")
+      .update({ ontology_status: "pending", last_processing_error: null })
       .eq("id", args.documentId);
   } else {
     await supabase

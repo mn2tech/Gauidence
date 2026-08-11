@@ -10,6 +10,7 @@ import BillingSection from "@/components/BillingSection";
 import StorageSection from "@/components/StorageSection";
 import ShareGuardianCard from "@/components/ShareGuardianCard";
 import { isPlatformAdmin } from "@/lib/admin";
+import { isGuardianOntologyEnabled } from "@/lib/features/ontology";
 import {
   guardianReferralCode,
   guardianTryUrl,
@@ -79,6 +80,16 @@ export default async function SettingsPage() {
                   Manage expert access (admin) →
                 </a>
               </p>
+              {isGuardianOntologyEnabled() ? (
+                <p className="mt-2">
+                  <a
+                    href="/settings/ontology"
+                    className="text-sm font-semibold text-brand hover:text-brand-dark"
+                  >
+                    Ontology Explorer (admin) →
+                  </a>
+                </p>
+              ) : null}
             </>
           ) : null}
           <div className="mt-8 space-y-8">
