@@ -32,7 +32,11 @@ Migration: `supabase/migrations/0073_guardian_ontology_phase1.sql`
 
 `documents.ontology_status`: `pending | processing | completed | failed | retryable | skipped`
 
-## Extraction flow
+## Extraction quality
+
+Relationship extraction prefers specific types (`WORKS_FOR`, `SUBCONTRACTOR_TO`, `CLIENT_OF`, etc.). Vague `RELATED_TO` edges are accepted only with high confidence and substantive evidence, and always land in the **review queue** (`pending`). Unknown relationship types are dropped. Common aliases (e.g. `EMPLOYED_BY` → `WORKS_FOR`) are normalized.
+
+Re-run ontology backfill on important docs after prompt/filter changes to refresh the graph.
 
 ```text
 Upload

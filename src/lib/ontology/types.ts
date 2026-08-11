@@ -14,6 +14,75 @@ export const ONTOLOGY_ENTITY_TYPES = [
 
 export type OntologyEntityType = (typeof ONTOLOGY_ENTITY_TYPES)[number];
 
+/** Canonical relationship types for extraction (prefer specific over RELATED_TO). */
+export const ONTOLOGY_RELATIONSHIP_TYPES = [
+  "WORKS_FOR",
+  "REPORTS_TO",
+  "MANAGES",
+  "FOUNDER_OF",
+  "OWNS",
+  "HAS_PROJECT",
+  "HAS_CONTRACT",
+  "HAS_INVOICE",
+  "BELONGS_TO",
+  "SERVICES",
+  "CLIENT_OF",
+  "VENDOR_OF",
+  "PARTNER_OF",
+  "ISSUED_BY",
+  "ISSUED_TO",
+  "SUBCONTRACTOR_TO",
+  "PRIME_CONTRACTOR_FOR",
+  "MENTIONED_IN",
+  "RELATED_TO",
+] as const;
+
+export type OntologyRelationshipType =
+  (typeof ONTOLOGY_RELATIONSHIP_TYPES)[number];
+
+/** Common LLM variants → canonical type. */
+export const ONTOLOGY_RELATIONSHIP_ALIASES: Record<string, OntologyRelationshipType> = {
+  EMPLOYED_BY: "WORKS_FOR",
+  EMPLOYEE_OF: "WORKS_FOR",
+  WORKS_AT: "WORKS_FOR",
+  WORKED_FOR: "WORKS_FOR",
+  WORKED_AT: "WORKS_FOR",
+  FOUNDER: "FOUNDER_OF",
+  CO_FOUNDER_OF: "FOUNDER_OF",
+  OWNER_OF: "OWNS",
+  OWNED_BY: "BELONGS_TO",
+  CONTRACTOR_TO: "SUBCONTRACTOR_TO",
+  SUBCONTRACTOR_OF: "SUBCONTRACTOR_TO",
+  SUBCONTRACTS_TO: "SUBCONTRACTOR_TO",
+  PROVIDES_SERVICES_TO: "SERVICES",
+  SERVICE_PROVIDER_FOR: "SERVICES",
+  CUSTOMER_OF: "CLIENT_OF",
+  SUPPLIER_OF: "VENDOR_OF",
+  PARTNER_WITH: "PARTNER_OF",
+  PARTNERS_WITH: "PARTNER_OF",
+  RELATED: "RELATED_TO",
+  ASSOCIATED_WITH: "RELATED_TO",
+  MENTIONED_IN_DOCUMENT: "MENTIONED_IN",
+};
+
+export function normalizeRelationshipType(
+  raw: string
+): OntologyRelationshipType | null {
+  const upper = raw.trim().toUpperCase().replace(/[\s-]+/g, "_");
+  if (!upper) return null;
+  if (
+    (ONTOLOGY_RELATIONSHIP_TYPES as readonly string[]).includes(upper)
+  ) {
+    return upper as OntologyRelationshipType;
+  }
+  return ONTOLOGY_RELATIONSHIP_ALIASES[upper] ?? null;
+}
+
+/** Vague RELATED_TO edges need stronger evidence and always stay in review. */
+export const RELATED_TO_MIN_CONFIDENCE = 0.85;
+export const RELATED_TO_MIN_EVIDENCE_CHARS = 40;
+export const DEFAULT_RELATIONSHIP_MIN_CONFIDENCE = 0.55;
+
 export type OntologySourceType =
   | "manual"
   | "document"
@@ -184,9 +253,12 @@ export const ONTOLOGY_VISIBLE_REVIEW_STATUSES: OntologyReviewStatus[] = [
 
 export function reviewStatusForConfidence(
   confidence: number | null | undefined,
-  sourceType?: string | null
+  sourceType?: string | null,
+  relationshipType?: string | null
 ): OntologyReviewStatus {
   if (sourceType === "manual") return "confirmed";
+  // Vague edges always need human confirmation.
+  if (relationshipType === "RELATED_TO") return "pending";
   if (confidence != null && confidence >= 0.9) return "confirmed";
   return "pending";
 }

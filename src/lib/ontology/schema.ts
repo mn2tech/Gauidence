@@ -1,4 +1,10 @@
-import { ONTOLOGY_ENTITY_TYPES } from "./types";
+import {
+  DEFAULT_RELATIONSHIP_MIN_CONFIDENCE,
+  ONTOLOGY_ENTITY_TYPES,
+  RELATED_TO_MIN_CONFIDENCE,
+  RELATED_TO_MIN_EVIDENCE_CHARS,
+  normalizeRelationshipType,
+} from "./types";
 import type { OntologyExtractionResult } from "./types";
 
 const ENTITY_TYPES = new Set<string>(ONTOLOGY_ENTITY_TYPES);
@@ -35,14 +41,23 @@ function parseRelationship(
   if (!isRecord(value)) return null;
   const source = typeof value.source === "string" ? value.source.trim() : "";
   const target = typeof value.target === "string" ? value.target.trim() : "";
-  const type = typeof value.type === "string" ? value.type.trim().toUpperCase() : "";
+  const rawType = typeof value.type === "string" ? value.type.trim() : "";
+  const type = normalizeRelationshipType(rawType);
   const evidence =
     typeof value.evidence === "string" ? value.evidence.trim() : "";
   const confidence =
     typeof value.confidence === "number" ? value.confidence : 0.5;
 
   if (!source || !target || !type) return null;
-  if (!evidence || confidence < 0.5) return null;
+  if (!evidence) return null;
+  if (source.toLowerCase() === target.toLowerCase()) return null;
+
+  if (type === "RELATED_TO") {
+    if (confidence < RELATED_TO_MIN_CONFIDENCE) return null;
+    if (evidence.length < RELATED_TO_MIN_EVIDENCE_CHARS) return null;
+  } else if (confidence < DEFAULT_RELATIONSHIP_MIN_CONFIDENCE) {
+    return null;
+  }
 
   return { source, type, target, evidence, confidence };
 }

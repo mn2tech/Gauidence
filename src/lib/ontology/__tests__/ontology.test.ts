@@ -99,6 +99,103 @@ describe("parseOntologyExtraction", () => {
     assert.equal(result!.relationships.length, 0);
   });
 
+  it("normalizes relationship aliases to canonical types", () => {
+    const result = parseOntologyExtraction({
+      entities: [
+        { type: "person", name: "Ada", confidence: 0.9 },
+        { type: "organization", name: "Acme", confidence: 0.9 },
+      ],
+      relationships: [
+        {
+          source: "Ada",
+          type: "EMPLOYED_BY",
+          target: "Acme",
+          confidence: 0.9,
+          evidence: "Ada is employed by Acme as a senior engineer.",
+        },
+      ],
+      events: [],
+    });
+
+    assert.ok(result);
+    assert.equal(result!.relationships.length, 1);
+    assert.equal(result!.relationships[0]!.type, "WORKS_FOR");
+  });
+
+  it("drops weak or short RELATED_TO edges", () => {
+    const result = parseOntologyExtraction({
+      entities: [
+        { type: "organization", name: "HashiCorp", confidence: 0.9 },
+        { type: "organization", name: "Deloitte", confidence: 0.9 },
+      ],
+      relationships: [
+        {
+          source: "Deloitte",
+          type: "RELATED_TO",
+          target: "HashiCorp",
+          confidence: 0.7,
+          evidence: "Worked with Terraform and HashiCorp tools on client projects.",
+        },
+        {
+          source: "Deloitte",
+          type: "RELATED_TO",
+          target: "HashiCorp",
+          confidence: 0.9,
+          evidence: "Used Terraform.",
+        },
+      ],
+      events: [],
+    });
+
+    assert.ok(result);
+    assert.equal(result!.relationships.length, 0);
+  });
+
+  it("keeps strong RELATED_TO with substantive evidence", () => {
+    const result = parseOntologyExtraction({
+      entities: [
+        { type: "organization", name: "Acme", confidence: 0.9 },
+        { type: "organization", name: "Beta", confidence: 0.9 },
+      ],
+      relationships: [
+        {
+          source: "Acme",
+          type: "RELATED_TO",
+          target: "Beta",
+          confidence: 0.9,
+          evidence:
+            "Acme and Beta entered a strategic collaboration agreement for joint delivery.",
+        },
+      ],
+      events: [],
+    });
+
+    assert.ok(result);
+    assert.equal(result!.relationships.length, 1);
+    assert.equal(result!.relationships[0]!.type, "RELATED_TO");
+  });
+
+  it("rejects unknown relationship types", () => {
+    const result = parseOntologyExtraction({
+      entities: [
+        { type: "organization", name: "Acme", confidence: 0.9 },
+      ],
+      relationships: [
+        {
+          source: "Acme",
+          type: "FEELS_ABOUT",
+          target: "Cloud",
+          confidence: 0.99,
+          evidence: "Acme feels strongly about cloud adoption across the enterprise.",
+        },
+      ],
+      events: [],
+    });
+
+    assert.ok(result);
+    assert.equal(result!.relationships.length, 0);
+  });
+
   it("returns null when no useful content", () => {
     assert.equal(
       parseOntologyExtraction({ entities: [], relationships: [], events: [] }),
@@ -293,5 +390,12 @@ describe("reviewStatusForConfidence", () => {
     assert.equal(reviewStatusForConfidence(0.5, "manual"), "confirmed");
     assert.equal(reviewStatusForConfidence(0.95, "document"), "confirmed");
     assert.equal(reviewStatusForConfidence(0.7, "document"), "pending");
+  });
+
+  it("keeps RELATED_TO pending even at high confidence", () => {
+    assert.equal(
+      reviewStatusForConfidence(0.99, "document", "RELATED_TO"),
+      "pending"
+    );
   });
 });
