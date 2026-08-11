@@ -752,3 +752,167 @@ export async function sendPayrollOwnerNotification(args: PayrollOwnerNotificatio
   }
   return true;
 }
+
+export type IntakeRequestEmailArgs = {
+  to: string;
+  recipientName: string;
+  businessName: string;
+  intakeUrl: string;
+  expiresAt: string;
+  optionalMessage?: string;
+};
+
+export function renderIntakeRequestEmail(args: IntakeRequestEmailArgs) {
+  const expires = new Date(args.expiresAt).toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+  const subject = `${args.businessName} — secure information request`;
+  const messageBlock = args.optionalMessage
+    ? `<p style="margin:0 0 16px;font-size:14px;color:#57534e;line-height:1.6;font-style:italic;">"${escapeHtml(args.optionalMessage)}"</p>`
+    : "";
+  const html = `
+  <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#fafaf9;padding:32px 16px;">
+    <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e7e5e4;border-radius:16px;overflow:hidden;">
+      <div style="padding:24px;">
+        <div style="font-size:18px;font-weight:700;color:#1c1917;">Guardian Secure Intake</div>
+        <p style="margin:16px 0 8px;font-size:15px;color:#1c1917;line-height:1.5;">
+          Hi ${escapeHtml(args.recipientName || "there")},
+        </p>
+        <p style="margin:0 0 16px;font-size:14px;color:#57534e;line-height:1.6;">
+          <strong>${escapeHtml(args.businessName)}</strong> needs you to provide information
+          for onboarding and clearance verification. You can type your Social Security number
+          or upload a document (W-9, SSN card, etc.) through a secure link.
+        </p>
+        ${messageBlock}
+        <p style="margin:0 0 20px;font-size:14px;color:#57534e;line-height:1.6;">
+          You'll verify your email with a one-time code before submitting. This link only
+          accepts the requested information — not access to a full Guardian account.
+        </p>
+        <a href="${escapeHtml(args.intakeUrl)}"
+          style="display:inline-block;padding:12px 20px;border-radius:999px;background:#0f766e;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;">
+          Open secure form
+        </a>
+        <p style="margin:20px 0 0;font-size:12px;color:#78716c;line-height:1.5;">
+          Link expires ${escapeHtml(expires)}. If you didn't expect this email, you can ignore it.
+        </p>
+      </div>
+    </div>
+  </div>`;
+  const text = [
+    `Hi ${args.recipientName || "there"},`,
+    "",
+    `${args.businessName} needs onboarding information for clearance verification.`,
+    args.optionalMessage ? `"${args.optionalMessage}"` : "",
+    "",
+    `Open secure form: ${args.intakeUrl}`,
+    "",
+    `Link expires ${expires}.`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+  return { subject, html, text };
+}
+
+export async function sendIntakeRequestEmail(args: IntakeRequestEmailArgs) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return false;
+  const from =
+    process.env.INVITE_FROM_EMAIL ??
+    process.env.REMINDER_FROM_EMAIL ??
+    "Guardian <onboarding@resend.dev>";
+  const resend = new Resend(apiKey);
+  const { subject, html, text } = renderIntakeRequestEmail(args);
+  const { error } = await resend.emails.send({ from, to: args.to, subject, html, text });
+  if (error) {
+    console.error("Intake request email failed:", args.to, error.message);
+    return false;
+  }
+  return true;
+}
+
+export type IntakeVerificationEmailArgs = {
+  to: string;
+  code: string;
+  businessName: string;
+};
+
+export function renderIntakeVerificationEmail(args: IntakeVerificationEmailArgs) {
+  const subject = `Your verification code — ${args.businessName}`;
+  const html = `
+  <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#fafaf9;padding:32px 16px;">
+    <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e7e5e4;border-radius:16px;overflow:hidden;">
+      <div style="padding:24px;">
+        <div style="font-size:18px;font-weight:700;color:#1c1917;">Guardian Secure Intake</div>
+        <p style="margin:16px 0 8px;font-size:15px;color:#1c1917;line-height:1.5;">
+          Your verification code for ${escapeHtml(args.businessName)}:
+        </p>
+        <p style="margin:0 0 16px;font-size:32px;font-weight:700;color:#0f766e;letter-spacing:0.25em;">
+          ${escapeHtml(args.code)}
+        </p>
+        <p style="margin:0;font-size:12px;color:#78716c;line-height:1.5;">
+          This code expires in 10 minutes. If you didn't request this, you can ignore this email.
+        </p>
+      </div>
+    </div>
+  </div>`;
+  const text = `Your verification code: ${args.code}\n\nThis code expires in 10 minutes.`;
+  return { subject, html, text };
+}
+
+export async function sendIntakeVerificationEmail(args: IntakeVerificationEmailArgs) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return false;
+  const from =
+    process.env.INVITE_FROM_EMAIL ??
+    process.env.REMINDER_FROM_EMAIL ??
+    "Guardian <onboarding@resend.dev>";
+  const resend = new Resend(apiKey);
+  const { subject, html, text } = renderIntakeVerificationEmail(args);
+  const { error } = await resend.emails.send({ from, to: args.to, subject, html, text });
+  if (error) {
+    console.error("Intake verification email failed:", args.to, error.message);
+    return false;
+  }
+  return true;
+}
+
+export type IntakeSubmittedEmailArgs = {
+  to: string;
+  contractorName: string;
+  openUrl: string;
+};
+
+export async function sendIntakeSubmittedEmail(args: IntakeSubmittedEmailArgs) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return false;
+  const from =
+    process.env.INVITE_FROM_EMAIL ??
+    process.env.REMINDER_FROM_EMAIL ??
+    "Guardian <onboarding@resend.dev>";
+  const resend = new Resend(apiKey);
+  const subject = `${args.contractorName} submitted onboarding information`;
+  const html = `
+  <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#fafaf9;padding:32px 16px;">
+    <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e7e5e4;border-radius:16px;padding:24px;">
+      <div style="font-size:18px;font-weight:700;color:#1c1917;">Guardian Secure Intake</div>
+      <p style="margin:16px 0;font-size:14px;color:#57534e;line-height:1.6;">
+        <strong>${escapeHtml(args.contractorName)}</strong> submitted onboarding information
+        through the secure intake link. Sign in to Guardian to review their SSN or uploaded document.
+      </p>
+      <a href="${escapeHtml(args.openUrl)}"
+        style="display:inline-block;padding:12px 20px;border-radius:999px;background:#0f766e;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;">
+        Open Guardian
+      </a>
+    </div>
+  </div>`;
+  const text = `${args.contractorName} submitted onboarding information. Open Guardian: ${args.openUrl}`;
+  const { error } = await resend.emails.send({ from, to: args.to, subject, html, text });
+  if (error) {
+    console.error("Intake submitted email failed:", args.to, error.message);
+    return false;
+  }
+  return true;
+}
