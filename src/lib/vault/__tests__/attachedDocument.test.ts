@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
 import { mergePinnedChunks } from "../retrieve";
 import type { RetrievedChunk } from "../retrieve";
 
@@ -25,13 +26,13 @@ describe("mergePinnedChunks", () => {
       chunk("b", "doc-2", "other"),
     ];
     const merged = mergePinnedChunks(pinned, retrieved);
-    expect(merged).toHaveLength(2);
-    expect(merged[0]?.id).toBe("a");
-    expect(merged[1]?.id).toBe("b");
+    assert.equal(merged.length, 2);
+    assert.equal(merged[0]?.id, "a");
+    assert.equal(merged[1]?.id, "b");
   });
 
   it("returns retrieval unchanged when nothing is pinned", () => {
     const retrieved = [chunk("b", "doc-2", "other")];
-    expect(mergePinnedChunks([], retrieved)).toEqual(retrieved);
+    assert.deepEqual(mergePinnedChunks([], retrieved), retrieved);
   });
 });

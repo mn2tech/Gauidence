@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
 import {
   buildVaultChatRetrievalScopes,
   chatScopedProfilePayload,
@@ -18,114 +19,126 @@ const profiles = [
 
 describe("detectVaultScope", () => {
   it("detects possessive mentions", () => {
-    expect(profileMentionedInQuestion("Check Nolan's report card", "Nolan")).toBe(
+    assert.equal(
+      profileMentionedInQuestion("Check Nolan's report card", "Nolan"),
       true
     );
-    expect(profileMentionedInQuestion("show Nolans summer camp flyer", "Nolan")).toBe(
+    assert.equal(
+      profileMentionedInQuestion("show Nolans summer camp flyer", "Nolan"),
       true
     );
-    expect(profileMentionedInQuestion("When is my passport due?", "Nolan")).toBe(
+    assert.equal(
+      profileMentionedInQuestion("When is my passport due?", "Nolan"),
       false
     );
   });
 
   it("detects cross-vault from possessive without apostrophe", () => {
-    expect(
+    assert.deepEqual(
       detectCrossVaultScope({
         question: "show Nolans summer camp flyer",
         activeProfileId: "personal",
         inScopeProfileIds: ["personal"],
         accessibleProfiles: profiles,
-      })
-    ).toEqual({ id: "nolan", display_name: "Nolan" });
+      }),
+      { id: "nolan", display_name: "Nolan" }
+    );
   });
 
   it("returns a single cross-vault match", () => {
-    expect(
+    assert.deepEqual(
       detectCrossVaultScope({
         question: "Check Nolan's report card",
         activeProfileId: "personal",
         inScopeProfileIds: ["personal"],
         accessibleProfiles: profiles,
-      })
-    ).toEqual({ id: "nolan", display_name: "Nolan" });
+      }),
+      { id: "nolan", display_name: "Nolan" }
+    );
   });
 
   it("skips profiles already in rollup scope", () => {
-    expect(
+    assert.equal(
       detectCrossVaultScope({
         question: "Check Nolan's report card",
         activeProfileId: "family",
         inScopeProfileIds: ["family", "nolan"],
         accessibleProfiles: profiles,
-      })
-    ).toBeNull();
+      }),
+      null
+    );
   });
 
   it("returns null when multiple children match", () => {
-    expect(
+    assert.equal(
       detectCrossVaultScope({
         question: "Compare Nolan and Emma report cards",
         activeProfileId: "personal",
         inScopeProfileIds: ["personal"],
         accessibleProfiles: profiles,
-      })
-    ).toBeNull();
+      }),
+      null
+    );
   });
 
   it("disambiguates with a full name mention", () => {
-    expect(
+    assert.deepEqual(
       detectCrossVaultScope({
         question: "Open Nolan Smith's homework folder",
         activeProfileId: "personal",
         inScopeProfileIds: ["personal"],
         accessibleProfiles: profiles,
-      })
-    ).toEqual({ id: "nolan-smith", display_name: "Nolan Smith" });
+      }),
+      { id: "nolan-smith", display_name: "Nolan Smith" }
+    );
   });
 });
 
 describe("detectMentionedVault", () => {
   it("finds a named vault even when all vaults are in read scope", () => {
-    expect(
+    assert.deepEqual(
       detectMentionedVault({
         question: "Check Nolan's report card",
         accessibleProfiles: profiles,
-      })
-    ).toEqual({ id: "nolan", display_name: "Nolan" });
+      }),
+      { id: "nolan", display_name: "Nolan" }
+    );
   });
 
   it("returns null when multiple vaults are named", () => {
-    expect(
+    assert.equal(
       detectMentionedVault({
         question: "Compare Nolan and Emma report cards",
         accessibleProfiles: profiles,
-      })
-    ).toBeNull();
+      }),
+      null
+    );
   });
 });
 
 describe("resolveGideonWriteVault", () => {
   it("prefers an explicit vault mention over retrieval dominance", () => {
-    expect(
+    assert.deepEqual(
       resolveGideonWriteVault({
         question: "Remind me about Nolan's soccer game",
         activeProfileId: "personal",
         accessibleProfiles: profiles,
         retrievedChunks: [{ profile_id: "emma" }, { profile_id: "emma" }],
-      })
-    ).toEqual({ id: "nolan", display_name: "Nolan" });
+      }),
+      { id: "nolan", display_name: "Nolan" }
+    );
   });
 
   it("falls back to the active vault when nothing else matches", () => {
-    expect(
+    assert.deepEqual(
       resolveGideonWriteVault({
         question: "What invoices are due?",
         activeProfileId: "personal",
         accessibleProfiles: profiles,
         retrievedChunks: [],
-      })
-    ).toEqual({ id: "personal", display_name: "Kola" });
+      }),
+      { id: "personal", display_name: "Kola" }
+    );
   });
 });
 
@@ -137,40 +150,41 @@ describe("buildVaultChatRetrievalScopes", () => {
   ];
 
   it("searches all accessible vaults in global scope", () => {
-    expect(
+    assert.deepEqual(
       buildVaultChatRetrievalScopes({
         accessibleProfiles: accessible,
         chatHomeProfileId: "personal",
         scopedProfileId: null,
         searchScope: "global",
-      })
-    ).toEqual(accessible);
+      }),
+      accessible
+    );
   });
 
   it("searches only chat home in workspace scope", () => {
-    expect(
+    assert.deepEqual(
       buildVaultChatRetrievalScopes({
         accessibleProfiles: accessible,
         chatHomeProfileId: "personal",
         scopedProfileId: null,
         searchScope: "workspace",
-      })
-    ).toEqual([
-      { id: "personal", display_name: "Kola", profile_type: "personal" },
-    ]);
+      }),
+      [{ id: "personal", display_name: "Kola", profile_type: "personal" }]
+    );
   });
 
   it("narrows to chat home plus scoped vault when scoped profile is set", () => {
-    expect(
+    assert.deepEqual(
       buildVaultChatRetrievalScopes({
         accessibleProfiles: accessible,
         chatHomeProfileId: "personal",
         scopedProfileId: "nolan",
-      })
-    ).toEqual([
-      { id: "personal", display_name: "Kola", profile_type: "personal" },
-      { id: "nolan", display_name: "Nolan", profile_type: "child" },
-    ]);
+      }),
+      [
+        { id: "personal", display_name: "Kola", profile_type: "personal" },
+        { id: "nolan", display_name: "Nolan", profile_type: "child" },
+      ]
+    );
   });
 });
 
@@ -181,23 +195,25 @@ describe("chatScopedProfilePayload", () => {
   ];
 
   it("returns null when scoped profile matches chat home", () => {
-    expect(
+    assert.equal(
       chatScopedProfilePayload({
         scopedProfileId: "personal",
         accessibleProfiles: accessible,
         chatHomeProfileId: "personal",
-      })
-    ).toBeNull();
+      }),
+      null
+    );
   });
 
   it("returns scoped profile metadata for follow-up UI", () => {
-    expect(
+    assert.deepEqual(
       chatScopedProfilePayload({
         scopedProfileId: "nolan",
         accessibleProfiles: accessible,
         chatHomeProfileId: "personal",
-      })
-    ).toEqual({ profileId: "nolan", profileName: "Nolan" });
+      }),
+      { profileId: "nolan", profileName: "Nolan" }
+    );
   });
 
   it("resolves an explicit space scope from the question", () => {
@@ -206,36 +222,44 @@ describe("chatScopedProfilePayload", () => {
       { id: "nolan", display_name: "Nolan" },
       { id: "biz", display_name: "NM2TECH" },
     ];
-    expect(
+    assert.deepEqual(
       resolveExplicitSpaceScope({
         question: "What do I have in my Personal space about Nolan?",
         accessibleProfiles: scopedProfiles,
-      })
-    ).toEqual({ id: "personal", display_name: "Personal" });
-    expect(
+      }),
+      { id: "personal", display_name: "Personal" }
+    );
+    assert.deepEqual(
       resolveExplicitSpaceScope({
         question: "What do I have in my Personal space about Nolan?",
         accessibleProfiles: [
-          { id: "mk-personal", display_name: "Michael Kola", profile_type: "personal" },
+          {
+            id: "mk-personal",
+            display_name: "Michael Kola",
+            profile_type: "personal",
+          },
           { id: "nolan", display_name: "Nolan Kola", profile_type: "child" },
         ],
-      })
-    ).toEqual({
-      id: "mk-personal",
-      display_name: "Michael Kola",
-      profile_type: "personal",
-    });
-    expect(
+      }),
+      {
+        id: "mk-personal",
+        display_name: "Michael Kola",
+        profile_type: "personal",
+      }
+    );
+    assert.deepEqual(
       resolveExplicitSpaceScope({
         question: "Show files in Nolan's space",
         accessibleProfiles: scopedProfiles,
-      })
-    ).toEqual({ id: "nolan", display_name: "Nolan" });
-    expect(
+      }),
+      { id: "nolan", display_name: "Nolan" }
+    );
+    assert.equal(
       resolveExplicitSpaceScope({
         question: "What happened today?",
         accessibleProfiles: scopedProfiles,
-      })
-    ).toBeNull();
+      }),
+      null
+    );
   });
 });
