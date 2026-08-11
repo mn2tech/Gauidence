@@ -43,10 +43,6 @@ import {
   type ActionTimelineEntry,
 } from "@/lib/actions/events";
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 export type VaultChatStreamArgs = {
   supabase: SupabaseClient;
   userId: string;
@@ -108,16 +104,17 @@ export function createVaultChatStreamResponse(
         });
 
         if (thinkingSteps.length > 0) {
-          for (let i = 0; i < thinkingSteps.length; i++) {
-            write({ type: "thinking", steps: thinkingSteps, activeIndex: i });
-            if (i < thinkingSteps.length - 1) {
-              await sleep(180);
-            }
-          }
+          // Show all steps immediately — do not delay the model stream.
+          write({
+            type: "thinking",
+            steps: thinkingSteps,
+            activeIndex: thinkingSteps.length - 1,
+          });
         }
 
         if (args.detectedActions?.length) {
-          await Promise.all(
+          // Persist detections without blocking first token.
+          void Promise.all(
             args.detectedActions.map((action) =>
               recordActionEvent(args.supabase, {
                 userId: args.userId,

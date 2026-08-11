@@ -190,80 +190,141 @@ export async function loadWorkspaceContext(
   const chunks = mergePinnedChunks(attachedDoc?.chunks ?? [], retrievedChunks);
   const formatted = formatRetrievalContext(chunks);
 
-  let structuredKnowledgeContext = "(none)";
-  if (isKnowledgeEngineV2Enabled()) {
-    const knowledge = await retrieveStructuredKnowledge(supabase, {
-      question: retrievalQuestion,
-      profileIds: effectiveSearchIds,
-    });
-    knowledgeCandidateCount = knowledge.facts.length;
-    structuredKnowledgeContext = formatKnowledgeForGideon(
-      knowledge,
-      profileNames
-    );
-  }
-
-  let ontologyContext = "(none)";
-  if (isGuardianOntologyEnabled()) {
-    const ontologySpaceId =
-      explicitSpace?.id ??
-      meta.chatScopedProfileId ??
-      activeProfile.id;
-    try {
-      const ontology = await getOntologyContext(supabase, {
-        spaceId: ontologySpaceId,
-        query: retrievalQuestion,
-      });
-      ontologyContext = formatOntologyForGideon(ontology);
-    } catch (err) {
-      console.warn(
-        "Ontology context for Gideon failed; continuing without it:",
-        err instanceof Error ? err.message : "error"
-      );
-      ontologyContext = "(none)";
-    }
-  }
-
-  const { logs: dailyLogs, authorNames } = await retrieveRelevantDailyLogs(
-    supabase,
-    {
-      profileId: activeProfile.id,
-      profileIds: effectiveSearchIds,
-      profileNames,
-      question: retrievalQuestion,
-      limit:
-        effectiveRetrievalScopes.length > 1 ? (fullLogQuote ? 8 : 6) : fullLogQuote ? 6 : 4,
-    }
-  );
-  const logContext = formatDailyLogsForGideon(
-    dailyLogs,
-    profileNames,
-    authorNames
-  );
-
+  const ontologySpaceId =
+    explicitSpace?.id ?? meta.chatScopedProfileId ?? activeProfile.id;
   const clientProfileIds = effectiveRetrievalScopes
     .filter((scope) => scope.profile_type === "client")
     .map((scope) => scope.id);
-  const { requests: clientRequests, authorNames: requestAuthorNames } =
-    await retrieveRelevantClientRequests(supabase, {
-      clientProfileIds,
-      profileNames,
-      question: retrievalQuestion,
-      limit: effectiveRetrievalScopes.length > 1 ? 6 : 4,
-    });
   const includeActiveRequests =
     clientProfileIds.length > 0 &&
     (clientRequestReplyAgent ||
       clientRequestCreateAgent ||
       isOrgStyleProfile(activeProfile.profile_type) ||
       /\b(request|requests|ticket|client)\b/i.test(retrievalQuestion));
-  const activeRequests = includeActiveRequests
-    ? await loadActiveClientRequestsForGideon(
-        supabase,
-        clientProfileIds,
-        effectiveRetrievalScopes.length > 1 ? 8 : 6
-      )
-    : [];
+  const loadProposals =
+    isOrgStyleProfile(activeProfile.profile_type) &&
+    activeProfile.profile_type !== "client" &&
+    /\b(proposal|proposals|quote|estimate)\b/i.test(retrievalQuestion);
+
+  const [
+    structuredKnowledgeBundle,
+    ontologyBundle,
+    dailyLogsBundle,
+    clientRequestsBundle,
+    activeRequests,
+    proposalsBundle,
+    fileInventoryContext,
+    upcomingAlerts,
+    linkedContext,
+    workMemoryBundleRaw,
+  ] = await Promise.all([
+    isKnowledgeEngineV2Enabled()
+      ? retrieveStructuredKnowledge(supabase, {
+          question: retrievalQuestion,
+          profileIds: effectiveSearchIds,
+        }).then((knowledge) => ({
+          count: knowledge.facts.length,
+          text: formatKnowledgeForGideon(knowledge, profileNames),
+        }))
+      : Promise.resolve({ count: 0, text: "(none)" }),
+    isGuardianOntologyEnabled()
+      ? getOntologyContext(supabase, {
+          spaceId: ontologySpaceId,
+          query: retrievalQuestion,
+        })
+          .then((ontology) => formatOntologyForGideon(ontology))
+          .catch((err) => {
+            console.warn(
+              "Ontology context for Gideon failed; continuing without it:",
+              err instanceof Error ? err.message : "error"
+            );
+            return "(none)";
+          })
+      : Promise.resolve("(none)"),
+    retrieveRelevantDailyLogs(supabase, {
+      profileId: activeProfile.id,
+      profileIds: effectiveSearchIds,
+      profileNames,
+      question: retrievalQuestion,
+      limit:
+        effectiveRetrievalScopes.length > 1
+          ? fullLogQuote
+            ? 8
+            : 6
+          : fullLogQuote
+            ? 6
+            : 4,
+    }),
+    retrieveRelevantClientRequests(supabase, {
+      clientProfileIds,
+      profileNames,
+      question: retrievalQuestion,
+      limit: effectiveRetrievalScopes.length > 1 ? 6 : 4,
+    }),
+    includeActiveRequests
+      ? loadActiveClientRequestsForGideon(
+          supabase,
+          clientProfileIds,
+          effectiveRetrievalScopes.length > 1 ? 8 : 6
+        )
+      : Promise.resolve([]),
+    loadProposals
+      ? supabase
+          .from("proposals")
+          .select(PROPOSAL_SELECT)
+          .eq("business_profile_id", activeProfile.id)
+          .order("updated_at", { ascending: false })
+          .limit(8)
+          .then(({ data: proposalRows }) =>
+            formatProposalsForGideon(
+              (proposalRows ?? []).map((row) => mapProposalRow(row)),
+              profileNames
+            )
+          )
+      : Promise.resolve("(none)"),
+    loadVaultFileInventoryContext(
+      supabase,
+      effectiveSearchIds,
+      profileNames,
+      retrievalQuestion
+    ),
+    retrieveUpcomingAlertsForGideon(supabase, {
+      profileIds: effectiveSearchIds,
+      profileNames,
+      question: retrievalQuestion,
+      timeZone,
+      limit: effectiveRetrievalScopes.length > 1 ? 12 : 10,
+    }),
+    loadLinkedOrgContext(supabase, user.id, activeProfile),
+    workProjectId
+      ? loadWorkMemoryProjectForGideon(supabase, user.id, workProjectId).then(
+          (focused) =>
+            focused
+              ? { focused: true as const, bundle: focused }
+              : loadWorkMemoryForGideon(supabase, user.id).then((bundle) => ({
+                  focused: false as const,
+                  bundle,
+                }))
+        )
+      : loadWorkMemoryForGideon(supabase, user.id).then((bundle) => ({
+          focused: false as const,
+          bundle,
+        })),
+  ]);
+
+  knowledgeCandidateCount = structuredKnowledgeBundle.count;
+  const structuredKnowledgeContext = structuredKnowledgeBundle.text;
+  const ontologyContext = ontologyBundle;
+
+  const { logs: dailyLogs, authorNames } = dailyLogsBundle;
+  const logContext = formatDailyLogsForGideon(
+    dailyLogs,
+    profileNames,
+    authorNames
+  );
+
+  const { requests: clientRequests, authorNames: requestAuthorNames } =
+    clientRequestsBundle;
   const mergedRequests = mergeClientRequestsForGideon(
     clientRequests,
     activeRequests,
@@ -293,48 +354,11 @@ export async function loadWorkspaceContext(
     requestAssigneeNames
   );
 
-  let proposalsContext = "(none)";
-  if (
-    isOrgStyleProfile(activeProfile.profile_type) &&
-    activeProfile.profile_type !== "client" &&
-    /\b(proposal|proposals|quote|estimate)\b/i.test(retrievalQuestion)
-  ) {
-    const { data: proposalRows } = await supabase
-      .from("proposals")
-      .select(PROPOSAL_SELECT)
-      .eq("business_profile_id", activeProfile.id)
-      .order("updated_at", { ascending: false })
-      .limit(8);
-    proposalsContext = formatProposalsForGideon(
-      (proposalRows ?? []).map((row) => mapProposalRow(row)),
-      profileNames
-    );
-  }
-
-  const fileInventoryContext = await loadVaultFileInventoryContext(
-    supabase,
-    effectiveSearchIds,
-    profileNames,
-    retrievalQuestion
-  );
-
-  const upcomingAlerts = await retrieveUpcomingAlertsForGideon(supabase, {
-    profileIds: effectiveSearchIds,
-    profileNames,
-    question: retrievalQuestion,
-    timeZone,
-    limit: effectiveRetrievalScopes.length > 1 ? 12 : 10,
-  });
+  const proposalsContext = proposalsBundle;
   const scheduleContext = formatAlertsForGideon(upcomingAlerts, {
     profileNames,
     timeZone,
   });
-
-  const linkedContext = await loadLinkedOrgContext(
-    supabase,
-    user.id,
-    activeProfile
-  );
 
   const vaultMapOwnerLabel =
     firstNameFrom(
@@ -348,12 +372,8 @@ export async function loadWorkspaceContext(
     activeProfile.id
   );
 
-  const focusedWorkMemory = workProjectId
-    ? await loadWorkMemoryProjectForGideon(supabase, user.id, workProjectId)
-    : null;
-  const workMemoryBundle =
-    focusedWorkMemory ??
-    (await loadWorkMemoryForGideon(supabase, user.id));
+  const workMemoryBundle = workMemoryBundleRaw.bundle;
+  const focusedWorkMemory = workMemoryBundleRaw.focused;
   const workMemoryBody = formatWorkMemoryForGideon(
     workMemoryBundle.projects,
     workMemoryBundle.sessionsByProject
