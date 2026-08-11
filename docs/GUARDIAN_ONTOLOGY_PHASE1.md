@@ -160,7 +160,7 @@ Set `GUARDIAN_ONTOLOGY_ENABLED=false` to disable without rollback.
 Admin Ontology Explorer includes:
 
 - **One-hop SVG map** on entity details (click connected nodes)
-- **Space map** tab — Space-wide graph of visible relationships (`GET /api/ontology/graph`). `MENTIONED_IN` edges are hidden by default (toggle to include). Capped for SVG performance; click a node to open entity details.
+- **Space map** tab — Space-wide graph with type filters (people/orgs/projects/contracts default). Hides `MENTIONED_IN` by default, drops phone/UUID junk names, layouts by type sector (no packed center), and caps to top-degree nodes. `GET /api/ontology/graph?profileId=&types=&hideRelatedTo=1&includeMentions=1`.
 
 ## Multi-hop reasoning (Phase 2)
 

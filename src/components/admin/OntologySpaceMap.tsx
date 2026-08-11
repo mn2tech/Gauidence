@@ -23,13 +23,25 @@ type LayoutNode = {
   degree: number;
 };
 
+const TYPE_ORDER = [
+  "organization",
+  "person",
+  "project",
+  "contract",
+  "invoice",
+  "asset",
+  "document",
+];
+
 function truncate(label: string, max = 18): string {
   const trimmed = label.trim();
   if (trimmed.length <= max) return trimmed;
   return `${trimmed.slice(0, max - 1)}…`;
 }
 
-/** Deterministic circular / ring layout by degree (no graph library). */
+/**
+ * Place nodes by entity-type sectors on a ring — avoids a packed center hub.
+ */
 function layoutNodes(entities: OntologyEntity[], relationships: OntologyRelationship[]) {
   const degree = new Map<string, number>();
   for (const e of entities) degree.set(e.id, 0);
@@ -38,21 +50,33 @@ function layoutNodes(entities: OntologyEntity[], relationships: OntologyRelation
     degree.set(r.target_entity_id, (degree.get(r.target_entity_id) ?? 0) + 1);
   }
 
-  const sorted = [...entities].sort(
-    (a, b) => (degree.get(b.id) ?? 0) - (degree.get(a.id) ?? 0)
-  );
-
-  const n = sorted.length;
-  const width = Math.max(720, Math.min(1200, 280 + n * 28));
-  const height = Math.max(520, Math.min(900, 240 + n * 22));
+  const n = entities.length;
+  const width = Math.max(780, Math.min(1100, 360 + n * 22));
+  const height = Math.max(560, Math.min(860, 320 + n * 18));
   const cx = width / 2;
   const cy = height / 2;
+  const radius = Math.min(cx, cy) - 70;
+
+  const byType = new Map<string, OntologyEntity[]>();
+  for (const entity of entities) {
+    const list = byType.get(entity.entity_type) ?? [];
+    list.push(entity);
+    byType.set(entity.entity_type, list);
+  }
+  for (const list of byType.values()) {
+    list.sort((a, b) => (degree.get(b.id) ?? 0) - (degree.get(a.id) ?? 0));
+  }
+
+  const types = [
+    ...TYPE_ORDER.filter((t) => byType.has(t)),
+    ...[...byType.keys()].filter((t) => !TYPE_ORDER.includes(t)).sort(),
+  ];
 
   const nodes: LayoutNode[] = [];
-  if (n === 0) return { nodes, width, height };
+  if (n === 0) return { nodes, width, height, showEdgeLabels: false };
 
   if (n === 1) {
-    const only = sorted[0]!;
+    const only = entities[0]!;
     nodes.push({
       id: only.id,
       label: only.name,
@@ -61,52 +85,47 @@ function layoutNodes(entities: OntologyEntity[], relationships: OntologyRelation
       y: cy,
       degree: degree.get(only.id) ?? 0,
     });
-    return { nodes, width, height };
+    return { nodes, width, height, showEdgeLabels: true };
   }
 
-  // Hub(s) near center; everyone else on rings.
-  const hubCount = Math.min(3, Math.max(1, Math.floor(n / 12)));
-  const hubs = sorted.slice(0, hubCount);
-  const rest = sorted.slice(hubCount);
+  const total = entities.length;
+  let cursor = 0;
+  const gap = (Math.PI * 2) / Math.max(types.length, 1) / 12;
 
-  hubs.forEach((entity, i) => {
-    const angle = (i / hubs.length) * Math.PI * 2 - Math.PI / 2;
-    const r = hubs.length === 1 ? 0 : 56;
-    nodes.push({
-      id: entity.id,
-      label: entity.name,
-      type: entity.entity_type,
-      x: cx + Math.cos(angle) * r,
-      y: cy + Math.sin(angle) * r,
-      degree: degree.get(entity.id) ?? 0,
-    });
-  });
+  for (const type of types) {
+    const group = byType.get(type) ?? [];
+    const share = group.length / total;
+    const span = Math.PI * 2 * share - gap;
+    const start = cursor + gap / 2;
 
-  const ringCapacity = Math.max(8, Math.ceil(Math.sqrt(rest.length) * 3));
-  let index = 0;
-  let ring = 0;
-  while (index < rest.length) {
-    const slice = rest.slice(index, index + ringCapacity);
-    const radius = 130 + ring * 110;
-    slice.forEach((entity, i) => {
-      const angle = (i / slice.length) * Math.PI * 2 - Math.PI / 2;
+    group.forEach((entity, i) => {
+      const t = group.length === 1 ? 0.5 : i / (group.length - 1);
+      const angle = start + span * t - Math.PI / 2;
+      // Slight radial jitter by degree so high-degree nodes sit slightly inward.
+      const deg = degree.get(entity.id) ?? 0;
+      const r = radius - Math.min(48, deg * 6);
       nodes.push({
         id: entity.id,
         label: entity.name,
         type: entity.entity_type,
-        x: cx + Math.cos(angle) * radius,
-        y: cy + Math.sin(angle) * radius,
-        degree: degree.get(entity.id) ?? 0,
+        x: cx + Math.cos(angle) * r,
+        y: cy + Math.sin(angle) * r,
+        degree: deg,
       });
     });
-    index += ringCapacity;
-    ring += 1;
+
+    cursor += Math.PI * 2 * share;
   }
 
-  return { nodes, width, height };
+  return {
+    nodes,
+    width,
+    height,
+    showEdgeLabels: relationships.length <= 36,
+  };
 }
 
-/** Space-wide ontology map (all visible edges, capped). */
+/** Space-wide ontology map (filtered / capped). */
 export default function OntologySpaceMap({
   graph,
   selectedId,
@@ -117,12 +136,16 @@ export default function OntologySpaceMap({
   if (!entities.length) {
     return (
       <p className="text-sm text-ink-muted">
-        No entities to map yet. Backfill documents or wait for extraction.
+        No entities match these filters. Try enabling more types or backfill
+        documents.
       </p>
     );
   }
 
-  const { nodes, width, height } = layoutNodes(entities, relationships);
+  const { nodes, width, height, showEdgeLabels } = layoutNodes(
+    entities,
+    relationships
+  );
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const nodeW = 112;
   const nodeH = 40;
@@ -165,15 +188,17 @@ export default function OntologySpaceMap({
                 strokeWidth="1.25"
                 markerEnd="url(#space-ontology-arrow)"
               />
-              <text
-                x={midX}
-                y={midY - 4}
-                textAnchor="middle"
-                className="fill-stone-400"
-                style={{ fontSize: 7, fontFamily: "ui-monospace, monospace" }}
-              >
-                {truncate(rel.relationship_type, 16)}
-              </text>
+              {showEdgeLabels ? (
+                <text
+                  x={midX}
+                  y={midY - 4}
+                  textAnchor="middle"
+                  className="fill-stone-400"
+                  style={{ fontSize: 7, fontFamily: "ui-monospace, monospace" }}
+                >
+                  {truncate(rel.relationship_type, 16)}
+                </text>
+              ) : null}
             </g>
           );
         })}
@@ -193,6 +218,7 @@ export default function OntologySpaceMap({
               style={{ cursor: onSelectEntity ? "pointer" : "default" }}
               onClick={() => onSelectEntity?.(node.id)}
             >
+              <title>{`${node.label} (${node.type}) · ${node.degree} links`}</title>
               <rect
                 width={nodeW}
                 height={nodeH}
@@ -225,7 +251,9 @@ export default function OntologySpaceMap({
       </svg>
       <p className="border-t border-stone-100 px-3 py-2 text-[11px] text-ink-muted">
         Space map · {entities.length} entities · {relationships.length} links
-        {truncated ? " · truncated for size" : ""} · click a node for details
+        {truncated ? " · top connections only" : ""}
+        {!showEdgeLabels ? " · edge labels hidden (dense)" : ""} · click a node
+        for details
       </p>
     </div>
   );

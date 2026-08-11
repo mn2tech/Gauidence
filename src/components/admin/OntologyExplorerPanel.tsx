@@ -58,6 +58,16 @@ export default function OntologyExplorerPanel({ profileId, profileName }: Props)
   const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
   const [spaceGraph, setSpaceGraph] = useState<SpaceGraphData | null>(null);
   const [includeMentions, setIncludeMentions] = useState(false);
+  const [hideRelatedTo, setHideRelatedTo] = useState(false);
+  const [typeFilters, setTypeFilters] = useState<Record<string, boolean>>({
+    person: true,
+    organization: true,
+    project: true,
+    contract: true,
+    invoice: false,
+    asset: false,
+    document: false,
+  });
   const [stats, setStats] = useState<SpaceStats | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [graph, setGraph] = useState<EntityGraph | null>(null);
@@ -112,6 +122,11 @@ export default function OntologyExplorerPanel({ profileId, profileName }: Props)
     try {
       const params = new URLSearchParams({ profileId });
       if (includeMentions) params.set("includeMentions", "1");
+      if (hideRelatedTo) params.set("hideRelatedTo", "1");
+      const types = Object.entries(typeFilters)
+        .filter(([, on]) => on)
+        .map(([t]) => t);
+      if (types.length) params.set("types", types.join(","));
       const [graphRes, statsRes] = await Promise.all([
         fetch(`/api/ontology/graph?${params}`),
         fetch(`/api/ontology/stats?profileId=${profileId}`),
@@ -125,7 +140,7 @@ export default function OntologyExplorerPanel({ profileId, profileName }: Props)
     } finally {
       setLoading(false);
     }
-  }, [profileId, includeMentions]);
+  }, [profileId, includeMentions, hideRelatedTo, typeFilters]);
 
   const loadGraph = useCallback(async (entityId: string) => {
     setSelectedId(entityId);
@@ -247,18 +262,63 @@ export default function OntologyExplorerPanel({ profileId, profileName }: Props)
                 Space map
               </h2>
               <p className="mt-2 text-sm text-ink-muted">
-                All visible connections in this Space (document mentions hidden by
-                default).
+                Filtered Space graph — people/orgs/projects by default. Phone-number
+                and UUID junk names are hidden.
               </p>
             </div>
-            <label className="flex items-center gap-2 text-sm text-ink-muted">
-              <input
-                type="checkbox"
-                checked={includeMentions}
-                onChange={(e) => setIncludeMentions(e.target.checked)}
-              />
-              Include MENTIONED_IN
-            </label>
+            <div className="flex flex-col gap-2 text-sm text-ink-muted">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={includeMentions}
+                  onChange={(e) => setIncludeMentions(e.target.checked)}
+                />
+                Include MENTIONED_IN
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={hideRelatedTo}
+                  onChange={(e) => setHideRelatedTo(e.target.checked)}
+                />
+                Hide RELATED_TO
+              </label>
+            </div>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {(
+              [
+                "person",
+                "organization",
+                "project",
+                "contract",
+                "invoice",
+                "asset",
+                "document",
+              ] as const
+            ).map((type) => (
+              <label
+                key={type}
+                className={`cursor-pointer rounded-lg border px-2.5 py-1 text-xs ${
+                  typeFilters[type]
+                    ? "border-teal-700 bg-teal-50 text-teal-900"
+                    : "border-stone-200 bg-white text-ink-muted"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  className="sr-only"
+                  checked={Boolean(typeFilters[type])}
+                  onChange={(e) =>
+                    setTypeFilters((prev) => ({
+                      ...prev,
+                      [type]: e.target.checked,
+                    }))
+                  }
+                />
+                {type}
+              </label>
+            ))}
           </div>
           {loading ? (
             <p className="mt-4 text-sm text-ink-muted">Loading…</p>

@@ -6,6 +6,7 @@ import {
   requireOntologyUser,
 } from "@/lib/ontology/auth";
 import { getSpaceOntologyGraph } from "@/lib/ontology/spaceGraph";
+import { ONTOLOGY_ENTITY_TYPES } from "@/lib/ontology/types";
 
 export const runtime = "nodejs";
 
@@ -30,9 +31,22 @@ export async function GET(request: Request) {
   }
 
   const includeMentions = searchParams.get("includeMentions") === "1";
+  const hideRelatedTo = searchParams.get("hideRelatedTo") === "1";
+  const typesParam = searchParams.get("types");
+  const entityTypes = typesParam
+    ? typesParam
+        .split(",")
+        .map((t) => t.trim().toLowerCase())
+        .filter((t) =>
+          (ONTOLOGY_ENTITY_TYPES as readonly string[]).includes(t)
+        )
+    : undefined;
+
   const graph = await getSpaceOntologyGraph(supabase, {
     spaceId: profileId,
     hideDocumentMentions: !includeMentions,
+    hideRelatedTo,
+    entityTypes,
   });
 
   return NextResponse.json(graph);
