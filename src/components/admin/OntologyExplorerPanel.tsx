@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { EntityGraph } from "@/lib/ontology/types";
+import OntologyGraphMap from "@/components/admin/OntologyGraphMap";
 
 type OntologyEntity = {
   id: string;
@@ -187,7 +188,16 @@ export default function OntologyExplorerPanel({ profileId, profileName }: Props)
                 </div>
               ) : null}
 
-              {graph.outgoingRelationships.length > 0 ? (
+              <div>
+                <h4 className="mb-2 font-medium">Map</h4>
+                <OntologyGraphMap
+                  graph={graph}
+                  onSelectEntity={(id) => void loadGraph(id)}
+                />
+              </div>
+
+              {graph.outgoingRelationships.length > 0 ||
+              graph.incomingRelationships.length > 0 ? (
                 <div>
                   <h4 className="font-medium">Relationships</h4>
                   <ul className="mt-2 space-y-1">
@@ -225,20 +235,6 @@ export default function OntologyExplorerPanel({ profileId, profileName }: Props)
                       </li>
                     ))}
                   </ul>
-                </div>
-              ) : null}
-
-              {graph.outgoingRelationships.length > 0 ? (
-                <div className="rounded-lg border border-dashed border-stone-200 p-4 font-mono text-xs text-ink-muted">
-                  <pre className="whitespace-pre-wrap">
-                    {[
-                      graph.entity.name,
-                      ...graph.outgoingRelationships.map(
-                        (rel) =>
-                          `  ├─ ${rel.relationship_type} → ${rel.targetEntity?.name ?? "?"}`
-                      ),
-                    ].join("\n")}
-                  </pre>
                 </div>
               ) : null}
             </div>

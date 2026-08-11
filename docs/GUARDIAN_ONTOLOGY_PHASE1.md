@@ -149,11 +149,14 @@ Set `GUARDIAN_ONTOLOGY_ENABLED=false` to disable without rollback.
 
 - One-hop graph traversal only
 - Events table exists but minimal integration
-- No graph visualization library (list/tree view only)
 - Fuzzy matching limited to organizations/projects
 - Admin Explorer uses active Space profile
 
-## Gideon integration (Phase 2 start)
+## Ontology map (Phase 2)
+
+Admin Ontology Explorer includes a lightweight **one-hop SVG map** (no graph DB / no React Flow). Click a connected node to open that entity.
+
+## Gideon integration (Phase 2)
 
 When `GUARDIAN_ONTOLOGY_ENABLED=true`, Ask Gideon loads one-hop ontology context for the active/explicit Space via `getOntologyContext()` and injects an `--- ONTOLOGY ---` block into the system prompt (`loadWorkspaceContext` → `formatOntologyForGideon`).
 
@@ -162,9 +165,9 @@ When `GUARDIAN_ONTOLOGY_ENABLED=true`, Ask Gideon loads one-hop ontology context
 
 ## Phase 2 recommendations (remaining)
 
-- Visual graph / map in Ontology Explorer
 - Multi-hop graph reasoning
 - Review queue for low-confidence extractions
 - Customer-facing entity management
 - Connector sources (`api`, `connector` source types)
 - Dedicated `ontology.nm2tech.com` admin UI (same database)
+- Richer interactive graph (pan/zoom library) if one-hop SVG is not enough
