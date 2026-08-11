@@ -5,6 +5,7 @@ import {
   CHAT_MODEL,
   createLlmClient,
   runChatCompletion,
+  runStructuredJson,
 } from "@/lib/analysis/llm";
 import {
   isAnthropicConfigured,
@@ -25,63 +26,55 @@ import type { BusinessLead } from "@/lib/leads/types";
 import { LEAD_SELECT } from "@/lib/leads/types";
 import {
   type LeadOpportunityBrief,
-  type LeadPotentialNeed,
-  isLeadEvidenceKind,
+  LEAD_OPPORTUNITY_SCHEMA,
+  parseLeadOpportunityBrief,
 } from "@/lib/leads/opportunity";
 import { SERVICE_TEMPLATE_SELECT } from "@/lib/proposals/types";
 import { withLlmUsage } from "@/lib/usage/record";
 
-function clampScore(value: unknown): number {
-  const n = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(n)) return 0;
-  return Math.max(0, Math.min(100, Math.round(n)));
-}
-
-function parseBrief(raw: string): LeadOpportunityBrief | null {
-  const trimmed = raw.trim().replace(/^```json\s*/i, "").replace(/```$/i, "").trim();
-  const jsonMatch = trimmed.match(/\{[\s\S]*\}/);
-  const jsonText = jsonMatch ? jsonMatch[0] : trimmed;
-  try {
-    const parsed = JSON.parse(jsonText) as Record<string, unknown>;
-    const needsRaw = Array.isArray(parsed.potentialNeeds)
-      ? parsed.potentialNeeds
-      : [];
-    const potentialNeeds: LeadPotentialNeed[] = needsRaw
-      .slice(0, 8)
-      .map((item) => {
-        if (!item || typeof item !== "object") return null;
-        const row = item as Record<string, unknown>;
-        const kind = String(row.kind ?? "inferred").toLowerCase();
-        return {
-          label: String(row.label ?? "").trim(),
-          kind: isLeadEvidenceKind(kind) ? kind : "inferred",
-          detail: String(row.detail ?? "").trim(),
-        };
-      })
-      .filter(
-        (n): n is LeadPotentialNeed =>
-          n != null && n.label.length > 0 && n.detail.length > 0
+async function requestOpportunityBrief(
+  userId: string,
+  userPrompt: string
+): Promise<LeadOpportunityBrief | null> {
+  if (isAnthropicConfigured()) {
+    try {
+      const client = createLlmClient();
+      const structured = await withLlmUsage(
+        { userId, feature: "other" },
+        () =>
+          runStructuredJson<Record<string, unknown>>(client, {
+            system: LEAD_OPPORTUNITY_SYSTEM,
+            userContent: [{ type: "text", text: userPrompt }],
+            schema: LEAD_OPPORTUNITY_SCHEMA as unknown as Record<
+              string,
+              unknown
+            >,
+            schemaName: "lead_opportunity_brief",
+            model: CHAT_MODEL,
+          })
       );
-
-    const primaryNeed = String(parsed.primaryNeed ?? "").trim();
-    const recommendedService = String(parsed.recommendedService ?? "").trim();
-    if (!primaryNeed && !recommendedService) return null;
-
-    return {
-      companySummary: String(parsed.companySummary ?? "").trim(),
-      primaryNeed,
-      potentialNeeds,
-      recommendedService,
-      reasoning: String(parsed.reasoning ?? "").trim(),
-      conversationAngle: String(parsed.conversationAngle ?? "").trim(),
-      suggestedOpening: String(parsed.suggestedOpening ?? "").trim(),
-      leadScore: clampScore(parsed.leadScore),
-      nextBestAction: String(parsed.nextBestAction ?? "").trim(),
-      analyzedAt: new Date().toISOString(),
-    };
-  } catch {
-    return null;
+      const brief = parseLeadOpportunityBrief(structured);
+      if (brief) return brief;
+    } catch (err) {
+      console.warn("Structured lead opportunity analysis failed; retrying", {
+        message: err instanceof Error ? err.message.slice(0, 200) : "unknown",
+      });
+    }
   }
+
+  const client = isAnthropicConfigured() ? createLlmClient() : null;
+  const raw = await withLlmUsage({ userId, feature: "other" }, () =>
+    runChatCompletion(client, {
+      system: `${LEAD_OPPORTUNITY_SYSTEM}
+
+You MUST respond with a single JSON object only (no markdown fences, no prose).`,
+      model: CHAT_MODEL,
+      maxTokens: 2048,
+      messages: [{ role: "user", content: userPrompt }],
+    })
+  );
+
+  return parseLeadOpportunityBrief(raw);
 }
 
 export async function runLeadOpportunityAnalysis(
@@ -199,17 +192,7 @@ export async function runLeadOpportunityAnalysis(
     knowledgeContext,
   });
 
-  const client = isAnthropicConfigured() ? createLlmClient() : null;
-  const raw = await withLlmUsage({ userId: args.userId, feature: "other" }, () =>
-    runChatCompletion(client, {
-      system: LEAD_OPPORTUNITY_SYSTEM,
-      model: CHAT_MODEL,
-      maxTokens: 2048,
-      messages: [{ role: "user", content: userPrompt }],
-    })
-  );
-
-  const brief = parseBrief(raw);
+  const brief = await requestOpportunityBrief(args.userId, userPrompt);
   if (!brief) {
     throw new Error("Gideon couldn't produce an opportunity brief. Try again.");
   }

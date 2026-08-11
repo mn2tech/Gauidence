@@ -15,6 +15,7 @@ import {
 import { findDuplicateReasons } from "../duplicates";
 import { suggestColumnMapping, mapRowToLead } from "../importMap";
 import { parseOutreachDraft } from "../outreach";
+import { parseLeadOpportunityBrief } from "../opportunity";
 
 describe("leads validators", () => {
   it("parseUuid accepts valid uuid", () => {
@@ -157,6 +158,62 @@ describe("leads duplicates", () => {
       existing
     );
     assert.ok(reasons.includes("company_and_contact"));
+  });
+});
+
+describe("leads opportunity brief", () => {
+  it("parseLeadOpportunityBrief extracts camelCase JSON", () => {
+    const brief = parseLeadOpportunityBrief(
+      JSON.stringify({
+        companySummary: "A regional HVAC contractor.",
+        primaryNeed: "Modernize field service scheduling",
+        potentialNeeds: [
+          {
+            label: "Manual dispatch",
+            kind: "observed",
+            detail: "Notes mention spreadsheets for scheduling.",
+          },
+        ],
+        recommendedService: "Managed IT Support",
+        reasoning: "Scheduling pain maps to operations tooling.",
+        conversationAngle: "Ask about technician routing delays.",
+        suggestedOpening: "Hi Alex, great meeting you at the chamber event.",
+        leadScore: 72,
+        nextBestAction: "Send a personalized introduction email.",
+      })
+    );
+    assert.equal(brief?.primaryNeed, "Modernize field service scheduling");
+    assert.equal(brief?.recommendedService, "Managed IT Support");
+    assert.equal(brief?.leadScore, 72);
+    assert.equal(brief?.potentialNeeds.length, 1);
+  });
+
+  it("parseLeadOpportunityBrief accepts snake_case aliases", () => {
+    const brief = parseLeadOpportunityBrief({
+      company_summary: "Local dental practice.",
+      primary_need: "HIPAA-compliant backups",
+      potential_needs: [
+        {
+          label: "Legacy server",
+          kind: "inferred",
+          detail: "Website suggests on-prem infrastructure.",
+        },
+      ],
+      recommended_service: "Cybersecurity Assessment",
+      reasoning: "Compliance exposure is likely.",
+      conversation_angle: "Lead with patient data protection.",
+      suggested_opening: "Hi Dr. Lee, following up from our conversation.",
+      lead_score: 81,
+      next_best_action: "Offer a short security review call.",
+    });
+    assert.equal(brief?.primaryNeed, "HIPAA-compliant backups");
+    assert.equal(brief?.recommendedService, "Cybersecurity Assessment");
+    assert.equal(brief?.leadScore, 81);
+  });
+
+  it("parseLeadOpportunityBrief rejects incomplete JSON", () => {
+    assert.equal(parseLeadOpportunityBrief('{"companySummary":"Only summary"}'), null);
+    assert.equal(parseLeadOpportunityBrief("not json"), null);
   });
 });
 
