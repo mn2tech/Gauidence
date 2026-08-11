@@ -157,7 +157,10 @@ Set `GUARDIAN_ONTOLOGY_ENABLED=false` to disable without rollback.
 
 ## Ontology map (Phase 2)
 
-Admin Ontology Explorer includes a lightweight **one-hop SVG map** (no graph DB / no React Flow). Click a connected node to open that entity. Entity details also list **up to 2-hop paths** from the selected node.
+Admin Ontology Explorer includes:
+
+- **One-hop SVG map** on entity details (click connected nodes)
+- **Space map** tab — Space-wide graph of visible relationships (`GET /api/ontology/graph`). `MENTIONED_IN` edges are hidden by default (toggle to include). Capped for SVG performance; click a node to open entity details.
 
 ## Multi-hop reasoning (Phase 2)
 

@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import type { EntityGraph } from "@/lib/ontology/types";
 import OntologyGraphMap from "@/components/admin/OntologyGraphMap";
+import OntologySpaceMap, {
+  type SpaceGraphData,
+} from "@/components/admin/OntologySpaceMap";
 
 type OntologyEntity = {
   id: string;
@@ -41,7 +44,7 @@ type ReviewItem =
       targetName?: string;
     };
 
-type Tab = "entities" | "review";
+type Tab = "entities" | "space" | "review";
 
 type Props = {
   profileId: string;
@@ -53,6 +56,8 @@ export default function OntologyExplorerPanel({ profileId, profileName }: Props)
   const [query, setQuery] = useState("");
   const [entities, setEntities] = useState<OntologyEntity[]>([]);
   const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
+  const [spaceGraph, setSpaceGraph] = useState<SpaceGraphData | null>(null);
+  const [includeMentions, setIncludeMentions] = useState(false);
   const [stats, setStats] = useState<SpaceStats | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [graph, setGraph] = useState<EntityGraph | null>(null);
@@ -101,6 +106,27 @@ export default function OntologyExplorerPanel({ profileId, profileName }: Props)
     }
   }, [profileId]);
 
+  const loadSpaceGraph = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams({ profileId });
+      if (includeMentions) params.set("includeMentions", "1");
+      const [graphRes, statsRes] = await Promise.all([
+        fetch(`/api/ontology/graph?${params}`),
+        fetch(`/api/ontology/stats?profileId=${profileId}`),
+      ]);
+      if (!graphRes.ok) throw new Error("Failed to load space map");
+      if (!statsRes.ok) throw new Error("Failed to load stats");
+      setSpaceGraph(await graphRes.json());
+      setStats(await statsRes.json());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Load failed");
+    } finally {
+      setLoading(false);
+    }
+  }, [profileId, includeMentions]);
+
   const loadGraph = useCallback(async (entityId: string) => {
     setSelectedId(entityId);
     setGraph(null);
@@ -115,9 +141,14 @@ export default function OntologyExplorerPanel({ profileId, profileName }: Props)
 
   useEffect(() => {
     if (tab === "entities") void loadEntities();
+    else if (tab === "space") void loadSpaceGraph();
     else void loadReview();
-  }, [tab, loadEntities, loadReview]);
+  }, [tab, loadEntities, loadSpaceGraph, loadReview]);
 
+  function openEntityFromMap(entityId: string) {
+    setTab("entities");
+    void loadGraph(entityId);
+  }
   async function runBackfill(limit: number) {
     setBackfillResult(null);
     try {
@@ -176,9 +207,12 @@ export default function OntologyExplorerPanel({ profileId, profileName }: Props)
         ) : null}
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <TabButton active={tab === "entities"} onClick={() => setTab("entities")}>
           Entities
+        </TabButton>
+        <TabButton active={tab === "space"} onClick={() => setTab("space")}>
+          Space map
         </TabButton>
         <TabButton active={tab === "review"} onClick={() => setTab("review")}>
           Needs review
@@ -202,6 +236,41 @@ export default function OntologyExplorerPanel({ profileId, profileName }: Props)
       {error ? (
         <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {error}
+        </div>
+      ) : null}
+
+      {tab === "space" ? (
+        <div className="rounded-2xl border border-stone-200 bg-white p-6">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">
+                Space map
+              </h2>
+              <p className="mt-2 text-sm text-ink-muted">
+                All visible connections in this Space (document mentions hidden by
+                default).
+              </p>
+            </div>
+            <label className="flex items-center gap-2 text-sm text-ink-muted">
+              <input
+                type="checkbox"
+                checked={includeMentions}
+                onChange={(e) => setIncludeMentions(e.target.checked)}
+              />
+              Include MENTIONED_IN
+            </label>
+          </div>
+          {loading ? (
+            <p className="mt-4 text-sm text-ink-muted">Loading…</p>
+          ) : spaceGraph ? (
+            <div className="mt-4">
+              <OntologySpaceMap
+                graph={spaceGraph}
+                selectedId={selectedId}
+                onSelectEntity={openEntityFromMap}
+              />
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -315,7 +384,7 @@ export default function OntologyExplorerPanel({ profileId, profileName }: Props)
             </ul>
           )}
         </div>
-      ) : (
+      ) : tab === "entities" ? (
         <div className="grid gap-6 lg:grid-cols-2">
           <div className="rounded-2xl border border-stone-200 bg-white p-6">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">
@@ -445,7 +514,7 @@ export default function OntologyExplorerPanel({ profileId, profileName }: Props)
             )}
           </div>
         </div>
-      )}
+      ) : null}
 
       <div className="rounded-2xl border border-stone-200 bg-white p-6">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">
