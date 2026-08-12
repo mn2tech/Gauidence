@@ -13,7 +13,7 @@ type SourceItemRow = {
   size_bytes: number | null;
   modified_at: string | null;
   metadata: Record<string, unknown> | null;
-  processing_status: "discovered" | "unavailable";
+  processing_status: SourceItem["processingStatus"];
   created_at: string;
   updated_at: string;
 };
@@ -127,7 +127,7 @@ export async function upsertScanResults(
       size_bytes: item.sizeBytes ?? null,
       modified_at: item.modifiedAt ?? null,
       metadata: item.metadata ?? {},
-      processing_status: "discovered",
+      processing_status: item.processingStatus,
     }));
 
     // Upsert in chunks to avoid payload limits.

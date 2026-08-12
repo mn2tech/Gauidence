@@ -69,7 +69,12 @@ export function nameSimilarity(a: string, b: string): number {
 
 /** Whether fuzzy matching is safe for this entity type. */
 export function isFuzzyMatchAllowed(entityType: string): boolean {
-  return entityType === "organization" || entityType === "project";
+  return (
+    entityType === "organization" ||
+    entityType === "project" ||
+    entityType === "restaurant" ||
+    entityType === "place"
+  );
 }
 
 /** Common person names should not auto-merge via fuzzy match. */

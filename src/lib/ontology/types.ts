@@ -1,7 +1,7 @@
 /** Review status for ontology entities and relationships. */
 export type OntologyReviewStatus = "pending" | "confirmed" | "rejected";
 
-/** Supported ontology entity types for Phase 1. */
+/** Supported ontology entity types (business + personal connector). */
 export const ONTOLOGY_ENTITY_TYPES = [
   "person",
   "organization",
@@ -10,6 +10,13 @@ export const ONTOLOGY_ENTITY_TYPES = [
   "contract",
   "invoice",
   "document",
+  "place",
+  "event",
+  "purchase",
+  "restaurant",
+  "movie",
+  "product",
+  "date",
 ] as const;
 
 export type OntologyEntityType = (typeof ONTOLOGY_ENTITY_TYPES)[number];
@@ -35,6 +42,15 @@ export const ONTOLOGY_RELATIONSHIP_TYPES = [
   "PRIME_CONTRACTOR_FOR",
   "MENTIONED_IN",
   "RELATED_TO",
+  "ATTENDED",
+  "PART_OF",
+  "OCCURRED_AT",
+  "PURCHASED_FROM",
+  "WATCHED",
+  "VISITED",
+  "OWNED_BY",
+  "CREATED_BY",
+  "EVIDENCED_BY",
 ] as const;
 
 export type OntologyRelationshipType =
@@ -50,7 +66,7 @@ export const ONTOLOGY_RELATIONSHIP_ALIASES: Record<string, OntologyRelationshipT
   FOUNDER: "FOUNDER_OF",
   CO_FOUNDER_OF: "FOUNDER_OF",
   OWNER_OF: "OWNS",
-  OWNED_BY: "BELONGS_TO",
+  OWNED_BY: "OWNED_BY",
   CONTRACTOR_TO: "SUBCONTRACTOR_TO",
   SUBCONTRACTOR_OF: "SUBCONTRACTOR_TO",
   SUBCONTRACTS_TO: "SUBCONTRACTOR_TO",
@@ -63,6 +79,15 @@ export const ONTOLOGY_RELATIONSHIP_ALIASES: Record<string, OntologyRelationshipT
   RELATED: "RELATED_TO",
   ASSOCIATED_WITH: "RELATED_TO",
   MENTIONED_IN_DOCUMENT: "MENTIONED_IN",
+  DINNER_AT: "OCCURRED_AT",
+  HAPPENED_AT: "OCCURRED_AT",
+  LOCATED_AT: "OCCURRED_AT",
+  BOUGHT_FROM: "PURCHASED_FROM",
+  PURCHASED_AT: "PURCHASED_FROM",
+  SAW: "WATCHED",
+  WENT_TO: "VISITED",
+  ATTENDED_BY: "ATTENDED",
+  EVIDENCE_OF: "EVIDENCED_BY",
 };
 
 export function normalizeRelationshipType(

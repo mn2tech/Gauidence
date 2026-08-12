@@ -1,4 +1,5 @@
-/** Feature flag for future "Analyze with Guardian" on source items. */
+/** Feature flag for "Analyze with Guardian" on connected source items. */
 export function isSourceItemAnalyzeEnabled(): boolean {
-  return process.env.NEXT_PUBLIC_GUARDIAN_SOURCE_ANALYZE === "true";
+  // Default enabled for connector → ontology. Set NEXT_PUBLIC_GUARDIAN_SOURCE_ANALYZE=false to hide.
+  return process.env.NEXT_PUBLIC_GUARDIAN_SOURCE_ANALYZE !== "false";
 }

@@ -11,7 +11,12 @@ export type ConnectedSourceStatus =
 
 export type ConnectedSourceType = "android_storage" | "guardian";
 
-export type SourceItemProcessingStatus = "discovered" | "unavailable";
+export type SourceItemProcessingStatus =
+  | "discovered"
+  | "analyzing"
+  | "analyzed"
+  | "analysis_failed"
+  | "unavailable";
 
 export type FileTypeCategory =
   | "Images"

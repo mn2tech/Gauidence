@@ -40,10 +40,6 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  if (!isGuardianOntologyEnabled()) {
-    return NextResponse.json({ error: "Not found." }, { status: 404 });
-  }
-
   const auth = await requireOntologyUser();
   if (!isOntologyAuthed(auth)) return auth;
   const { supabase, user } = auth;

@@ -34,6 +34,7 @@ function itemChanged(
 /**
  * Idempotent scan reconciliation against existing rows.
  * Missing files become unavailable; new/changed files are upserted.
+ * Preserves analyzed / analyzing / analysis_failed when metadata is unchanged.
  */
 export function reconcileScan(
   existing: ExistingSourceItemRow[],
@@ -60,6 +61,7 @@ export function reconcileScan(
     }
     if (itemChanged(prev, item)) {
       updatedCount += 1;
+      // Content/metadata changed — reset so Analyze can run again.
       toUpsert.push({ ...item, processingStatus: "discovered" });
     } else {
       unchangedCount += 1;
