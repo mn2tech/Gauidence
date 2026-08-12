@@ -21,6 +21,7 @@ import {
   Bell,
   FileText,
   FolderOpen,
+  HardDrive,
   Info,
   Loader2,
   Menu,
@@ -4225,6 +4226,15 @@ export default function VaultChatPanel({
                   </button>
                   <div className="my-1 border-t border-stone-100" role="separator" />
                   <Link
+                    href="/settings/connections"
+                    role="menuitem"
+                    onClick={() => setPlusOpen(false)}
+                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-medium text-foreground hover:bg-stone-50"
+                  >
+                    <HardDrive className="h-4 w-4 text-brand" />
+                    Connections
+                  </Link>
+                  <Link
                     href="/settings/profiles?add=1&return=%2Fask"
                     role="menuitem"
                     onClick={() => setPlusOpen(false)}
@@ -4661,6 +4671,15 @@ export default function VaultChatPanel({
           </div>
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             <AgentModeToggle compact className="hidden sm:inline-flex" />
+            <Link
+              href="/settings/connections"
+              aria-label="Connections"
+              title="Connections"
+              className="inline-flex items-center gap-1 rounded-full border border-stone-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50 sm:px-3"
+            >
+              <FolderOpen className="h-3.5 w-3.5 text-ink-muted" aria-hidden />
+              <span className="hidden sm:inline">Connections</span>
+            </Link>
             <Link
               href={docsHref}
               aria-label={VAULT_NAV_LABEL}

@@ -22,6 +22,7 @@ import {
   type NestedVaultGroup,
 } from "@/lib/profiles/types";
 import { useVaultSubVaultMenu } from "@/components/VaultSubVaultMenu";
+import AskConnectedSourcesPanel from "@/components/connections/AskConnectedSourcesPanel";
 
 type ChatSummary = {
   id: string;
@@ -367,6 +368,7 @@ export default function AskGideonSidebar({
   const vaultLabel = activeVaultName?.trim() || "this space";
   const [vaultsOpen, setVaultsOpen] = useState(true);
   const [chatsOpen, setChatsOpen] = useState(true);
+  const [connectionsOpen, setConnectionsOpen] = useState(true);
 
   return (
     <>
@@ -401,7 +403,7 @@ export default function AskGideonSidebar({
 
       <div
         className={`shrink-0 overflow-y-auto border-b border-stone-200 p-2 ${
-          vaultsOpen ? "max-h-[38%]" : ""
+          vaultsOpen ? "max-h-[32%]" : ""
         }`}
       >
         <CollapsibleSection
@@ -413,6 +415,16 @@ export default function AskGideonSidebar({
             Right-click a vault to add a sub-vault.
           </p>
           <VaultList onPicked={onSidebarAction} />
+        </CollapsibleSection>
+      </div>
+
+      <div className="shrink-0 border-b border-stone-200 p-2">
+        <CollapsibleSection
+          title="Connections"
+          open={connectionsOpen}
+          onToggle={() => setConnectionsOpen((o) => !o)}
+        >
+          <AskConnectedSourcesPanel onNavigate={onSidebarAction} />
         </CollapsibleSection>
       </div>
 
