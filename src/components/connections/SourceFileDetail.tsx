@@ -97,7 +97,7 @@ export default function SourceFileDetail({ sourceId, itemId }: Props) {
         <dl className="mt-6 space-y-3 text-sm">
           <div className="flex justify-between gap-4 border-b border-stone-100 pb-3">
             <dt className="text-ink-muted">Source</dt>
-            <dd className="font-medium text-foreground">Phone Storage</dd>
+            <dd className="font-medium text-foreground">Device Storage</dd>
           </div>
           <div className="flex justify-between gap-4 border-b border-stone-100 pb-3">
             <dt className="text-ink-muted">Folder</dt>

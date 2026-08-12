@@ -7,6 +7,8 @@ import type {
 import { ConnectorError } from "../types";
 import {
   buildSourceUri,
+  CHROME_BLOCKED_FOLDER_HINT,
+  isLikelyMobileBrowser,
   loadDirectoryHandle,
   persistDirectoryHandle,
   requestDirectoryPermission,
@@ -15,6 +17,8 @@ import {
 } from "./androidStoragePermissions";
 import { scanDirectoryHandle, scanFileList } from "./androidStorageScanner";
 
+export type ConnectFolderMode = "compatible" | "persistent" | "auto";
+
 /**
  * Phone Storage connector (android_storage).
  *
@@ -22,6 +26,9 @@ import { scanDirectoryHandle, scanFileList } from "./androidStorageScanner";
  * API (Chromium) or a webkitdirectory fallback. A future Expo/RN shell can
  * replace the pick/persist/scan internals with ACTION_OPEN_DOCUMENT_TREE
  * without changing the GuardianConnector interface or Supabase schema.
+ *
+ * Default connect mode is "compatible" (webkitdirectory) because Chrome blocks
+ * well-known folders like Downloads/Documents in showDirectoryPicker.
  */
 export class AndroidStorageConnector implements GuardianConnector {
   readonly type = "android_storage";
@@ -31,7 +38,9 @@ export class AndroidStorageConnector implements GuardianConnector {
   private pendingUri: string | null = null;
   private pendingFiles: File[] | null = null;
 
-  async connect(): Promise<{
+  async connect(options?: {
+    mode?: ConnectFolderMode;
+  }): Promise<{
     displayName: string;
     sourceUri: string;
     settings: Record<string, unknown>;
@@ -41,15 +50,31 @@ export class AndroidStorageConnector implements GuardianConnector {
     if (typeof window === "undefined") {
       throw new ConnectorError(
         "unsupported",
-        "Phone Storage can only be connected from a browser or Android app."
+        "Device Storage can only be connected from a browser or app on this device."
       );
     }
 
-    if (supportsShowDirectoryPicker()) {
+    const mode = options?.mode ?? "compatible";
+
+    if (mode === "compatible") {
+      return this.connectWithWebkitDirectory();
+    }
+
+    if (mode === "persistent") {
+      if (!supportsShowDirectoryPicker()) {
+        throw new ConnectorError(
+          "unsupported",
+          `${CHROME_BLOCKED_FOLDER_HINT} This browser does not support persistent folder access — use the compatible picker instead.`
+        );
+      }
       return this.connectWithDirectoryPicker();
     }
 
-    return this.connectWithWebkitDirectory();
+    // auto: mobile → compatible; desktop with FS Access → persistent
+    if (isLikelyMobileBrowser() || !supportsShowDirectoryPicker()) {
+      return this.connectWithWebkitDirectory();
+    }
+    return this.connectWithDirectoryPicker();
   }
 
   private async connectWithDirectoryPicker(): Promise<{
@@ -77,7 +102,7 @@ export class AndroidStorageConnector implements GuardianConnector {
       });
 
       return {
-        displayName: `Phone Storage — ${handle.name}`,
+        displayName: `Device Storage — ${handle.name}`,
         sourceUri,
         settings: {
           folderName: handle.name,
@@ -89,10 +114,21 @@ export class AndroidStorageConnector implements GuardianConnector {
       };
     } catch (err) {
       const name = err instanceof Error ? err.name : "";
-      if (name === "AbortError" || name === "NotAllowedError") {
+      const message = err instanceof Error ? err.message : "";
+      if (name === "AbortError") {
         throw new ConnectorError(
           "cancelled",
           "Folder selection was cancelled.",
+          { cause: err }
+        );
+      }
+      if (
+        name === "NotAllowedError" ||
+        /privacy|can't use this folder|cannot use this folder/i.test(message)
+      ) {
+        throw new ConnectorError(
+          "unsupported",
+          CHROME_BLOCKED_FOLDER_HINT,
           { cause: err }
         );
       }
@@ -155,7 +191,7 @@ export class AndroidStorageConnector implements GuardianConnector {
         });
 
         resolve({
-          displayName: `Phone Storage — ${folderName}`,
+          displayName: `Device Storage — ${folderName}`,
           sourceUri,
           settings: {
             folderName,
@@ -244,14 +280,7 @@ export class AndroidStorageConnector implements GuardianConnector {
 
     const loaded = await loadDirectoryHandle(source.id).catch(() => null);
     if (!loaded) {
-      // Offer re-pick for webkitdirectory / revoked handles.
-      if (supportsShowDirectoryPicker()) {
-        throw new ConnectorError(
-          "permission_revoked",
-          "Guardian no longer has access to this folder."
-        );
-      }
-      // Prompt user to re-select folder for scan-again on mobile browsers.
+      // No persisted handle — prompt with compatible picker (works with Downloads).
       const picked = await this.connectWithWebkitDirectory();
       if (!this.pendingFiles) {
         throw new ConnectorError(

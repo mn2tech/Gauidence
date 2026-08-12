@@ -44,7 +44,7 @@ export default async function BrowseConnectionFilesPage({ params }: Props) {
             Browse Files
           </h1>
           <p className="mt-2 text-sm text-ink-muted">
-            Phone Storage · {folderName} · metadata only
+            Device Storage · {folderName} · metadata only
           </p>
           <div className="mt-8">
             <BrowseSourceFiles sourceId={id} />

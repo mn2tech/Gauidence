@@ -6,8 +6,8 @@ Guardian Phone Storage is the first external connector. It discovers **file meta
 
 This repository is a **Next.js web app** (not Expo / React Native). Folder access uses:
 
-1. **Chromium File System Access API** (`showDirectoryPicker`) when available — directory handles are persisted in IndexedDB (web equivalent of Android persistent URI permissions).
-2. **`webkitdirectory` file input** fallback on browsers that lack directory picker support (common on mobile browsers). Re-scan may require re-selecting the folder.
+1. **Compatible picker (default):** `<input webkitdirectory>` — works with Downloads and other well-known folders that Chrome blocks in `showDirectoryPicker`.
+2. **Persistent picker (optional):** Chromium File System Access API (`showDirectoryPicker`) — can persist a `FileSystemDirectoryHandle` in IndexedDB, but Chrome blocks Downloads, Documents, Desktop, Pictures, etc. Use a **subfolder** (e.g. `Downloads/Guardian`) instead.
 
 True Android `ACTION_OPEN_DOCUMENT_TREE` / SAF persistent permissions require a future **native Android shell or Expo development build**. The `AndroidStorageConnector` interface is ready for that swap without changing Supabase schema or UI contracts.
 

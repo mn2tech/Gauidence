@@ -104,6 +104,19 @@ export function supportsShowDirectoryPicker(): boolean {
   );
 }
 
+/**
+ * Chrome blocks well-known folders (Downloads, Documents, Desktop, Pictures,
+ * etc.) in showDirectoryPicker with: "Can't use this folder. To protect your
+ * privacy, choose another folder." Prefer webkitdirectory for Phone Storage.
+ */
+export const CHROME_BLOCKED_FOLDER_HINT =
+  "Chrome blocks Downloads, Documents, Desktop, and Pictures in its folder picker. Choose a subfolder (for example Downloads/Guardian), or use the compatible picker which can open Downloads.";
+
+export function isLikelyMobileBrowser(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+}
+
 export async function requestDirectoryPermission(
   handle: FileSystemDirectoryHandle,
   mode: "read" | "readwrite" = "read"

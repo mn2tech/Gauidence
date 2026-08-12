@@ -4,9 +4,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
+  Folder,
   HardDrive,
   Loader2,
-  Phone,
   RefreshCw,
   Shield,
 } from "lucide-react";
@@ -32,10 +32,12 @@ type ItemSummary = {
 
 const PRIVACY_LINES = [
   "Guardian only accesses folders you choose.",
-  "Files remain on your phone.",
+  "Files remain on your device.",
   "Guardian currently stores only file metadata.",
   "Guardian will not upload or analyze files until you explicitly choose to do so.",
 ];
+
+const DEVICE_STORAGE_LABEL = "Device Storage";
 
 function StatusDot({
   tone,
@@ -148,13 +150,13 @@ export default function ConnectionsPanel() {
     []
   );
 
-  const connectPhone = useCallback(async () => {
+  const connectPhone = useCallback(async (mode: "compatible" | "persistent" = "compatible") => {
     setBusy("connect");
     setError(null);
     setScanResult(null);
     const connector = new AndroidStorageConnector();
     try {
-      const draft = await connector.connect();
+      const draft = await connector.connect({ mode });
       const res = await fetch("/api/connections", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -310,15 +312,15 @@ export default function ConnectionsPanel() {
             </div>
           </section>
 
-          {/* Phone Storage */}
+          {/* Device Storage */}
           <section className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
             <div className="flex items-start gap-3">
               <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-stone-100 text-ink-muted">
-                <Phone className="h-4 w-4" aria-hidden />
+                <Folder className="h-4 w-4" aria-hidden />
               </span>
               <div className="min-w-0 flex-1">
                 <h2 className="text-base font-semibold text-foreground">
-                  Phone Storage
+                  {DEVICE_STORAGE_LABEL}
                 </h2>
 
                 {permissionRevoked ? (
@@ -332,7 +334,7 @@ export default function ConnectionsPanel() {
                     </p>
                     <button
                       type="button"
-                      onClick={() => void connectPhone()}
+                      onClick={() => void connectPhone("compatible")}
                       disabled={busy !== null}
                       className="mt-4 inline-flex items-center justify-center rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-60"
                     >
@@ -430,7 +432,7 @@ export default function ConnectionsPanel() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => void connectPhone()}
+                        onClick={() => void connectPhone("compatible")}
                         disabled={busy !== null}
                         className="inline-flex items-center justify-center rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-foreground hover:bg-stone-50 disabled:opacity-60"
                       >
@@ -453,12 +455,18 @@ export default function ConnectionsPanel() {
                       Not Connected
                     </p>
                     <p className="mt-2 text-sm text-ink-muted">
-                      Choose a folder on your device. Guardian stores metadata
-                      only — files stay on your phone.
+                      Choose a folder on this device. Guardian stores metadata
+                      only — files stay on your device.
+                    </p>
+                    <p className="mt-2 text-xs text-ink-muted">
+                      Tip: Chrome blocks Downloads, Documents, Desktop, and
+                      Pictures in its built-in folder picker. Use Connect below
+                      (compatible mode), or create a subfolder such as
+                      Downloads/Guardian and connect that instead.
                     </p>
                     <button
                       type="button"
-                      onClick={() => void connectPhone()}
+                      onClick={() => void connectPhone("compatible")}
                       disabled={busy !== null}
                       className="mt-4 inline-flex items-center justify-center rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-60"
                     >
@@ -468,8 +476,16 @@ export default function ConnectionsPanel() {
                           Connecting…
                         </>
                       ) : (
-                        "Connect Phone Storage"
+                        "Connect Device Storage"
                       )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void connectPhone("persistent")}
+                      disabled={busy !== null}
+                      className="mt-2 block text-sm font-semibold text-brand hover:text-brand-dark disabled:opacity-60"
+                    >
+                      Or use persistent folder access (custom subfolders)
                     </button>
                   </>
                 )}
@@ -510,7 +526,7 @@ export default function ConnectionsPanel() {
               id="disconnect-title"
               className="text-lg font-semibold text-foreground"
             >
-              Disconnect Phone Storage?
+              Disconnect Device Storage?
             </h3>
             <p className="mt-2 text-sm text-ink-muted">
               Guardian will stop accessing this folder.
