@@ -12,12 +12,30 @@ import {
   type SourceContent,
 } from "./types";
 
+export type ReadSourceOptions = {
+  /** Reuse a granted directory handle across a batch. */
+  directoryHandle?: FileSystemDirectoryHandle;
+  /**
+   * One-shot folder share (webkitdirectory). Keys are lowercased relative
+   * paths and basenames for lookup.
+   */
+  fileIndex?: Map<string, File>;
+  /** Default true. Batch mode sets false to avoid N file pickers. */
+  allowSingleFileFallback?: boolean;
+};
+
+export type BatchReadAccess = {
+  directoryHandle?: FileSystemDirectoryHandle;
+  fileIndex?: Map<string, File>;
+};
+
 /**
  * Read a Device Storage source item temporarily in the browser.
  * Bytes stay in memory for the analyze request only.
  */
 export async function readSourceItemContent(
-  item: SourceItem & { id: string }
+  item: SourceItem & { id: string },
+  options: ReadSourceOptions = {}
 ): Promise<SourceContent> {
   const mime =
     item.mimeType || guessMimeFromName(item.name) || "application/octet-stream";
@@ -32,27 +50,143 @@ export async function readSourceItemContent(
   const relativePath = String(
     item.metadata?.relativePath ?? item.externalId ?? item.name
   );
+  const allowSingle = options.allowSingleFileFallback !== false;
 
-  const loaded = await loadDirectoryHandle(item.sourceId).catch(() => null);
-  if (loaded) {
-    const granted = await requestDirectoryPermission(loaded.handle, "read");
+  if (options.fileIndex && options.fileIndex.size > 0) {
+    const file = findInFileIndex(options.fileIndex, relativePath, item.name);
+    if (file) {
+      return toSourceContent(file, item.name, mime, relativePath, true);
+    }
+  }
+
+  const handle =
+    options.directoryHandle ??
+    (await loadDirectoryHandle(item.sourceId).catch(() => null))?.handle;
+
+  if (handle) {
+    const granted = await requestDirectoryPermission(handle, "read");
     if (granted) {
       try {
         const file = await getFileFromDirectory(
-          loaded.handle,
+          handle,
           relativePath,
           item.name
         );
         return await toSourceContent(file, item.name, mime, relativePath, false);
       } catch {
-        // Path mismatch or stale handle — fall through to single-file picker.
+        // Path mismatch — fall through.
       }
     }
   }
 
-  // No usable persisted handle — prompt user to re-select this one file.
+  if (!allowSingle) {
+    throw new ConnectorError(
+      "read_failed",
+      `Couldn't find "${item.name}" in the selected folder. Choose the same folder you connected, then try again.`
+    );
+  }
+
   const file = await pickSingleFile(item.name);
   return toSourceContent(file, item.name, mime, relativePath, true);
+}
+
+/**
+ * Prepare folder access once for a batch Analyze run.
+ * Prefers a persisted FS Access handle; otherwise prompts for a compatible
+ * folder share (webkitdirectory) so Downloads works in Chrome.
+ */
+export async function ensureBatchReadAccess(
+  sourceId: string
+): Promise<BatchReadAccess> {
+  const loaded = await loadDirectoryHandle(sourceId).catch(() => null);
+  if (loaded) {
+    const granted = await requestDirectoryPermission(loaded.handle, "read");
+    if (granted) {
+      return { directoryHandle: loaded.handle };
+    }
+  }
+
+  const files = await pickFolderFiles();
+  return { fileIndex: buildFileIndex(files) };
+}
+
+export function buildFileIndex(files: File[]): Map<string, File> {
+  const index = new Map<string, File>();
+  for (const file of files) {
+    const relative = String(
+      (file as File & { webkitRelativePath?: string }).webkitRelativePath ||
+        file.name
+    )
+      .replace(/\\/g, "/")
+      .replace(/^\/+/, "");
+    const keys = uniquePaths([
+      relative,
+      relative.split("/").slice(1).join("/"),
+      relative.split("/").slice(-2).join("/"),
+      file.name,
+    ]);
+    for (const key of keys) {
+      index.set(key.toLowerCase(), file);
+    }
+  }
+  return index;
+}
+
+function findInFileIndex(
+  index: Map<string, File>,
+  relativePath: string,
+  fileName: string
+): File | null {
+  const normalized = relativePath.replace(/\\/g, "/");
+  const candidates = uniquePaths([
+    normalized,
+    normalized.split("/").slice(1).join("/"),
+    normalized.split("/").slice(-2).join("/"),
+    fileName,
+  ]);
+  for (const c of candidates) {
+    const hit = index.get(c.toLowerCase());
+    if (hit) return hit;
+  }
+  return null;
+}
+
+function pickFolderFiles(): Promise<File[]> {
+  return new Promise((resolve, reject) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.multiple = true;
+    input.setAttribute("webkitdirectory", "");
+    input.setAttribute("directory", "");
+    input.style.display = "none";
+    document.body.appendChild(input);
+
+    const cleanup = () => input.remove();
+
+    input.addEventListener("cancel", () => {
+      cleanup();
+      reject(
+        new ConnectorError(
+          "cancelled",
+          "Folder selection was cancelled. Guardian needs temporary access to analyze these files."
+        )
+      );
+    });
+
+    input.addEventListener("change", () => {
+      const list = input.files ? Array.from(input.files) : [];
+      cleanup();
+      if (!list.length) {
+        reject(
+          new ConnectorError("cancelled", "Folder selection was cancelled.")
+        );
+        return;
+      }
+      resolve(list);
+    });
+
+    input.click();
+  });
 }
 
 async function toSourceContent(
@@ -93,7 +227,6 @@ async function getFileFromDirectory(
     normalized,
     stripRootPrefix(normalized, root.name),
     fileName,
-    // parentFolder/name style
     normalized.includes("/")
       ? normalized.split("/").slice(-2).join("/")
       : fileName,

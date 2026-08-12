@@ -4,6 +4,11 @@ import {
   guessMimeFromName,
   isAnalyzeSupportedMime,
 } from "../content/types";
+import { buildFileIndex } from "../content/readClient";
+import {
+  isItemAnalyzable,
+  isItemNeedsAnalyze,
+} from "../clientAnalyze";
 import {
   normalizeRelationshipType,
   ONTOLOGY_ENTITY_TYPES,
@@ -34,6 +39,59 @@ describe("connector analyze support", () => {
       guessMimeFromName("Kpactech02-2.xlsx"),
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     );
+  });
+
+  it("selects batch-eligible items", () => {
+    assert.equal(
+      isItemNeedsAnalyze({
+        name: "a.pdf",
+        mimeType: "application/pdf",
+        processingStatus: "discovered",
+      }),
+      true
+    );
+    assert.equal(
+      isItemNeedsAnalyze({
+        name: "a.pdf",
+        mimeType: "application/pdf",
+        processingStatus: "analyzed",
+      }),
+      false
+    );
+    assert.equal(
+      isItemAnalyzable({
+        name: "a.pdf",
+        mimeType: "application/pdf",
+        processingStatus: "analyzed",
+      }),
+      true
+    );
+    assert.equal(
+      isItemAnalyzable({
+        name: "a.zip",
+        mimeType: "application/zip",
+        processingStatus: "discovered",
+      }),
+      false
+    );
+    assert.equal(
+      isItemAnalyzable({
+        name: "a.pdf",
+        mimeType: "application/pdf",
+        processingStatus: "unavailable",
+      }),
+      false
+    );
+  });
+
+  it("indexes webkitdirectory paths for batch reads", () => {
+    const file = new File(["x"], "invoice.pdf", { type: "application/pdf" });
+    Object.defineProperty(file, "webkitRelativePath", {
+      value: "January/invoice.pdf",
+    });
+    const index = buildFileIndex([file]);
+    assert.equal(index.get("january/invoice.pdf"), file);
+    assert.equal(index.get("invoice.pdf"), file);
   });
 });
 

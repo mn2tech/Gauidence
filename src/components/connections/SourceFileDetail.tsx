@@ -10,10 +10,7 @@ import {
   formatBytes,
   formatModified,
 } from "@/lib/connectors/services/sourceItems";
-import {
-  hashSourceBytes,
-  readSourceItemContent,
-} from "@/lib/connectors/content/readClient";
+import { analyzeSourceItemClient } from "@/lib/connectors/clientAnalyze";
 import { isAnalyzeSupportedMime } from "@/lib/connectors/content/types";
 
 type Props = {
@@ -111,47 +108,32 @@ export default function SourceFileDetail({ sourceId, itemId }: Props) {
     setAnalyzing(true);
     setError(null);
     try {
-      const content = await readSourceItemContent(item);
-      if (!content.bytes) {
-        throw new Error("Couldn't read file bytes for analysis.");
-      }
-      const contentHash = await hashSourceBytes(content.bytes);
-      const form = new FormData();
-      const ab = content.bytes.buffer.slice(
-        content.bytes.byteOffset,
-        content.bytes.byteOffset + content.bytes.byteLength
-      ) as ArrayBuffer;
-      form.append(
-        "file",
-        new File([ab], content.filename, { type: content.mimeType })
-      );
-      form.append("contentHash", contentHash);
-      if (content.text) form.append("text", content.text);
-      if (
-        item.processingStatus === "analyzed" ||
-        item.processingStatus === "analysis_failed"
-      ) {
-        form.append("force", "1");
-      }
-
-      const res = await fetch(
-        `/api/connections/${sourceId}/items/${itemId}/analyze`,
-        { method: "POST", body: form }
-      );
-      const body = (await res.json().catch(() => ({}))) as AnalysisResult & {
-        error?: string;
-        code?: string;
-      };
-      if (!res.ok) {
-        if (body.code === "permission_revoked") {
+      const result = await analyzeSourceItemClient({
+        sourceId,
+        item,
+      });
+      if (!result.ok) {
+        if (result.cancelled) {
+          setError(null);
+          return;
+        }
+        if (result.code === "permission_revoked") {
           throw new ConnectorError(
             "permission_revoked",
-            body.error ?? "Access to this folder was revoked."
+            result.error ?? "Access to this folder was revoked."
           );
         }
-        throw new Error(body.error ?? "Analysis failed.");
+        throw new Error(result.error);
       }
-      setAnalysis(body);
+      setAnalysis({
+        skipped: result.skipped,
+        profileId: result.profileId ?? "",
+        entitiesFound: result.entitiesFound ?? 0,
+        relationshipsFound: result.relationshipsFound ?? 0,
+        confidence: result.confidence ?? "—",
+        entities: result.entities ?? [],
+        relationships: result.relationships ?? [],
+      });
       await load();
     } catch (err) {
       if (err instanceof ConnectorError && err.code === "cancelled") {
@@ -162,7 +144,7 @@ export default function SourceFileDetail({ sourceId, itemId }: Props) {
     } finally {
       setAnalyzing(false);
     }
-  }, [item, itemId, load, sourceId]);
+  }, [item, load, sourceId]);
 
   const setReview = useCallback(
     async (
