@@ -459,10 +459,16 @@ export default function ConnectionsPanel() {
                       only — files stay on your device.
                     </p>
                     <p className="mt-2 text-xs text-ink-muted">
+                      Your browser may ask “Upload files to this site?” That
+                      only lets Guardian read names and sizes in this session —
+                      files are not saved to Guardian storage. Prefer a smaller
+                      folder (for example a subfolder of Downloads) when you can.
+                    </p>
+                    <p className="mt-2 text-xs text-ink-muted">
                       Tip: Chrome blocks Downloads, Documents, Desktop, and
-                      Pictures in its built-in folder picker. Use Connect below
-                      (compatible mode), or create a subfolder such as
-                      Downloads/Guardian and connect that instead.
+                      Pictures in its persistent folder picker. Compatible
+                      Connect works with those folders; or create
+                      Downloads/Guardian and use persistent access.
                     </p>
                     <button
                       type="button"
