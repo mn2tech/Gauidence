@@ -20,6 +20,8 @@ const FILTERS: Array<"All" | FileTypeCategory> = [
   "Other",
 ];
 
+type StatusFilter = "available" | "unavailable" | "all";
+
 type Props = {
   sourceId: string;
 };
@@ -27,9 +29,11 @@ type Props = {
 export default function BrowseSourceFiles({ sourceId }: Props) {
   const [items, setItems] = useState<Array<SourceItem & { id: string }>>([]);
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<(typeof FILTERS)[number]>("All");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("available");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
   useEffect(() => {
@@ -68,14 +72,54 @@ export default function BrowseSourceFiles({ sourceId }: Props) {
     void load();
   }, [load]);
 
+  const unavailableCount = useMemo(
+    () => items.filter((i) => i.processingStatus === "unavailable").length,
+    [items]
+  );
+
   const filtered = useMemo(() => {
-    if (category === "All") return items;
-    return items.filter((item) => {
+    let list = items;
+    if (statusFilter === "available") {
+      list = list.filter((i) => i.processingStatus !== "unavailable");
+    } else if (statusFilter === "unavailable") {
+      list = list.filter((i) => i.processingStatus === "unavailable");
+    }
+    if (category === "All") return list;
+    return list.filter((item) => {
       const cat = classifyFileType(item.name, item.mimeType);
       if (category === "Other") return cat === "Other" || cat === "Text";
       return cat === category;
     });
-  }, [category, items]);
+  }, [category, items, statusFilter]);
+
+  const clearUnavailable = useCallback(async () => {
+    if (unavailableCount === 0) return;
+    const ok = window.confirm(
+      `Remove ${unavailableCount} unavailable file record(s) from Guardian?\n\nThis only clears metadata. Nothing on your device is deleted.`
+    );
+    if (!ok) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/connections/${sourceId}/items?scope=unavailable`,
+        { method: "DELETE" }
+      );
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        deleted?: number;
+      };
+      if (!res.ok) {
+        setError(body.error ?? "Couldn't clear unavailable files.");
+        return;
+      }
+      await load();
+    } catch {
+      setError("Couldn't clear unavailable files.");
+    } finally {
+      setBusy(false);
+    }
+  }, [load, sourceId, unavailableCount]);
 
   return (
     <div className="space-y-4">
@@ -90,6 +134,29 @@ export default function BrowseSourceFiles({ sourceId }: Props) {
             className="w-full rounded-full border border-stone-200 bg-white py-2 pl-9 pr-4 text-sm outline-none ring-brand focus:ring-2"
           />
         </label>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {(
+          [
+            ["available", "Available"],
+            ["unavailable", `Unavailable${unavailableCount ? ` (${unavailableCount})` : ""}`],
+            ["all", "All statuses"],
+          ] as const
+        ).map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => setStatusFilter(value)}
+            className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+              statusFilter === value
+                ? "bg-brand text-white"
+                : "border border-stone-200 bg-white text-ink-muted hover:bg-stone-50"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -109,6 +176,25 @@ export default function BrowseSourceFiles({ sourceId }: Props) {
         ))}
       </div>
 
+      {unavailableCount > 0 ? (
+        <div className="flex flex-wrap items-center gap-3 text-sm text-ink-muted">
+          <p>
+            {unavailableCount} unavailable record
+            {unavailableCount === 1 ? "" : "s"} from earlier scans. Go to
+            Connections and press <span className="font-medium">Scan Again</span>{" "}
+            on this folder to refresh available files.
+          </p>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void clearUnavailable()}
+            className="rounded-full border border-stone-200 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-stone-50 disabled:opacity-60"
+          >
+            {busy ? "Clearing…" : "Clear unavailable"}
+          </button>
+        </div>
+      ) : null}
+
       {error ? (
         <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
           {error}
@@ -122,7 +208,9 @@ export default function BrowseSourceFiles({ sourceId }: Props) {
         </p>
       ) : filtered.length === 0 ? (
         <p className="rounded-2xl border border-stone-200 bg-white p-6 text-sm text-ink-muted shadow-sm">
-          No files match this filter.
+          {statusFilter === "available"
+            ? "No available files yet. Go back to Connections and press Scan Again, then choose the January folder."
+            : "No files match this filter."}
         </p>
       ) : (
         <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
@@ -153,7 +241,7 @@ export default function BrowseSourceFiles({ sourceId }: Props) {
                       {formatModified(item.modifiedAt)}
                     </span>
                     <span className="text-sm capitalize text-ink-muted">
-                      {item.processingStatus}
+                      {item.processingStatus.replace(/_/g, " ")}
                     </span>
                   </Link>
                 </li>

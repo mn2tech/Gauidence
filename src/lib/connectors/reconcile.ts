@@ -69,10 +69,13 @@ export function reconcileScan(
   }
 
   const toMarkUnavailable: string[] = [];
-  for (const row of existing) {
-    if (seen.has(row.externalId)) continue;
-    if (row.processingStatus === "unavailable") continue;
-    toMarkUnavailable.push(row.externalId);
+  // An empty scan is treated as cancelled/failed access — do not wipe the catalog.
+  if (scanned.length > 0) {
+    for (const row of existing) {
+      if (seen.has(row.externalId)) continue;
+      if (row.processingStatus === "unavailable") continue;
+      toMarkUnavailable.push(row.externalId);
+    }
   }
 
   return {

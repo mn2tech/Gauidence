@@ -83,6 +83,19 @@ describe("scan reconciliation", () => {
     assert.equal(result.summary.unavailableCount, 1);
   });
 
+  it("does not mark unavailable when scan returns zero files", () => {
+    const existing = [
+      {
+        externalId: "a.pdf",
+        name: "a.pdf",
+        processingStatus: "discovered",
+      },
+    ];
+    const result = reconcileScan(existing, []);
+    assert.deepEqual(result.toMarkUnavailable, []);
+    assert.equal(result.summary.unavailableCount, 0);
+  });
+
   it("revives previously unavailable files that reappear", () => {
     const existing = [
       {
