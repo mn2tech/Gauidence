@@ -25,10 +25,11 @@ export function formatOntologyForGideon(ctx: OntologyContext): string {
           ? ` | confidence:${Number(entity.confidence).toFixed(2)}`
           : "";
       const desc = entity.description
-        ? ` — ${entity.description.slice(0, 120)}`
+        ? ` — ${entity.description.slice(0, 160)}`
         : "";
+      const attrs = formatEntityAttributes(entity.properties);
       blocks.push(
-        `- ${entity.name} (${entity.entity_type})${desc}${conf}`
+        `- ${entity.name} (${entity.entity_type})${desc}${attrs}${conf}`
       );
     }
   }
@@ -63,6 +64,38 @@ export function formatOntologyForGideon(ctx: OntologyContext): string {
   }
 
   return blocks.length ? blocks.join("\n") : "(none)";
+}
+
+function formatEntityAttributes(
+  properties: Record<string, unknown> | null | undefined
+): string {
+  if (!properties || typeof properties !== "object") return "";
+  const parts: string[] = [];
+  const amount = properties.amount ?? properties.total ?? properties.invoice_amount;
+  const currency =
+    typeof properties.currency === "string" ? properties.currency : "USD";
+  if (typeof amount === "number" && Number.isFinite(amount)) {
+    parts.push(`amount:${currency} ${amount}`);
+  } else if (typeof amount === "string" && amount.trim()) {
+    parts.push(`amount:${amount.trim()}`);
+  }
+  const invoiceNumber =
+    properties.invoice_number ?? properties.invoiceNumber ?? properties.number;
+  if (typeof invoiceNumber === "string" && invoiceNumber.trim()) {
+    parts.push(`invoice_number:${invoiceNumber.trim()}`);
+  } else if (typeof invoiceNumber === "number") {
+    parts.push(`invoice_number:${invoiceNumber}`);
+  }
+  const issuer = properties.issuer ?? properties.from;
+  if (typeof issuer === "string" && issuer.trim()) {
+    parts.push(`issuer:${issuer.trim()}`);
+  }
+  const recipient = properties.recipient ?? properties.to;
+  if (typeof recipient === "string" && recipient.trim()) {
+    parts.push(`recipient:${recipient.trim()}`);
+  }
+  if (!parts.length) return "";
+  return ` | ${parts.join("; ")}`;
 }
 
 /**

@@ -78,6 +78,30 @@ describe("parseOntologyExtraction", () => {
     assert.equal(result!.entities[0]!.name, "NM2TECH LLC");
   });
 
+  it("parses entity attributes for invoices", () => {
+    const result = parseOntologyExtraction({
+      entities: [
+        {
+          type: "invoice",
+          name: "Invoice 00000001",
+          confidence: 0.95,
+          attributes: {
+            amount: 1250,
+            currency: "USD",
+            invoice_number: "00000001",
+            issuer: "NM2TECH LLC",
+            recipient: "KPAC Tech LLC",
+          },
+        },
+      ],
+      relationships: [],
+      events: [],
+    });
+    assert.ok(result);
+    assert.equal(result!.entities[0]!.attributes?.amount, 1250);
+    assert.equal(result!.entities[0]!.attributes?.invoice_number, "00000001");
+  });
+
   it("rejects relationships without evidence", () => {
     const result = parseOntologyExtraction({
       entities: [

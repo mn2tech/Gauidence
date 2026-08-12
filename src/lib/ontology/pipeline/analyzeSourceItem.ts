@@ -127,12 +127,13 @@ export async function analyzeSourceItem(
     profileId = profile.id;
   }
 
-  // Idempotency: same content hash already analyzed.
+  // Idempotency: same content hash AND same analysis version already analyzed.
   if (
     !args.force &&
     item.processing_status === "analyzed" &&
     item.content_hash &&
-    item.content_hash === args.contentHash
+    item.content_hash === args.contentHash &&
+    (item.analysis_version ?? version) === version
   ) {
     const existing = await listOntologyForSourceItem(
       supabase,

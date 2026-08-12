@@ -190,6 +190,8 @@ export type ExtractedOntologyEntity = {
   name: string;
   aliases?: string[];
   description?: string;
+  /** Structured attributes (amount, currency, invoice_number, etc.). */
+  attributes?: Record<string, unknown>;
   confidence: number;
 };
 

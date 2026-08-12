@@ -19,7 +19,7 @@ import {
   isExcelMimeOrName,
 } from "@/lib/connectors/content/extractExcel";
 
-const CONNECTOR_ANALYSIS_VERSION = "connector-ontology-v1";
+const CONNECTOR_ANALYSIS_VERSION = "connector-ontology-v2";
 
 export function connectorAnalysisVersion(): string {
   return CONNECTOR_ANALYSIS_VERSION;
@@ -34,11 +34,15 @@ Rules:
   Example: Event "Dinner" — OCCURRED_AT → Restaurant "Chipotle"; Event "Movie Night" — WATCHED → Movie.
 - Do NOT invent people attending an event unless the source clearly names them.
 - Entity types allowed: person, organization, place, event, document, purchase, restaurant, movie, product, date, project, asset, contract, invoice.
+- For invoices and purchases, ALWAYS capture structured attributes when present:
+  attributes.amount (number), attributes.currency (e.g. USD), attributes.invoice_number,
+  attributes.issuer, attributes.recipient, attributes.invoice_date.
+  Also put a one-line money summary in description, e.g. "Invoice 00000001 for $1,250.00 USD".
 - Every relationship MUST include an evidence quote (verbatim or short paraphrase from the source, max 300 chars).
 - Include confidence 0.0-1.0 for each entity and relationship.
 - Prefer specific names. Avoid generic labels like "Receipt" as an organization.
-- Use relationship types when they fit: OCCURRED_AT, PURCHASED_FROM, VISITED, WATCHED, ATTENDED, PART_OF, OWNED_BY, CREATED_BY, EVIDENCED_BY, MENTIONED_IN, RELATED_TO (last resort).
-- Also allowed when clear: WORKS_FOR, CLIENT_OF, VENDOR_OF, ISSUED_BY, ISSUED_TO.
+- Use relationship types when they fit: OCCURRED_AT, PURCHASED_FROM, VISITED, WATCHED, ATTENDED, PART_OF, OWNED_BY, CREATED_BY, EVIDENCED_BY, MENTIONED_IN, ISSUED_BY, ISSUED_TO, RELATED_TO (last resort).
+- Also allowed when clear: WORKS_FOR, CLIENT_OF, VENDOR_OF.
 - Return empty arrays if there is insufficient evidence.
 - Avoid guessing. When uncertain, omit rather than hallucinate.`;
 }

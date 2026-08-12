@@ -76,6 +76,7 @@ export async function persistConnectorOntologyExtraction(
       sourceType: "connector",
       sourceId: input.sourceItemId,
       createdBy: input.userId,
+      properties: extracted.attributes ?? {},
     });
 
     entityNameMap.set(key, result.entity.id);

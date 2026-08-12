@@ -127,6 +127,12 @@ export default function SourceFileDetail({ sourceId, itemId }: Props) {
       );
       form.append("contentHash", contentHash);
       if (content.text) form.append("text", content.text);
+      if (
+        item.processingStatus === "analyzed" ||
+        item.processingStatus === "analysis_failed"
+      ) {
+        form.append("force", "1");
+      }
 
       const res = await fetch(
         `/api/connections/${sourceId}/items/${itemId}/analyze`,

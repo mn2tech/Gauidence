@@ -32,7 +32,14 @@ function parseEntity(value: unknown): OntologyExtractionResult["entities"][numbe
   const description =
     typeof value.description === "string" ? value.description.trim() : undefined;
 
-  return { type, name, aliases, description, confidence };
+  let attributes: Record<string, unknown> | undefined;
+  if (isRecord(value.attributes)) {
+    attributes = value.attributes;
+  } else if (isRecord(value.properties)) {
+    attributes = value.properties;
+  }
+
+  return { type, name, aliases, description, attributes, confidence };
 }
 
 function parseRelationship(
@@ -118,6 +125,7 @@ export const ONTOLOGY_EXTRACTION_JSON_SCHEMA = {
           name: { type: "string" },
           aliases: { type: "array", items: { type: "string" } },
           description: { type: "string" },
+          attributes: { type: "object", additionalProperties: true },
           confidence: { type: "number" },
         },
         required: ["type", "name", "confidence"],

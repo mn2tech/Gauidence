@@ -25,6 +25,7 @@ export type ResolveOntologyEntityInput = {
   sourceId?: string;
   createdBy?: string;
   description?: string;
+  properties?: Record<string, unknown>;
 };
 
 async function findByCanonicalName(
@@ -120,6 +121,7 @@ async function createEntity(
       name: input.name.trim(),
       canonical_name: normalized,
       description: input.description ?? null,
+      properties: input.properties ?? {},
       confidence: input.confidence ?? null,
       review_status: reviewStatusForConfidence(
         input.confidence,
@@ -196,7 +198,13 @@ export async function resolveOntologyEntity(
         normalized
       );
     }
-    return { entity: canonical, created: false, matchType: "canonical" };
+    const entity = await mergeEntityProperties(
+      supabase,
+      canonical,
+      input.properties,
+      input.description
+    );
+    return { entity, created: false, matchType: "canonical" };
   }
 
   const byAlias = await findByAlias(supabase, input.spaceId, normalized);
@@ -210,7 +218,13 @@ export async function resolveOntologyEntity(
         byAlias.canonical_name ?? normalized
       );
     }
-    return { entity: byAlias, created: false, matchType: "alias" };
+    const entity = await mergeEntityProperties(
+      supabase,
+      byAlias,
+      input.properties,
+      input.description
+    );
+    return { entity, created: false, matchType: "alias" };
   }
 
   const fuzzy = await findByFuzzyMatch(
@@ -230,7 +244,13 @@ export async function resolveOntologyEntity(
         fuzzy.canonical_name ?? normalized
       );
     }
-    return { entity: fuzzy, created: false, matchType: "fuzzy" };
+    const entity = await mergeEntityProperties(
+      supabase,
+      fuzzy,
+      input.properties,
+      input.description
+    );
+    return { entity, created: false, matchType: "fuzzy" };
   }
 
   const entity = await createEntity(supabase, input, normalized);
@@ -238,4 +258,38 @@ export async function resolveOntologyEntity(
   await ensureAliases(supabase, input.spaceId, entity.id, allAliases, normalized);
 
   return { entity, created: true, matchType: "created" };
+}
+
+async function mergeEntityProperties(
+  supabase: SupabaseClient,
+  entity: OntologyEntity,
+  properties?: Record<string, unknown>,
+  description?: string
+): Promise<OntologyEntity> {
+  const nextProps = {
+    ...(entity.properties ?? {}),
+    ...(properties ?? {}),
+  };
+  const nextDescription =
+    description && description.trim()
+      ? description.trim()
+      : entity.description;
+
+  const propsChanged =
+    JSON.stringify(entity.properties ?? {}) !== JSON.stringify(nextProps);
+  const descChanged = nextDescription !== entity.description;
+
+  if (!propsChanged && !descChanged) return entity;
+
+  const { data } = await supabase
+    .from("ontology_entities")
+    .update({
+      properties: nextProps,
+      description: nextDescription,
+    })
+    .eq("id", entity.id)
+    .select(ONTOLOGY_ENTITY_SELECT)
+    .maybeSingle();
+
+  return (data as OntologyEntity | null) ?? { ...entity, properties: nextProps, description: nextDescription };
 }
