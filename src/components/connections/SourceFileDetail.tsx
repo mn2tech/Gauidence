@@ -316,7 +316,8 @@ export default function SourceFileDetail({ sourceId, itemId }: Props) {
           <p className="text-xs text-ink-muted">
             Guardian reads this file temporarily to extract knowledge. The
             original stays on your device — nothing is copied into Guardian
-            storage.
+            storage. If folder access expired, your browser will ask you to
+            pick this one file again.
           </p>
           {!supported ? (
             <p className="text-xs text-amber-800">

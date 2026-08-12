@@ -36,56 +36,84 @@ export async function readSourceItemContent(
   const loaded = await loadDirectoryHandle(item.sourceId).catch(() => null);
   if (loaded) {
     const granted = await requestDirectoryPermission(loaded.handle, "read");
-    if (!granted) {
-      throw new ConnectorError(
-        "permission_revoked",
-        "Guardian no longer has access to this folder. Reconnect Device Storage and try again."
-      );
-    }
-    try {
-      const file = await getFileFromDirectory(loaded.handle, relativePath);
-      const bytes = new Uint8Array(await file.arrayBuffer());
-      const resolvedMime = file.type || mime;
-      const text = maybeDecodeText(resolvedMime, bytes);
-      return {
-        mimeType: resolvedMime,
-        filename: item.name,
-        bytes,
-        text,
-        metadata: {
+    if (granted) {
+      try {
+        const file = await getFileFromDirectory(
+          loaded.handle,
           relativePath,
-          sizeBytes: bytes.byteLength,
-          lastModified: file.lastModified,
-        },
-      };
-    } catch (err) {
-      if (err instanceof ConnectorError) throw err;
-      throw new ConnectorError(
-        "read_failed",
-        "Couldn't read this file from the connected folder. Try Scan Again or reconnect access.",
-        { cause: err }
-      );
+          item.name
+        );
+        return await toSourceContent(file, item.name, mime, relativePath, false);
+      } catch {
+        // Path mismatch or stale handle — fall through to single-file picker.
+      }
     }
   }
 
-  // No persisted handle — prompt user to re-select the file.
+  // No usable persisted handle — prompt user to re-select this one file.
   const file = await pickSingleFile(item.name);
+  return toSourceContent(file, item.name, mime, relativePath, true);
+}
+
+async function toSourceContent(
+  file: File,
+  filename: string,
+  fallbackMime: string,
+  relativePath: string,
+  picked: boolean
+): Promise<SourceContent> {
   const bytes = new Uint8Array(await file.arrayBuffer());
-  const resolvedMime = file.type || mime;
+  const resolvedMime = file.type || fallbackMime;
   return {
     mimeType: resolvedMime,
-    filename: item.name,
+    filename,
     bytes,
     text: maybeDecodeText(resolvedMime, bytes),
     metadata: {
       relativePath,
       sizeBytes: bytes.byteLength,
-      picked: true,
+      lastModified: file.lastModified,
+      picked,
     },
   };
 }
 
+/**
+ * Resolve a file under a directory handle.
+ * Tries several path shapes because webkitdirectory paths often include the
+ * root folder name while FS Access handles are already rooted there.
+ */
 async function getFileFromDirectory(
+  root: FileSystemDirectoryHandle,
+  relativePath: string,
+  fileName: string
+): Promise<File> {
+  const normalized = relativePath.replace(/\\/g, "/");
+  const candidates = uniquePaths([
+    normalized,
+    stripRootPrefix(normalized, root.name),
+    fileName,
+    // parentFolder/name style
+    normalized.includes("/")
+      ? normalized.split("/").slice(-2).join("/")
+      : fileName,
+  ]);
+
+  let lastError: unknown;
+  for (const candidate of candidates) {
+    try {
+      return await openPath(root, candidate);
+    } catch (err) {
+      lastError = err;
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new ConnectorError("read_failed", "File not found in connected folder.");
+}
+
+async function openPath(
   root: FileSystemDirectoryHandle,
   relativePath: string
 ): Promise<File> {
@@ -100,6 +128,26 @@ async function getFileFromDirectory(
   }
   const fileHandle = await dir.getFileHandle(parts[parts.length - 1]!);
   return fileHandle.getFile();
+}
+
+function stripRootPrefix(path: string, rootName: string): string {
+  const parts = path.split("/").filter(Boolean);
+  if (parts.length > 1 && parts[0]?.toLowerCase() === rootName.toLowerCase()) {
+    return parts.slice(1).join("/");
+  }
+  return path;
+}
+
+function uniquePaths(paths: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const p of paths) {
+    const key = p.replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+    if (!key || seen.has(key.toLowerCase())) continue;
+    seen.add(key.toLowerCase());
+    out.push(key);
+  }
+  return out;
 }
 
 function pickSingleFile(expectedName: string): Promise<File> {
@@ -132,7 +180,6 @@ function pickSingleFile(expectedName: string): Promise<File> {
         );
         return;
       }
-      // Soft hint only — user may pick the correct file under a slightly different name.
       void expectedName;
       resolve(file);
     });
