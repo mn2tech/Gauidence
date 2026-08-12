@@ -27,5 +27,6 @@ Hide Analyze with `NEXT_PUBLIC_GUARDIAN_SOURCE_ANALYZE=false`.
 
 - Original file stays on the device
 - Request-scoped bytes only (max 15 MB)
+- Supported for Analyze: PDF, images, text, CSV, and Excel (`.xlsx` / `.xls`)
 - Re-analyze with the same content hash is idempotent
 - Evidence always points at `source_items.id`

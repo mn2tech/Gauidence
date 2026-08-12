@@ -320,7 +320,7 @@ export default function SourceFileDetail({ sourceId, itemId }: Props) {
           </p>
           {!supported ? (
             <p className="text-xs text-amber-800">
-              Supported for Analyze: PDF, images, text, and CSV.
+              Supported for Analyze: PDF, images, text, CSV, and Excel.
             </p>
           ) : null}
           {!accessible ? (

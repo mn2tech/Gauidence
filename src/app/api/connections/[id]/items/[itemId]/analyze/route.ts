@@ -118,7 +118,7 @@ export async function POST(req: Request, ctx: Ctx) {
     return NextResponse.json(
       {
         error:
-          "This file type isn't supported for Analyze yet. Try a PDF, image, text, or CSV file.",
+          "This file type isn't supported for Analyze yet. Try a PDF, image, text, CSV, or Excel file.",
       },
       { status: 400 }
     );

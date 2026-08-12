@@ -11,17 +11,29 @@ import {
 } from "@/lib/ontology/types";
 
 describe("connector analyze support", () => {
-  it("accepts pdf, text, csv, images", () => {
+  it("accepts pdf, text, csv, images, excel", () => {
     assert.equal(isAnalyzeSupportedMime("application/pdf", "a.pdf"), true);
     assert.equal(isAnalyzeSupportedMime("text/plain", "a.txt"), true);
     assert.equal(isAnalyzeSupportedMime("text/csv", "a.csv"), true);
     assert.equal(isAnalyzeSupportedMime("image/jpeg", "a.jpg"), true);
+    assert.equal(
+      isAnalyzeSupportedMime(
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "a.xlsx"
+      ),
+      true
+    );
+    assert.equal(isAnalyzeSupportedMime(undefined, "report.xls"), true);
     assert.equal(isAnalyzeSupportedMime("application/zip", "a.zip"), false);
   });
 
   it("guesses mime from filename", () => {
     assert.equal(guessMimeFromName("receipt.PDF"), "application/pdf");
     assert.equal(guessMimeFromName("notes.txt"), "text/plain");
+    assert.equal(
+      guessMimeFromName("Kpactech02-2.xlsx"),
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
   });
 });
 

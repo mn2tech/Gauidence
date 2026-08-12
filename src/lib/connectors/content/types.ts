@@ -35,6 +35,9 @@ export const ANALYZE_SUPPORTED_MIME = new Set([
   "image/webp",
   "image/heic",
   "image/gif",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-excel",
+  "application/excel",
 ]);
 
 export function isAnalyzeSupportedMime(
@@ -44,7 +47,7 @@ export function isAnalyzeSupportedMime(
   const mime = (mimeType ?? "").toLowerCase().trim();
   if (mime && ANALYZE_SUPPORTED_MIME.has(mime)) return true;
   const name = (filename ?? "").toLowerCase();
-  return /\.(pdf|txt|md|csv|jpe?g|png|webp|heic|gif)$/i.test(name);
+  return /\.(pdf|txt|md|csv|jpe?g|png|webp|heic|gif|xlsx|xls)$/i.test(name);
 }
 
 export function guessMimeFromName(filename: string): string {
@@ -53,6 +56,10 @@ export function guessMimeFromName(filename: string): string {
   if (lower.endsWith(".txt")) return "text/plain";
   if (lower.endsWith(".md")) return "text/markdown";
   if (lower.endsWith(".csv")) return "text/csv";
+  if (lower.endsWith(".xlsx")) {
+    return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+  }
+  if (lower.endsWith(".xls")) return "application/vnd.ms-excel";
   if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
   if (lower.endsWith(".png")) return "image/png";
   if (lower.endsWith(".webp")) return "image/webp";

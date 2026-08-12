@@ -14,6 +14,10 @@ import {
 } from "../schema";
 import type { OntologyExtractionResult } from "../types";
 import type { SourceContent } from "@/lib/connectors/content/types";
+import {
+  extractExcelText,
+  isExcelMimeOrName,
+} from "@/lib/connectors/content/extractExcel";
 
 const CONNECTOR_ANALYSIS_VERSION = "connector-ontology-v1";
 
@@ -58,6 +62,16 @@ export async function extractOntologyFromSourceContent(args: {
 
   let extractedText = (args.content.text ?? "").trim();
   let extractionMethod = extractedText ? "provided_text" : "none";
+
+  if (
+    !extractedText &&
+    bytes &&
+    isExcelMimeOrName(mimeType, fileName)
+  ) {
+    const excel = extractExcelText({ bytes, fileName });
+    extractedText = excel.text.trim();
+    extractionMethod = "excel_sheet_text";
+  }
 
   if (!extractedText && base64) {
     const extraction = await extractDocumentText({
