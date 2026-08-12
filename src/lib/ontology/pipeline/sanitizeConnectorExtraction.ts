@@ -34,37 +34,62 @@ export function sanitizeConnectorOntologyExtraction(
 function coerceEntity(
   entity: OntologyExtractionResult["entities"][number]
 ): OntologyExtractionResult["entities"][number] {
-  const attrs = entity.attributes ?? {};
+  const attrs = { ...(entity.attributes ?? {}) };
+  const description = entity.description ?? "";
+
+  // Backfill structured money/invoice fields from description when missing.
+  if (!hasMoneyAttr(attrs) && description) {
+    const money = description.match(/\$\s*([\d,]+(?:\.\d{1,2})?)/);
+    if (money?.[1]) {
+      const amount = Number.parseFloat(money[1].replace(/,/g, ""));
+      if (Number.isFinite(amount)) {
+        attrs.amount = amount;
+        if (typeof attrs.currency !== "string") attrs.currency = "USD";
+      }
+    }
+  }
+  if (!hasInvoiceNumberAttr(attrs)) {
+    const num =
+      entity.name.match(/\binvoice\s*#?\s*([0-9]{3,})\b/i)?.[1] ||
+      description.match(/\binvoice\s*#?\s*([0-9]{3,})\b/i)?.[1];
+    if (num) attrs.invoice_number = num;
+  }
+
+  const withAttrs = { ...entity, attributes: attrs };
   const looksInvoice =
-    entity.type === "invoice" ||
-    entity.type === "purchase" ||
+    withAttrs.type === "invoice" ||
+    withAttrs.type === "purchase" ||
     hasMoneyAttr(attrs) ||
     hasInvoiceNumberAttr(attrs) ||
-    /\binvoice\s*#?\s*\d+/i.test(entity.name) ||
-    (/^invoice\b/i.test(entity.name) && entity.type === "organization");
+    /\binvoice\s*#?\s*\d+/i.test(withAttrs.name) ||
+    (/^invoice\b/i.test(withAttrs.name) && withAttrs.type === "organization");
 
-  if (!looksInvoice) return entity;
+  if (!looksInvoice) return withAttrs;
 
   // Never keep invoice titles as organizations.
   if (
-    entity.type === "organization" ||
-    entity.type === "event" ||
-    entity.type === "document"
+    withAttrs.type === "organization" ||
+    withAttrs.type === "event" ||
+    withAttrs.type === "document"
   ) {
     if (
-      /\binvoice\b/i.test(entity.name) ||
+      /\binvoice\b/i.test(withAttrs.name) ||
       hasMoneyAttr(attrs) ||
       hasInvoiceNumberAttr(attrs)
     ) {
-      return { ...entity, type: "invoice" };
+      return { ...withAttrs, type: "invoice" };
     }
   }
 
-  if (entity.type !== "invoice" && entity.type !== "purchase" && hasMoneyAttr(attrs)) {
-    return { ...entity, type: "invoice" };
+  if (
+    withAttrs.type !== "invoice" &&
+    withAttrs.type !== "purchase" &&
+    hasMoneyAttr(attrs)
+  ) {
+    return { ...withAttrs, type: "invoice" };
   }
 
-  return entity;
+  return withAttrs;
 }
 
 function isJunkEntity(

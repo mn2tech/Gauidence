@@ -402,14 +402,7 @@ describe("formatOntologyForGideon", () => {
           canonical_name: "invoice 00000001",
           description:
             "Invoice for $19,250.00 USD from NM2TECH LLC to KPAC Tech LLC",
-          properties: {
-            amount: 19250,
-            currency: "USD",
-            invoice_number: "00000001",
-            issuer: "NM2TECH LLC",
-            recipient: "KPAC Tech LLC",
-            invoice_date: "02/05/2025",
-          },
+          properties: {},
           confidence: 0.97,
           source_type: "connector",
           source_id: "s1",
@@ -418,12 +411,28 @@ describe("formatOntologyForGideon", () => {
           updated_at: "2026-01-01T00:00:00Z",
         },
         {
+          id: "inv2",
+          profile_id: "p1",
+          entity_type: "invoice",
+          name: "Invoice 0000037",
+          canonical_name: "invoice 0000037",
+          description:
+            "Invoice 0000037 for $22,397.76 USD issued by NM2TECH LLC to Octo Metric, LLC",
+          properties: {},
+          confidence: 0.97,
+          source_type: "connector",
+          source_id: "s2",
+          created_by: null,
+          created_at: "2026-01-01T00:00:00Z",
+          updated_at: "2026-01-01T00:00:00Z",
+        },
+        {
           id: "junk",
           profile_id: "p1",
-          entity_type: "organization",
-          name: "Invoice",
-          canonical_name: "invoice",
-          description: null,
+          entity_type: "purchase",
+          name: "Database Support Services",
+          canonical_name: "database support services",
+          description: "154 hours totaling $19,250",
           properties: {},
           confidence: 0.5,
           source_type: "connector",
@@ -447,40 +456,13 @@ describe("formatOntologyForGideon", () => {
           created_at: "2026-01-01T00:00:00Z",
           updated_at: "2026-01-01T00:00:00Z",
         },
-        {
-          id: "r2",
-          profile_id: "p1",
-          source_entity_id: "inv1",
-          relationship_type: "PURCHASED_FROM",
-          target_entity_id: "db1",
-          properties: {},
-          confidence: 0.6,
-          source_document_id: null,
-          created_by: null,
-          created_at: "2026-01-01T00:00:00Z",
-          updated_at: "2026-01-01T00:00:00Z",
-        },
-        {
-          id: "r3",
-          profile_id: "p1",
-          source_entity_id: "p1e",
-          relationship_type: "RELATED_TO",
-          target_entity_id: "junk",
-          properties: {},
-          confidence: 0.9,
-          source_document_id: null,
-          created_by: null,
-          created_at: "2026-01-01T00:00:00Z",
-          updated_at: "2026-01-01T00:00:00Z",
-        },
       ],
       evidence: [],
       entityNames: {
         inv1: "Invoice 00000001",
+        inv2: "Invoice 0000037",
         org1: "KPAC Tech LLC",
-        db1: "Supporting Databases (Aurora Postgres)",
-        junk: "Invoice",
-        p1e: "Tracy",
+        junk: "Database Support Services",
       },
       paths: [],
     });
@@ -488,17 +470,19 @@ describe("formatOntologyForGideon", () => {
     assert.match(block, /INVOICE SUMMARY/);
     assert.match(block, /Invoice #00000001/);
     assert.match(block, /19,250/);
-    assert.match(block, /NM2TECH LLC/);
-    assert.match(block, /KPAC Tech LLC/);
+    assert.match(block, /22,397\.76/);
     assert.match(block, /TOTAL:/);
-    assert.doesNotMatch(block, /PURCHASED_FROM/);
-    assert.doesNotMatch(block, /RELATED_TO/);
+    assert.match(block, /41,647\.76/);
+    assert.doesNotMatch(
+      block.split("MATCHED ENTITIES")[0] ?? "",
+      /Database Support Services/
+    );
 
     const fallback = buildOntologyAnswerFallback(block);
     assert.ok(fallback);
-    assert.match(fallback!, /Invoice #00000001/);
-    assert.doesNotMatch(fallback!, /Matching entities:/);
-    assert.doesNotMatch(fallback!, /Supporting Databases/);
+    assert.match(fallback!, /TOTAL:/);
+    assert.match(fallback!, /41,647\.76/);
+    assert.doesNotMatch(fallback!, /Ask a follow-up/);
   });
 
   it("builds a spoken fallback when the model returns blank", () => {

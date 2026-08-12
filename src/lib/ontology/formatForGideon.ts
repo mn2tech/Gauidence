@@ -19,17 +19,18 @@ export function formatOntologyForGideon(ctx: OntologyContext): string {
   const blocks: string[] = [];
 
   if (invoices.length > 0) {
-    blocks.push("INVOICE SUMMARY (answer the user from this first; do not dump the graph):");
+    blocks.push("INVOICE SUMMARY (answer the user from this first; list each invoice, then TOTAL):");
     for (const invoice of invoices.slice(0, 12)) {
       blocks.push(`- ${formatInvoiceProse(invoice, ctx)}`);
     }
     const total = sumInvoiceAmounts(invoices);
     if (total) {
       blocks.push(
-        `- TOTAL: ${total.currency} ${total.amount.toLocaleString("en-US", {
-          minimumFractionDigits: total.amount % 1 === 0 ? 0 : 2,
-          maximumFractionDigits: 2,
-        })} across ${total.count} invoice${total.count === 1 ? "" : "s"} with known amounts`
+        `- TOTAL: ${formatMoney(total.amount, total.currency)} across ${total.count} invoice${total.count === 1 ? "" : "s"} with known amounts`
+      );
+    } else {
+      blocks.push(
+        "- TOTAL: unknown (invoice amounts were not stored as structured attributes yet)"
       );
     }
   }
@@ -47,7 +48,11 @@ export function formatOntologyForGideon(ctx: OntologyContext): string {
       const desc = entity.description
         ? ` — ${entity.description.slice(0, 160)}`
         : "";
-      const attrs = formatEntityAttributes(entity.properties);
+      const attrs = formatEntityAttributes(
+        entity.properties,
+        entity.description,
+        entity.name
+      );
       blocks.push(
         `- ${entity.name} (${entity.entity_type})${desc}${attrs}${conf}`
       );
@@ -88,10 +93,11 @@ export function formatOntologyForGideon(ctx: OntologyContext): string {
 }
 
 function formatEntityAttributes(
-  properties: Record<string, unknown> | null | undefined
+  properties: Record<string, unknown> | null | undefined,
+  description?: string | null,
+  name?: string | null
 ): string {
-  if (!properties || typeof properties !== "object") return "";
-  const facts = readInvoiceFacts(properties);
+  const facts = readInvoiceFacts(properties, description, name);
   const parts: string[] = [];
   if (facts.amountLabel) parts.push(`amount:${facts.amountLabel}`);
   if (facts.invoiceNumber) parts.push(`invoice_number:${facts.invoiceNumber}`);
@@ -173,14 +179,22 @@ export function buildOntologyAnswerFallback(ontologyBlock: string): string | nul
   const parts: string[] = ["## FROM YOUR ONTOLOGY", ""];
 
   if (invoiceSummaries.length) {
-    for (const summary of invoiceSummaries.slice(0, 12)) {
-      parts.push(summary.startsWith("TOTAL:") ? summary : `- ${summary}`);
+    const totalLine = invoiceSummaries.find((s) => /^TOTAL:/i.test(s));
+    const rows = invoiceSummaries.filter((s) => !/^TOTAL:/i.test(s));
+    for (const summary of rows.slice(0, 12)) {
+      parts.push(`- ${summary.replace(/^- /, "")}`);
     }
-    // If TOTAL wasn't already in the block, leave as-is; summaries may include it.
-    if (relationshipLines.length && invoiceSummaries.length <= 3) {
+    if (totalLine) {
       parts.push("");
-      parts.push("Key connections:");
-      for (const r of relationshipLines.slice(0, 4)) parts.push(`- ${r}`);
+      parts.push(totalLine.replace(/^- /, ""));
+    } else {
+      const computed = sumAmountsFromTextLines(rows);
+      if (computed) {
+        parts.push("");
+        parts.push(
+          `TOTAL: ${formatMoney(computed.amount, computed.currency)} across ${computed.count} invoice${computed.count === 1 ? "" : "s"} with known amounts`
+        );
+      }
     }
   } else {
     if (entityLines.length) {
@@ -192,17 +206,19 @@ export function buildOntologyAnswerFallback(ontologyBlock: string): string | nul
       parts.push("Connections:");
       for (const r of relationshipLines.slice(0, 6)) parts.push(`- ${r}`);
     }
+    parts.push("");
+    parts.push(
+      "Ask a follow-up if you want more detail from the source file."
+    );
   }
 
-  parts.push("");
-  parts.push(
-    "Ask a follow-up if you want more detail from the source file."
-  );
   return parts.join("\n");
 }
 
 type InvoiceFacts = {
   amountLabel: string | null;
+  amountValue: number | null;
+  currency: string;
   invoiceNumber: string | null;
   issuer: string | null;
   recipient: string | null;
@@ -210,69 +226,143 @@ type InvoiceFacts = {
 };
 
 function readInvoiceFacts(
-  properties: Record<string, unknown> | null | undefined
+  properties: Record<string, unknown> | null | undefined,
+  description?: string | null,
+  name?: string | null
 ): InvoiceFacts {
   const empty: InvoiceFacts = {
     amountLabel: null,
+    amountValue: null,
+    currency: "USD",
     invoiceNumber: null,
     issuer: null,
     recipient: null,
     invoiceDate: null,
   };
-  if (!properties || typeof properties !== "object") return empty;
 
-  const amount = properties.amount ?? properties.total ?? properties.invoice_amount;
+  const props =
+    properties && typeof properties === "object" ? properties : {};
   const currency =
-    typeof properties.currency === "string" && properties.currency.trim()
-      ? properties.currency.trim()
+    typeof props.currency === "string" && props.currency.trim()
+      ? props.currency.trim()
       : "USD";
-  let amountLabel: string | null = null;
+
+  let amountValue: number | null = null;
+  const amount = props.amount ?? props.total ?? props.invoice_amount;
   if (typeof amount === "number" && Number.isFinite(amount)) {
-    amountLabel = `${currency} ${amount.toLocaleString("en-US", {
-      minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
-      maximumFractionDigits: 2,
-    })}`;
+    amountValue = amount;
   } else if (typeof amount === "string" && amount.trim()) {
-    amountLabel = amount.trim();
+    const parsed = parseMoneyNumber(amount);
+    if (parsed != null) amountValue = parsed;
+  }
+  if (amountValue == null && description) {
+    amountValue = parseMoneyNumber(description);
+  }
+  if (amountValue == null && name) {
+    amountValue = parseMoneyNumber(name);
   }
 
+  const amountLabel =
+    amountValue != null ? formatMoney(amountValue, currency) : null;
+
   const invoiceNumberRaw =
-    properties.invoice_number ?? properties.invoiceNumber ?? properties.number;
-  const invoiceNumber =
+    props.invoice_number ?? props.invoiceNumber ?? props.number;
+  let invoiceNumber =
     typeof invoiceNumberRaw === "string" && invoiceNumberRaw.trim()
       ? invoiceNumberRaw.trim()
       : typeof invoiceNumberRaw === "number"
         ? String(invoiceNumberRaw)
         : null;
+  if (!invoiceNumber) {
+    const fromName = name?.match(/\binvoice\s*#?\s*([0-9]{3,})\b/i)?.[1];
+    const fromDesc = description?.match(/\binvoice\s*#?\s*([0-9]{3,})\b/i)?.[1];
+    invoiceNumber = fromName ?? fromDesc ?? null;
+  }
 
-  const issuerRaw = properties.issuer ?? properties.from;
-  const recipientRaw = properties.recipient ?? properties.to;
-  const dateRaw =
-    properties.invoice_date ?? properties.date ?? properties.issued_on;
+  const issuerRaw = props.issuer ?? props.from;
+  const recipientRaw = props.recipient ?? props.to;
+  const dateRaw = props.invoice_date ?? props.date ?? props.issued_on;
+
+  let issuer =
+    typeof issuerRaw === "string" && issuerRaw.trim()
+      ? issuerRaw.trim()
+      : null;
+  let recipient =
+    typeof recipientRaw === "string" && recipientRaw.trim()
+      ? recipientRaw.trim()
+      : null;
+  if (description) {
+    if (!issuer) {
+      const m = description.match(/\b(?:from|issued by)\s+([^,]+?)(?:\s+to\b|,|$)/i);
+      if (m?.[1]) issuer = m[1].trim();
+    }
+    if (!recipient) {
+      const m = description.match(/\bto\s+([^,]+?)(?:\s+for\b|,|$)/i);
+      if (m?.[1]) recipient = m[1].trim();
+    }
+  }
 
   return {
     amountLabel,
+    amountValue,
+    currency,
     invoiceNumber,
-    issuer:
-      typeof issuerRaw === "string" && issuerRaw.trim()
-        ? issuerRaw.trim()
-        : null,
-    recipient:
-      typeof recipientRaw === "string" && recipientRaw.trim()
-        ? recipientRaw.trim()
-        : null,
+    issuer,
+    recipient,
     invoiceDate:
       typeof dateRaw === "string" && dateRaw.trim() ? dateRaw.trim() : null,
   };
 }
 
+function parseMoneyNumber(text: string): number | null {
+  const match =
+    text.match(/\$\s*([\d,]+(?:\.\d{1,2})?)/) ||
+    text.match(/([\d,]+(?:\.\d{1,2})?)\s*USD\b/i) ||
+    text.match(/\btotal(?:ing)?\s+\$?\s*([\d,]+(?:\.\d{1,2})?)/i);
+  if (!match?.[1]) return null;
+  const parsed = Number.parseFloat(match[1].replace(/,/g, ""));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function formatMoney(amount: number, currency = "USD"): string {
+  return `${currency} ${amount.toLocaleString("en-US", {
+    minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
 function pickInvoiceEntities(entities: OntologyEntity[]): OntologyEntity[] {
-  return entities.filter(
-    (e) =>
-      e.entity_type === "invoice" ||
-      e.entity_type === "purchase" ||
-      hasInvoiceSignals(e)
-  );
+  const candidates = entities.filter((e) => {
+    if (/\breceipt\b/i.test(e.name)) return false;
+    if (e.entity_type === "invoice") return true;
+    if (e.entity_type === "purchase" && /\binvoice\b/i.test(e.name)) return true;
+    return hasInvoiceSignals(e) && /\binvoice\b/i.test(e.name);
+  });
+  return dedupeInvoiceEntities(candidates);
+}
+
+function dedupeInvoiceEntities(entities: OntologyEntity[]): OntologyEntity[] {
+  const byKey = new Map<string, OntologyEntity>();
+  const score = (e: OntologyEntity) => {
+    let s = 0;
+    if (e.entity_type === "invoice") s += 10;
+    if (/^invoice\b/i.test(e.name)) s += 5;
+    if (e.properties && Object.keys(e.properties).length) s += 2;
+    return s;
+  };
+  for (const entity of entities) {
+    const facts = readInvoiceFacts(entity.properties, entity.description, entity.name);
+    const key =
+      (facts.invoiceNumber ? `num:${facts.invoiceNumber}` : null) ||
+      (facts.amountValue != null
+        ? `amt:${facts.amountValue}:${(facts.issuer ?? "").toLowerCase()}`
+        : `id:${entity.id}`);
+    const existing = byKey.get(key);
+    if (!existing || score(entity) > score(existing)) {
+      byKey.set(key, entity);
+    }
+  }
+  return [...byKey.values()];
 }
 
 function sumInvoiceAmounts(invoices: OntologyEntity[]): {
@@ -284,28 +374,43 @@ function sumInvoiceAmounts(invoices: OntologyEntity[]): {
   let count = 0;
   let currency = "USD";
   for (const invoice of invoices) {
-    const props = invoice.properties ?? {};
-    const amount = props.amount ?? props.total ?? props.invoice_amount;
-    if (typeof amount === "number" && Number.isFinite(amount)) {
-      sum += amount;
-      count += 1;
-      if (typeof props.currency === "string" && props.currency.trim()) {
-        currency = props.currency.trim();
-      }
-    } else if (typeof amount === "string") {
-      const parsed = Number.parseFloat(amount.replace(/[,$]/g, ""));
-      if (Number.isFinite(parsed)) {
-        sum += parsed;
-        count += 1;
-      }
-    }
+    const facts = readInvoiceFacts(
+      invoice.properties,
+      invoice.description,
+      invoice.name
+    );
+    if (facts.amountValue == null) continue;
+    sum += facts.amountValue;
+    count += 1;
+    currency = facts.currency || currency;
   }
   if (!count) return null;
   return { amount: sum, currency, count };
 }
 
+function sumAmountsFromTextLines(lines: string[]): {
+  amount: number;
+  currency: string;
+  count: number;
+} | null {
+  let sum = 0;
+  let count = 0;
+  for (const line of lines) {
+    const value = parseMoneyNumber(line);
+    if (value == null) continue;
+    sum += value;
+    count += 1;
+  }
+  if (!count) return null;
+  return { amount: sum, currency: "USD", count };
+}
+
 function hasInvoiceSignals(entity: OntologyEntity): boolean {
-  const facts = readInvoiceFacts(entity.properties);
+  const facts = readInvoiceFacts(
+    entity.properties,
+    entity.description,
+    entity.name
+  );
   if (facts.amountLabel || facts.invoiceNumber) return true;
   return /\binvoice\b/i.test(entity.name) && entity.entity_type !== "organization";
 }
@@ -314,7 +419,11 @@ function formatInvoiceProse(
   invoice: OntologyEntity,
   ctx: OntologyContext
 ): string {
-  const facts = readInvoiceFacts(invoice.properties);
+  const facts = readInvoiceFacts(
+    invoice.properties,
+    invoice.description,
+    invoice.name
+  );
   const issuer =
     facts.issuer ??
     findRelatedName(ctx, invoice.id, "ISSUED_BY") ??
@@ -337,9 +446,14 @@ function formatInvoiceProse(
   if (recipient) bits.push(`to ${recipient}`);
   if (facts.invoiceDate) bits.push(`dated ${facts.invoiceDate}`);
 
-  const desc = invoice.description?.trim();
+  // Prefer compact structured line; only append description when it adds new detail.
   const prose = bits.join(" ");
-  if (desc && !prose.toLowerCase().includes(desc.slice(0, 24).toLowerCase())) {
+  const desc = invoice.description?.trim();
+  if (
+    desc &&
+    !facts.amountLabel &&
+    !prose.toLowerCase().includes(desc.slice(0, 24).toLowerCase())
+  ) {
     return `${prose}. ${desc.slice(0, 160)}`;
   }
   return prose;
