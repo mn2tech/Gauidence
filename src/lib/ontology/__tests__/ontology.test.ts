@@ -9,6 +9,7 @@ import {
 import { parseOntologyExtraction } from "../schema";
 import { formatOntologyForGideon, buildOntologyAnswerFallback } from "../formatForGideon";
 import { reviewStatusForConfidence } from "../types";
+import { sanitizeConnectorOntologyExtraction } from "../pipeline/sanitizeConnectorExtraction";
 
 describe("normalizeEntityName", () => {
   it("lowercases and trims", () => {
@@ -360,6 +361,115 @@ describe("formatOntologyForGideon", () => {
     assert.match(text, /subcontracting services/);
   });
 
+  it("builds an invoice prose summary for the prompt and fallback", () => {
+    const block = formatOntologyForGideon({
+      matchedEntities: [
+        {
+          id: "inv1",
+          profile_id: "p1",
+          entity_type: "invoice",
+          name: "Invoice 00000001",
+          canonical_name: "invoice 00000001",
+          description:
+            "Invoice for $19,250.00 USD from NM2TECH LLC to KPAC Tech LLC",
+          properties: {
+            amount: 19250,
+            currency: "USD",
+            invoice_number: "00000001",
+            issuer: "NM2TECH LLC",
+            recipient: "KPAC Tech LLC",
+            invoice_date: "02/05/2025",
+          },
+          confidence: 0.97,
+          source_type: "connector",
+          source_id: "s1",
+          created_by: null,
+          created_at: "2026-01-01T00:00:00Z",
+          updated_at: "2026-01-01T00:00:00Z",
+        },
+        {
+          id: "junk",
+          profile_id: "p1",
+          entity_type: "organization",
+          name: "Invoice",
+          canonical_name: "invoice",
+          description: null,
+          properties: {},
+          confidence: 0.5,
+          source_type: "connector",
+          source_id: "s1",
+          created_by: null,
+          created_at: "2026-01-01T00:00:00Z",
+          updated_at: "2026-01-01T00:00:00Z",
+        },
+      ],
+      relationships: [
+        {
+          id: "r1",
+          profile_id: "p1",
+          source_entity_id: "inv1",
+          relationship_type: "ISSUED_TO",
+          target_entity_id: "org1",
+          properties: {},
+          confidence: 0.95,
+          source_document_id: null,
+          created_by: null,
+          created_at: "2026-01-01T00:00:00Z",
+          updated_at: "2026-01-01T00:00:00Z",
+        },
+        {
+          id: "r2",
+          profile_id: "p1",
+          source_entity_id: "inv1",
+          relationship_type: "PURCHASED_FROM",
+          target_entity_id: "db1",
+          properties: {},
+          confidence: 0.6,
+          source_document_id: null,
+          created_by: null,
+          created_at: "2026-01-01T00:00:00Z",
+          updated_at: "2026-01-01T00:00:00Z",
+        },
+        {
+          id: "r3",
+          profile_id: "p1",
+          source_entity_id: "p1e",
+          relationship_type: "RELATED_TO",
+          target_entity_id: "junk",
+          properties: {},
+          confidence: 0.9,
+          source_document_id: null,
+          created_by: null,
+          created_at: "2026-01-01T00:00:00Z",
+          updated_at: "2026-01-01T00:00:00Z",
+        },
+      ],
+      evidence: [],
+      entityNames: {
+        inv1: "Invoice 00000001",
+        org1: "KPAC Tech LLC",
+        db1: "Supporting Databases (Aurora Postgres)",
+        junk: "Invoice",
+        p1e: "Tracy",
+      },
+      paths: [],
+    });
+
+    assert.match(block, /INVOICE SUMMARY/);
+    assert.match(block, /Invoice #00000001/);
+    assert.match(block, /19,250/);
+    assert.match(block, /NM2TECH LLC/);
+    assert.match(block, /KPAC Tech LLC/);
+    assert.doesNotMatch(block, /PURCHASED_FROM/);
+    assert.doesNotMatch(block, /RELATED_TO/);
+
+    const fallback = buildOntologyAnswerFallback(block);
+    assert.ok(fallback);
+    assert.match(fallback!, /Invoice #00000001/);
+    assert.doesNotMatch(fallback!, /Matching entities:/);
+    assert.doesNotMatch(fallback!, /Supporting Databases/);
+  });
+
   it("builds a spoken fallback when the model returns blank", () => {
     const block = formatOntologyForGideon({
       matchedEntities: [
@@ -406,6 +516,77 @@ describe("formatOntologyForGideon", () => {
     assert.match(fallback!, /FROM YOUR ONTOLOGY/);
     assert.match(fallback!, /Onyx Government Services/);
     assert.match(fallback!, /SUBCONTRACTOR_TO/);
+  });
+});
+
+describe("sanitizeConnectorOntologyExtraction", () => {
+  it("coerces invoice orgs, flips inverted ISSUED_*, and drops noise", () => {
+    const cleaned = sanitizeConnectorOntologyExtraction({
+      entities: [
+        {
+          type: "organization",
+          name: "Invoice 00000001",
+          confidence: 0.9,
+          attributes: { amount: 19250, currency: "USD", invoice_number: "00000001" },
+        },
+        {
+          type: "organization",
+          name: "NM2TECH LLC",
+          confidence: 0.95,
+        },
+        {
+          type: "organization",
+          name: "Supporting Databases (Aurora Postgres)",
+          confidence: 0.7,
+        },
+      ],
+      relationships: [
+        {
+          source: "NM2TECH LLC",
+          type: "ISSUED_BY",
+          target: "Invoice 00000001",
+          confidence: 0.9,
+          evidence: "Invoice issued by NM2TECH LLC to the client.",
+        },
+        {
+          source: "Invoice 00000001",
+          type: "PURCHASED_FROM",
+          target: "Supporting Databases (Aurora Postgres)",
+          confidence: 0.8,
+          evidence: "Sheet title Supporting Databases (Aurora Postgres).",
+        },
+        {
+          source: "Tracy",
+          type: "RELATED_TO",
+          target: "Invoice 00000001",
+          confidence: 0.9,
+          evidence: "Tracy appears on the invoice contact line somehow somehow.",
+        },
+      ],
+      events: [
+        {
+          type: "invoice",
+          title: "Database Support Services Invoice",
+          confidence: 0.8,
+        },
+      ],
+    });
+
+    assert.equal(cleaned.entities.find((e) => e.name.includes("00000001"))?.type, "invoice");
+    assert.ok(
+      !cleaned.entities.some((e) => e.name.includes("Supporting Databases"))
+    );
+    assert.equal(cleaned.events.length, 0);
+    assert.ok(
+      cleaned.relationships.some(
+        (r) =>
+          r.type === "ISSUED_BY" &&
+          r.source.includes("00000001") &&
+          r.target.includes("NM2TECH")
+      )
+    );
+    assert.ok(!cleaned.relationships.some((r) => r.type === "PURCHASED_FROM"));
+    assert.ok(!cleaned.relationships.some((r) => r.type === "RELATED_TO"));
   });
 });
 

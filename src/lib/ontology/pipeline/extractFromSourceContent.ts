@@ -18,8 +18,9 @@ import {
   extractExcelText,
   isExcelMimeOrName,
 } from "@/lib/connectors/content/extractExcel";
+import { sanitizeConnectorOntologyExtraction } from "./sanitizeConnectorExtraction";
 
-const CONNECTOR_ANALYSIS_VERSION = "connector-ontology-v2";
+const CONNECTOR_ANALYSIS_VERSION = "connector-ontology-v3";
 
 export function connectorAnalysisVersion(): string {
   return CONNECTOR_ANALYSIS_VERSION;
@@ -30,18 +31,28 @@ function buildConnectorSystemPrompt(): string {
 Extract useful personal and business knowledge as entities and relationships.
 
 Rules:
-- Prefer Event-centered modeling when appropriate (receipts, tickets, photos of activities).
+- Prefer Event-centered modeling for personal receipts, tickets, and activity photos.
   Example: Event "Dinner" — OCCURRED_AT → Restaurant "Chipotle"; Event "Movie Night" — WATCHED → Movie.
+- For business invoices: do NOT create Event entities. Create one entity_type "invoice"
+  (name like "Invoice 00000001") plus organization entities for issuer and recipient.
+- Invoice relationship directions (strict):
+  Invoice —[ISSUED_BY]→ issuer organization
+  Invoice —[ISSUED_TO]→ recipient organization
+  Never reverse those directions. Do not use RELATED_TO for invoice parties.
 - Do NOT invent people attending an event unless the source clearly names them.
 - Entity types allowed: person, organization, place, event, document, purchase, restaurant, movie, product, date, project, asset, contract, invoice.
+- Never type an invoice title/number as organization, event, or document.
+- Never create organizations from folder/sheet/infrastructure labels
+  (e.g. "Supporting Databases", "Downloads", sheet names, file paths).
 - For invoices and purchases, ALWAYS capture structured attributes when present:
   attributes.amount (number), attributes.currency (e.g. USD), attributes.invoice_number,
   attributes.issuer, attributes.recipient, attributes.invoice_date.
   Also put a one-line money summary in description, e.g. "Invoice 00000001 for $1,250.00 USD".
 - Every relationship MUST include an evidence quote (verbatim or short paraphrase from the source, max 300 chars).
 - Include confidence 0.0-1.0 for each entity and relationship.
-- Prefer specific names. Avoid generic labels like "Receipt" as an organization.
+- Prefer specific names. Avoid generic labels like "Receipt" or bare "Invoice" as an organization.
 - Use relationship types when they fit: OCCURRED_AT, PURCHASED_FROM, VISITED, WATCHED, ATTENDED, PART_OF, OWNED_BY, CREATED_BY, EVIDENCED_BY, MENTIONED_IN, ISSUED_BY, ISSUED_TO, RELATED_TO (last resort).
+- Do not use PURCHASED_FROM for invoice issuer/recipient (use ISSUED_BY / ISSUED_TO).
 - Also allowed when clear: WORKS_FOR, CLIENT_OF, VENDOR_OF.
 - Return empty arrays if there is insufficient evidence.
 - Avoid guessing. When uncertain, omit rather than hallucinate.`;
@@ -163,7 +174,8 @@ async function extractOntologyConnectorText(input: {
   } catch {
     return null;
   }
-  return parseOntologyExtraction(parsed);
+  const extraction = parseOntologyExtraction(parsed);
+  return extraction ? sanitizeConnectorOntologyExtraction(extraction) : null;
 }
 
 async function extractOntologyMultimodal(args: {
@@ -209,5 +221,6 @@ File: ${args.fileName}${args.spaceName ? `\nSpace: ${args.spaceName}` : ""}`;
   } catch {
     return null;
   }
-  return parseOntologyExtraction(parsed);
+  const extraction = parseOntologyExtraction(parsed);
+  return extraction ? sanitizeConnectorOntologyExtraction(extraction) : null;
 }

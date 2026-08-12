@@ -8,6 +8,7 @@ import type {
   OntologyPersistStats,
 } from "../types";
 import { reviewStatusForConfidence } from "../types";
+import { looksLikeInfraOrFolderLabel } from "../formatForGideon";
 
 export type PersistConnectorOntologyInput = {
   userId: string;
@@ -108,6 +109,19 @@ export async function persistConnectorOntologyExtraction(
   }
 
   for (const rel of input.extraction.relationships) {
+    if (
+      looksLikeInfraOrFolderLabel(rel.source) ||
+      looksLikeInfraOrFolderLabel(rel.target)
+    ) {
+      if (
+        rel.type === "PURCHASED_FROM" ||
+        rel.type === "RELATED_TO" ||
+        rel.type === "EVIDENCED_BY"
+      ) {
+        continue;
+      }
+    }
+
     const sourceKey = normalizeEntityName(rel.source);
     const targetKey = normalizeEntityName(rel.target);
     let sourceId = entityNameMap.get(sourceKey);
@@ -158,7 +172,15 @@ export async function persistConnectorOntologyExtraction(
     });
   }
 
+  const hasInvoiceEntity = input.extraction.entities.some(
+    (e) => e.type === "invoice" || e.type === "purchase"
+  );
+
   for (const event of input.extraction.events) {
+    if (hasInvoiceEntity && /\binvoice\b/i.test(event.title)) {
+      continue;
+    }
+
     // Also resolve as event entity for graph connectivity.
     const eventEntity = await resolveOntologyEntity(supabase, {
       spaceId: input.profileId,
@@ -193,9 +215,18 @@ export async function persistConnectorOntologyExtraction(
 }
 
 function guessEntityType(name: string): string {
-  const lower = name.toLowerCase();
-  if (/\b(inc|llc|corp|company|restaurant|cafe)\b/.test(lower)) {
+  const lower = name.toLowerCase().trim();
+  if (/\binvoice\b/.test(lower) || /^inv[#\s-]?\d+/i.test(name)) {
+    return "invoice";
+  }
+  if (looksLikeInfraOrFolderLabel(name)) {
+    return "document";
+  }
+  if (/\b(inc|llc|corp|ltd|company|technologies|tech)\b/.test(lower)) {
     return "organization";
+  }
+  if (/^[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+$/.test(name.trim())) {
+    return "person";
   }
   return "organization";
 }

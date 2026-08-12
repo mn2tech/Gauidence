@@ -70,7 +70,7 @@ export function buildGideonSystemPrompt(
     : "";
   const ontologyNote =
     blocks.ontology.trim() && blocks.ontology.trim() !== "(none)"
-      ? `When ONTOLOGY has matches, always answer using those entities and relationships — including when the user sends a short name or keyword (for example "Onyx"). Summarize the match and key connections in 2–5 sentences. Never return a blank reply when ONTOLOGY is non-empty.`
+      ? `When ONTOLOGY has matches, always answer using those entities and relationships — including when the user sends a short name or keyword (for example "Onyx"). If INVOICE SUMMARY is present, answer in 2–5 plain sentences from that summary (amount, parties, date). Do not dump MATCHED ENTITIES or RELATIONSHIPS lists unless the user asked about connections. Never return a blank reply when ONTOLOGY is non-empty.`
       : "";
 
   return `${withVaultPersonality(VAULT_CHAT_SYSTEM, profileKind)}
