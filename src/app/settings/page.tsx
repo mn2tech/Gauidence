@@ -56,6 +56,14 @@ export default async function SettingsPage() {
           </p>
           <p className="mt-2">
             <a
+              href="/settings/connections"
+              className="text-sm font-semibold text-brand hover:text-brand-dark"
+            >
+              Connections →
+            </a>
+          </p>
+          <p className="mt-2">
+            <a
               href="/settings/knowledge"
               className="text-sm font-semibold text-brand hover:text-brand-dark"
             >
