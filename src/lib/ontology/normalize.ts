@@ -83,6 +83,7 @@ export function tokenizeForOntologySearch(query: string): string[] {
   const raw = normalized
     .split(" ")
     .map((t) => t.trim())
+    .map(singularizeOntologyToken)
     .filter((t) => t.length >= 3)
     .filter((t) => !ONTOLOGY_QUERY_STOPWORDS.has(t));
 
@@ -96,6 +97,34 @@ export function tokenizeForOntologySearch(query: string): string[] {
     if (unique.length >= 6) break;
   }
   return unique;
+}
+
+/** Lightweight plural → singular for ontology search tokens. */
+export function singularizeOntologyToken(token: string): string {
+  const t = token.toLowerCase();
+  if (t.length <= 3) return t;
+  if (t.endsWith("ies") && t.length > 4) return `${t.slice(0, -3)}y`;
+  if (t.endsWith("sses") || t.endsWith("ches") || t.endsWith("shes")) {
+    return t.slice(0, -2);
+  }
+  if (t.endsWith("ses") && t.length > 4) return t.slice(0, -2);
+  if (t.endsWith("s") && !t.endsWith("ss") && !t.endsWith("us") && !t.endsWith("is")) {
+    return t.slice(0, -1);
+  }
+  return t;
+}
+
+/** True when the user is asking to list invoices and/or sum amounts. */
+export function isInvoiceAggregateQuery(query: string): boolean {
+  const q = query.toLowerCase();
+  if (!/\binvoices?\b/.test(q)) return false;
+  return (
+    /\b(total|amount|sum|all|list|how many|outstanding|due)\b/.test(q) ||
+    /show\s+(me\s+)?(the\s+)?invoices?\b/.test(q) ||
+    /^(what|which)\s+invoices?\b/.test(q.trim()) ||
+    q.trim() === "invoices" ||
+    q.trim() === "invoice"
+  );
 }
 
 /** Levenshtein distance for conservative fuzzy matching. */

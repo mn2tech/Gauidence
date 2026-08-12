@@ -20,8 +20,17 @@ export function formatOntologyForGideon(ctx: OntologyContext): string {
 
   if (invoices.length > 0) {
     blocks.push("INVOICE SUMMARY (answer the user from this first; do not dump the graph):");
-    for (const invoice of invoices.slice(0, 3)) {
+    for (const invoice of invoices.slice(0, 12)) {
       blocks.push(`- ${formatInvoiceProse(invoice, ctx)}`);
+    }
+    const total = sumInvoiceAmounts(invoices);
+    if (total) {
+      blocks.push(
+        `- TOTAL: ${total.currency} ${total.amount.toLocaleString("en-US", {
+          minimumFractionDigits: total.amount % 1 === 0 ? 0 : 2,
+          maximumFractionDigits: 2,
+        })} across ${total.count} invoice${total.count === 1 ? "" : "s"} with known amounts`
+      );
     }
   }
 
@@ -30,7 +39,7 @@ export function formatOntologyForGideon(ctx: OntologyContext): string {
     blocks.push("MATCHED ENTITIES:");
     // Keep prompt compact: prefer invoices/orgs/people over duplicate events.
     const entities = rankEntitiesForPrompt(ctx.matchedEntities);
-    for (const entity of entities.slice(0, 5)) {
+    for (const entity of entities.slice(0, invoices.length > 1 ? 12 : 5)) {
       const conf =
         entity.confidence != null
           ? ` | confidence:${Number(entity.confidence).toFixed(2)}`
@@ -134,6 +143,10 @@ export function buildOntologyAnswerFallback(ontologyBlock: string): string | nul
       section = "evidence";
       continue;
     }
+    if (line.startsWith("TOTAL:")) {
+      invoiceSummaries.push(line);
+      continue;
+    }
     if (!line.startsWith("- ")) continue;
     const item = line.slice(2).trim();
     if (section === "invoice_summary") {
@@ -160,10 +173,11 @@ export function buildOntologyAnswerFallback(ontologyBlock: string): string | nul
   const parts: string[] = ["## FROM YOUR ONTOLOGY", ""];
 
   if (invoiceSummaries.length) {
-    for (const summary of invoiceSummaries.slice(0, 3)) {
-      parts.push(summary);
+    for (const summary of invoiceSummaries.slice(0, 12)) {
+      parts.push(summary.startsWith("TOTAL:") ? summary : `- ${summary}`);
     }
-    if (relationshipLines.length) {
+    // If TOTAL wasn't already in the block, leave as-is; summaries may include it.
+    if (relationshipLines.length && invoiceSummaries.length <= 3) {
       parts.push("");
       parts.push("Key connections:");
       for (const r of relationshipLines.slice(0, 4)) parts.push(`- ${r}`);
@@ -259,6 +273,35 @@ function pickInvoiceEntities(entities: OntologyEntity[]): OntologyEntity[] {
       e.entity_type === "purchase" ||
       hasInvoiceSignals(e)
   );
+}
+
+function sumInvoiceAmounts(invoices: OntologyEntity[]): {
+  amount: number;
+  currency: string;
+  count: number;
+} | null {
+  let sum = 0;
+  let count = 0;
+  let currency = "USD";
+  for (const invoice of invoices) {
+    const props = invoice.properties ?? {};
+    const amount = props.amount ?? props.total ?? props.invoice_amount;
+    if (typeof amount === "number" && Number.isFinite(amount)) {
+      sum += amount;
+      count += 1;
+      if (typeof props.currency === "string" && props.currency.trim()) {
+        currency = props.currency.trim();
+      }
+    } else if (typeof amount === "string") {
+      const parsed = Number.parseFloat(amount.replace(/[,$]/g, ""));
+      if (Number.isFinite(parsed)) {
+        sum += parsed;
+        count += 1;
+      }
+    }
+  }
+  if (!count) return null;
+  return { amount: sum, currency, count };
 }
 
 function hasInvoiceSignals(entity: OntologyEntity): boolean {

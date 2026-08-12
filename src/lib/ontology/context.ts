@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { tokenizeForOntologySearch } from "./normalize";
+import { isInvoiceAggregateQuery, tokenizeForOntologySearch } from "./normalize";
 import { getPathsBetweenMatchedEntities } from "./paths";
 import type { OntologyContext, OntologyEntity } from "./types";
 import {
@@ -33,8 +33,9 @@ export async function getOntologyContext(
   const trimmed = args.query.trim();
   if (!trimmed) return empty;
 
+  const listInvoices = isInvoiceAggregateQuery(trimmed);
   const searchTerms = tokenizeForOntologySearch(trimmed);
-  if (!searchTerms.length) return empty;
+  if (!searchTerms.length && !listInvoices) return empty;
 
   const safeTerms = searchTerms.map((term) =>
     term.replace(/[%_\\]/g, "\\$&").slice(0, 48)
@@ -49,7 +50,7 @@ export async function getOntologyContext(
       .or(
         `name.ilike.%${term}%,canonical_name.ilike.%${term}%,description.ilike.%${term}%`
       )
-      .limit(8)
+      .limit(listInvoices ? 12 : 8)
   );
   const aliasQueries = safeTerms.map((term) =>
     supabase
@@ -60,17 +61,22 @@ export async function getOntologyContext(
       .limit(8)
   );
 
-  const [entityResults, aliasResults, connectorEntities] = await Promise.all([
-    Promise.all(entityQueries),
-    Promise.all(aliasQueries),
-    args.userId
-      ? findConnectorEntitiesForQuery(supabase, {
-          userId: args.userId,
-          terms: safeTerms,
-          preferSpaceId: args.spaceId,
-        })
-      : Promise.resolve([] as OntologyEntity[]),
-  ]);
+  const [entityResults, aliasResults, connectorEntities, invoiceEntities] =
+    await Promise.all([
+      Promise.all(entityQueries),
+      Promise.all(aliasQueries),
+      args.userId
+        ? findConnectorEntitiesForQuery(supabase, {
+            userId: args.userId,
+            terms: safeTerms.length ? safeTerms : ["invoice"],
+            preferSpaceId: args.spaceId,
+            listInvoices,
+          })
+        : Promise.resolve([] as OntologyEntity[]),
+      listInvoices
+        ? loadInvoiceEntities(supabase, args.spaceId)
+        : Promise.resolve([] as OntologyEntity[]),
+    ]);
 
   const byId = new Map<string, OntologyEntity>();
   for (const res of entityResults) {
@@ -98,14 +104,17 @@ export async function getOntologyContext(
     }
   }
 
+  for (const row of invoiceEntities) {
+    byId.set(row.id, row);
+  }
   for (const row of connectorEntities) {
     byId.set(row.id, row);
   }
 
-  const entities = rankEntitiesByQueryTokens([...byId.values()], searchTerms).slice(
-    0,
-    5
-  );
+  const ranked = rankEntitiesByQueryTokens([...byId.values()], searchTerms);
+  const entities = listInvoices
+    ? preferInvoicesFirst(ranked).slice(0, 20)
+    : ranked.slice(0, 5);
   if (!entities.length) return empty;
 
   // Relationships/evidence stay space-scoped for the matched entity's profile when possible.
@@ -165,12 +174,30 @@ export async function getOntologyContext(
   };
 }
 
+async function loadInvoiceEntities(
+  supabase: SupabaseClient,
+  spaceId: string
+): Promise<OntologyEntity[]> {
+  const { data } = await supabase
+    .from("ontology_entities")
+    .select(ONTOLOGY_ENTITY_SELECT)
+    .eq("profile_id", spaceId)
+    .in("entity_type", ["invoice", "purchase"])
+    .in("review_status", ONTOLOGY_VISIBLE_REVIEW_STATUSES)
+    .order("updated_at", { ascending: false })
+    .limit(25);
+  return (data as OntologyEntity[] | null) ?? [];
+}
+
 async function findConnectorEntitiesForQuery(
   supabase: SupabaseClient,
-  args: { userId: string; terms: string[]; preferSpaceId: string }
+  args: {
+    userId: string;
+    terms: string[];
+    preferSpaceId: string;
+    listInvoices?: boolean;
+  }
 ): Promise<OntologyEntity[]> {
-  if (!args.terms.length) return [];
-
   const { data: sources } = await supabase
     .from("connected_sources")
     .select("id")
@@ -181,33 +208,60 @@ async function findConnectorEntitiesForQuery(
   const sourceIds = (sources ?? []).map((s) => s.id as string);
   if (!sourceIds.length) return [];
 
-  const orName = args.terms.map((t) => `name.ilike.%${t}%`).join(",");
-  const { data: items } = await supabase
-    .from("source_items")
-    .select("id, name, processing_status")
-    .in("source_id", sourceIds)
-    .neq("processing_status", "unavailable")
-    .or(orName)
-    .limit(12);
-
-  const itemIds = (items ?? []).map((i) => i.id as string);
+  let itemIds: string[] = [];
+  if (args.listInvoices) {
+    const { data: items } = await supabase
+      .from("source_items")
+      .select("id, name, processing_status")
+      .in("source_id", sourceIds)
+      .eq("processing_status", "analyzed")
+      .limit(40);
+    itemIds = (items ?? []).map((i) => i.id as string);
+  } else if (args.terms.length) {
+    const orName = args.terms.map((t) => `name.ilike.%${t}%`).join(",");
+    const { data: items } = await supabase
+      .from("source_items")
+      .select("id, name, processing_status")
+      .in("source_id", sourceIds)
+      .neq("processing_status", "unavailable")
+      .or(orName)
+      .limit(12);
+    itemIds = (items ?? []).map((i) => i.id as string);
+  }
   if (!itemIds.length) return [];
 
-  // Entities created from connector analyze use source_type=connector + source_id=item id.
-  const { data: entities } = await supabase
+  let entityQuery = supabase
     .from("ontology_entities")
     .select(ONTOLOGY_ENTITY_SELECT)
     .eq("source_type", "connector")
     .in("source_id", itemIds)
     .in("review_status", ONTOLOGY_VISIBLE_REVIEW_STATUSES)
-    .limit(20);
+    .limit(args.listInvoices ? 40 : 20);
+
+  if (args.listInvoices) {
+    entityQuery = entityQuery.in("entity_type", [
+      "invoice",
+      "purchase",
+      "document",
+      "organization",
+    ]);
+  }
+
+  const { data: entities } = await entityQuery;
 
   const rows = (entities as OntologyEntity[] | null) ?? [];
-  // Prefer entities already in the active Ask Gideon space.
   return [...rows].sort((a, b) => {
     const ap = a.profile_id === args.preferSpaceId ? 1 : 0;
     const bp = b.profile_id === args.preferSpaceId ? 1 : 0;
     return bp - ap;
+  });
+}
+
+function preferInvoicesFirst(entities: OntologyEntity[]): OntologyEntity[] {
+  return [...entities].sort((a, b) => {
+    const ai = a.entity_type === "invoice" || a.entity_type === "purchase" ? 1 : 0;
+    const bi = b.entity_type === "invoice" || b.entity_type === "purchase" ? 1 : 0;
+    return bi - ai;
   });
 }
 

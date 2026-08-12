@@ -24,6 +24,7 @@ Grounding (strict):
 - When ONTOLOGY lists entities or relationships, use them for questions about organizations, people, projects, contracts, invoices, and how they connect. Cite EVIDENCE quotes or source documents when stating ontology facts. Do not invent relationships not listed there.
 - When an ONTOLOGY entity includes attributes such as amount, currency, or invoice_number, treat those as facts and answer with them.
 - When ONTOLOGY includes an INVOICE SUMMARY, lead with that prose answer (amount, issuer, recipient, date). Do not paste raw MATCHED ENTITIES or RELATIONSHIPS lists unless the user asked how things are connected.
+- If INVOICE SUMMARY includes a TOTAL line, state that total clearly when the user asks for totals, sums, or all invoices.
 - Prefer ISSUED_BY / ISSUED_TO for invoices. Ignore noisy edges to folders, sheet names, or database/infrastructure labels.
 - Connected Device Storage files may appear in ONTOLOGY as document/invoice entities (for example OnePi_Invoice32.xlsx) even when they are not uploaded into SPACE FILE INVENTORY. Treat those as valid answers. Only suggest Analyze when the file is connected but ontology has no useful invoice attributes yet.
 - If ontology confirms a connected file (for example evidenced by an .xlsx) but a requested field is missing from ONTOLOGY attributes/evidence, say the field is not in the ontology yet and suggest Analyze again on that connected Device Storage file. Do NOT tell the user to upload a duplicate into the space when the source is already a connected file.

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   isAmbiguousPersonName,
   isFuzzyMatchAllowed,
+  isInvoiceAggregateQuery,
   nameSimilarity,
   normalizeEntityName,
   tokenizeForOntologySearch,
@@ -34,6 +35,24 @@ describe("tokenizeForOntologySearch", () => {
     assert.ok(tokens.includes("invoice"));
     assert.ok(!tokens.includes("show"));
     assert.ok(!tokens.includes("the"));
+  });
+
+  it("singularizes plurals like invoices", () => {
+    const tokens = tokenizeForOntologySearch(
+      "show the invoices and the total amount"
+    );
+    assert.ok(tokens.includes("invoice"));
+    assert.ok(!tokens.includes("invoices"));
+  });
+});
+
+describe("isInvoiceAggregateQuery", () => {
+  it("detects list/total invoice questions", () => {
+    assert.equal(
+      isInvoiceAggregateQuery("show the invoices and the total amount"),
+      true
+    );
+    assert.equal(isInvoiceAggregateQuery("what is KPAC"), false);
   });
 });
 
@@ -471,6 +490,7 @@ describe("formatOntologyForGideon", () => {
     assert.match(block, /19,250/);
     assert.match(block, /NM2TECH LLC/);
     assert.match(block, /KPAC Tech LLC/);
+    assert.match(block, /TOTAL:/);
     assert.doesNotMatch(block, /PURCHASED_FROM/);
     assert.doesNotMatch(block, /RELATED_TO/);
 
