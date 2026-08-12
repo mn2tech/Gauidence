@@ -5,6 +5,7 @@ import {
   isFuzzyMatchAllowed,
   nameSimilarity,
   normalizeEntityName,
+  tokenizeForOntologySearch,
 } from "../normalize";
 import { parseOntologyExtraction } from "../schema";
 import { formatOntologyForGideon, buildOntologyAnswerFallback } from "../formatForGideon";
@@ -23,6 +24,16 @@ describe("normalizeEntityName", () => {
 
   it("collapses repeated spaces", () => {
     assert.equal(normalizeEntityName("NM2   Tech"), "nm2 tech");
+  });
+});
+
+describe("tokenizeForOntologySearch", () => {
+  it("splits underscores and drops stopwords", () => {
+    const tokens = tokenizeForOntologySearch("show the OnePi_invoice");
+    assert.ok(tokens.includes("onepi"));
+    assert.ok(tokens.includes("invoice"));
+    assert.ok(!tokens.includes("show"));
+    assert.ok(!tokens.includes("the"));
   });
 });
 

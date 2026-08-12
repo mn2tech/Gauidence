@@ -18,6 +18,7 @@ import {
 } from "@/lib/connectors/clientAnalyze";
 import { ensureBatchReadAccess } from "@/lib/connectors/content/readClient";
 import { ConnectorError } from "@/lib/connectors/types";
+import { useActiveProfile } from "@/components/ProfileProvider";
 
 const FILTERS: Array<"All" | FileTypeCategory> = [
   "All",
@@ -43,6 +44,7 @@ type Props = {
 
 export default function BrowseSourceFiles({ sourceId }: Props) {
   const analyzeEnabled = isSourceItemAnalyzeEnabled();
+  const { active } = useActiveProfile();
   const [items, setItems] = useState<Array<SourceItem & { id: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -229,6 +231,7 @@ export default function BrowseSourceFiles({ sourceId }: Props) {
         const result = await analyzeSourceItemClient({
           sourceId,
           item,
+          profileId: active?.id,
           force:
             item.processingStatus === "analyzed" ||
             item.processingStatus === "analysis_failed",
@@ -292,7 +295,7 @@ export default function BrowseSourceFiles({ sourceId }: Props) {
       setBatchBusy(false);
       await load();
     },
-    [batchBusy, load, sourceId]
+    [batchBusy, load, sourceId, active?.id]
   );
 
   const analyzeSelected = useCallback(() => {

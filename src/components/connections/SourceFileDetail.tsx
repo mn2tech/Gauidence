@@ -12,6 +12,7 @@ import {
 } from "@/lib/connectors/services/sourceItems";
 import { analyzeSourceItemClient } from "@/lib/connectors/clientAnalyze";
 import { isAnalyzeSupportedMime } from "@/lib/connectors/content/types";
+import { useActiveProfile } from "@/components/ProfileProvider";
 
 type Props = {
   sourceId: string;
@@ -46,6 +47,7 @@ type AnalysisResult = {
 };
 
 export default function SourceFileDetail({ sourceId, itemId }: Props) {
+  const { active } = useActiveProfile();
   const [item, setItem] = useState<(SourceItem & { id: string }) | null>(null);
   const [source, setSource] = useState<ConnectedSource | null>(null);
   const [loading, setLoading] = useState(true);
@@ -111,6 +113,7 @@ export default function SourceFileDetail({ sourceId, itemId }: Props) {
       const result = await analyzeSourceItemClient({
         sourceId,
         item,
+        profileId: active?.id,
       });
       if (!result.ok) {
         if (result.cancelled) {
@@ -144,7 +147,7 @@ export default function SourceFileDetail({ sourceId, itemId }: Props) {
     } finally {
       setAnalyzing(false);
     }
-  }, [item, load, sourceId]);
+  }, [item, load, sourceId, active?.id]);
 
   const setReview = useCallback(
     async (

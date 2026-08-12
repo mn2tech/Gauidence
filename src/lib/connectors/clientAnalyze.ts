@@ -67,9 +67,10 @@ export async function analyzeSourceItemClient(args: {
   sourceId: string;
   item: SourceItem & { id: string };
   force?: boolean;
+  profileId?: string | null;
   readOptions?: ReadSourceOptions;
 }): Promise<AnalyzeClientResult | AnalyzeClientFailure> {
-  const { sourceId, item, force, readOptions } = args;
+  const { sourceId, item, force, profileId, readOptions } = args;
   try {
     const content = await readSourceItemContent(item, readOptions);
     if (!content.bytes) {
@@ -87,6 +88,7 @@ export async function analyzeSourceItemClient(args: {
     );
     form.append("contentHash", contentHash);
     if (content.text) form.append("text", content.text);
+    if (profileId) form.append("profileId", profileId);
     const shouldForce =
       force === true ||
       item.processingStatus === "analyzed" ||

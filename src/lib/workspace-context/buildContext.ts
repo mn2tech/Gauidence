@@ -231,6 +231,7 @@ export async function loadWorkspaceContext(
       ? getOntologyContext(supabase, {
           spaceId: ontologySpaceId,
           query: retrievalQuestion,
+          userId: user.id,
         })
           .then((ontology) => formatOntologyForGideon(ontology))
           .catch((err) => {

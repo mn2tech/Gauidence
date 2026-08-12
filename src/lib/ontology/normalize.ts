@@ -29,6 +29,75 @@ export function normalizeEntityName(name: string): string {
   return normalized;
 }
 
+const ONTOLOGY_QUERY_STOPWORDS = new Set([
+  "the",
+  "and",
+  "for",
+  "with",
+  "from",
+  "your",
+  "show",
+  "what",
+  "which",
+  "where",
+  "when",
+  "about",
+  "tell",
+  "give",
+  "find",
+  "look",
+  "please",
+  "me",
+  "my",
+  "a",
+  "an",
+  "of",
+  "to",
+  "in",
+  "on",
+  "is",
+  "are",
+  "was",
+  "were",
+  "this",
+  "that",
+  "any",
+  "all",
+  "file",
+  "files",
+  "document",
+  "documents",
+]);
+
+/**
+ * Tokenize a user question for ontology entity matching.
+ * Splits underscores/hyphens so "OnePi_invoice" → ["onepi", "invoice"].
+ */
+export function tokenizeForOntologySearch(query: string): string[] {
+  const normalized = normalizeEntityName(query)
+    .replace(/[_./\\-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!normalized) return [];
+
+  const raw = normalized
+    .split(" ")
+    .map((t) => t.trim())
+    .filter((t) => t.length >= 3)
+    .filter((t) => !ONTOLOGY_QUERY_STOPWORDS.has(t));
+
+  // Prefer distinctive tokens (longer first), keep order-stable unique set.
+  const unique: string[] = [];
+  const seen = new Set<string>();
+  for (const token of [...raw].sort((a, b) => b.length - a.length)) {
+    if (seen.has(token)) continue;
+    seen.add(token);
+    unique.push(token);
+    if (unique.length >= 6) break;
+  }
+  return unique;
+}
+
 /** Levenshtein distance for conservative fuzzy matching. */
 export function levenshteinDistance(a: string, b: string): number {
   if (a === b) return 0;
