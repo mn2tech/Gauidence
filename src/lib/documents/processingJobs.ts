@@ -255,7 +255,7 @@ async function markJobFailed(
       .update({
         analysis_status: retryable ? "uploaded" : "failed",
         last_processing_error: message.slice(0, 500),
-        processing_step: retryable ? "queued" : "failed",
+        processing_step: "failed",
       })
       .eq("id", job.document_id);
   } else if (job.job_type === "index_document") {

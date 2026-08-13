@@ -18,4 +18,43 @@ describe("json text helpers", () => {
     assert.equal(normalizeJsonText("{not json"), "{not json");
     assert.equal(normalizeJsonText("  "), "");
   });
+
+  it("compacts Trello exports into board and card text", () => {
+    const text = normalizeJsonText(
+      JSON.stringify({
+        name: "Ops",
+        url: "https://trello.com/b/ops",
+        lists: [{ id: "l1", name: "Doing" }],
+        cards: [
+          {
+            id: "c1",
+            idList: "l1",
+            name: "File taxes",
+            desc: "Q3 return",
+            due: "2026-09-01T00:00:00.000Z",
+            closed: false,
+            labels: [{ name: "Finance" }],
+          },
+        ],
+        actions: [{ id: "a1", type: "updateCard", data: { huge: "noise" } }],
+      })
+    );
+    assert.match(text, /Trello board: Ops/);
+    assert.match(text, /\[Doing\] File taxes/);
+    assert.match(text, /Finance/);
+    assert.doesNotMatch(text, /updateCard/);
+  });
+
+  it("caps oversized JSON", () => {
+    const bulky = {
+      name: "dump",
+      items: Array.from({ length: 200 }, (_, i) => ({
+        id: i,
+        note: "x".repeat(200),
+      })),
+    };
+    const text = normalizeJsonText(JSON.stringify(bulky), 800);
+    assert.ok(text.length <= 900);
+    assert.match(text, /truncated/);
+  });
 });

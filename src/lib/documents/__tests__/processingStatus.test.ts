@@ -107,6 +107,27 @@ describe("processingStatus", () => {
     );
   });
 
+  it("shows retry when analysis fell back to uploaded with an error", () => {
+    assert.equal(
+      deriveProcessingStage({
+        analysis_status: "uploaded",
+        last_processing_error: "Claude request too large",
+      }),
+      "retryable"
+    );
+    assert.equal(
+      userFacingStatusLabel({
+        analysis_status: "uploaded",
+        last_processing_error: "Claude request too large",
+      }),
+      "Processing paused — tap Retry"
+    );
+    assert.equal(
+      deriveProcessingStage({ analysis_status: "uploaded" }),
+      "uploaded"
+    );
+  });
+
   it("increases progress through pipeline stages", () => {
     assert.ok(
       processingProgressPercent({ analysis_status: "queued" }) <

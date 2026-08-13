@@ -1254,7 +1254,9 @@ export default function DocumentManager({
                           ? progressLabel ?? "Analyzing…"
                           : readOnly
                             ? "View Analysis"
-                            : doc.analysis_status === "failed"
+                            : doc.analysis_status === "failed" ||
+                                processingStatuses[doc.id]?.processingStage ===
+                                  "retryable"
                               ? "Try Again"
                               : analysis
                                 ? "View Analysis"

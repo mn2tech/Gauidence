@@ -76,6 +76,7 @@ export type DocumentProcessingFields = {
   ontology_status?: string | null;
   knowledge_status?: string | null;
   processing_step?: string | null;
+  last_processing_error?: string | null;
 };
 
 export function isAnalysisComplete(analysisStatus: string): boolean {
@@ -139,6 +140,9 @@ export function deriveProcessingStage(
     return "indexing";
   }
 
+  if (analysis === "uploaded" && doc.last_processing_error?.trim()) {
+    return "retryable";
+  }
   if (analysis === "uploaded") return "uploaded";
   return "uploaded";
 }

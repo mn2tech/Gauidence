@@ -13,6 +13,7 @@ import {
   isDeepSeekChatPrimary,
   isDeepSeekConfigured,
 } from "@/lib/analysis/chatProvider";
+import { clipTextForPrompt } from "@/lib/vault/sourceText";
 
 /** Claude model for text-heavy docs. Override with CLAUDE_MODEL or ANTHROPIC_MODEL. */
 export const ANALYSIS_MODEL =
@@ -123,7 +124,7 @@ export function buildFileContent(
         text: `${instruction}
 
 --- DOCUMENT TEXT (preserve numbers, leading zeros, and table columns exactly) ---
-${text}
+${clipTextForPrompt(text)}
 --- END DOCUMENT TEXT ---`,
       },
     ];
