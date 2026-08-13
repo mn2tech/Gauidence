@@ -7,10 +7,7 @@ import {
   processingProgressPercent,
   userFacingStatusLabel,
 } from "@/lib/documents/processingStatus";
-import {
-  enqueueAnalyzePipeline,
-  processPendingDocumentJobs,
-} from "@/lib/documents/processingJobs";
+import { enqueueAnalyzePipeline } from "@/lib/documents/processingJobs";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -144,16 +141,6 @@ export async function POST(request: Request) {
     documentId,
     profileId: doc.profile_id,
     userId: user.id,
-  });
-
-  void processPendingDocumentJobs(supabase, user.id, {
-    limit: 3,
-    profileId: doc.profile_id,
-  }).catch((err) => {
-    console.error(
-      "Document processing drain failed:",
-      err instanceof Error ? err.message : "error"
-    );
   });
 
   const stage = deriveProcessingStage({

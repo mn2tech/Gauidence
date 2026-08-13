@@ -37,7 +37,8 @@ export type ProcessingJobStatus =
   | "retryable";
 
 const STAGE_TIMEOUT_MS: Record<ProcessingJobType, number> = {
-  analyze_document: 10 * 60 * 1000,
+  /** Just longer than process-jobs maxDuration (300s) so live workers are not killed. */
+  analyze_document: 6 * 60 * 1000,
   index_document: 5 * 60 * 1000,
   extract_ontology: 5 * 60 * 1000,
   extract_knowledge: 5 * 60 * 1000,
@@ -128,6 +129,7 @@ export async function enqueueAnalyzePipeline(
   const { jobId } = await enqueueDocumentProcessingJob(supabase, {
     ...args,
     jobType: "analyze_document",
+    force: true,
   });
 
   logProcessingDiagnostics(args.documentId, "queue_create", {
@@ -674,6 +676,8 @@ export async function processPendingDocumentJobs(
   userId: string,
   options: { limit?: number; profileId?: string } = {}
 ): Promise<{ processed: number; failed: number }> {
+  await recoverStaleProcessingJobs(supabase);
+
   const maxJobs = options.limit ?? processingConcurrencyLimit();
   const now = new Date().toISOString();
 

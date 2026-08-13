@@ -24,6 +24,7 @@ describe("async upload pipeline contracts", () => {
     assert.match(source, /queued:\s*true/);
     assert.match(source, /enqueueAnalyzePipeline/);
     assert.doesNotMatch(source, /runAnalysisPipeline\(/);
+    assert.doesNotMatch(source, /processPendingDocumentJobs/);
   });
 
   it("processing jobs chain analyze then index then knowledge", async () => {

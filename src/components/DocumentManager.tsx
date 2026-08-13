@@ -266,7 +266,7 @@ export default function DocumentManager({
   );
 
   const { statuses: processingStatuses, markActive, refreshStatus } =
-    useDocumentProcessingPoll(activeDocumentIds);
+    useDocumentProcessingPoll(activeDocumentIds, { kickProcessing: true });
 
   const hasQueuedDocuments = useMemo(
     () =>
@@ -749,6 +749,7 @@ export default function DocumentManager({
       );
     } else {
       setProgressLabel(scheduled.processingLabel ?? "Analyzing in the background…");
+      void kickDocumentProcessingJobs(3);
       void refreshStatus(doc.id);
     }
 
@@ -1242,7 +1243,12 @@ export default function DocumentManager({
                             handleAnalyze(doc);
                           }
                         }}
-                        disabled={analyzingId === doc.id || (readOnly && !analysis)}
+                        disabled={
+                          analyzingId === doc.id ||
+                          doc.analysis_status === "queued" ||
+                          IN_PROGRESS_ANALYSIS.includes(doc.analysis_status) ||
+                          (readOnly && !analysis)
+                        }
                         className="inline-flex items-center gap-1.5 rounded-full border border-brand/30 bg-brand-light px-3 py-1.5 text-xs font-semibold text-brand-dark transition hover:border-brand focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50"
                       >
                         {analyzingId === doc.id ? (
@@ -1250,8 +1256,13 @@ export default function DocumentManager({
                         ) : (
                           <Sparkles className="h-3.5 w-3.5" />
                         )}
-                        {analyzingId === doc.id
-                          ? progressLabel ?? "Analyzing…"
+                        {analyzingId === doc.id ||
+                        doc.analysis_status === "queued" ||
+                        IN_PROGRESS_ANALYSIS.includes(doc.analysis_status)
+                          ? progressLabel ??
+                            (doc.analysis_status === "queued"
+                              ? "Waiting…"
+                              : "Analyzing…")
                           : readOnly
                             ? "View Analysis"
                             : doc.analysis_status === "failed" ||
