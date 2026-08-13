@@ -37,7 +37,7 @@ export type ProcessingJobStatus =
   | "retryable";
 
 const STAGE_TIMEOUT_MS: Record<ProcessingJobType, number> = {
-  /** Just longer than process-jobs maxDuration (300s) so live workers are not killed. */
+  /** Must stay above process-jobs maxDuration (300s) and status-poll stale window. */
   analyze_document: 6 * 60 * 1000,
   index_document: 5 * 60 * 1000,
   extract_ontology: 5 * 60 * 1000,

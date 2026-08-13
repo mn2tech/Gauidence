@@ -17,11 +17,13 @@ import {
 } from "@/lib/documents/processingTrace";
 import type { ProcessingDiagnostics } from "@/lib/documents/processingDiagnostics";
 
+/** Stale thresholds for status-poll recovery. Must exceed process-jobs maxDuration (300s)
+ *  for analyze, or polls will kill live workers every ~90s and loop forever. */
 const ACTIVE_STATUS_STALE_MS = {
-  analyze_document: 90_000,
-  index_document: 120_000,
-  extract_ontology: 120_000,
-  extract_knowledge: 120_000,
+  analyze_document: 6 * 60 * 1000,
+  index_document: 5 * 60 * 1000,
+  extract_ontology: 5 * 60 * 1000,
+  extract_knowledge: 5 * 60 * 1000,
 } as const;
 
 export const runtime = "nodejs";

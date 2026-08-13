@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { User } from "@supabase/supabase-js";
 import { isDocumentCategory } from "@/lib/categories";
 import { runAnalysisPipeline } from "@/lib/analysis/pipeline";
+import { isJsonMimeOrName, normalizeJsonText } from "@/lib/analysis/jsonText";
 import { toDisplayFacts, collectDeadlines } from "@/lib/analysis/display";
 import { documentTypeToCategory } from "@/lib/analysis/llm";
 import type { AnalysisStatus } from "@/lib/analysis/types";
@@ -78,7 +79,17 @@ export async function executeDocumentAnalysis(
   }
   diagnostics = recordDuration(diagnostics, "storage_upload_ms", downloadStart);
 
-  const base64 = Buffer.from(await file.arrayBuffer()).toString("base64");
+  const bytes = Buffer.from(await file.arrayBuffer());
+  let mimeType = doc.mime_type;
+  let base64: string;
+  if (isJsonMimeOrName(doc.mime_type, doc.file_name)) {
+    // Compact before the pipeline so we never base64/re-parse a multi-MB export.
+    const compact = normalizeJsonText(bytes.toString("utf8"));
+    mimeType = "text/plain";
+    base64 = Buffer.from(compact, "utf8").toString("base64");
+  } else {
+    base64 = bytes.toString("base64");
+  }
 
   const { data: accountProfile } = await supabase
     .from("profiles")
@@ -108,7 +119,7 @@ export async function executeDocumentAnalysis(
   const result = await withLlmUsage({ userId: user.id, feature: "analyze" }, () =>
     runAnalysisPipeline(
       {
-        mimeType: doc.mime_type,
+        mimeType,
         fileName: doc.file_name,
         base64,
       },

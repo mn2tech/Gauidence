@@ -145,7 +145,10 @@ function formatTrelloBoard(
 function attachmentsFromActions(actions: unknown): Map<string, unknown[]> {
   const byCard = new Map<string, unknown[]>();
   if (!Array.isArray(actions)) return byCard;
-  for (const action of actions) {
+  // Newest actions are usually last; scan a bounded tail for attachment events.
+  const start = Math.max(0, actions.length - 8_000);
+  for (let i = start; i < actions.length; i++) {
+    const action = actions[i];
     if (!isRecord(action)) continue;
     const type = String(action.type ?? "");
     if (!/attachment/i.test(type)) continue;
