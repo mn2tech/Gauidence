@@ -14,4 +14,12 @@ describe("classificationFromFileName", () => {
   it("returns null for unrelated names", () => {
     assert.equal(classificationFromFileName("summer-camp-flyer.pdf"), null);
   });
+
+  it("skips classify LLM for JSON / Trello exports", () => {
+    const json = classificationFromFileName("Trello_Knowledge.json");
+    assert.equal(json?.document_type, "general");
+    assert.equal(json?.document_subtype, "json_export");
+    const trello = classificationFromFileName("Trello_Knowledge");
+    assert.equal(trello?.document_type, "general");
+  });
 });

@@ -7,12 +7,21 @@ import type { Classification } from "./types";
 
 const CONTRACT_NAME =
   /\b(contract|agreement|ctr[-_]|mou|statement[\s_-]?of[\s_-]?work|sow)\b/i;
+const JSON_OR_TRELLO_NAME = /\.json$/i;
 
 export function classificationFromFileName(
   fileName: string | null | undefined
 ): Classification | null {
   const name = fileName?.trim();
   if (!name) return null;
+  if (JSON_OR_TRELLO_NAME.test(name) || /trello/i.test(name)) {
+    return {
+      document_type: "general",
+      document_subtype: "json_export",
+      classification_confidence: 0.95,
+      classification_reason: "JSON / Trello export inferred from the file name.",
+    };
+  }
   if (!CONTRACT_NAME.test(name)) return null;
   return {
     document_type: "contract",

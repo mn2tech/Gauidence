@@ -60,6 +60,7 @@ export async function executeDocumentAnalysis(
   }
 
   const setStatus = async (status: AnalysisStatus) => {
+    const tick = new Date().toISOString();
     await supabase
       .from("documents")
       .update({
@@ -68,6 +69,16 @@ export async function executeDocumentAnalysis(
         processing_progress: null,
       })
       .eq("id", doc.id);
+    // Keep the job lease fresh so status-poll recovery does not kill a live worker.
+    await supabase
+      .from("document_processing_jobs")
+      .update({
+        processing_started_at: tick,
+        updated_at: tick,
+      })
+      .eq("document_id", doc.id)
+      .eq("job_type", "analyze_document")
+      .eq("status", "processing");
   };
 
   const downloadStart = Date.now();

@@ -116,6 +116,36 @@ export async function enqueueAnalyzePipeline(
   }
 ): Promise<{ jobId?: string }> {
   const queueStart = Date.now();
+
+  const existing = await supabase
+    .from("document_processing_jobs")
+    .select("id, status")
+    .eq("document_id", args.documentId)
+    .eq("job_type", "analyze_document")
+    .eq("pipeline_version", PIPELINE_VERSION)
+    .maybeSingle();
+
+  // Never reset a live worker — that restarts analysis and leaves "Reading document" forever.
+  if (
+    existing.data &&
+    (existing.data.status === "pending" || existing.data.status === "processing")
+  ) {
+    if (existing.data.status === "pending") {
+      await supabase
+        .from("documents")
+        .update({
+          analysis_status: "queued",
+          processing_step: "queued",
+          last_processing_error: null,
+        })
+        .eq("id", args.documentId);
+    }
+    logProcessingDiagnostics(args.documentId, "queue_create", {
+      queue_create_ms: Date.now() - queueStart,
+    });
+    return { jobId: existing.data.id };
+  }
+
   await supabase
     .from("documents")
     .update({
@@ -546,7 +576,7 @@ export async function processDocumentProcessingJob(
   const now = new Date().toISOString();
   let diagnostics = createDiagnostics();
 
-  await supabase
+  const { data: claimed } = await supabase
     .from("document_processing_jobs")
     .update({
       status: "processing",
@@ -554,7 +584,13 @@ export async function processDocumentProcessingJob(
       processing_started_at: now,
       updated_at: now,
     })
-    .eq("id", job.id);
+    .eq("id", job.id)
+    .in("status", ["pending", "retryable"])
+    .select("id")
+    .maybeSingle();
+
+  // Another worker already claimed this job.
+  if (!claimed) return;
 
   try {
     if (job.job_type === "analyze_document") {
