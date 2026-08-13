@@ -50,8 +50,15 @@ import {
 } from "@/lib/billing/storageClient";
 import { notifyVaultActivityClient } from "@/lib/vault/clientNotifyActivity";
 import type { OrganizationSuggestionPayload } from "@/lib/organization/types";
-import { scheduleDocumentAnalysis } from "@/lib/documents/clientProcessing";
-import { useDocumentProcessingPoll } from "@/hooks/useDocumentProcessingPoll";
+import {
+  kickDocumentProcessingJobs,
+  scheduleDocumentAnalysis,
+} from "@/lib/documents/clientProcessing";
+import { isAnalysisComplete } from "@/lib/documents/processingStatus";
+import {
+  useDocumentProcessingPoll,
+  type DocumentStatusSnapshot,
+} from "@/hooks/useDocumentProcessingPoll";
 
 type DocumentRow = {
   id: string;
@@ -120,6 +127,35 @@ function formatDate(iso: string) {
     day: "numeric",
     timeZone: GUARDIAN_TIME_ZONE,
   });
+}
+
+function documentCardStatusLabel(
+  doc: DocumentRow,
+  analysis: Analysis | undefined,
+  snap?: DocumentStatusSnapshot
+): string {
+  const activelyAnalyzing = [
+    "extracting",
+    "classifying",
+    "analyzing",
+    "validating",
+  ].includes(doc.analysis_status);
+
+  if (analysis && !activelyAnalyzing && doc.analysis_status !== "failed") {
+    if (snap && snap.processingStage !== "queued") {
+      return snap.processingLabel;
+    }
+    if (isAnalysisComplete(doc.analysis_status)) {
+      return ANALYSIS_STATUS_LABELS[doc.analysis_status];
+    }
+    return ANALYSIS_STATUS_LABELS.completed;
+  }
+
+  return (
+    snap?.processingLabel ??
+    ANALYSIS_STATUS_LABELS[doc.analysis_status] ??
+    doc.analysis_status
+  );
 }
 
 export function notifyAlertsUpdated() {
@@ -226,6 +262,26 @@ export default function DocumentManager({
 
   const { statuses: processingStatuses, markActive, refreshStatus } =
     useDocumentProcessingPoll(activeDocumentIds);
+
+  const hasQueuedDocuments = useMemo(
+    () =>
+      documents.some(
+        (d) =>
+          d.analysis_status === "uploaded" ||
+          d.analysis_status === "queued" ||
+          IN_PROGRESS_ANALYSIS.includes(d.analysis_status)
+      ),
+    [documents]
+  );
+
+  useEffect(() => {
+    if (!hasQueuedDocuments) return;
+    void kickDocumentProcessingJobs(3);
+    const timer = window.setInterval(() => {
+      void kickDocumentProcessingJobs(3);
+    }, 4000);
+    return () => window.clearInterval(timer);
+  }, [hasQueuedDocuments]);
 
   const loadDocuments = useCallback(async () => {
     if (!supabase || !profileId) return;
@@ -1110,9 +1166,11 @@ export default function DocumentManager({
                         {formatSize(doc.size_bytes)} · {formatDate(doc.created_at)}
                       </span>
                       <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-ink-muted">
-                        {processingStatuses[doc.id]?.processingLabel ??
-                          ANALYSIS_STATUS_LABELS[doc.analysis_status] ??
-                          doc.analysis_status}
+                        {documentCardStatusLabel(
+                          doc,
+                          analysis,
+                          processingStatuses[doc.id]
+                        )}
                       </span>
                       {analysis?.facts?.length ? (
                         <span className="text-[11px] text-ink-muted">

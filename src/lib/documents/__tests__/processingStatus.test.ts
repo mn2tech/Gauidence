@@ -62,6 +62,39 @@ describe("processingStatus", () => {
     assert.doesNotMatch(label, /embedding|vector|HNSW/i);
   });
 
+  it("ignores a stale queued step after analysis completes", () => {
+    assert.equal(
+      userFacingStatusLabel({
+        analysis_status: "completed",
+        indexing_status: "completed",
+        knowledge_status: "skipped",
+        processing_step: "queued",
+      }),
+      "Ready to ask Gideon"
+    );
+  });
+
+  it("keeps waiting label only while analysis is still queued", () => {
+    assert.equal(
+      userFacingStatusLabel({
+        analysis_status: "queued",
+        processing_step: "queued",
+      }),
+      "Waiting for analysis"
+    );
+  });
+
+  it("uses indexing label after analysis when step is still queued", () => {
+    assert.equal(
+      userFacingStatusLabel({
+        analysis_status: "completed",
+        indexing_status: "pending",
+        processing_step: "queued",
+      }),
+      "Making document searchable"
+    );
+  });
+
   it("increases progress through pipeline stages", () => {
     assert.ok(
       processingProgressPercent({ analysis_status: "queued" }) <

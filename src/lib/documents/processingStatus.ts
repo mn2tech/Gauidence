@@ -177,9 +177,30 @@ export function processingProgressPercent(
   }
 }
 
+/** Maps a granular processing_step onto the coarser derived stage. */
+const STEP_TO_STAGE: Record<string, DocumentProcessingStage> = {
+  queued: "queued",
+  extracting: "analyzing",
+  classifying: "analyzing",
+  analyzing: "analyzing",
+  validating: "analyzing",
+  indexing: "indexing",
+  ontology: "knowledge_processing",
+  knowledge: "knowledge_processing",
+  ready: "ready",
+};
+
 export function userFacingStatusLabel(doc: DocumentProcessingFields): string {
-  if (doc.processing_step && PROCESSING_STEP_LABELS[doc.processing_step]) {
-    return PROCESSING_STEP_LABELS[doc.processing_step]!;
+  const stage = deriveProcessingStage(doc);
+  const step = doc.processing_step;
+  // Only use processing_step when it matches the current stage. A stale
+  // "queued" step must not hide completed analysis as "Waiting for analysis".
+  if (
+    step &&
+    PROCESSING_STEP_LABELS[step] &&
+    STEP_TO_STAGE[step] === stage
+  ) {
+    return PROCESSING_STEP_LABELS[step]!;
   }
-  return PROCESSING_STAGE_LABELS[deriveProcessingStage(doc)];
+  return PROCESSING_STAGE_LABELS[stage];
 }
