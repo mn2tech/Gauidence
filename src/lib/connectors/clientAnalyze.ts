@@ -60,8 +60,13 @@ export function isItemNeedsAnalyze(
   );
 }
 
+function isTrelloBoardItem(item: SourceItem): boolean {
+  return item.metadata?.provider === "trello" || item.metadata?.kind === "board";
+}
+
 /**
  * Read bytes + POST analyze for one connected source item.
+ * Trello boards are fetched server-side (no local file picker).
  */
 export async function analyzeSourceItemClient(args: {
   sourceId: string;
@@ -72,6 +77,48 @@ export async function analyzeSourceItemClient(args: {
 }): Promise<AnalyzeClientResult | AnalyzeClientFailure> {
   const { sourceId, item, force, profileId, readOptions } = args;
   try {
+    const shouldForce =
+      force === true ||
+      item.processingStatus === "analyzed" ||
+      item.processingStatus === "analysis_failed";
+
+    if (isTrelloBoardItem(item)) {
+      const res = await fetch(
+        `/api/connections/${sourceId}/items/${item.id}/analyze`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fetchFromSource: true,
+            force: shouldForce,
+            profileId: profileId ?? null,
+          }),
+        }
+      );
+      const body = (await res.json().catch(() => ({}))) as AnalyzeClientResult & {
+        error?: string;
+        code?: string;
+      };
+      if (!res.ok) {
+        return {
+          ok: false,
+          error: body.error ?? "Analysis failed.",
+          code: body.code,
+        };
+      }
+      return {
+        ok: true,
+        skipped: body.skipped,
+        reason: body.reason,
+        profileId: body.profileId,
+        entitiesFound: body.entitiesFound,
+        relationshipsFound: body.relationshipsFound,
+        confidence: body.confidence,
+        entities: body.entities,
+        relationships: body.relationships,
+      };
+    }
+
     const content = await readSourceItemContent(item, readOptions);
     if (!content.bytes) {
       return { ok: false, error: "Couldn't read file bytes for analysis." };
@@ -89,10 +136,6 @@ export async function analyzeSourceItemClient(args: {
     form.append("contentHash", contentHash);
     if (content.text) form.append("text", content.text);
     if (profileId) form.append("profileId", profileId);
-    const shouldForce =
-      force === true ||
-      item.processingStatus === "analyzed" ||
-      item.processingStatus === "analysis_failed";
     if (shouldForce) form.append("force", "1");
 
     const res = await fetch(

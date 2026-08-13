@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   Folder,
   HardDrive,
+  LayoutGrid,
   Loader2,
   RefreshCw,
   Shield,
@@ -68,9 +69,18 @@ export default function ConnectionsPanel() {
   const [error, setError] = useState<string | null>(null);
   const [scanResult, setScanResult] = useState<ScanResultSummary | null>(null);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
+  const [confirmTrelloDisconnect, setConfirmTrelloDisconnect] = useState(false);
+  const [trelloModalOpen, setTrelloModalOpen] = useState(false);
+  const [trelloApiKey, setTrelloApiKey] = useState("");
+  const [trelloToken, setTrelloToken] = useState("");
+  const [trelloSummary, setTrelloSummary] = useState<ItemSummary | null>(null);
 
   const phoneSource = useMemo(
     () => sources.find((s) => s.sourceType === "android_storage") ?? null,
+    [sources]
+  );
+  const trelloSource = useMemo(
+    () => sources.find((s) => s.sourceType === "trello") ?? null,
     [sources]
   );
 
@@ -105,6 +115,22 @@ export default function ConnectionsPanel() {
         }
       } else {
         setSummary(null);
+      }
+      const trello = list.find((s) => s.sourceType === "trello");
+      if (trello && trello.status !== "disconnected") {
+        const sumRes = await fetch(
+          `/api/connections/${trello.id}/items?summary=1`
+        );
+        const sumBody = (await sumRes.json().catch(() => ({}))) as ItemSummary & {
+          error?: string;
+        };
+        if (sumRes.ok) {
+          setTrelloSummary(sumBody);
+        } else {
+          setTrelloSummary(null);
+        }
+      } else {
+        setTrelloSummary(null);
       }
     } catch {
       setError("Network unavailable. Check your connection and try again.");
@@ -242,13 +268,120 @@ export default function ConnectionsPanel() {
     }
   }, [load, phoneSource]);
 
+  const connectTrello = useCallback(async () => {
+    setBusy("trello-connect");
+    setError(null);
+    setScanResult(null);
+    try {
+      const res = await fetch("/api/connections", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sourceType: "trello",
+          apiKey: trelloApiKey.trim(),
+          token: trelloToken.trim(),
+        }),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        source?: ConnectedSource;
+        error?: string;
+      };
+      if (!res.ok || !body.source) {
+        throw new Error(body.error ?? "Couldn't connect Trello.");
+      }
+      const scanRes = await fetch(`/api/connections/${body.source.id}/scan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const scanBody = (await scanRes.json().catch(() => ({}))) as {
+        summary?: ScanResultSummary;
+        error?: string;
+        message?: string;
+      };
+      if (!scanRes.ok) {
+        throw new Error(
+          scanBody.message ?? scanBody.error ?? "Connected, but board scan failed."
+        );
+      }
+      setScanResult(scanBody.summary ?? null);
+      setTrelloModalOpen(false);
+      setTrelloApiKey("");
+      setTrelloToken("");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't connect Trello.");
+    } finally {
+      setBusy(null);
+    }
+  }, [load, trelloApiKey, trelloToken]);
+
+  const scanTrelloAgain = useCallback(async () => {
+    if (!trelloSource) return;
+    setBusy("trello-scan");
+    setError(null);
+    setScanResult(null);
+    try {
+      const res = await fetch(`/api/connections/${trelloSource.id}/scan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        summary?: ScanResultSummary;
+        error?: string;
+        message?: string;
+      };
+      if (res.status === 403 || body.error === "permission_revoked") {
+        await load();
+        throw new Error(
+          body.message ?? "Trello access was revoked. Reconnect with a new token."
+        );
+      }
+      if (!res.ok) {
+        throw new Error(body.error ?? "Couldn't scan Trello boards.");
+      }
+      setScanResult(body.summary ?? null);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Trello scan failed.");
+    } finally {
+      setBusy(null);
+    }
+  }, [load, trelloSource]);
+
+  const disconnectTrello = useCallback(async () => {
+    if (!trelloSource) return;
+    setBusy("trello-disconnect");
+    setError(null);
+    try {
+      const res = await fetch(`/api/connections/${trelloSource.id}`, {
+        method: "DELETE",
+      });
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        throw new Error(body.error ?? "Couldn't disconnect Trello.");
+      }
+      setConfirmTrelloDisconnect(false);
+      setScanResult(null);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't disconnect Trello.");
+    } finally {
+      setBusy(null);
+    }
+  }, [load, trelloSource]);
+
   const folderName = String(
     phoneSource?.settings?.folderName ?? "Selected folder"
   );
   const phoneConnected =
     phoneSource?.status === "connected" || phoneSource?.status === "error";
   const permissionRevoked = phoneSource?.status === "permission_revoked";
-
+  const trelloConnected =
+    trelloSource?.status === "connected" || trelloSource?.status === "error";
+  const trelloRevoked = trelloSource?.status === "permission_revoked";
+  const trelloUsername = String(trelloSource?.settings?.username ?? "");
   return (
     <div className="space-y-6">
       <section className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
@@ -499,6 +632,133 @@ export default function ConnectionsPanel() {
             </div>
           </section>
 
+          {/* Trello */}
+          <section className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-stone-100 text-ink-muted">
+                <LayoutGrid className="h-4 w-4" aria-hidden />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-base font-semibold text-foreground">
+                  Trello
+                </h2>
+
+                {trelloRevoked ? (
+                  <>
+                    <p className="mt-1 flex items-center gap-2 text-sm text-amber-800">
+                      <AlertTriangle className="h-4 w-4" aria-hidden />
+                      Access Required
+                    </p>
+                    <p className="mt-2 text-sm text-ink-muted">
+                      Trello rejected the saved token. Connect again with a fresh
+                      token.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setTrelloModalOpen(true)}
+                      disabled={busy !== null}
+                      className="mt-4 inline-flex items-center justify-center rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-60"
+                    >
+                      Reconnect Trello
+                    </button>
+                  </>
+                ) : trelloConnected && trelloSource ? (
+                  <>
+                    <p className="mt-1 flex items-center gap-2 text-sm text-ink-muted">
+                      <StatusDot tone="ok" />
+                      Connected
+                    </p>
+                    <dl className="mt-4 grid gap-2 text-sm">
+                      <div className="flex justify-between gap-4">
+                        <dt className="text-ink-muted">Account</dt>
+                        <dd className="font-medium text-foreground">
+                          {trelloUsername
+                            ? `@${trelloUsername}`
+                            : trelloSource.displayName ?? "Trello"}
+                        </dd>
+                      </div>
+                      <div className="flex justify-between gap-4">
+                        <dt className="text-ink-muted">Boards discovered</dt>
+                        <dd className="font-medium text-foreground">
+                          {trelloSummary?.total ?? "—"}
+                        </dd>
+                      </div>
+                      <div className="flex justify-between gap-4">
+                        <dt className="text-ink-muted">Last scanned</dt>
+                        <dd className="font-medium text-foreground">
+                          {formatLastScanned(
+                            trelloSummary?.lastScanAt ?? trelloSource.lastScanAt
+                          )}
+                        </dd>
+                      </div>
+                    </dl>
+                    <div className="mt-5 flex flex-wrap gap-2">
+                      <Link
+                        href={`/settings/connections/${trelloSource.id}`}
+                        className="inline-flex items-center justify-center rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-foreground hover:bg-stone-50"
+                      >
+                        Browse Boards
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => void scanTrelloAgain()}
+                        disabled={busy !== null}
+                        className="inline-flex items-center justify-center rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-foreground hover:bg-stone-50 disabled:opacity-60"
+                      >
+                        {busy === "trello-scan" ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Scanning…
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="mr-2 h-4 w-4" aria-hidden />
+                            Scan Again
+                          </>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTrelloModalOpen(true)}
+                        disabled={busy !== null}
+                        className="inline-flex items-center justify-center rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-foreground hover:bg-stone-50 disabled:opacity-60"
+                      >
+                        Update credentials
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmTrelloDisconnect(true)}
+                        disabled={busy !== null}
+                        className="inline-flex items-center justify-center rounded-full border border-stone-200 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-60"
+                      >
+                        Disconnect
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="mt-1 flex items-center gap-2 text-sm text-ink-muted">
+                      <StatusDot tone="off" />
+                      Not Connected
+                    </p>
+                    <p className="mt-2 text-sm text-ink-muted">
+                      Connect with your Trello API key and token to import open
+                      boards for analysis — no manual CSV/JSON export needed.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setTrelloModalOpen(true)}
+                      disabled={busy !== null}
+                      className="mt-4 inline-flex items-center justify-center rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-60"
+                    >
+                      Connect Trello
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </section>
+
           {/* Coming soon */}
           {[
             { name: "Google Drive", soon: true },
@@ -556,6 +816,121 @@ export default function ConnectionsPanel() {
                 className="rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
               >
                 {busy === "disconnect" ? "Disconnecting…" : "Disconnect"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {confirmTrelloDisconnect ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="trello-disconnect-title"
+        >
+          <div className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-lg">
+            <h3
+              id="trello-disconnect-title"
+              className="text-lg font-semibold text-foreground"
+            >
+              Disconnect Trello?
+            </h3>
+            <p className="mt-2 text-sm text-ink-muted">
+              Guardian will stop syncing boards. Saved credentials are removed
+              from this connection.
+            </p>
+            <div className="mt-6 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmTrelloDisconnect(false)}
+                className="rounded-full border border-stone-200 px-4 py-2 text-sm font-semibold text-foreground hover:bg-stone-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void disconnectTrello()}
+                disabled={busy !== null}
+                className="rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+              >
+                {busy === "trello-disconnect" ? "Disconnecting…" : "Disconnect"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {trelloModalOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="trello-connect-title"
+        >
+          <div className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-lg">
+            <h3
+              id="trello-connect-title"
+              className="text-lg font-semibold text-foreground"
+            >
+              Connect Trello
+            </h3>
+            <p className="mt-2 text-sm text-ink-muted">
+              Paste your Power-Up API key and user token. Guardian stores them
+              only for your account and uses them to list and analyze boards.
+            </p>
+            <label className="mt-4 block text-sm font-medium text-foreground">
+              API key
+              <input
+                type="password"
+                autoComplete="off"
+                value={trelloApiKey}
+                onChange={(e) => setTrelloApiKey(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2 text-sm"
+                placeholder="From Power-Up → API key"
+              />
+            </label>
+            <label className="mt-3 block text-sm font-medium text-foreground">
+              Token
+              <input
+                type="password"
+                autoComplete="off"
+                value={trelloToken}
+                onChange={(e) => setTrelloToken(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2 text-sm"
+                placeholder="From the Token authorize page"
+              />
+            </label>
+            <div className="mt-6 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setTrelloModalOpen(false);
+                  setTrelloApiKey("");
+                  setTrelloToken("");
+                }}
+                className="rounded-full border border-stone-200 px-4 py-2 text-sm font-semibold text-foreground hover:bg-stone-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void connectTrello()}
+                disabled={
+                  busy !== null ||
+                  !trelloApiKey.trim() ||
+                  !trelloToken.trim()
+                }
+                className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-60"
+              >
+                {busy === "trello-connect" ? (
+                  <>
+                    <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
+                    Connecting…
+                  </>
+                ) : (
+                  "Connect"
+                )}
               </button>
             </div>
           </div>

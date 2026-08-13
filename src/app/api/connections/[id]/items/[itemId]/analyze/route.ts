@@ -9,6 +9,9 @@ import {
   isAnalyzeSupportedMime,
 } from "@/lib/connectors/content/types";
 import { connectorLog } from "@/lib/connectors/log";
+import { getConnectedSourceWithSecrets } from "@/lib/connectors/services/connectedSources";
+import { getSourceItem } from "@/lib/connectors/services/sourceItems";
+import { loadTrelloBoardAnalysisContent } from "@/lib/connectors/trello/scan";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -20,6 +23,7 @@ const MAX_BYTES = 15 * 1024 * 1024;
 /**
  * Analyze a connected source item into ontology.
  * Accepts multipart form with temporary file bytes — never stored in Storage.
+ * For Trello boards, accepts JSON `{ fetchFromSource: true }` and loads via API.
  */
 export async function POST(req: Request, ctx: Ctx) {
   const { id: sourceId, itemId } = await ctx.params;
@@ -86,32 +90,64 @@ export async function POST(req: Request, ctx: Ctx) {
         profileId?: string | null;
         force?: boolean;
         text?: string;
+        fetchFromSource?: boolean;
       };
-      if (!body.base64) {
-        return NextResponse.json(
-          { error: "base64 content is required." },
-          { status: 400 }
+
+      if (body.fetchFromSource) {
+        const source = await getConnectedSourceWithSecrets(
+          supabase,
+          user.id,
+          sourceId
         );
-      }
-      filename = body.filename?.trim() || filename;
-      mimeType = body.mimeType || guessMimeFromName(filename);
-      bytes = Uint8Array.from(Buffer.from(body.base64, "base64"));
-      if (bytes.byteLength > MAX_BYTES) {
-        return NextResponse.json(
-          { error: "This file is too large to analyze right now (15 MB limit)." },
-          { status: 413 }
+        if (!source || source.sourceType !== "trello") {
+          return NextResponse.json(
+            { error: "fetchFromSource is only supported for Trello." },
+            { status: 400 }
+          );
+        }
+        const item = await getSourceItem(supabase, sourceId, itemId);
+        if (!item) {
+          return NextResponse.json({ error: "Board not found." }, { status: 404 });
+        }
+        const loaded = await loadTrelloBoardAnalysisContent(
+          source,
+          item.externalId
         );
+        filename = loaded.filename;
+        mimeType = loaded.mimeType;
+        bytes = loaded.bytes;
+        text = loaded.text;
+        contentHash = body.contentHash?.trim() || (await sha256Hex(bytes));
+        profileId = body.profileId ?? null;
+        force = Boolean(body.force);
+      } else {
+        if (!body.base64) {
+          return NextResponse.json(
+            { error: "base64 content is required." },
+            { status: 400 }
+          );
+        }
+        filename = body.filename?.trim() || filename;
+        mimeType = body.mimeType || guessMimeFromName(filename);
+        bytes = Uint8Array.from(Buffer.from(body.base64, "base64"));
+        if (bytes.byteLength > MAX_BYTES) {
+          return NextResponse.json(
+            { error: "This file is too large to analyze right now (15 MB limit)." },
+            { status: 413 }
+          );
+        }
+        contentHash = body.contentHash?.trim() || (await sha256Hex(bytes));
+        profileId = body.profileId ?? null;
+        force = Boolean(body.force);
+        text = body.text;
       }
-      contentHash = body.contentHash?.trim() || (await sha256Hex(bytes));
-      profileId = body.profileId ?? null;
-      force = Boolean(body.force);
-      text = body.text;
     }
-  } catch {
-    return NextResponse.json(
-      { error: "Couldn't read the uploaded file for analysis." },
-      { status: 400 }
-    );
+  } catch (err) {
+    const message =
+      err instanceof Error
+        ? err.message
+        : "Couldn't read the uploaded file for analysis.";
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 
   if (!isAnalyzeSupportedMime(mimeType, filename)) {

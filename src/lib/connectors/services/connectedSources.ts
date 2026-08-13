@@ -35,6 +35,30 @@ export function mapConnectedSource(row: ConnectedSourceRow): ConnectedSource {
   };
 }
 
+/** Public mapping — never send Trello apiKey/token to the browser. */
+export function mapConnectedSourceForClient(
+  row: ConnectedSourceRow
+): ConnectedSource {
+  const source = mapConnectedSource(row);
+  if (source.sourceType !== "trello") return source;
+  const {
+    apiKey: _k,
+    token: _t,
+    secret: _s,
+    ...safe
+  } = source.settings;
+  return {
+    ...source,
+    settings: {
+      ...safe,
+      hasCredentials: Boolean(
+        String(row.settings?.apiKey ?? "").trim() &&
+          String(row.settings?.token ?? "").trim()
+      ),
+    },
+  };
+}
+
 export async function listConnectedSources(
   supabase: SupabaseClient,
   userId: string
@@ -46,10 +70,29 @@ export async function listConnectedSources(
     .order("updated_at", { ascending: false });
 
   if (error) throw error;
-  return (data as ConnectedSourceRow[] | null)?.map(mapConnectedSource) ?? [];
+  return (
+    (data as ConnectedSourceRow[] | null)?.map(mapConnectedSourceForClient) ?? []
+  );
 }
 
 export async function getConnectedSource(
+  supabase: SupabaseClient,
+  userId: string,
+  sourceId: string
+): Promise<ConnectedSource | null> {
+  const { data, error } = await supabase
+    .from("connected_sources")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("id", sourceId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data ? mapConnectedSourceForClient(data as ConnectedSourceRow) : null;
+}
+
+/** Internal: includes secrets for server-side Trello API calls. */
+export async function getConnectedSourceWithSecrets(
   supabase: SupabaseClient,
   userId: string,
   sourceId: string
@@ -91,7 +134,7 @@ export async function createConnectedSource(
     .single();
 
   if (error) throw error;
-  return mapConnectedSource(data as ConnectedSourceRow);
+  return mapConnectedSourceForClient(data as ConnectedSourceRow);
 }
 
 export async function updateConnectedSource(
@@ -122,7 +165,7 @@ export async function updateConnectedSource(
     .single();
 
   if (error) throw error;
-  return mapConnectedSource(data as ConnectedSourceRow);
+  return mapConnectedSourceForClient(data as ConnectedSourceRow);
 }
 
 export async function disconnectConnectedSource(

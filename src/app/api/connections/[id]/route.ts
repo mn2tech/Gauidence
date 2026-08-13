@@ -106,6 +106,17 @@ export async function DELETE(_req: Request, ctx: Ctx) {
     if (!existing) {
       return NextResponse.json({ error: "Connection not found." }, { status: 404 });
     }
+    if (existing.sourceType === "trello") {
+      const source = await updateConnectedSource(supabase, user.id, id, {
+        status: "disconnected",
+        settings: {
+          username: existing.settings.username ?? null,
+          fullName: existing.settings.fullName ?? null,
+          memberId: existing.settings.memberId ?? null,
+        },
+      });
+      return NextResponse.json({ source });
+    }
     const source = await disconnectConnectedSource(supabase, user.id, id);
     return NextResponse.json({ source });
   } catch (err) {

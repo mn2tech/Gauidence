@@ -25,7 +25,10 @@ export default async function BrowseConnectionFilesPage({ params }: Props) {
   const source = await getConnectedSource(supabase, user.id, id);
   if (!source) notFound();
 
-  const folderName = String(source.settings?.folderName ?? "Folder");
+  const folderName =
+    source.sourceType === "trello"
+      ? String(source.settings?.username ?? source.displayName ?? "Trello")
+      : String(source.settings?.folderName ?? "Folder");
 
   return (
     <div className="flex min-h-screen flex-col">
