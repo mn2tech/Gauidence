@@ -223,6 +223,16 @@ export async function searchKeywordChunks(
     ) {
       return [];
     }
+    // Large vaults can trip statement_timeout on keyword FTS — fall back to vector.
+    if (
+      error.code === "57014" ||
+      /statement timeout|canceling statement/i.test(msg)
+    ) {
+      console.warn(
+        "Keyword vault retrieval timed out; continuing with vector-only results."
+      );
+      return [];
+    }
     throw new Error(`Keyword vault retrieval failed: ${error.message}`);
   }
 
