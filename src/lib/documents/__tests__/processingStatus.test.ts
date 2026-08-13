@@ -28,6 +28,18 @@ describe("processingStatus", () => {
     assert.equal(deriveProcessingStage(doc), "ready");
   });
 
+  it("treats skipped indexing as ready to ask Gideon", () => {
+    const doc = {
+      analysis_status: "completed",
+      indexing_status: "skipped",
+      knowledge_status: "skipped",
+      processing_step: "ready",
+    };
+    assert.equal(isDocumentSearchable(doc), true);
+    assert.equal(deriveProcessingStage(doc), "ready");
+    assert.equal(userFacingStatusLabel(doc), "Ready to ask Gideon");
+  });
+
   it("keeps indexing stage after analysis without chunks", () => {
     const doc = {
       analysis_status: "completed",

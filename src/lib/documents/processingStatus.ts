@@ -90,9 +90,10 @@ export function isAnalysisReadyForFiling(analysisStatus: string): boolean {
 }
 
 export function isDocumentSearchable(doc: DocumentProcessingFields): boolean {
+  const indexing = doc.indexing_status ?? "pending";
   return (
     isAnalysisComplete(doc.analysis_status) &&
-    (doc.indexing_status ?? "pending") === "completed"
+    (indexing === "completed" || indexing === "skipped")
   );
 }
 

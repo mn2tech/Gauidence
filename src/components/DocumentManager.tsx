@@ -54,7 +54,7 @@ import {
   kickDocumentProcessingJobs,
   scheduleDocumentAnalysis,
 } from "@/lib/documents/clientProcessing";
-import { isAnalysisComplete } from "@/lib/documents/processingStatus";
+import { PROCESSING_STAGE_LABELS } from "@/lib/documents/processingStatus";
 import {
   useDocumentProcessingPoll,
   type DocumentStatusSnapshot,
@@ -141,14 +141,19 @@ function documentCardStatusLabel(
     "validating",
   ].includes(doc.analysis_status);
 
+  const laterStage =
+    snap &&
+    ["indexing", "knowledge_processing", "retryable", "failed"].includes(
+      snap.processingStage
+    );
+  if (laterStage) {
+    return snap.processingLabel;
+  }
+
   if (analysis && !activelyAnalyzing && doc.analysis_status !== "failed") {
-    if (snap && snap.processingStage !== "queued") {
-      return snap.processingLabel;
-    }
-    if (isAnalysisComplete(doc.analysis_status)) {
-      return ANALYSIS_STATUS_LABELS[doc.analysis_status];
-    }
-    return ANALYSIS_STATUS_LABELS.completed;
+    return snap?.processingStage === "ready"
+      ? snap.processingLabel
+      : PROCESSING_STAGE_LABELS.ready;
   }
 
   return (
