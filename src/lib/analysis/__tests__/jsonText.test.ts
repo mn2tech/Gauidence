@@ -34,6 +34,13 @@ describe("json text helpers", () => {
             due: "2026-09-01T00:00:00.000Z",
             closed: false,
             labels: [{ name: "Finance" }],
+            attachments: [
+              {
+                name: "chords.pdf",
+                mimeType: "application/pdf",
+                url: "https://trello.com/1/cards/c1/attachments/a1/download/chords.pdf",
+              },
+            ],
           },
         ],
         actions: [{ id: "a1", type: "updateCard", data: { huge: "noise" } }],
@@ -42,7 +49,37 @@ describe("json text helpers", () => {
     assert.match(text, /Trello board: Ops/);
     assert.match(text, /\[Doing\] File taxes/);
     assert.match(text, /Finance/);
+    assert.match(text, /attachment \(PDF\): chords\.pdf/);
+    assert.match(
+      text,
+      /https:\/\/trello\.com\/1\/cards\/c1\/attachments\/a1\/download\/chords\.pdf/
+    );
     assert.doesNotMatch(text, /updateCard/);
+  });
+
+  it("recovers Trello attachments from actions when cards omit them", () => {
+    const text = normalizeJsonText(
+      JSON.stringify({
+        name: "Songs",
+        lists: [{ id: "l1", name: "Setlist" }],
+        cards: [{ id: "c9", idList: "l1", name: "Living Waters", closed: false }],
+        actions: [
+          {
+            type: "addAttachmentToCard",
+            data: {
+              card: { id: "c9" },
+              attachment: {
+                name: "living-waters-chords.pdf",
+                mimeType: "application/pdf",
+                url: "https://trello.com/1/cards/c9/attachments/z/download/living-waters-chords.pdf",
+              },
+            },
+          },
+        ],
+      })
+    );
+    assert.match(text, /attachment \(PDF\): living-waters-chords\.pdf/);
+    assert.match(text, /living-waters-chords\.pdf/);
   });
 
   it("caps oversized JSON", () => {

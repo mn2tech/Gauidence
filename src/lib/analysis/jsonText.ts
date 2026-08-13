@@ -66,6 +66,7 @@ function formatTrelloBoard(
   }
 
   const cards = Array.isArray(board.cards) ? board.cards : [];
+  const attachmentsByCard = attachmentsFromActions(board.actions);
   const openCards = cards.filter((card) => isRecord(card) && card.closed !== true);
   const members = Array.isArray(board.members) ? board.members : [];
   const checklists = Array.isArray(board.checklists) ? board.checklists : [];
@@ -111,6 +112,12 @@ function formatTrelloBoard(
     lines.push(`- [${list}] ${String(card.name ?? "Untitled")}${due}${labelBit}`);
     const desc = String(card.desc ?? "").trim();
     if (desc) lines.push(`  ${desc.slice(0, 280).replace(/\s+/g, " ")}`);
+    for (const attachment of formatCardAttachments(
+      card,
+      attachmentsByCard.get(String(card.id ?? ""))
+    )) {
+      lines.push(attachment);
+    }
     if (joinedLength(lines) > maxChars) {
       lines.push(`…[truncated; ${openCards.length} open cards total]`);
       break;
@@ -133,6 +140,65 @@ function formatTrelloBoard(
   }
 
   return lines.join("\n");
+}
+
+function attachmentsFromActions(actions: unknown): Map<string, unknown[]> {
+  const byCard = new Map<string, unknown[]>();
+  if (!Array.isArray(actions)) return byCard;
+  for (const action of actions) {
+    if (!isRecord(action)) continue;
+    const type = String(action.type ?? "");
+    if (!/attachment/i.test(type)) continue;
+    const data = isRecord(action.data) ? action.data : null;
+    if (!data) continue;
+    const card = isRecord(data.card) ? data.card : null;
+    const attachment = isRecord(data.attachment) ? data.attachment : null;
+    const cardId = card && typeof card.id === "string" ? card.id : "";
+    if (!cardId || !attachment) continue;
+    const list = byCard.get(cardId) ?? [];
+    list.push(attachment);
+    byCard.set(cardId, list);
+  }
+  return byCard;
+}
+
+function formatCardAttachments(
+  card: Record<string, unknown>,
+  actionAttachments?: unknown[]
+): string[] {
+  const fromCard = Array.isArray(card.attachments) ? card.attachments : [];
+  const merged = fromCard.length > 0 ? fromCard : actionAttachments ?? [];
+  if (merged.length === 0) return [];
+  const lines: string[] = [];
+  const limit = 12;
+  const shown = merged.slice(0, limit);
+  for (const raw of shown) {
+    if (!isRecord(raw)) continue;
+    const name = String(raw.name ?? raw.fileName ?? "attachment").trim();
+    const mime = typeof raw.mimeType === "string" ? raw.mimeType : "";
+    const kind = mime.includes("pdf")
+      ? "PDF"
+      : mime.startsWith("image/")
+        ? "image"
+        : mime
+          ? mime
+          : /\.pdf$/i.test(name)
+            ? "PDF"
+            : "file";
+    const url =
+      (typeof raw.url === "string" && raw.url) ||
+      (typeof raw.fileUrl === "string" && raw.fileUrl) ||
+      "";
+    lines.push(
+      url
+        ? `  attachment (${kind}): ${name} — ${url}`
+        : `  attachment (${kind}): ${name}`
+    );
+  }
+  if (merged.length > limit) {
+    lines.push(`  …[${merged.length - limit} more attachments]`);
+  }
+  return lines;
 }
 
 function formatGenericJson(value: unknown): string {
