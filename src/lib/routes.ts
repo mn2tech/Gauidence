@@ -22,6 +22,17 @@ export function documentsHref(profileId?: string | null): string {
   return `${DOCUMENTS_PATH}#documents-${profileId}`;
 }
 
+/** Dashboard URL after switching spaces — always points at the new space. */
+export function vaultSwitchHref(
+  profileId: string,
+  searchParams: URLSearchParams
+): string {
+  const params = new URLSearchParams(searchParams.toString());
+  params.set("profileId", profileId);
+  if (!params.has("docs")) params.set("docs", "1");
+  return `/dashboard?${params.toString()}#documents-${profileId}`;
+}
+
 export function dailyLogHref(profileId?: string | null): string {
   if (!profileId) return DOCUMENTS_PATH;
   const q = new URLSearchParams({ docs: "1", profileId });

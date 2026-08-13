@@ -569,6 +569,12 @@ function readUrlChatId(): string | null {
   return chatId?.trim() ? chatId.trim() : null;
 }
 
+function readUrlProfileId(): string | null {
+  if (typeof window === "undefined") return null;
+  const profileId = new URLSearchParams(window.location.search).get("profileId");
+  return profileId?.trim() ? profileId.trim() : null;
+}
+
 function clearStaleChatPointer(
   chatId: string,
   profileId: string | null,
@@ -738,6 +744,7 @@ export default function VaultChatPanel({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pendingAttachmentRef = useRef<PendingVaultAttachment | null>(null);
   const profileSwitchRef = useRef(false);
+  const skipResumeOnBootstrapRef = useRef(false);
   const deepLinkChatConsumed = useRef<string | null>(null);
   const requestedChatIdRef = useRef<string | null>(requestedChatId);
   const draftAppliedRef = useRef(false);
@@ -1085,7 +1092,9 @@ export default function VaultChatPanel({
       const list = await loadMetaAndChats();
       if (generation !== bootstrapGeneration.current) return;
 
-      if (startFreshChat || isDrawer) return;
+      const skipResume = skipResumeOnBootstrapRef.current;
+      skipResumeOnBootstrapRef.current = false;
+      if (startFreshChat || isDrawer || skipResume) return;
 
       const urlChatId = readUrlChatId();
       const rememberedChatId = readRememberedVaultChat(vaultProfileId);
@@ -1128,18 +1137,6 @@ export default function VaultChatPanel({
       return;
     }
     if (!active?.id) return;
-    if (requestedProfileId && active.id !== requestedProfileId) {
-      // Stale profileId in URL (e.g. from an old vault before switch) — drop it.
-      if (typeof window !== "undefined") {
-        const params = new URLSearchParams(window.location.search);
-        if (params.has("profileId")) {
-          params.delete("profileId");
-          const qs = params.toString();
-          const next = `${window.location.pathname}${qs ? `?${qs}` : ""}`;
-          window.history.replaceState(window.history.state, "", next);
-        }
-      }
-    }
     if (bootstrappedVaultRef.current === active.id) return;
     bootstrappedVaultRef.current = active.id;
     void bootstrapRef.current();
@@ -1149,7 +1146,6 @@ export default function VaultChatPanel({
     active?.id,
     scopedProfileId,
     profiles.length,
-    requestedProfileId,
   ]);
 
   useEffect(() => {
@@ -1161,11 +1157,14 @@ export default function VaultChatPanel({
   useEffect(() => {
     if (profilesLoading || needsSetup || profileSwitchRef.current) return;
     if (scopedProfileId) return;
-    if (!requestedProfileId) return;
-    if (active?.id === requestedProfileId) return;
-    if (!profiles.some((p) => p.id === requestedProfileId)) return;
+    // Read the live URL, not useSearchParams. history.replaceState can clear
+    // profileId before Next.js catches up — the stale param would snap back.
+    const liveProfileId = readUrlProfileId();
+    if (!liveProfileId) return;
+    if (active?.id === liveProfileId) return;
+    if (!profiles.some((p) => p.id === liveProfileId)) return;
     profileSwitchRef.current = true;
-    void switchProfile(requestedProfileId).finally(() => {
+    void switchProfile(liveProfileId).finally(() => {
       profileSwitchRef.current = false;
     });
   }, [
@@ -1175,6 +1174,7 @@ export default function VaultChatPanel({
     needsSetup,
     profiles,
     switchProfile,
+    scopedProfileId,
   ]);
 
   useEffect(() => {
@@ -1241,9 +1241,11 @@ export default function VaultChatPanel({
       bootstrapGeneration.current += 1;
       bootstrappedVaultRef.current = null;
       deepLinkChatConsumed.current = null;
+      skipResumeOnBootstrapRef.current = true;
       setChats([]);
       setActiveChatId(null);
       setMessages([]);
+      setMeta(null);
       setError(null);
       setLoadingHistory(true);
       syncAskUrlRef.current(null);
@@ -2404,7 +2406,7 @@ export default function VaultChatPanel({
             ? { workProjectId: requestedWorkProjectId }
             : {}),
           ...(agentModeEnabled ? { agentMode: true } : {}),
-          searchScope: meta?.searchScope ?? (isPage ? "global" : "workspace"),
+          searchScope: meta?.searchScope ?? "workspace",
         },
         vaultProfileId ?? profileId
       );
@@ -4069,7 +4071,7 @@ export default function VaultChatPanel({
           onOpenSearch={
             isPage ? () => setVaultSearchOpen(true) : undefined
           }
-          searchScope={meta?.searchScope ?? (isPage ? "global" : "workspace")}
+          searchScope={meta?.searchScope ?? "workspace"}
           showSearchScopeToggle={
             profiles.length > 1 && workingInDisplay.mode !== "searching"
           }

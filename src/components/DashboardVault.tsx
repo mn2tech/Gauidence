@@ -41,15 +41,13 @@ import {
   type GuardianProfileType,
 } from "@/lib/profiles/types";
 import { EMPLOYEE_HUB_PATH } from "@/lib/employee-hub/routing";
-import { hasDocumentsIntent, PROPOSALS_PATH, REQUESTS_PATH } from "@/lib/routes";
+import {
+  hasDocumentsIntent,
+  PROPOSALS_PATH,
+  REQUESTS_PATH,
+  vaultSwitchHref,
+} from "@/lib/routes";
 import { clientBusinessLabel } from "@/lib/client-requests/helpers";
-
-function vaultSwitchHref(profileId: string, searchParams: URLSearchParams) {
-  const params = new URLSearchParams(searchParams.toString());
-  if (!params.has("docs")) params.set("docs", "1");
-  const qs = params.toString();
-  return `/dashboard?${qs}#documents-${profileId}`;
-}
 
 function VaultStickyBar({
   onVaultSwitch,
@@ -182,6 +180,7 @@ export default function DashboardVault({ userId }: { userId: string }) {
   const { active, profiles, loading, switchProfile } = useActiveProfile();
   const requestedProfileId = searchParams.get("profileId");
   const switchingRef = useRef(false);
+  const ignoreUrlProfileRef = useRef(false);
   const sectionDefaults = useVaultSectionDefaults(active?.id ?? "");
   const [vaultSearchOpen, setVaultSearchOpen] = useState(false);
 
@@ -193,12 +192,28 @@ export default function DashboardVault({ userId }: { userId: string }) {
   );
 
   useEffect(() => {
-    const onChange = () => router.refresh();
+    const onChange = (event: Event) => {
+      const nextId = (event as CustomEvent<{ profileId?: string }>).detail
+        ?.profileId;
+      ignoreUrlProfileRef.current = true;
+      if (nextId) {
+        router.replace(vaultSwitchHref(nextId, searchParams));
+        return;
+      }
+      router.refresh();
+    };
     window.addEventListener("guardian:profile-changed", onChange);
-    return () => window.removeEventListener("guardian:profile-changed", onChange);
-  }, [router]);
+    return () =>
+      window.removeEventListener("guardian:profile-changed", onChange);
+  }, [router, searchParams]);
 
   useEffect(() => {
+    if (ignoreUrlProfileRef.current) {
+      if (!requestedProfileId || active?.id === requestedProfileId) {
+        ignoreUrlProfileRef.current = false;
+      }
+      return;
+    }
     if (!requestedProfileId || loading || switchingRef.current) return;
     if (active?.id === requestedProfileId) return;
     if (!profiles.some((p) => p.id === requestedProfileId)) return;
