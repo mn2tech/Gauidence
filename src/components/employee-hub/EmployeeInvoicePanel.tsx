@@ -6,10 +6,14 @@ import { Camera, Loader2, Receipt, UploadCloud } from "lucide-react";
 import CameraCaptureModal from "@/components/CameraCaptureModal";
 import { employeeInvoiceDocumentsHref } from "@/lib/employee-hub/routing";
 import type { EmployeeInvoiceDocument } from "@/lib/employee-hub/types";
-import {
-  uploadAndAnalyzeToVault,
-  VAULT_ACCEPTED_TYPES,
-} from "@/lib/vault/clientUpload";
+import { uploadAndAnalyzeToVault } from "@/lib/vault/clientUpload";
+
+const INVOICE_UPLOAD_TYPES = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
 
 type Props = {
   profileId: string;
@@ -108,7 +112,12 @@ export default function EmployeeInvoicePanel({
   async function handleUpload(file: File) {
     setError(null);
     setStatus(null);
-    if (!VAULT_ACCEPTED_TYPES[file.type]) {
+    const type = file.type?.trim();
+    const lower = file.name.toLowerCase();
+    const allowed =
+      INVOICE_UPLOAD_TYPES.has(type) ||
+      /\.(pdf|jpe?g|png|webp)$/.test(lower);
+    if (!allowed) {
       setError("Upload a PDF, JPG, PNG, or WebP invoice.");
       return;
     }

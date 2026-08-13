@@ -37,6 +37,12 @@ import {
   buildPastedTextFile,
   VAULT_PASTE_MAX_CHARS,
 } from "@/lib/vault/pastedText";
+import {
+  resolveVaultFileMimeType,
+  VAULT_ACCEPTED_TYPES,
+  VAULT_FILE_ACCEPT,
+  VAULT_UNSUPPORTED_TYPE_MESSAGE,
+} from "@/lib/vault/acceptedTypes";
 import DocumentChatPanel from "@/components/DocumentChatPanel";
 import CameraCaptureModal from "@/components/CameraCaptureModal";
 import ShareDocumentButton from "@/components/ShareDocumentButton";
@@ -99,13 +105,7 @@ type Analysis = {
   classificationConfidence?: number | null;
 };
 
-const ACCEPTED_TYPES: Record<string, string> = {
-  "application/pdf": "PDF",
-  "image/jpeg": "JPG",
-  "image/png": "PNG",
-  "image/webp": "WebP",
-  "text/plain": "Text",
-};
+const ACCEPTED_TYPES = VAULT_ACCEPTED_TYPES;
 const MAX_SIZE_BYTES = 15 * 1024 * 1024;
 
 const SOURCE_BADGE_STYLES: Record<Fact["source"], string> = {
@@ -458,10 +458,9 @@ export default function DocumentManager({
     if (!file) return;
     setError(null);
 
-    if (!ACCEPTED_TYPES[file.type]) {
-      setError(
-        "That file type isn't supported. Upload a PDF, JPG, PNG, WebP, or paste text."
-      );
+    const mimeType = resolveVaultFileMimeType(file);
+    if (!ACCEPTED_TYPES[mimeType]) {
+      setError(VAULT_UNSUPPORTED_TYPE_MESSAGE);
       return;
     }
     if (file.size > MAX_SIZE_BYTES) {
@@ -493,7 +492,7 @@ export default function DocumentManager({
     try {
       const { error: uploadError } = await supabase.storage
         .from("documents")
-        .upload(path, file, { contentType: file.type });
+        .upload(path, file, { contentType: mimeType });
       if (uploadError) {
         setError(
           uploadError.message?.includes("Bucket not found")
@@ -511,7 +510,7 @@ export default function DocumentManager({
           profile_id: profileId,
           file_name: file.name,
           file_path: path,
-          mime_type: file.type,
+          mime_type: mimeType,
           size_bytes: file.size,
           analysis_status: "uploaded",
         })
@@ -883,12 +882,12 @@ export default function DocumentManager({
           </button>
         </div>
         <p className="text-xs text-ink-muted">
-          PDF, JPG, PNG, WebP, or pasted text — up to 15 MB
+          PDF, JPG, PNG, WebP, JSON, or pasted text — up to 15 MB
         </p>
         <input
           ref={fileInputRef}
           type="file"
-          accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
+          accept={VAULT_FILE_ACCEPT}
           className="hidden"
           onChange={(e) => handleFiles(e.target.files)}
         />

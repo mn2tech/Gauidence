@@ -8,6 +8,7 @@ import {
   type FilePayload,
 } from "@/lib/analysis/llm";
 import { extractDocumentText } from "@/lib/analysis/extract";
+import { isJsonMimeOrName, normalizeJsonText } from "@/lib/analysis/jsonText";
 import {
   ONTOLOGY_EXTRACTION_JSON_SCHEMA,
   parseOntologyExtraction,
@@ -77,6 +78,9 @@ export async function extractOntologyFromSourceContent(args: {
 
   let extractedText = (args.content.text ?? "").trim();
   let extractionMethod = extractedText ? "provided_text" : "none";
+  if (extractedText && isJsonMimeOrName(mimeType, fileName)) {
+    extractedText = normalizeJsonText(extractedText);
+  }
 
   if (
     !extractedText &&

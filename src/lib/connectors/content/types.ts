@@ -6,7 +6,7 @@
 export interface SourceContent {
   mimeType: string;
   filename: string;
-  /** UTF-8 text when already available (plain text / csv). */
+  /** UTF-8 text when already available (plain text / csv / json). */
   text?: string;
   /** Raw bytes for server-side extraction (request-scoped only). */
   bytes?: Uint8Array;
@@ -29,6 +29,8 @@ export const ANALYZE_SUPPORTED_MIME = new Set([
   "text/plain",
   "text/markdown",
   "text/csv",
+  "application/json",
+  "text/json",
   "image/jpeg",
   "image/jpg",
   "image/png",
@@ -47,7 +49,7 @@ export function isAnalyzeSupportedMime(
   const mime = (mimeType ?? "").toLowerCase().trim();
   if (mime && ANALYZE_SUPPORTED_MIME.has(mime)) return true;
   const name = (filename ?? "").toLowerCase();
-  return /\.(pdf|txt|md|csv|jpe?g|png|webp|heic|gif|xlsx|xls)$/i.test(name);
+  return /\.(pdf|txt|md|csv|json|jpe?g|png|webp|heic|gif|xlsx|xls)$/i.test(name);
 }
 
 export function guessMimeFromName(filename: string): string {
@@ -56,6 +58,7 @@ export function guessMimeFromName(filename: string): string {
   if (lower.endsWith(".txt")) return "text/plain";
   if (lower.endsWith(".md")) return "text/markdown";
   if (lower.endsWith(".csv")) return "text/csv";
+  if (lower.endsWith(".json")) return "application/json";
   if (lower.endsWith(".xlsx")) {
     return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
   }

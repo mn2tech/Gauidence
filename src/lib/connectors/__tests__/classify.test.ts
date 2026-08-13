@@ -15,6 +15,8 @@ describe("file type classification", () => {
     assert.equal(classifyFileType("a.xlsx"), "Spreadsheets");
     assert.equal(classifyFileType("notes.txt"), "Text");
     assert.equal(classifyFileType("readme.md"), "Text");
+    assert.equal(classifyFileType("export.json"), "Text");
+    assert.equal(classifyFileType("blob", "application/json"), "Text");
   });
 
   it("falls back to mime type and Other", () => {

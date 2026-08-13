@@ -4,7 +4,7 @@ const IMAGE_EXT = new Set(["jpg", "jpeg", "png", "webp", "heic", "gif", "bmp"]);
 const PDF_EXT = new Set(["pdf"]);
 const DOC_EXT = new Set(["doc", "docx", "rtf", "odt"]);
 const SHEET_EXT = new Set(["xls", "xlsx", "csv", "ods"]);
-const TEXT_EXT = new Set(["txt", "md", "markdown", "log"]);
+const TEXT_EXT = new Set(["txt", "md", "markdown", "log", "json"]);
 
 export function extensionOf(filename: string): string {
   const base = filename.trim().split(/[/\\]/).pop() ?? filename;
@@ -35,7 +35,11 @@ export function classifyFileType(
   ) {
     return "Spreadsheets";
   }
-  if (TEXT_EXT.has(ext) || mimeType?.startsWith("text/")) {
+  if (
+    TEXT_EXT.has(ext) ||
+    mimeType?.startsWith("text/") ||
+    mimeType === "application/json"
+  ) {
     return "Text";
   }
   return "Other";

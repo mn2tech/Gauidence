@@ -1,3 +1,5 @@
+import { isJsonMimeOrName } from "./jsonText";
+
 /**
  * Document input-mode selection (pure; safe for unit tests).
  * Visual structured docs → multimodal page images.
@@ -32,7 +34,8 @@ export function detectDocumentCharacteristics(args: {
   const isPdf = args.mimeType === "application/pdf";
   const isPlainText =
     args.mimeType === "text/plain" ||
-    args.mimeType === "text/markdown";
+    args.mimeType === "text/markdown" ||
+    isJsonMimeOrName(args.mimeType);
   const pageCount = args.extraction.pageCount;
   const nativeTextQuality = args.extraction.quality;
   const hasNativeText = (args.extraction.text ?? "").trim().length >= 40;
@@ -75,7 +78,8 @@ export function resolveAnalysisInputMode(
 ): AnalysisInputMode {
   if (
     characteristics.mimeType === "text/plain" ||
-    characteristics.mimeType === "text/markdown"
+    characteristics.mimeType === "text/markdown" ||
+    isJsonMimeOrName(characteristics.mimeType)
   ) {
     return "text";
   }

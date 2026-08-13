@@ -16,10 +16,12 @@ import {
 } from "@/lib/ontology/types";
 
 describe("connector analyze support", () => {
-  it("accepts pdf, text, csv, images, excel", () => {
+  it("accepts pdf, text, csv, json, images, excel", () => {
     assert.equal(isAnalyzeSupportedMime("application/pdf", "a.pdf"), true);
     assert.equal(isAnalyzeSupportedMime("text/plain", "a.txt"), true);
     assert.equal(isAnalyzeSupportedMime("text/csv", "a.csv"), true);
+    assert.equal(isAnalyzeSupportedMime("application/json", "a.json"), true);
+    assert.equal(isAnalyzeSupportedMime(undefined, "export.json"), true);
     assert.equal(isAnalyzeSupportedMime("image/jpeg", "a.jpg"), true);
     assert.equal(
       isAnalyzeSupportedMime(
@@ -35,6 +37,7 @@ describe("connector analyze support", () => {
   it("guesses mime from filename", () => {
     assert.equal(guessMimeFromName("receipt.PDF"), "application/pdf");
     assert.equal(guessMimeFromName("notes.txt"), "text/plain");
+    assert.equal(guessMimeFromName("export.JSON"), "application/json");
     assert.equal(
       guessMimeFromName("Kpactech02-2.xlsx"),
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"

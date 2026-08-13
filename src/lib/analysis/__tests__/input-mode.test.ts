@@ -71,6 +71,21 @@ describe("analysis input mode", () => {
     assert.equal(resolveAnalysisInputMode(c), "text");
   });
 
+  it("routes JSON uploads to text mode", () => {
+    const c = detectDocumentCharacteristics({
+      mimeType: "application/json",
+      extraction: {
+        quality: 0.9,
+        pageCount: 1,
+        charCount: 500,
+        text: '{"name":"Ada"}',
+      },
+    });
+    assert.equal(c.likelyTextHeavy, true);
+    assert.equal(c.likelyVisuallyStructured, false);
+    assert.equal(resolveAnalysisInputMode(c), "text");
+  });
+
   it("routes pasted plain text to text mode", () => {
     const c = detectDocumentCharacteristics({
       mimeType: "text/plain",

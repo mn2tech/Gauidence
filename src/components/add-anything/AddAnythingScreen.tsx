@@ -27,7 +27,7 @@ import {
 import {
   buildPastedTextFile,
   uploadAndAnalyzeToVault,
-  VAULT_ACCEPTED_TYPES,
+  VAULT_FILE_ACCEPT,
   VAULT_MAX_SIZE_BYTES,
   VAULT_PASTE_MAX_CHARS,
 } from "@/lib/vault/clientUpload";
@@ -444,13 +444,13 @@ export default function AddAnythingScreen() {
           <input
             ref={fileRef}
             type="file"
-            accept={Object.keys(VAULT_ACCEPTED_TYPES).join(",")}
+            accept={VAULT_FILE_ACCEPT}
             className="sr-only"
             onChange={onFileChange}
           />
           <p className="text-xs text-ink-muted">
             Max file size {Math.round(VAULT_MAX_SIZE_BYTES / (1024 * 1024))} MB.
-            Supported: PDF, images, plain text.
+            Supported: PDF, images, plain text, JSON.
           </p>
         </>
       ) : null}

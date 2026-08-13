@@ -29,7 +29,7 @@ import { clientBusinessLabel } from "@/lib/client-requests/helpers";
 import { documentsHref } from "@/lib/routes";
 import {
   uploadAndAnalyzeToVault,
-  VAULT_ACCEPTED_TYPES,
+  VAULT_FILE_ACCEPT,
 } from "@/lib/vault/clientUpload";
 import { createClient } from "@/lib/supabase/client";
 
@@ -638,7 +638,7 @@ export default function ClientRequestsScreen() {
               <input
                 id="request-file"
                 type="file"
-                accept={Object.keys(VAULT_ACCEPTED_TYPES).join(",")}
+                accept={VAULT_FILE_ACCEPT}
                 onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                 className="mt-1 block w-full text-sm text-ink-muted file:mr-3 file:rounded-lg file:border-0 file:bg-brand-light file:px-3 file:py-2 file:text-sm file:font-medium file:text-brand-dark"
               />

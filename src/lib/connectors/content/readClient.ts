@@ -43,7 +43,7 @@ export async function readSourceItemContent(
   if (!isAnalyzeSupportedMime(mime, item.name)) {
     throw new ConnectorError(
       "unsupported",
-      "This file type isn't supported for Analyze yet. Try a PDF, image, text, CSV, or Excel file."
+      "This file type isn't supported for Analyze yet. Try a PDF, image, text, JSON, CSV, or Excel file."
     );
   }
 
@@ -288,7 +288,7 @@ function pickSingleFile(expectedName: string): Promise<File> {
     const input = document.createElement("input");
     input.type = "file";
     input.accept =
-      ".pdf,.txt,.md,.csv,.xls,.xlsx,.jpg,.jpeg,.png,.webp,.gif,.heic,image/*,application/pdf,text/*,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+      ".pdf,.txt,.md,.csv,.json,.xls,.xlsx,.jpg,.jpeg,.png,.webp,.gif,.heic,image/*,application/pdf,text/*,application/json,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     input.style.display = "none";
     document.body.appendChild(input);
 
@@ -325,7 +325,8 @@ function maybeDecodeText(mime: string, bytes: Uint8Array): string | undefined {
   if (
     mime.startsWith("text/") ||
     mime === "application/csv" ||
-    mime === "text/csv"
+    mime === "text/csv" ||
+    mime === "application/json"
   ) {
     try {
       return new TextDecoder("utf-8", { fatal: false }).decode(bytes);

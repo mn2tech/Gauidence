@@ -13,6 +13,7 @@ import {
   scoreExtractionQuality,
 } from "./extract-quality";
 import { shouldPreparePageImages } from "./inputMode";
+import { isJsonMimeOrName, normalizeJsonText } from "./jsonText";
 
 export type ExtractionMethod =
   | "native_pdf"
@@ -171,15 +172,18 @@ export async function extractDocumentText(args: {
   base64: string;
   fileName: string;
 }): Promise<ExtractionResult> {
+  const isJson = isJsonMimeOrName(args.mimeType, args.fileName);
   if (
     args.mimeType === "text/plain" ||
     args.mimeType === "text/markdown" ||
+    isJson ||
     /\.txt$/i.test(args.fileName)
   ) {
-    const text = Buffer.from(args.base64, "base64")
+    const raw = Buffer.from(args.base64, "base64")
       .toString("utf8")
       .replace(/\r\n/g, "\n")
       .trim();
+    const text = isJson ? normalizeJsonText(raw) : raw;
     const report = assessExtractionQuality(text);
     return {
       text,
@@ -194,8 +198,12 @@ export async function extractDocumentText(args: {
       nativeTextPreview: previewText(text || "[empty pasted text]", 800),
       reason:
         text.length === 0
-          ? "Pasted text document was empty."
-          : "Plain text / pasted content; using native text for analysis.",
+          ? isJson
+            ? "JSON document was empty."
+            : "Pasted text document was empty."
+          : isJson
+            ? "JSON file; using native text for analysis."
+            : "Plain text / pasted content; using native text for analysis.",
     };
   }
 

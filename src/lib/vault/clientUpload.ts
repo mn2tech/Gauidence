@@ -3,14 +3,18 @@
 import { createClient } from "@/lib/supabase/client";
 import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
 import { syncDocumentAwards } from "@/lib/awards/client";
+import {
+  resolveVaultFileMimeType,
+  VAULT_ACCEPTED_TYPES,
+  VAULT_UNSUPPORTED_TYPE_MESSAGE,
+} from "@/lib/vault/acceptedTypes";
 
-export const VAULT_ACCEPTED_TYPES: Record<string, string> = {
-  "application/pdf": "PDF",
-  "image/jpeg": "JPEG",
-  "image/png": "PNG",
-  "image/webp": "WebP",
-  "text/plain": "Text",
-};
+export {
+  resolveVaultFileMimeType,
+  VAULT_ACCEPTED_TYPES,
+  VAULT_FILE_ACCEPT,
+  VAULT_UNSUPPORTED_TYPE_MESSAGE,
+} from "@/lib/vault/acceptedTypes";
 
 export const VAULT_MAX_SIZE_BYTES = 15 * 1024 * 1024;
 export {
@@ -32,19 +36,6 @@ import {
 
 export type { VaultUploadResult };
 
-function resolveVaultFileMimeType(file: { type: string; name: string }): string {
-  const direct = file.type?.trim();
-  if (direct && VAULT_ACCEPTED_TYPES[direct]) return direct;
-
-  const lower = file.name.toLowerCase();
-  if (lower.endsWith(".txt")) return "text/plain";
-  if (lower.endsWith(".pdf")) return "application/pdf";
-  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
-  if (lower.endsWith(".png")) return "image/png";
-  if (lower.endsWith(".webp")) return "image/webp";
-  return direct || "";
-}
-
 /**
  * Upload a file into the active profile vault and queue background analysis.
  */
@@ -64,9 +55,7 @@ export async function uploadAndAnalyzeToVault(args: {
   }
 
   if (!VAULT_ACCEPTED_TYPES[resolveVaultFileMimeType(args.file)]) {
-    throw new Error(
-      "That file type isn't supported. Upload a PDF, JPG, PNG, WebP, or paste text."
-    );
+    throw new Error(VAULT_UNSUPPORTED_TYPE_MESSAGE);
   }
   if (args.file.size > VAULT_MAX_SIZE_BYTES) {
     throw new Error("That file is larger than 15 MB. Please upload a smaller file.");

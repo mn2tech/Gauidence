@@ -136,6 +136,7 @@ function guessMime(filename: string): string {
     csv: "text/csv",
     txt: "text/plain",
     md: "text/markdown",
+    json: "application/json",
   };
   return map[ext] ?? "";
 }

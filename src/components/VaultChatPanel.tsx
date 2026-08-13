@@ -92,7 +92,14 @@ import { isImageFileName } from "@/lib/vault/images";
 import { renderPdfThumbnailFromFile, renderPdfThumbnailFromUrl } from "@/lib/vault/pdfThumbnail";
 import { renderGideonText } from "@/components/gideonText";
 import { clipboardImageToFile } from "@/lib/vault/clipboardImage";
-import { uploadAndAnalyzeToVault, type VaultUploadResult } from "@/lib/vault/clientUpload";
+import {
+  uploadAndAnalyzeToVault,
+  resolveVaultFileMimeType,
+  VAULT_ACCEPTED_TYPES,
+  VAULT_FILE_ACCEPT,
+  VAULT_UNSUPPORTED_TYPE_MESSAGE,
+  type VaultUploadResult,
+} from "@/lib/vault/clientUpload";
 import SmartUploadSuggestionCard from "@/components/SmartUploadSuggestionCard";
 import WorkspaceContextBar from "@/components/WorkspaceContextBar";
 import GlobalVaultSearch from "@/components/GlobalVaultSearch";
@@ -903,6 +910,10 @@ export default function VaultChatPanel({
       if (!profileId || vaultBusy || sending) return;
       setPlusOpen(false);
       setCameraOpen(false);
+      if (!VAULT_ACCEPTED_TYPES[resolveVaultFileMimeType(file)]) {
+        setError(VAULT_UNSUPPORTED_TYPE_MESSAGE);
+        return;
+      }
       setError(null);
       setPendingAttachment((prev) => {
         if (prev?.previewUrl) revokePendingPreview(prev.previewUrl);
@@ -4291,7 +4302,7 @@ export default function VaultChatPanel({
         <input
           ref={fileInputRef}
           type="file"
-          accept="application/pdf,image/jpeg,image/png,image/webp"
+          accept={VAULT_FILE_ACCEPT}
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0];
