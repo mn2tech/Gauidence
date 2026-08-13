@@ -187,10 +187,12 @@ export const GIDEON_ATTACHED_DOCUMENT_NOTE = `Attached document:
 - Answer using that attachment. Do not say the image or file is missing.
 - For photos: describe what you see when asked; transcribe visible text or lists when asked.`;
 
-export const GIDEON_CROSS_VAULT_NOTE = `Everything search:
-- Excerpts may come from any space or workspace the user can access, not only the active space shown in the UI.
-- When the answer relies on a specific space, start with a short lead-in such as "From Nolan's space:" before the facts.
-- Attribute each fact to the space owner labeled in the source. Do not imply the document is in the active space unless it is.`;
+export const GIDEON_CROSS_VAULT_NOTE = `All-spaces search:
+- Excerpts may come from any space the user can access, not only the active space shown in the UI.
+- Start the reply with "From all your spaces:" then the answer.
+- When a fact is from a specific space, name it (for example "From Nolan's space:").
+- Do not imply a document is in the active space unless the source says so.
+- New files, notes, and reminders still belong in the active space.`;
 
 export const GIDEON_TRANSCRIPTION_NOTE = `Transcription mode:
 - The user wants a readable transcription or list from their space (often a photo or scan).
@@ -653,7 +655,7 @@ export function gideonChatContextLabel(
 }
 
 export const VAULT_SCOPE_NOTE =
-  "Searching Everything across your spaces and workspaces.";
+  "Searching all your spaces.";
 
 function formatVaultNameList(vaultNames: string[]): string {
   if (vaultNames.length <= 5) return vaultNames.join(", ");
@@ -710,9 +712,9 @@ export function buildVaultScopeNote(args: {
     if (isGlobal) {
       const list = formatVaultNameList(searchNames);
       if (scoped) {
-        return `Searching Everything across ${searchNames.length} spaces and workspaces · Chat saved in ${scoped}.`;
+        return `Searching all ${searchNames.length} spaces · Chat saved in ${scoped}.`;
       }
-      return `Searching Everything: ${list}.`;
+      return `Searching all your spaces: ${list}.`;
     }
     if (scoped) {
       return `Answers may use all ${searchNames.length} spaces · Chat saved in ${scoped}.`;

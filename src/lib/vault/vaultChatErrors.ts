@@ -7,7 +7,7 @@ const GENERIC_VAULT_CHAT_ERROR =
 
 /** Shown when the model returns no text (not when facts need verification). */
 export const GIDEON_EMPTY_ANSWER_FALLBACK =
-  "I couldn't put together an answer just now. Try rephrasing your question, or switch search scope to Everything if the information might be in another space.";
+  "I couldn't put together an answer just now. Try rephrasing your question, or switch to All spaces if it might be in another space.";
 
 /** When retrieval found no document excerpts and the model still returned blank. */
 export function buildGideonEmptyAnswerFallback(args: {
@@ -15,12 +15,12 @@ export function buildGideonEmptyAnswerFallback(args: {
   explicitSpaceName?: string | null;
 }): string {
   if (args.explicitSpaceName?.trim()) {
-    return `I couldn't find anything in ${args.explicitSpaceName.trim()} that matches that question. Try adding a document or Daily Log there, or switch search scope to Everything if it might be in another space.`;
+    return `I couldn't find anything in ${args.explicitSpaceName.trim()} that matches that question. Try adding a document or Daily Log there, or switch to All spaces if it might be in another space.`;
   }
   if (args.chunks.length > 0) {
     return "I found some related material but couldn't finish the answer. Please try asking again in one sentence.";
   }
-  return "I couldn't find anything in your spaces that matches that question. Try rephrasing, adding a document or Daily Log, or switch search scope to Everything if it might be in another space.";
+  return "I couldn't find anything in your spaces that matches that question. Try rephrasing, adding a document or Daily Log, or switch to All spaces if it might be in another space.";
 }
 
 export function formatVaultChatError(err: unknown): {

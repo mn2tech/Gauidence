@@ -165,7 +165,7 @@ describe("Gideon helpers", () => {
     );
     assert.equal(
       VAULT_SCOPE_NOTE,
-      "Searching Everything across your spaces and workspaces."
+      "Searching all your spaces."
     );
     assert.equal(
       buildVaultScopeNote({ displayName: "Nolan", profileKind: "child" }),
@@ -230,7 +230,7 @@ describe("Gideon helpers", () => {
         searchVaultNames: ["Personal", "Business", "Nolan"],
         searchScope: "global",
       }),
-      "Searching Everything: Personal, Business, Nolan."
+      "Searching all your spaces: Personal, Business, Nolan."
     );
   });
 

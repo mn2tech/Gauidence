@@ -5,11 +5,18 @@ import { useEffect, useRef, useState } from "react";
 import ProfileAvatar from "@/components/ProfileAvatar";
 import type { WorkingInDisplay } from "@/lib/workspace-context/client";
 import {
+  SEARCH_SCOPE_FIRST_HINT,
+  searchScopeHeading,
+  searchScopeHint,
   searchScopeLabel,
   type SearchScopeMode,
 } from "@/lib/workspace-context/client";
 import type { GuardianProfile } from "@/lib/profiles/types";
 import { nestedUnder, topLevelProfiles } from "@/lib/profiles/types";
+import {
+  readSearchScopeHintSeen,
+  writeSearchScopeHintSeen,
+} from "@/lib/vault/searchScopeHintClient";
 
 type Props = {
   display: WorkingInDisplay;
@@ -96,7 +103,12 @@ export default function WorkspaceContextBar({
   className = "",
 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [hintSeen, setHintSeen] = useState(true);
   const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setHintSeen(readSearchScopeHintSeen());
+  }, []);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -108,10 +120,18 @@ export default function WorkspaceContextBar({
   }, [menuOpen]);
 
   const heading = "Searching";
-  const scopeLabel =
-    showSearchScopeToggle && searchScope === "global"
-      ? searchScopeLabel("global")
-      : display.primaryName;
+  const scopeLabel = showSearchScopeToggle
+    ? searchScopeHeading(searchScope, display.primaryName)
+    : display.primaryName;
+  const hint = showSearchScopeToggle
+    ? searchScopeHint(searchScope, display.primaryName)
+    : null;
+  const showFirstHint = showSearchScopeToggle && !hintSeen;
+
+  function markHintSeen() {
+    writeSearchScopeHintSeen(true);
+    setHintSeen(true);
+  }
 
   return (
     <div
@@ -125,13 +145,28 @@ export default function WorkspaceContextBar({
           <p className="text-sm font-semibold text-foreground">
             {scopeLabel}
           </p>
-          {display.secondaryLabel &&
-          !(showSearchScopeToggle && searchScope === "global") ? (
+          {display.secondaryLabel && searchScope !== "global" ? (
             <p className="text-xs text-ink-muted">{display.secondaryLabel}</p>
           ) : null}
         </div>
-        {display.scopeNote ? (
+        {hint ? (
+          <p className="mt-0.5 text-[11px] text-ink-muted">{hint}</p>
+        ) : display.scopeNote ? (
           <p className="mt-0.5 text-[11px] text-ink-muted">{display.scopeNote}</p>
+        ) : null}
+        {showFirstHint ? (
+          <div className="mt-2 rounded-lg bg-white px-2.5 py-2 ring-1 ring-stone-200">
+            <p className="text-[11px] leading-snug text-foreground">
+              {SEARCH_SCOPE_FIRST_HINT}
+            </p>
+            <button
+              type="button"
+              onClick={markHintSeen}
+              className="mt-1.5 text-[11px] font-semibold text-brand hover:text-brand-dark"
+            >
+              Got it
+            </button>
+          </div>
         ) : null}
         {showSearchScopeToggle && onSearchScopeChange ? (
           <div
@@ -144,7 +179,11 @@ export default function WorkspaceContextBar({
                 key={mode}
                 type="button"
                 aria-pressed={searchScope === mode}
-                onClick={() => onSearchScopeChange(mode)}
+                title={searchScopeHint(mode, display.primaryName)}
+                onClick={() => {
+                  markHintSeen();
+                  onSearchScopeChange(mode);
+                }}
                 className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition ${
                   searchScope === mode
                     ? "bg-brand text-white"

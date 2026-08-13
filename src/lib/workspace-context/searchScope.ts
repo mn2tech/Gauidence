@@ -78,8 +78,30 @@ export function profileIdsForSearchScope(
 }
 
 export function searchScopeLabel(mode: SearchScopeMode): string {
-  return mode === "global" ? "Everything" : "This space";
+  return mode === "global" ? "All spaces" : "This space";
 }
+
+/** Large heading next to Searching — space name, or “all your spaces”. */
+export function searchScopeHeading(
+  mode: SearchScopeMode,
+  spaceName: string
+): string {
+  return mode === "global" ? "All your spaces" : spaceName;
+}
+
+/** One-line explanation under the This space / All spaces pills. */
+export function searchScopeHint(
+  mode: SearchScopeMode,
+  spaceName: string
+): string {
+  if (mode === "global") {
+    return `Answers can come from any space you can access. New files still save in ${spaceName}.`;
+  }
+  return "Answers come only from this space.";
+}
+
+export const SEARCH_SCOPE_FIRST_HINT =
+  "You have more than one space. Stay in this one, or search all of them? New files always save here.";
 
 export function formatSearchConfidence(score: number): string {
   const pct = Math.round(Math.max(0, Math.min(100, score)));

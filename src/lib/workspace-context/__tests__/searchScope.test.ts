@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import {
   buildWorkingInDisplay,
   parseSearchScope,
+  searchScopeHeading,
+  searchScopeHint,
   searchScopeLabel,
 } from "../searchScope.ts";
 
@@ -48,6 +50,26 @@ describe("parseSearchScope", () => {
 describe("searchScopeLabel", () => {
   it("labels workspace and global scopes", () => {
     assert.equal(searchScopeLabel("workspace"), "This space");
-    assert.equal(searchScopeLabel("global"), "Everything");
+    assert.equal(searchScopeLabel("global"), "All spaces");
+  });
+});
+
+describe("searchScopeHeading", () => {
+  it("uses the space name or all-spaces heading", () => {
+    assert.equal(searchScopeHeading("workspace", "NM2TECH"), "NM2TECH");
+    assert.equal(searchScopeHeading("global", "NM2TECH"), "All your spaces");
+  });
+});
+
+describe("searchScopeHint", () => {
+  it("explains this-space vs all-spaces in one line", () => {
+    assert.equal(
+      searchScopeHint("workspace", "NM2TECH"),
+      "Answers come only from this space."
+    );
+    assert.equal(
+      searchScopeHint("global", "NM2TECH"),
+      "Answers can come from any space you can access. New files still save in NM2TECH."
+    );
   });
 });

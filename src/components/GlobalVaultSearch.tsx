@@ -28,6 +28,7 @@ import {
   withSearchTerm,
 } from "@/lib/search";
 import {
+  searchScopeHint,
   searchScopeLabel,
   type SearchScopeMode,
 } from "@/lib/workspace-context/client";
@@ -256,6 +257,7 @@ export default function GlobalVaultSearch({
               key={mode}
               type="button"
               onClick={() => setSearchScope(mode)}
+              title={searchScopeHint(mode, active?.display_name ?? "this space")}
               className={`rounded-full px-3 py-1 text-xs font-medium transition ${
                 searchScope === mode
                   ? "bg-brand text-white"
