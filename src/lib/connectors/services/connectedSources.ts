@@ -147,6 +147,7 @@ export async function updateConnectedSource(
     settings?: Record<string, unknown>;
     lastScanAt?: string | null;
     sourceUri?: string | null;
+    profileId?: string | null;
   }
 ): Promise<ConnectedSource> {
   const payload: Record<string, unknown> = {};
@@ -155,6 +156,7 @@ export async function updateConnectedSource(
   if (patch.settings !== undefined) payload.settings = patch.settings;
   if (patch.lastScanAt !== undefined) payload.last_scan_at = patch.lastScanAt;
   if (patch.sourceUri !== undefined) payload.source_uri = patch.sourceUri;
+  if (patch.profileId !== undefined) payload.profile_id = patch.profileId;
 
   const { data, error } = await supabase
     .from("connected_sources")

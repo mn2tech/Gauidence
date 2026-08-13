@@ -63,6 +63,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
     displayName?: string;
     settings?: Record<string, unknown>;
     lastScanAt?: string | null;
+    profileId?: string | null;
   };
   try {
     body = await req.json();

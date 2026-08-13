@@ -128,6 +128,7 @@ export async function POST(req: Request) {
           sourceUri,
           status: "connected",
           settings,
+          profileId: body.profileId ?? null,
         });
         return NextResponse.json({ source, reused: true });
       }

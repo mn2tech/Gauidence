@@ -14,6 +14,22 @@ import {
 import { AndroidStorageConnector } from "@/lib/connectors/android/AndroidStorageConnector";
 import { ConnectorError, type ConnectedSource, type ScanResultSummary } from "@/lib/connectors/types";
 import { formatLastScanned } from "@/lib/connectors/services/sourceItems";
+import { useActiveProfile } from "@/components/ProfileProvider";
+
+const TRELLO_BOUND_SPACE_NAME = "Wednesday Practice";
+
+function findTrelloBoundProfile<T extends { id: string; display_name: string }>(
+  profiles: T[]
+): T | null {
+  const target = TRELLO_BOUND_SPACE_NAME.toLowerCase();
+  return (
+    profiles.find((p) => p.display_name.trim().toLowerCase() === target) ??
+    profiles.find((p) =>
+      p.display_name.trim().toLowerCase().includes("wednesday practice")
+    ) ??
+    null
+  );
+}
 
 type CategoryCounts = {
   Images: number;
@@ -62,6 +78,11 @@ function StatusDot({
 }
 
 export default function ConnectionsPanel() {
+  const { profiles } = useActiveProfile();
+  const trelloBoundProfile = useMemo(
+    () => findTrelloBoundProfile(profiles),
+    [profiles]
+  );
   const [sources, setSources] = useState<ConnectedSource[]>([]);
   const [summary, setSummary] = useState<ItemSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -273,6 +294,11 @@ export default function ConnectionsPanel() {
     setError(null);
     setScanResult(null);
     try {
+      if (!trelloBoundProfile) {
+        throw new Error(
+          `Create a space named "${TRELLO_BOUND_SPACE_NAME}" first, then connect Trello.`
+        );
+      }
       const res = await fetch("/api/connections", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -280,6 +306,7 @@ export default function ConnectionsPanel() {
           sourceType: "trello",
           apiKey: trelloApiKey.trim(),
           token: trelloToken.trim(),
+          profileId: trelloBoundProfile.id,
         }),
       });
       const body = (await res.json().catch(() => ({}))) as {
@@ -314,7 +341,31 @@ export default function ConnectionsPanel() {
     } finally {
       setBusy(null);
     }
-  }, [load, trelloApiKey, trelloToken]);
+  }, [load, trelloApiKey, trelloBoundProfile, trelloToken]);
+
+  const bindTrelloToWednesdayPractice = useCallback(async () => {
+    if (!trelloSource || !trelloBoundProfile) return;
+    setBusy("trello-bind");
+    setError(null);
+    try {
+      const res = await fetch(`/api/connections/${trelloSource.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profileId: trelloBoundProfile.id }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        throw new Error(body.error ?? "Couldn't bind Trello to that space.");
+      }
+      await load();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Couldn't bind Trello to that space."
+      );
+    } finally {
+      setBusy(null);
+    }
+  }, [load, trelloBoundProfile, trelloSource]);
 
   const scanTrelloAgain = useCallback(async () => {
     if (!trelloSource) return;
@@ -678,6 +729,20 @@ export default function ConnectionsPanel() {
                         </dd>
                       </div>
                       <div className="flex justify-between gap-4">
+                        <dt className="text-ink-muted">Bound space</dt>
+                        <dd className="font-medium text-foreground">
+                          {trelloSource.profileId &&
+                          trelloBoundProfile &&
+                          trelloSource.profileId === trelloBoundProfile.id
+                            ? trelloBoundProfile.display_name
+                            : trelloSource.profileId
+                              ? profiles.find(
+                                  (p) => p.id === trelloSource.profileId
+                                )?.display_name ?? "Another space"
+                              : "Not bound to a space"}
+                        </dd>
+                      </div>
+                      <div className="flex justify-between gap-4">
                         <dt className="text-ink-muted">Boards discovered</dt>
                         <dd className="font-medium text-foreground">
                           {trelloSummary?.total ?? "—"}
@@ -693,6 +758,24 @@ export default function ConnectionsPanel() {
                       </div>
                     </dl>
                     <div className="mt-5 flex flex-wrap gap-2">
+                      {trelloBoundProfile &&
+                      trelloSource.profileId !== trelloBoundProfile.id ? (
+                        <button
+                          type="button"
+                          onClick={() => void bindTrelloToWednesdayPractice()}
+                          disabled={busy !== null}
+                          className="inline-flex items-center justify-center rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-60"
+                        >
+                          {busy === "trello-bind" ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Binding…
+                            </>
+                          ) : (
+                            `Bind to ${TRELLO_BOUND_SPACE_NAME}`
+                          )}
+                        </button>
+                      ) : null}
                       <Link
                         href={`/settings/connections/${trelloSource.id}`}
                         className="inline-flex items-center justify-center rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-foreground hover:bg-stone-50"
@@ -743,12 +826,22 @@ export default function ConnectionsPanel() {
                     </p>
                     <p className="mt-2 text-sm text-ink-muted">
                       Connect with your Trello API key and token to import open
-                      boards for analysis — no manual CSV/JSON export needed.
+                      boards into{" "}
+                      <span className="font-medium text-foreground">
+                        {TRELLO_BOUND_SPACE_NAME}
+                      </span>
+                      .
                     </p>
+                    {!trelloBoundProfile ? (
+                      <p className="mt-2 text-sm text-amber-800">
+                        Create a space named &quot;{TRELLO_BOUND_SPACE_NAME}
+                        &quot; first, then connect.
+                      </p>
+                    ) : null}
                     <button
                       type="button"
                       onClick={() => setTrelloModalOpen(true)}
-                      disabled={busy !== null}
+                      disabled={busy !== null || !trelloBoundProfile}
                       className="mt-4 inline-flex items-center justify-center rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-60"
                     >
                       Connect Trello
@@ -876,8 +969,11 @@ export default function ConnectionsPanel() {
               Connect Trello
             </h3>
             <p className="mt-2 text-sm text-ink-muted">
-              Paste your Power-Up API key and user token. Guardian stores them
-              only for your account and uses them to list and analyze boards.
+              Paste your Power-Up API key and user token. Boards analyze into{" "}
+              <span className="font-medium text-foreground">
+                {trelloBoundProfile?.display_name ?? TRELLO_BOUND_SPACE_NAME}
+              </span>
+              .
             </p>
             <label className="mt-4 block text-sm font-medium text-foreground">
               API key
