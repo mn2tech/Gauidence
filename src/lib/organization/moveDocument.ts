@@ -133,21 +133,26 @@ export async function moveDocumentToProfile(
   ]);
 
   const childFailed = childUpdates.find((r) => r.error);
-  if (childFailed?.error) {
-    return {
-      ok: true,
-      targetProfileId: target.id,
-      targetProfileName: target.display_name,
-      previousProfileId,
-      warning:
-        "Document moved, but some related records may still show under the old vault. Re-analyze if Ask can't find it.",
-    };
-  }
+
+  const { relocateOntologyAfterDocumentMove } = await import(
+    "@/lib/ontology/moveWithDocument"
+  );
+  const ontology = await relocateOntologyAfterDocumentMove(supabase, {
+    userId,
+    documentId,
+    fromSpaceId: previousProfileId,
+    toSpaceId: target.id,
+  });
+
+  const warning = childFailed?.error
+    ? "Document moved, but some related records may still show under the old vault. Re-analyze if Ask can't find it."
+    : ontology.warning;
 
   return {
     ok: true,
     targetProfileId: target.id,
     targetProfileName: target.display_name,
     previousProfileId,
+    ...(warning ? { warning } : {}),
   };
 }

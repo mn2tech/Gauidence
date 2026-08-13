@@ -12,6 +12,7 @@ import { parseOntologyExtraction } from "../schema";
 import { formatOntologyForGideon, buildOntologyAnswerFallback } from "../formatForGideon";
 import { reviewStatusForConfidence } from "../types";
 import { sanitizeConnectorOntologyExtraction } from "../pipeline/sanitizeConnectorExtraction";
+import { planOntologyDetach } from "../detachFromDocument";
 
 describe("normalizeEntityName", () => {
   it("lowercases and trims", () => {
@@ -273,6 +274,104 @@ describe("entity resolution normalization", () => {
     assert.equal(short, "nm2tech");
     assert.equal(full, "nm2tech llc");
     assert.equal(short, full.replace(" llc", ""));
+  });
+});
+
+describe("planOntologyDetach", () => {
+  const invoice = "doc-invoice";
+  const acme = {
+    id: "ent-acme",
+    entity_type: "organization",
+    source_type: "document",
+    source_id: invoice,
+  };
+  const invoiceEnt = {
+    id: "ent-inv",
+    entity_type: "invoice",
+    source_type: "document",
+    source_id: invoice,
+  };
+  const fileEnt = {
+    id: "ent-file",
+    entity_type: "document",
+    source_type: "document",
+    source_id: invoice,
+  };
+  const issuedBy = {
+    id: "rel-issued",
+    source_document_id: invoice,
+    source_entity_id: "ent-inv",
+    target_entity_id: "ent-acme",
+  };
+
+  it("keeps shared entities that other files still evidence", () => {
+    const plan = planOntologyDetach({
+      documentId: invoice,
+      documentEvidence: [
+        { id: "ev-1", entity_id: "ent-acme", relationship_id: null },
+        { id: "ev-2", entity_id: "ent-inv", relationship_id: null },
+        { id: "ev-3", entity_id: null, relationship_id: "rel-issued" },
+      ],
+      otherEvidence: [
+        { id: "ev-other", entity_id: "ent-acme", relationship_id: null },
+      ],
+      relationships: [issuedBy],
+      entities: [acme, invoiceEnt, fileEnt],
+    });
+
+    assert.ok(plan.deleteEvidenceIds.includes("ev-1"));
+    assert.ok(plan.deleteRelationshipIds.includes("rel-issued"));
+    assert.ok(plan.deleteEntityIds.includes("ent-inv"));
+    assert.ok(plan.deleteEntityIds.includes("ent-file"));
+    assert.ok(!plan.deleteEntityIds.includes("ent-acme"));
+  });
+
+  it("removes entities only evidenced by the moved file", () => {
+    const plan = planOntologyDetach({
+      documentId: invoice,
+      documentEvidence: [
+        { id: "ev-1", entity_id: "ent-acme", relationship_id: null },
+        { id: "ev-2", entity_id: "ent-inv", relationship_id: null },
+      ],
+      otherEvidence: [],
+      relationships: [issuedBy],
+      entities: [acme, invoiceEnt, fileEnt],
+    });
+
+    assert.ok(plan.deleteEntityIds.includes("ent-acme"));
+    assert.ok(plan.deleteEntityIds.includes("ent-inv"));
+    assert.ok(plan.deleteEntityIds.includes("ent-file"));
+  });
+
+  it("does not delete manual entities", () => {
+    const plan = planOntologyDetach({
+      documentId: invoice,
+      documentEvidence: [
+        { id: "ev-1", entity_id: "ent-acme", relationship_id: null },
+      ],
+      otherEvidence: [],
+      relationships: [],
+      entities: [{ ...acme, source_type: "manual", source_id: null }],
+    });
+
+    assert.ok(!plan.deleteEntityIds.includes("ent-acme"));
+  });
+
+  it("clears source_document_id when a relationship still has other evidence", () => {
+    const plan = planOntologyDetach({
+      documentId: invoice,
+      documentEvidence: [
+        { id: "ev-1", entity_id: null, relationship_id: "rel-issued" },
+      ],
+      otherEvidence: [
+        { id: "ev-other", entity_id: null, relationship_id: "rel-issued" },
+      ],
+      relationships: [issuedBy],
+      entities: [acme, invoiceEnt],
+    });
+
+    assert.deepEqual(plan.deleteRelationshipIds, []);
+    assert.deepEqual(plan.clearRelationshipSourceDocIds, ["rel-issued"]);
   });
 });
 

@@ -229,21 +229,26 @@ export async function POST(request: Request, ctx: Ctx) {
       "Document related profile update failed:",
       childFailed.error.message
     );
-    return NextResponse.json(
-      {
-        documentId,
-        profileId: targetProfileId,
-        profileName: target.display_name,
-        warning:
-          "Document moved, but some related records may still show under the old vault. Re-analyze if Ask can't find it.",
-      },
-      { status: 200 }
-    );
   }
+
+  const { relocateOntologyAfterDocumentMove } = await import(
+    "@/lib/ontology/moveWithDocument"
+  );
+  const ontology = await relocateOntologyAfterDocumentMove(supabase, {
+    userId: user.id,
+    documentId,
+    fromSpaceId: source.id,
+    toSpaceId: targetProfileId,
+  });
+
+  const warning = childFailed?.error
+    ? "Document moved, but some related records may still show under the old vault. Re-analyze if Ask can't find it."
+    : ontology.warning;
 
   return NextResponse.json({
     documentId,
     profileId: targetProfileId,
     profileName: target.display_name,
+    ...(warning ? { warning } : {}),
   });
 }
