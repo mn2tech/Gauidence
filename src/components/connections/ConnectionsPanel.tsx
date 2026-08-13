@@ -780,7 +780,7 @@ export default function ConnectionsPanel() {
                         href={`/settings/connections/${trelloSource.id}`}
                         className="inline-flex items-center justify-center rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-foreground hover:bg-stone-50"
                       >
-                        Browse Boards
+                        Browse Boards & PDFs
                       </Link>
                       <button
                         type="button"
@@ -826,7 +826,7 @@ export default function ConnectionsPanel() {
                     </p>
                     <p className="mt-2 text-sm text-ink-muted">
                       Connect with your Trello API key and token to import open
-                      boards into{" "}
+                      boards and PDF attachments into{" "}
                       <span className="font-medium text-foreground">
                         {TRELLO_BOUND_SPACE_NAME}
                       </span>

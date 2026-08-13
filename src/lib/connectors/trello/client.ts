@@ -35,14 +35,6 @@ export class TrelloApiError extends Error {
   }
 }
 
-function authQuery(creds: TrelloCredentials): string {
-  const params = new URLSearchParams({
-    key: creds.apiKey,
-    token: creds.token,
-  });
-  return params.toString();
-}
-
 async function trelloFetch<T>(
   creds: TrelloCredentials,
   path: string,
@@ -114,7 +106,8 @@ export async function fetchTrelloBoardExport(
     creds,
     `/boards/${encodeURIComponent(boardId)}`,
     {
-      fields: "id,name,desc,url,shortUrl,shortLink,closed,dateLastActivity,labelNames",
+      fields:
+        "id,name,desc,url,shortUrl,shortLink,closed,dateLastActivity,labelNames",
       lists: "open",
       list_fields: "id,name,closed,pos",
       cards: "open",
@@ -133,76 +126,80 @@ export async function fetchTrelloBoardExport(
   return board;
 }
 
-export function formatBoardAsAnalysisText(
-  board: Record<string, unknown>
-): string {
-  const name = String(board.name ?? "Untitled board");
-  const lines: string[] = [`Trello board: ${name}`];
-  const url = board.url ?? board.shortUrl;
-  if (typeof url === "string" && url) lines.push(`URL: ${url}`);
-  if (typeof board.desc === "string" && board.desc.trim()) {
-    lines.push(`Description: ${board.desc.trim().slice(0, 500)}`);
-  }
-
-  const lists = Array.isArray(board.lists) ? board.lists : [];
-  const listName = new Map<string, string>();
-  for (const list of lists) {
-    if (!list || typeof list !== "object") continue;
-    const row = list as Record<string, unknown>;
-    if (typeof row.id === "string") {
-      listName.set(row.id, String(row.name ?? "Untitled list"));
+/** Open cards on a board with attachment metadata (for PDF discovery). */
+export async function listTrelloBoardCardsWithAttachments(
+  creds: TrelloCredentials,
+  boardId: string
+): Promise<unknown[]> {
+  const cards = await trelloFetch<unknown[]>(
+    creds,
+    `/boards/${encodeURIComponent(boardId)}/cards`,
+    {
+      filter: "open",
+      fields: "id,name,closed,idList",
+      attachments: "true",
+      attachment_fields: "id,name,url,mimeType,bytes,date,fileName",
     }
-  }
-  const listNames = [...listName.values()];
-  if (listNames.length) {
-    lines.push(`Lists (${listNames.length}): ${listNames.join(", ")}`);
-  }
+  );
+  return Array.isArray(cards) ? cards : [];
+}
 
-  const members = Array.isArray(board.members) ? board.members : [];
-  const memberNames = members
-    .filter((m): m is Record<string, unknown> => !!m && typeof m === "object")
-    .map((m) => String(m.fullName ?? m.username ?? ""))
-    .filter(Boolean);
-  if (memberNames.length) {
-    lines.push(`Members: ${memberNames.join(", ")}`);
+/**
+ * Download an uploaded Trello attachment (PDF, etc.).
+ * Prefer the authenticated download endpoint; fall back to the attachment URL.
+ */
+export async function downloadTrelloAttachment(
+  creds: TrelloCredentials,
+  args: {
+    cardId: string;
+    attachmentId: string;
+    fileName: string;
+    url?: string;
   }
-
-  const cards = Array.isArray(board.cards) ? board.cards : [];
-  const openCards = cards.filter((c) => {
-    if (!c || typeof c !== "object") return false;
-    return (c as Record<string, unknown>).closed !== true;
+): Promise<{ bytes: Uint8Array; contentType: string }> {
+  const safeName = encodeURIComponent(
+    args.fileName.replace(/[^\w.\- ()[\]]+/g, "_") || "attachment.pdf"
+  );
+  const downloadPath = `/cards/${encodeURIComponent(args.cardId)}/attachments/${encodeURIComponent(args.attachmentId)}/download/${safeName}`;
+  const params = new URLSearchParams({
+    key: creds.apiKey,
+    token: creds.token,
   });
-  lines.push(`Cards (${openCards.length} open / ${cards.length} total):`);
 
-  const maxChars = 80_000;
-  for (const card of openCards) {
-    if (!card || typeof card !== "object") continue;
-    const row = card as Record<string, unknown>;
-    const list = listName.get(String(row.idList ?? "")) ?? "Unknown list";
-    const labels = Array.isArray(row.labels)
-      ? row.labels
-          .filter((l): l is Record<string, unknown> => !!l && typeof l === "object")
-          .map((l) => String(l.name ?? ""))
-          .filter(Boolean)
-          .join(", ")
-      : "";
-    const due = row.due ? ` | due ${String(row.due).slice(0, 10)}` : "";
-    const labelBit = labels ? ` | labels: ${labels}` : "";
-    lines.push(
-      `- [${list}] ${String(row.name ?? "Untitled")}${due}${labelBit}`
-    );
-    const desc = String(row.desc ?? "").trim();
-    if (desc) lines.push(`  ${desc.slice(0, 280).replace(/\s+/g, " ")}`);
-    if (lines.join("\n").length > maxChars) {
-      lines.push(`…[truncated; ${openCards.length} open cards total]`);
-      break;
+  const tryUrls = [
+    `${TRELLO_API}${downloadPath}?${params.toString()}`,
+    args.url
+      ? args.url.includes("?")
+        ? `${args.url}&${params.toString()}`
+        : `${args.url}?${params.toString()}`
+      : null,
+  ].filter(Boolean) as string[];
+
+  let lastStatus = 0;
+  let lastText = "";
+  for (const url of tryUrls) {
+    const res = await fetch(url, {
+      method: "GET",
+      headers: { Accept: "*/*" },
+      cache: "no-store",
+      redirect: "follow",
+    });
+    if (res.ok) {
+      const buf = new Uint8Array(await res.arrayBuffer());
+      const contentType =
+        res.headers.get("content-type")?.split(";")[0]?.trim() ||
+        "application/pdf";
+      return { bytes: buf, contentType };
     }
+    lastStatus = res.status;
+    lastText = await res.text().catch(() => "");
   }
 
-  return lines.join("\n");
+  throw new TrelloApiError(
+    lastStatus || 502,
+    lastText.slice(0, 200) ||
+      `Couldn't download Trello attachment (${lastStatus || "error"})`
+  );
 }
 
-/** @internal test helper — auth query shape */
-export function __testAuthQuery(creds: TrelloCredentials): string {
-  return authQuery(creds);
-}
+export { formatBoardAsAnalysisText } from "./formatBoard";

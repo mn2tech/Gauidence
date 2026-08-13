@@ -11,7 +11,7 @@ import {
 import { connectorLog } from "@/lib/connectors/log";
 import { getConnectedSourceWithSecrets } from "@/lib/connectors/services/connectedSources";
 import { getSourceItem } from "@/lib/connectors/services/sourceItems";
-import { loadTrelloBoardAnalysisContent } from "@/lib/connectors/trello/scan";
+import { loadTrelloItemAnalysisContent } from "@/lib/connectors/trello/scan";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -107,18 +107,25 @@ export async function POST(req: Request, ctx: Ctx) {
         }
         const item = await getSourceItem(supabase, sourceId, itemId);
         if (!item) {
-          return NextResponse.json({ error: "Board not found." }, { status: 404 });
+          return NextResponse.json({ error: "Item not found." }, { status: 404 });
         }
-        const loaded = await loadTrelloBoardAnalysisContent(
-          source,
-          item.externalId
-        );
+        const loaded = await loadTrelloItemAnalysisContent(source, item);
+        if (loaded.bytes.byteLength > MAX_BYTES) {
+          return NextResponse.json(
+            {
+              error:
+                "This Trello file is too large to analyze right now (15 MB limit).",
+            },
+            { status: 413 }
+          );
+        }
         filename = loaded.filename;
         mimeType = loaded.mimeType;
         bytes = loaded.bytes;
         text = loaded.text;
         contentHash = body.contentHash?.trim() || (await sha256Hex(bytes));
-        profileId = body.profileId ?? null;
+        // Bound Trello space (e.g. Wednesday Practice) wins over active space.
+        profileId = source.profileId ?? body.profileId ?? null;
         force = Boolean(body.force);
       } else {
         if (!body.base64) {

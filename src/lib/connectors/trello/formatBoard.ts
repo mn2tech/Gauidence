@@ -60,6 +60,32 @@ export function formatBoardAsAnalysisText(
     );
     const desc = String(row.desc ?? "").trim();
     if (desc) lines.push(`  ${desc.slice(0, 280).replace(/\s+/g, " ")}`);
+    const attachments = Array.isArray(row.attachments) ? row.attachments : [];
+    for (const raw of attachments.slice(0, 12)) {
+      if (!raw || typeof raw !== "object") continue;
+      const att = raw as Record<string, unknown>;
+      const attName = String(att.name ?? att.fileName ?? "attachment").trim();
+      const mime = typeof att.mimeType === "string" ? att.mimeType : "";
+      const kind = mime.includes("pdf")
+        ? "PDF"
+        : mime.startsWith("image/")
+          ? "image"
+          : /\.pdf$/i.test(attName)
+            ? "PDF"
+            : "file";
+      const attUrl =
+        (typeof att.url === "string" && att.url) ||
+        (typeof att.fileUrl === "string" && att.fileUrl) ||
+        "";
+      lines.push(
+        attUrl
+          ? `  attachment (${kind}): ${attName} — ${attUrl}`
+          : `  attachment (${kind}): ${attName}`
+      );
+    }
+    if (attachments.length > 12) {
+      lines.push(`  …[${attachments.length - 12} more attachments]`);
+    }
     if (lines.join("\n").length > maxChars) {
       lines.push(`…[truncated; ${openCards.length} open cards total]`);
       break;

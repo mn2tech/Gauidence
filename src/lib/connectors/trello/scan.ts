@@ -2,12 +2,15 @@ import "server-only";
 
 import type { ConnectedSource, SourceItem } from "../types";
 import {
+  downloadTrelloAttachment,
   fetchTrelloBoardExport,
+  listTrelloBoardCardsWithAttachments,
   listTrelloBoards,
   type TrelloCredentials,
   verifyTrelloCredentials,
 } from "./client";
 import { formatBoardAsAnalysisText } from "./formatBoard";
+import { collectPdfAttachmentsFromCards } from "./attachments";
 
 export function getTrelloCredentials(
   source: Pick<ConnectedSource, "settings">
@@ -43,18 +46,22 @@ export async function scanTrelloSource(
 ): Promise<SourceItem[]> {
   const creds = getTrelloCredentials(source);
   if (!creds) {
-    throw new Error("Trello credentials are missing. Reconnect with your API key and token.");
+    throw new Error(
+      "Trello credentials are missing. Reconnect with your API key and token."
+    );
   }
 
   const boards = await listTrelloBoards(creds);
-  return boards.map((board) => {
+  const items: SourceItem[] = [];
+
+  for (const board of boards) {
     const uri =
       board.url ||
       board.shortUrl ||
       (board.shortLink
         ? `https://trello.com/b/${board.shortLink}`
         : `trello://board/${board.id}`);
-    return {
+    items.push({
       sourceId: source.id,
       externalId: board.id,
       name: board.name || "Untitled board",
@@ -68,15 +75,61 @@ export async function scanTrelloSource(
         closed: board.closed ?? false,
         desc: typeof board.desc === "string" ? board.desc.slice(0, 280) : null,
       },
-      processingStatus: "discovered" as const,
-    };
-  });
+      processingStatus: "discovered",
+    });
+
+    try {
+      const cards = await listTrelloBoardCardsWithAttachments(creds, board.id);
+      const pdfs = collectPdfAttachmentsFromCards({
+        boardId: board.id,
+        boardName: board.name || "Untitled board",
+        cards,
+      });
+      for (const pdf of pdfs) {
+        items.push({
+          sourceId: source.id,
+          externalId: `att:${pdf.attachmentId}`,
+          name: pdf.name,
+          mimeType: "application/pdf",
+          sourceUri:
+            pdf.url ||
+            `trello://card/${pdf.cardId}/attachment/${pdf.attachmentId}`,
+          sizeBytes: pdf.bytes,
+          modifiedAt: pdf.date,
+          metadata: {
+            provider: "trello",
+            kind: "attachment",
+            attachmentId: pdf.attachmentId,
+            cardId: pdf.cardId,
+            cardName: pdf.cardName,
+            boardId: pdf.boardId,
+            boardName: pdf.boardName,
+          },
+          processingStatus: "discovered",
+        });
+      }
+    } catch (err) {
+      // Board listing still succeeds if one board's attachments fail.
+      console.warn(
+        "Trello PDF attachment scan failed for board",
+        board.id,
+        err instanceof Error ? err.message : err
+      );
+    }
+  }
+
+  return items;
 }
 
 export async function loadTrelloBoardAnalysisContent(
   source: ConnectedSource,
   boardId: string
-): Promise<{ text: string; filename: string; mimeType: string; bytes: Uint8Array }> {
+): Promise<{
+  text: string;
+  filename: string;
+  mimeType: string;
+  bytes: Uint8Array;
+}> {
   const creds = getTrelloCredentials(source);
   if (!creds) {
     throw new Error("Trello credentials are missing.");
@@ -91,6 +144,75 @@ export async function loadTrelloBoardAnalysisContent(
     mimeType: "application/json",
     bytes,
   };
+}
+
+export async function loadTrelloAttachmentAnalysisContent(
+  source: ConnectedSource,
+  item: {
+    name: string;
+    metadata?: Record<string, unknown> | null;
+  }
+): Promise<{
+  text?: string;
+  filename: string;
+  mimeType: string;
+  bytes: Uint8Array;
+}> {
+  const creds = getTrelloCredentials(source);
+  if (!creds) {
+    throw new Error("Trello credentials are missing.");
+  }
+  const meta = item.metadata ?? {};
+  const cardId = String(meta.cardId ?? "").trim();
+  const attachmentId = String(meta.attachmentId ?? "").trim();
+  if (!cardId || !attachmentId) {
+    throw new Error("This Trello attachment is missing card/attachment ids. Scan again.");
+  }
+  const fileName = item.name || "attachment.pdf";
+  const url = typeof meta.url === "string" ? meta.url : undefined;
+  // Prefer URL from source item if present in metadata via scan — we store url in sourceUri.
+  const downloaded = await downloadTrelloAttachment(creds, {
+    cardId,
+    attachmentId,
+    fileName,
+    url,
+  });
+  return {
+    filename: fileName,
+    mimeType: downloaded.contentType.includes("pdf")
+      ? "application/pdf"
+      : downloaded.contentType || "application/pdf",
+    bytes: downloaded.bytes,
+  };
+}
+
+export async function loadTrelloItemAnalysisContent(
+  source: ConnectedSource,
+  item: {
+    externalId: string;
+    name: string;
+    mimeType?: string;
+    sourceUri?: string;
+    metadata?: Record<string, unknown> | null;
+  }
+): Promise<{
+  text?: string;
+  filename: string;
+  mimeType: string;
+  bytes: Uint8Array;
+}> {
+  const kind = String(item.metadata?.kind ?? "");
+  if (kind === "attachment") {
+    const loaded = await loadTrelloAttachmentAnalysisContent(source, {
+      name: item.name,
+      metadata: {
+        ...(item.metadata ?? {}),
+        url: item.sourceUri,
+      },
+    });
+    return loaded;
+  }
+  return loadTrelloBoardAnalysisContent(source, item.externalId);
 }
 
 export { verifyTrelloCredentials };

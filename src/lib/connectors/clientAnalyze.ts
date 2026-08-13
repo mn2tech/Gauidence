@@ -60,13 +60,13 @@ export function isItemNeedsAnalyze(
   );
 }
 
-function isTrelloBoardItem(item: SourceItem): boolean {
-  return item.metadata?.provider === "trello" || item.metadata?.kind === "board";
+function isTrelloRemoteItem(item: SourceItem): boolean {
+  return item.metadata?.provider === "trello";
 }
 
 /**
  * Read bytes + POST analyze for one connected source item.
- * Trello boards are fetched server-side (no local file picker).
+ * Trello boards/PDFs are fetched server-side (no local file picker).
  */
 export async function analyzeSourceItemClient(args: {
   sourceId: string;
@@ -82,7 +82,7 @@ export async function analyzeSourceItemClient(args: {
       item.processingStatus === "analyzed" ||
       item.processingStatus === "analysis_failed";
 
-    if (isTrelloBoardItem(item)) {
+    if (isTrelloRemoteItem(item)) {
       const res = await fetch(
         `/api/connections/${sourceId}/items/${item.id}/analyze`,
         {
