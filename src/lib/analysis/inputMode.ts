@@ -35,6 +35,8 @@ export function detectDocumentCharacteristics(args: {
   const isPlainText =
     args.mimeType === "text/plain" ||
     args.mimeType === "text/markdown" ||
+    args.mimeType === "text/csv" ||
+    args.mimeType === "application/csv" ||
     isJsonMimeOrName(args.mimeType);
   const pageCount = args.extraction.pageCount;
   const nativeTextQuality = args.extraction.quality;
@@ -79,6 +81,8 @@ export function resolveAnalysisInputMode(
   if (
     characteristics.mimeType === "text/plain" ||
     characteristics.mimeType === "text/markdown" ||
+    characteristics.mimeType === "text/csv" ||
+    characteristics.mimeType === "application/csv" ||
     isJsonMimeOrName(characteristics.mimeType)
   ) {
     return "text";

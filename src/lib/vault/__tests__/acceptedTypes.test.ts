@@ -13,6 +13,12 @@ describe("vault accepted types", () => {
     assert.match(VAULT_FILE_ACCEPT, /application\/json/);
   });
 
+  it("includes CSV", () => {
+    assert.equal(VAULT_ACCEPTED_TYPES["text/csv"], "CSV");
+    assert.match(VAULT_FILE_ACCEPT, /\.csv/);
+    assert.match(VAULT_FILE_ACCEPT, /text\/csv/);
+  });
+
   it("resolves JSON from MIME or extension", () => {
     assert.equal(
       resolveVaultFileMimeType({
@@ -24,6 +30,29 @@ describe("vault accepted types", () => {
     assert.equal(
       resolveVaultFileMimeType({ type: "", name: "contacts.JSON" }),
       "application/json"
+    );
+  });
+
+  it("resolves CSV from MIME or extension", () => {
+    assert.equal(
+      resolveVaultFileMimeType({ type: "text/csv", name: "export.csv" }),
+      "text/csv"
+    );
+    assert.equal(
+      resolveVaultFileMimeType({ type: "application/csv", name: "export.csv" }),
+      "text/csv"
+    );
+    assert.equal(
+      resolveVaultFileMimeType({ type: "", name: "contacts.CSV" }),
+      "text/csv"
+    );
+    // Windows often labels .csv as Excel MIME — prefer extension.
+    assert.equal(
+      resolveVaultFileMimeType({
+        type: "application/vnd.ms-excel",
+        name: "rows.csv",
+      }),
+      "text/csv"
     );
   });
 

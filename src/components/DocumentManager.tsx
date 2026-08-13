@@ -887,7 +887,7 @@ export default function DocumentManager({
           </button>
         </div>
         <p className="text-xs text-ink-muted">
-          PDF, JPG, PNG, WebP, JSON, or pasted text — up to 15 MB
+          PDF, JPG, PNG, WebP, CSV, JSON, or pasted text — up to 15 MB
         </p>
         <input
           ref={fileInputRef}

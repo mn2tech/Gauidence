@@ -173,9 +173,14 @@ export async function extractDocumentText(args: {
   fileName: string;
 }): Promise<ExtractionResult> {
   const isJson = isJsonMimeOrName(args.mimeType, args.fileName);
+  const isCsv =
+    args.mimeType === "text/csv" ||
+    args.mimeType === "application/csv" ||
+    /\.csv$/i.test(args.fileName);
   if (
     args.mimeType === "text/plain" ||
     args.mimeType === "text/markdown" ||
+    isCsv ||
     isJson ||
     /\.txt$/i.test(args.fileName)
   ) {
@@ -200,10 +205,14 @@ export async function extractDocumentText(args: {
         text.length === 0
           ? isJson
             ? "JSON document was empty."
-            : "Pasted text document was empty."
+            : isCsv
+              ? "CSV document was empty."
+              : "Pasted text document was empty."
           : isJson
             ? "JSON file; using native text for analysis."
-            : "Plain text / pasted content; using native text for analysis.",
+            : isCsv
+              ? "CSV file; using native text for analysis."
+              : "Plain text / pasted content; using native text for analysis.",
     };
   }
 
