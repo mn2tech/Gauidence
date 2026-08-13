@@ -57,5 +57,8 @@ describe("wantsTranscription", () => {
     assert.equal(wantsTranscription("list all participants"), true);
     assert.equal(wantsTranscription("who is presiding tonight"), true);
     assert.equal(wantsTranscription("who are the participants"), true);
+    assert.equal(wantsTranscription("list all the members on the roster"), true);
+    assert.equal(wantsTranscription("who is on the roster"), true);
+    assert.equal(wantsTranscription("list all the members"), true);
   });
 });

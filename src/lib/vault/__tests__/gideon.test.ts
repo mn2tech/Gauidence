@@ -10,6 +10,7 @@ import {
   isSimpleCurrentTimeQuestion,
   isSimpleTodayDateQuestion,
   firstNameFrom,
+  buildListAnswerFromChunks,
   getVaultTemplate,
   gideonChatContextLabel,
   parseGideonSections,
@@ -282,6 +283,23 @@ Payment status is unclear.`);
     );
     assert.equal(sections.length, 1);
     assert.equal(sections[0]?.kind, "body");
+  });
+
+  it("builds a numbered roster from retrieved fact lines", () => {
+    const answer = buildListAnswerFromChunks([
+      {
+        file_name: "roster.jpg",
+        content: `Document: roster.jpg
+Title: Member Roster
+Facts:
+- Person: Ada Lovelace
+- Person: Alan Turing
+- Member: Grace Hopper`,
+      },
+    ]);
+    assert.match(answer ?? "", /Member Roster/);
+    assert.match(answer ?? "", /1\. Ada Lovelace/);
+    assert.match(answer ?? "", /3\. Grace Hopper/);
   });
 });
 

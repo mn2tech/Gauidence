@@ -1,12 +1,14 @@
 import { GIDEON_SYSTEM } from "./gideon";
 
 /** Cap each retrieved excerpt so vault context stays lean. */
-const CHUNK_CONTENT_MAX_CHARS = 700;
+export const CHUNK_CONTENT_MAX_CHARS = 700;
+/** Keep full roster/list chunks so names are not cut off mid-list. */
+export const TRANSCRIPTION_CHUNK_MAX_CHARS = 4000;
 
-function trimChunkContent(content: string): string {
+function trimChunkContent(content: string, maxChars = CHUNK_CONTENT_MAX_CHARS): string {
   const trimmed = content.trim();
-  if (trimmed.length <= CHUNK_CONTENT_MAX_CHARS) return trimmed;
-  return `${trimmed.slice(0, CHUNK_CONTENT_MAX_CHARS).trimEnd()}…`;
+  if (trimmed.length <= maxChars) return trimmed;
+  return `${trimmed.slice(0, maxChars).trimEnd()}…`;
 }
 
 export type RetrievedChunk = {
@@ -26,7 +28,10 @@ export type RetrievedChunk = {
   match_source?: string;
 };
 
-export function formatRetrievalContext(chunks: RetrievedChunk[]): {
+export function formatRetrievalContext(
+  chunks: RetrievedChunk[],
+  options?: { maxChunkChars?: number }
+): {
   context: string;
   citations: { documentId: string; fileName: string; profileName?: string }[];
 } {
@@ -34,6 +39,7 @@ export function formatRetrievalContext(chunks: RetrievedChunk[]): {
     return { context: "", citations: [] };
   }
 
+  const maxChunkChars = options?.maxChunkChars ?? CHUNK_CONTENT_MAX_CHARS;
   const citationMap = new Map<
     string,
     { fileName: string; profileName?: string }
@@ -56,7 +62,7 @@ export function formatRetrievalContext(chunks: RetrievedChunk[]): {
         : ` | sim:${c.similarity.toFixed(3)}`;
     const sourceMeta = c.match_source ? ` | match:${c.match_source}` : "";
     blocks.push(
-      `[Source: ${label}${spaceTag} | doc:${c.document_id} | chunk:${c.chunk_index}${rankMeta}${sourceMeta}]\n${trimChunkContent(c.content)}`
+      `[Source: ${label}${spaceTag} | doc:${c.document_id} | chunk:${c.chunk_index}${rankMeta}${sourceMeta}]\n${trimChunkContent(c.content, maxChunkChars)}`
     );
   }
 

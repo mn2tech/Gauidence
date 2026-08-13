@@ -166,20 +166,70 @@ export function wantsTranscription(question: string): boolean {
     /\bread (?:this|the) (?:note|list|photo|image|picture|document|sheet|program)\b/i.test(
       q
     ) ||
-    /\blist (?:the |all )?(?:items?|books?|names?|participants?|people|attendees?)\b/i.test(
+    /\blist (?:(?:the |all |all the |every )+)?(?:items?|books?|names?|participants?|people|attendees?|members?)\b/i.test(
       q
     ) ||
-    /\bgive me (?:the |their |all )?(?:names?|participants?|people|attendees?|roster)\b/i.test(
+    /\b(?:list|show|give|read|who(?:'s| is)|what(?:'s| are)).{0,48}\broster\b/i.test(
+      q
+    ) ||
+    /\b(?:members?|names?|people|participants?|attendees?) on (?:the |this )?(?:roster|list)\b/i.test(
+      q
+    ) ||
+    /\bgive me (?:the |their |all )?(?:names?|participants?|people|attendees?|members?|roster)\b/i.test(
       q
     ) ||
     /\bbook names?\b/i.test(q) ||
     /\bitems (?:on|in) (?:this|the)\b/i.test(q) ||
     /\bturn this into a list\b/i.test(q) ||
     /\bwho(?:'s| is) (?:presiding|leading)\b/i.test(q) ||
-    /\b(?:who|what) are (?:the )?(?:participants?|people|names?|attendees?)\b/i.test(
+    /\b(?:who|what) are (?:the )?(?:participants?|people|names?|attendees?|members?)\b/i.test(
       q
     )
   );
+}
+
+const SKIP_LIST_LABELS =
+  /^(document|title|type|summary|warnings?|specialist fields|facts)$/i;
+
+/** Numbered list from retrieved fact lines when the model returns a blank reply. */
+export function buildListAnswerFromChunks(
+  chunks: { content: string; file_name?: string }[]
+): string | null {
+  const items: string[] = [];
+  const seen = new Set<string>();
+  let title = "";
+
+  for (const chunk of chunks) {
+    for (const raw of chunk.content.split(/\r?\n/)) {
+      const line = raw.trim();
+      if (!line) continue;
+      const titleMatch = line.match(/^Title:\s*(.+)$/i);
+      if (titleMatch?.[1] && !title) {
+        title = titleMatch[1].trim();
+        continue;
+      }
+      const fact = line.match(/^[-*•]\s+(?:([^:]{1,40}):\s*)?(.+)$/);
+      if (!fact) continue;
+      const label = (fact[1] ?? "").trim();
+      const value = (fact[2] ?? "").trim();
+      if (
+        !value ||
+        value.length > 120 ||
+        SKIP_LIST_LABELS.test(label) ||
+        SKIP_LIST_LABELS.test(value)
+      ) {
+        continue;
+      }
+      const key = value.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      items.push(value);
+    }
+  }
+
+  if (items.length < 2) return null;
+  const heading = title || "From your documents";
+  return `${heading}\n\n${items.map((item, i) => `${i + 1}. ${item}`).join("\n")}`;
 }
 
 export const GIDEON_ATTACHED_DOCUMENT_NOTE = `Attached document:

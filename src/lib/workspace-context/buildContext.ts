@@ -161,7 +161,7 @@ export async function loadWorkspaceContext(
       : null;
   embeddingDurationMs = Date.now() - embeddingStarted;
 
-  const matchCount = showPictures ? 10 : 8;
+  const matchCount = showPictures ? 10 : transcriptionMode ? 20 : 8;
   const rollupScopes: LinkedVaultProfile[] = effectiveRetrievalScopes.map((scope) => ({
     id: scope.id,
     display_name: scope.display_name,
@@ -188,7 +188,9 @@ export async function loadWorkspaceContext(
   }
 
   const chunks = mergePinnedChunks(attachedDoc?.chunks ?? [], retrievedChunks);
-  const formatted = formatRetrievalContext(chunks);
+  const formatted = formatRetrievalContext(chunks, {
+    maxChunkChars: transcriptionMode ? 4000 : undefined,
+  });
 
   const ontologySpaceId =
     explicitSpace?.id ?? meta.chatScopedProfileId ?? activeProfile.id;

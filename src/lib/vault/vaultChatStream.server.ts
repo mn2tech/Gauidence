@@ -35,6 +35,7 @@ import { withLlmUsage } from "@/lib/usage/record";
 import { recordChatEvent } from "@/lib/billing/quota";
 import { refreshUserAwards } from "@/lib/awards/grant";
 import { formatVaultChatError, buildGideonEmptyAnswerFallback } from "@/lib/vault/vaultChatErrors";
+import { buildListAnswerFromChunks } from "@/lib/vault/gideon";
 import { buildOntologyAnswerFallback } from "@/lib/ontology/formatForGideon";
 import {
   listActionTimeline,
@@ -158,7 +159,7 @@ export function createVaultChatStreamResponse(
           answer = await runChatCompletionStream(client, {
             system: `${args.system}\n\nCRITICAL: You must reply with at least one complete sentence. Never return a blank response.`,
             model: CHAT_MODEL,
-            maxTokens: Math.min(args.maxTokens, 700),
+            maxTokens: Math.max(args.maxTokens, 1600),
             messages: [
               ...args.history,
               { role: "user", content: args.question },
@@ -178,6 +179,7 @@ export function createVaultChatStreamResponse(
 
         if (!answer.trim()) {
           answer =
+            buildListAnswerFromChunks(args.chunks) ??
             buildOntologyAnswerFallback(args.ontologyBlock ?? "") ??
             buildGideonEmptyAnswerFallback({
               chunks: args.chunks,
