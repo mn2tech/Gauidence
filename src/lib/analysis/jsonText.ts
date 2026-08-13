@@ -11,6 +11,18 @@ const NOISY_JSON_KEYS = new Set([
   "labelNames",
 ]);
 
+/** Heavy Trello keys stripped before JSON.parse so large exports do not OOM. */
+const STRIP_BEFORE_PARSE = [
+  "actions",
+  "pluginData",
+  "memberships",
+  "limits",
+  "prefs",
+  "powerUps",
+  "premiumFeatures",
+  "labelNames",
+];
+
 /** Detect JSON documents by MIME or filename. */
 export function isJsonMimeOrName(
   mimeType?: string | null,
@@ -19,6 +31,153 @@ export function isJsonMimeOrName(
   const mime = (mimeType ?? "").toLowerCase().trim();
   if (mime === "application/json" || mime === "text/json") return true;
   return /\.json$/i.test(fileName ?? "");
+}
+
+/**
+ * Remove selected top-level object keys before parsing.
+ * Used to drop Trello history (`actions`) which can be megabytes.
+ */
+export function stripTopLevelJsonKeys(
+  raw: string,
+  keys: string[] = STRIP_BEFORE_PARSE
+): string {
+  if (!raw || keys.length === 0) return raw;
+  const drop = new Set(keys);
+  let out = "";
+  let i = 0;
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+
+  while (i < raw.length) {
+    const ch = raw[i]!;
+
+    if (inString) {
+      out += ch;
+      if (escape) escape = false;
+      else if (ch === "\\") escape = true;
+      else if (ch === "\"") inString = false;
+      i += 1;
+      continue;
+    }
+
+    if (ch === "\"") {
+      // Possible key at depth 1: "name" :
+      if (depth === 1) {
+        const keyMatch = readJsonKey(raw, i);
+        if (keyMatch && drop.has(keyMatch.key)) {
+          const afterKey = skipWs(raw, keyMatch.end);
+          if (raw[afterKey] === ":") {
+            const valueStart = skipWs(raw, afterKey + 1);
+            const valueEnd = skipJsonValue(raw, valueStart);
+            let next = skipWs(raw, valueEnd);
+            if (raw[next] === ",") next += 1;
+            // Drop trailing comma left before this key if present in out
+            out = out.replace(/,\s*$/, "");
+            i = next;
+            continue;
+          }
+        }
+      }
+      inString = true;
+      out += ch;
+      i += 1;
+      continue;
+    }
+
+    if (ch === "{" || ch === "[") depth += 1;
+    else if (ch === "}" || ch === "]") depth -= 1;
+    out += ch;
+    i += 1;
+  }
+
+  // Clean double commas / trailing commas from removals
+  return out
+    .replace(/,\s*,/g, ",")
+    .replace(/,\s*([}\]])/g, "$1");
+}
+
+function readJsonKey(
+  raw: string,
+  start: number
+): { key: string; end: number } | null {
+  if (raw[start] !== "\"") return null;
+  let i = start + 1;
+  let escape = false;
+  let key = "";
+  while (i < raw.length) {
+    const ch = raw[i]!;
+    if (escape) {
+      key += ch;
+      escape = false;
+      i += 1;
+      continue;
+    }
+    if (ch === "\\") {
+      escape = true;
+      i += 1;
+      continue;
+    }
+    if (ch === "\"") return { key, end: i + 1 };
+    key += ch;
+    i += 1;
+  }
+  return null;
+}
+
+function skipWs(raw: string, start: number): number {
+  let i = start;
+  while (i < raw.length && /\s/.test(raw[i]!)) i += 1;
+  return i;
+}
+
+function skipJsonValue(raw: string, start: number): number {
+  let i = skipWs(raw, start);
+  const ch = raw[i];
+  if (ch === "\"" ) {
+    i += 1;
+    let escape = false;
+    while (i < raw.length) {
+      const c = raw[i]!;
+      if (escape) escape = false;
+      else if (c === "\\") escape = true;
+      else if (c === "\"") return i + 1;
+      i += 1;
+    }
+    return i;
+  }
+  if (ch === "{" || ch === "[") {
+    const open = ch;
+    const close = ch === "{" ? "}" : "]";
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+    while (i < raw.length) {
+      const c = raw[i]!;
+      if (inString) {
+        if (escape) escape = false;
+        else if (c === "\\") escape = true;
+        else if (c === "\"") inString = false;
+        i += 1;
+        continue;
+      }
+      if (c === "\"") {
+        inString = true;
+        i += 1;
+        continue;
+      }
+      if (c === open) depth += 1;
+      else if (c === close) {
+        depth -= 1;
+        if (depth === 0) return i + 1;
+      }
+      i += 1;
+    }
+    return i;
+  }
+  // number, true, false, null
+  while (i < raw.length && !/[,}\]\s]/.test(raw[i]!)) i += 1;
+  return i;
 }
 
 /**
@@ -32,11 +191,16 @@ export function normalizeJsonText(
   const trimmed = raw.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").trim();
   if (!trimmed) return "";
 
+  const stripped = stripTopLevelJsonKeys(trimmed);
   let parsed: unknown;
   try {
-    parsed = JSON.parse(trimmed) as unknown;
+    parsed = JSON.parse(stripped) as unknown;
   } catch {
-    return clipWithNote(trimmed, maxChars);
+    try {
+      parsed = JSON.parse(trimmed) as unknown;
+    } catch {
+      return clipWithNote(trimmed, maxChars);
+    }
   }
 
   const text = isTrelloBoard(parsed)

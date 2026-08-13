@@ -266,25 +266,29 @@ export default function DocumentManager({
   );
 
   const { statuses: processingStatuses, markActive, refreshStatus } =
-    useDocumentProcessingPoll(activeDocumentIds, { kickProcessing: true });
+    useDocumentProcessingPoll(activeDocumentIds, {
+      // Only kick the worker for queued/uploaded docs — never while Reading/Analyzing.
+      kickProcessing: documents.some(
+        (d) =>
+          d.analysis_status === "uploaded" || d.analysis_status === "queued"
+      ),
+    });
 
   const hasQueuedDocuments = useMemo(
     () =>
       documents.some(
         (d) =>
-          d.analysis_status === "uploaded" ||
-          d.analysis_status === "queued" ||
-          IN_PROGRESS_ANALYSIS.includes(d.analysis_status)
+          d.analysis_status === "uploaded" || d.analysis_status === "queued"
       ),
     [documents]
   );
 
   useEffect(() => {
     if (!hasQueuedDocuments) return;
-    void kickDocumentProcessingJobs(3);
+    void kickDocumentProcessingJobs(2);
     const timer = window.setInterval(() => {
-      void kickDocumentProcessingJobs(3);
-    }, 4000);
+      void kickDocumentProcessingJobs(2);
+    }, 5000);
     return () => window.clearInterval(timer);
   }, [hasQueuedDocuments]);
 

@@ -1,6 +1,10 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { isJsonMimeOrName, normalizeJsonText } from "../jsonText";
+import {
+  isJsonMimeOrName,
+  normalizeJsonText,
+  stripTopLevelJsonKeys,
+} from "../jsonText";
 
 describe("json text helpers", () => {
   it("detects JSON by mime or filename", () => {
@@ -17,6 +21,20 @@ describe("json text helpers", () => {
     );
     assert.equal(normalizeJsonText("{not json"), "{not json");
     assert.equal(normalizeJsonText("  "), "");
+  });
+
+  it("strips heavy top-level keys before parse", () => {
+    const raw = JSON.stringify({
+      name: "Board",
+      lists: [],
+      cards: [],
+      actions: [{ type: "updateCard", data: { huge: "x".repeat(1000) } }],
+    });
+    const stripped = stripTopLevelJsonKeys(raw);
+    assert.doesNotMatch(stripped, /updateCard/);
+    assert.match(stripped, /"name":"Board"/);
+    const parsed = JSON.parse(stripped) as { actions?: unknown };
+    assert.equal(parsed.actions, undefined);
   });
 
   it("compacts Trello exports into board and card text", () => {
@@ -57,7 +75,7 @@ describe("json text helpers", () => {
     assert.doesNotMatch(text, /updateCard/);
   });
 
-  it("recovers Trello attachments from actions when cards omit them", () => {
+  it("still lists cards when attachment history was stripped", () => {
     const text = normalizeJsonText(
       JSON.stringify({
         name: "Songs",
@@ -78,8 +96,9 @@ describe("json text helpers", () => {
         ],
       })
     );
-    assert.match(text, /attachment \(PDF\): living-waters-chords\.pdf/);
-    assert.match(text, /living-waters-chords\.pdf/);
+    assert.match(text, /Living Waters/);
+    // History (`actions`) is stripped so analysis can finish on large boards.
+    assert.doesNotMatch(text, /living-waters-chords/);
   });
 
   it("caps oversized JSON", () => {

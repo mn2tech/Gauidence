@@ -14,5 +14,6 @@ describe("document status stale recovery", () => {
     );
     assert.match(source, /analyze_document:\s*6\s*\*\s*60\s*\*\s*1000/);
     assert.doesNotMatch(source, /analyze_document:\s*90_000/);
+    assert.match(source, /STUCK_EXTRACTING_MS\s*=\s*90_000/);
   });
 });

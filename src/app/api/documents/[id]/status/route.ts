@@ -18,13 +18,16 @@ import {
 import type { ProcessingDiagnostics } from "@/lib/documents/processingDiagnostics";
 
 /** Stale thresholds for status-poll recovery. Must exceed process-jobs maxDuration (300s)
- *  for analyze, or polls will kill live workers every ~90s and loop forever. */
+ *  for analyze once past extract, or polls will kill live Claude workers. */
 const ACTIVE_STATUS_STALE_MS = {
   analyze_document: 6 * 60 * 1000,
   index_document: 5 * 60 * 1000,
   extract_ontology: 5 * 60 * 1000,
   extract_knowledge: 5 * 60 * 1000,
 } as const;
+
+/** Extract should finish in seconds after JSON strip; longer means a dead worker. */
+const STUCK_EXTRACTING_MS = 90_000;
 
 export const runtime = "nodejs";
 
@@ -61,9 +64,16 @@ export async function GET(
   }
 
   const initialStage = deriveProcessingStage(doc);
-  if (isProcessingActive(initialStage)) {
+  if (isProcessingActive(initialStage) || doc.analysis_status === "extracting") {
+    const olderThanMs =
+      doc.analysis_status === "extracting"
+        ? {
+            ...ACTIVE_STATUS_STALE_MS,
+            analyze_document: STUCK_EXTRACTING_MS,
+          }
+        : ACTIVE_STATUS_STALE_MS;
     const recovered = await recoverStaleProcessingJobs(supabase, {
-      olderThanMs: ACTIVE_STATUS_STALE_MS,
+      olderThanMs,
     });
     if (recovered > 0) {
       const refreshed = await supabase
