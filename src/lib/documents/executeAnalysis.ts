@@ -94,8 +94,21 @@ export async function executeDocumentAnalysis(
   let mimeType = doc.mime_type;
   let base64: string;
   if (isJsonMimeOrName(doc.mime_type, doc.file_name)) {
+    await setStatus("extracting");
     // Compact before the pipeline so we never base64/re-parse a multi-MB export.
-    const compact = normalizeJsonText(bytes.toString("utf8"));
+    let compact: string;
+    try {
+      compact = normalizeJsonText(bytes.toString("utf8"));
+    } catch {
+      compact = bytes
+        .toString("utf8")
+        .slice(0, 50_000)
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+    if (!compact.trim()) {
+      throw new Error("This JSON file had no readable text to analyze.");
+    }
     mimeType = "text/plain";
     base64 = Buffer.from(compact, "utf8").toString("base64");
   } else {

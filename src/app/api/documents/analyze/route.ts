@@ -1,16 +1,22 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { assertBillingQuota } from "@/lib/billing/quota";
+import { isJsonMimeOrName } from "@/lib/analysis/jsonText";
 import {
   deriveProcessingStage,
   documentReadiness,
   processingProgressPercent,
   userFacingStatusLabel,
 } from "@/lib/documents/processingStatus";
-import { enqueueAnalyzePipeline } from "@/lib/documents/processingJobs";
+import {
+  enqueueAnalyzePipeline,
+  enqueueDocumentProcessingJob,
+  processDocumentProcessingJob,
+} from "@/lib/documents/processingJobs";
 
 export const runtime = "nodejs";
-export const maxDuration = 30;
+/** JSON / Trello runs sync in this request; needs headroom past compact + one Claude call. */
+export const maxDuration = 120;
 
 const MAX_ANALYZE_BYTES = 15 * 1024 * 1024;
 
@@ -57,7 +63,7 @@ export async function POST(request: Request) {
   const { data: doc } = await supabase
     .from("documents")
     .select(
-      "id, file_name, size_bytes, profile_id, analysis_status, indexing_status, knowledge_status, processing_step"
+      "id, file_name, mime_type, size_bytes, profile_id, analysis_status, indexing_status, knowledge_status, processing_step"
     )
     .eq("id", documentId)
     .maybeSingle();
@@ -75,29 +81,28 @@ export async function POST(request: Request) {
   const quota = await assertBillingQuota(supabase, user.id, "analyze", user.email);
   if (!quota.ok) return quota.response;
 
-  if (sync) {
-    const { processDocumentProcessingJob } = await import(
-      "@/lib/documents/processingJobs"
-    );
-    const { enqueueDocumentProcessingJob } = await import(
-      "@/lib/documents/processingJobs"
-    );
-    const { data: job } = await supabase
-      .from("document_processing_jobs")
-      .select("id, document_id, profile_id, job_type, attempts")
-      .eq("document_id", documentId)
-      .eq("job_type", "analyze_document")
-      .maybeSingle();
+  // Large JSON/Trello exports hang in the background worker — run them inline.
+  const runSync =
+    sync || isJsonMimeOrName(doc.mime_type, doc.file_name);
 
-    if (!job) {
-      await enqueueDocumentProcessingJob(supabase, {
-        documentId,
-        profileId: doc.profile_id,
-        userId: user.id,
-        jobType: "analyze_document",
-        force: true,
-      });
-    }
+  if (runSync) {
+    await supabase
+      .from("documents")
+      .update({
+        analysis_status: "queued",
+        processing_step: "queued",
+        processing_started_at: new Date().toISOString(),
+        last_processing_error: null,
+      })
+      .eq("id", documentId);
+
+    await enqueueDocumentProcessingJob(supabase, {
+      documentId,
+      profileId: doc.profile_id,
+      userId: user.id,
+      jobType: "analyze_document",
+      force: true,
+    });
 
     const { data: freshJob } = await supabase
       .from("document_processing_jobs")
@@ -106,13 +111,25 @@ export async function POST(request: Request) {
       .eq("job_type", "analyze_document")
       .single();
 
-    await processDocumentProcessingJob(supabase, user, {
-      id: freshJob!.id,
-      document_id: freshJob!.document_id,
-      profile_id: freshJob!.profile_id,
-      job_type: "analyze_document",
-      attempts: freshJob!.attempts ?? 0,
-    });
+    if (!freshJob) {
+      return NextResponse.json(
+        { error: "Analysis couldn't be scheduled. Please try again." },
+        { status: 500 }
+      );
+    }
+
+    try {
+      await processDocumentProcessingJob(supabase, user, {
+        id: freshJob.id,
+        document_id: freshJob.document_id,
+        profile_id: freshJob.profile_id,
+        job_type: "analyze_document",
+        attempts: freshJob.attempts ?? 0,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Analysis failed.";
+      return NextResponse.json({ error: message, sync: true }, { status: 500 });
+    }
 
     const { data: extracted } = await supabase
       .from("extracted_data")
@@ -122,18 +139,47 @@ export async function POST(request: Request) {
 
     const { data: updated } = await supabase
       .from("documents")
-      .select("analysis_status")
+      .select(
+        "analysis_status, indexing_status, knowledge_status, processing_step"
+      )
       .eq("id", documentId)
       .single();
 
+    const stage = deriveProcessingStage({
+      analysis_status: updated?.analysis_status ?? "completed",
+      indexing_status: updated?.indexing_status,
+      knowledge_status: updated?.knowledge_status,
+      processing_step: updated?.processing_step,
+    });
+
     return NextResponse.json({
+      queued: false,
+      sync: true,
+      documentId: doc.id,
+      fileName: doc.file_name,
       summary: extracted?.summary ?? "",
       facts: extracted?.facts ?? [],
       model: extracted?.model ?? null,
       title: extracted?.title ?? null,
       documentType: extracted?.document_type ?? null,
       analysisStatus: updated?.analysis_status ?? "completed",
-      sync: true,
+      processingStage: stage,
+      processingLabel: userFacingStatusLabel({
+        analysis_status: updated?.analysis_status ?? "completed",
+        indexing_status: updated?.indexing_status,
+        knowledge_status: updated?.knowledge_status,
+        processing_step: updated?.processing_step,
+      }),
+      processingProgress: processingProgressPercent({
+        analysis_status: updated?.analysis_status ?? "completed",
+        indexing_status: updated?.indexing_status,
+        knowledge_status: updated?.knowledge_status,
+      }),
+      readiness: documentReadiness({
+        analysis_status: updated?.analysis_status ?? "completed",
+        indexing_status: updated?.indexing_status,
+        knowledge_status: updated?.knowledge_status,
+      }),
     });
   }
 

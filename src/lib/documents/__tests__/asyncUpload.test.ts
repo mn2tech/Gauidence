@@ -7,14 +7,14 @@ describe("async upload pipeline contracts", () => {
     assert.equal(PIPELINE_VERSION, "v1");
   });
 
-  it("analyze route maxDuration is short for queue-only responses", async () => {
+  it("analyze route allows longer runs for sync JSON analysis", async () => {
     const route = await import(
       "../../../app/api/documents/analyze/route.ts"
     );
-    assert.equal(route.maxDuration, 30);
+    assert.equal(route.maxDuration, 120);
   });
 
-  it("analyze handler returns queued payload shape", async () => {
+  it("analyze handler returns queued payload shape for async docs", async () => {
     const source = await import("node:fs/promises").then((fs) =>
       fs.readFile(
         new URL("../../../app/api/documents/analyze/route.ts", import.meta.url),
@@ -23,6 +23,8 @@ describe("async upload pipeline contracts", () => {
     );
     assert.match(source, /queued:\s*true/);
     assert.match(source, /enqueueAnalyzePipeline/);
+    assert.match(source, /isJsonMimeOrName/);
+    assert.match(source, /processDocumentProcessingJob/);
     assert.doesNotMatch(source, /runAnalysisPipeline\(/);
     assert.doesNotMatch(source, /processPendingDocumentJobs/);
   });

@@ -32,7 +32,9 @@ export type ScheduleAnalysisResult = {
   error?: string;
 };
 
-/** Queue background analysis — returns immediately after job creation. */
+/** Queue background analysis — returns immediately after job creation.
+ * JSON / Trello files run synchronously in the analyze request instead.
+ */
 export async function scheduleDocumentAnalysis(
   documentId: string
 ): Promise<ScheduleAnalysisResult> {
@@ -49,9 +51,11 @@ export async function scheduleDocumentAnalysis(
     const body = (await res.json().catch(() => ({}))) as {
       error?: string;
       queued?: boolean;
+      sync?: boolean;
       processingStage?: DocumentProcessingStage;
       processingLabel?: string;
       jobId?: string | null;
+      analysisStatus?: string;
     };
 
     if (!res.ok) {
@@ -61,6 +65,17 @@ export async function scheduleDocumentAnalysis(
         error:
           body.error ??
           "Analysis couldn't be scheduled. You can retry from Documents.",
+      };
+    }
+
+    // Sync JSON path finished in this request — treat as successfully scheduled.
+    if (body.sync) {
+      return {
+        queued: true,
+        documentId,
+        processingStage: body.processingStage,
+        processingLabel: body.processingLabel ?? "Ready to ask Gideon",
+        jobId: body.jobId ?? null,
       };
     }
 
