@@ -8,6 +8,7 @@ import type { Classification } from "./types";
 const CONTRACT_NAME =
   /\b(contract|agreement|ctr[-_]|mou|statement[\s_-]?of[\s_-]?work|sow)\b/i;
 const JSON_OR_TRELLO_NAME = /\.json$/i;
+const CSV_EXPORT_NAME = /\.csv$/i;
 
 export function classificationFromFileName(
   fileName: string | null | undefined
@@ -20,6 +21,14 @@ export function classificationFromFileName(
       document_subtype: "json_export",
       classification_confidence: 0.95,
       classification_reason: "JSON / Trello export inferred from the file name.",
+    };
+  }
+  if (CSV_EXPORT_NAME.test(name)) {
+    return {
+      document_type: "general",
+      document_subtype: "csv_export",
+      classification_confidence: 0.95,
+      classification_reason: "CSV export inferred from the file name.",
     };
   }
   if (!CONTRACT_NAME.test(name)) return null;

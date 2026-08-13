@@ -123,13 +123,18 @@ export function deriveProcessingStage(
   if (analysis === "failed" || indexing === "failed" || knowledge === "failed") {
     return "failed";
   }
-  if (indexing === "retryable" || knowledge === "retryable") {
+  // Indexing pause blocks search. Knowledge-only pause must not hide a searchable doc.
+  if (indexing === "retryable") {
     return "retryable";
   }
 
   if (isDocumentSearchable(doc)) {
     if (knowledge === "processing") return "knowledge_processing";
     return "ready";
+  }
+
+  if (knowledge === "retryable") {
+    return "retryable";
   }
 
   if (indexing === "processing") return "indexing";

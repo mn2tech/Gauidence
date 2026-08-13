@@ -33,7 +33,7 @@ export type ScheduleAnalysisResult = {
 };
 
 /** Queue background analysis — returns immediately after job creation.
- * JSON / Trello files run synchronously in the analyze request instead.
+ * JSON / CSV / Trello files run synchronously in the analyze request instead.
  */
 export async function scheduleDocumentAnalysis(
   documentId: string

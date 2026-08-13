@@ -13,7 +13,9 @@ export const EMBEDDING_MODEL =
 export const EMBEDDING_DIMENSIONS = 1536;
 
 export function isVaultEmbeddingConfigured(): boolean {
-  return Boolean(process.env.OPENAI_API_KEY?.trim());
+  const key = process.env.OPENAI_API_KEY?.trim() ?? "";
+  // Reject empty / placeholder values (e.g. `""` pulled from Vercel).
+  return key.length >= 20 && key.startsWith("sk-");
 }
 
 function createEmbeddingClient(): OpenAI {

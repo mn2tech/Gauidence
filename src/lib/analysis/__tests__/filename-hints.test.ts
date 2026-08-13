@@ -22,4 +22,12 @@ describe("classificationFromFileName", () => {
     const trello = classificationFromFileName("Trello_Knowledge");
     assert.equal(trello?.document_type, "general");
   });
+
+  it("skips classify LLM for CSV exports", () => {
+    const csv = classificationFromFileName(
+      "K1egmGd1 - the-living-waters.csv"
+    );
+    assert.equal(csv?.document_type, "general");
+    assert.equal(csv?.document_subtype, "csv_export");
+  });
 });

@@ -4,6 +4,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { User } from "@supabase/supabase-js";
 import { isDocumentCategory } from "@/lib/categories";
 import { runAnalysisPipeline } from "@/lib/analysis/pipeline";
+import {
+  CSV_ANALYSIS_MAX_CHARS,
+  isCsvMimeOrName,
+  normalizeCsvText,
+} from "@/lib/analysis/csvText";
 import { isJsonMimeOrName, normalizeJsonText } from "@/lib/analysis/jsonText";
 import { toDisplayFacts, collectDeadlines } from "@/lib/analysis/display";
 import { documentTypeToCategory } from "@/lib/analysis/llm";
@@ -108,6 +113,17 @@ export async function executeDocumentAnalysis(
     }
     if (!compact.trim()) {
       throw new Error("This JSON file had no readable text to analyze.");
+    }
+    mimeType = "text/plain";
+    base64 = Buffer.from(compact, "utf8").toString("base64");
+  } else if (isCsvMimeOrName(doc.mime_type, doc.file_name)) {
+    await setStatus("extracting");
+    const compact = normalizeCsvText(
+      bytes.toString("utf8"),
+      CSV_ANALYSIS_MAX_CHARS
+    );
+    if (!compact.trim()) {
+      throw new Error("This CSV file had no readable text to analyze.");
     }
     mimeType = "text/plain";
     base64 = Buffer.from(compact, "utf8").toString("base64");

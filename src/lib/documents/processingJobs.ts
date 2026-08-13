@@ -433,7 +433,7 @@ async function runIndexJob(
   const { indexDocumentForVault } = await import("@/lib/vault/indexDocument");
   const { markDocumentIndexCompleted } = await import("@/lib/vault/indexingJobs");
 
-  await indexDocumentForVault({
+  const indexed = await indexDocumentForVault({
     supabase,
     userId,
     profileId,
@@ -456,6 +456,19 @@ async function runIndexJob(
       sourceText: extracted.source_text,
     },
   });
+
+  if (indexed.skipped === "missing_openai_key") {
+    await supabase
+      .from("documents")
+      .update({
+        indexing_status: "skipped",
+        processing_step: "ready",
+        processing_completed_at: new Date().toISOString(),
+        last_processing_error: null,
+      })
+      .eq("id", documentId);
+    return diagnostics;
+  }
 
   await markDocumentIndexCompleted(supabase, documentId);
   await supabase

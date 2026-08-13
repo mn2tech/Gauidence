@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { assertBillingQuota } from "@/lib/billing/quota";
+import { isCsvMimeOrName } from "@/lib/analysis/csvText";
 import { isJsonMimeOrName } from "@/lib/analysis/jsonText";
 import {
   deriveProcessingStage,
@@ -15,7 +16,7 @@ import {
 } from "@/lib/documents/processingJobs";
 
 export const runtime = "nodejs";
-/** JSON / Trello runs sync in this request; needs headroom past compact + one Claude call. */
+/** JSON / CSV / Trello runs sync in this request; needs headroom past compact + one Claude call. */
 export const maxDuration = 120;
 
 const MAX_ANALYZE_BYTES = 15 * 1024 * 1024;
@@ -81,9 +82,11 @@ export async function POST(request: Request) {
   const quota = await assertBillingQuota(supabase, user.id, "analyze", user.email);
   if (!quota.ok) return quota.response;
 
-  // Large JSON/Trello exports hang in the background worker — run them inline.
+  // Large JSON/CSV/Trello exports hang in the background worker — run them inline.
   const runSync =
-    sync || isJsonMimeOrName(doc.mime_type, doc.file_name);
+    sync ||
+    isJsonMimeOrName(doc.mime_type, doc.file_name) ||
+    isCsvMimeOrName(doc.mime_type, doc.file_name);
 
   if (runSync) {
     await supabase
@@ -126,6 +129,40 @@ export async function POST(request: Request) {
         job_type: "analyze_document",
         attempts: freshJob.attempts ?? 0,
       });
+
+      // Finish indexing in the same request so CSV/JSON don't stall on "paused"
+      // after analysis while a background worker never picks up the next stage.
+      for (let i = 0; i < 3; i += 1) {
+        const { data: nextJobs } = await supabase
+          .from("document_processing_jobs")
+          .select("id, document_id, profile_id, job_type, attempts")
+          .eq("document_id", documentId)
+          .in("status", ["pending", "retryable"])
+          .in("job_type", [
+            "index_document",
+            "extract_ontology",
+            "extract_knowledge",
+          ])
+          .order("created_at", { ascending: true })
+          .limit(1);
+        const next = nextJobs?.[0];
+        if (!next) break;
+        try {
+          await processDocumentProcessingJob(supabase, user, {
+            id: next.id,
+            document_id: next.document_id,
+            profile_id: next.profile_id,
+            job_type: next.job_type as
+              | "index_document"
+              | "extract_ontology"
+              | "extract_knowledge",
+            attempts: next.attempts ?? 0,
+          });
+        } catch {
+          // Leave remaining stages for background workers / Retry.
+          break;
+        }
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Analysis failed.";
       return NextResponse.json({ error: message, sync: true }, { status: 500 });

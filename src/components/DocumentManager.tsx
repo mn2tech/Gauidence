@@ -265,16 +265,7 @@ export default function DocumentManager({
     [documents]
   );
 
-  const { statuses: processingStatuses, markActive, refreshStatus } =
-    useDocumentProcessingPoll(activeDocumentIds, {
-      // Only kick the worker for queued/uploaded docs — never while Reading/Analyzing.
-      kickProcessing: documents.some(
-        (d) =>
-          d.analysis_status === "uploaded" || d.analysis_status === "queued"
-      ),
-    });
-
-  const hasQueuedDocuments = useMemo(
+  const shouldKickAnalysisQueue = useMemo(
     () =>
       documents.some(
         (d) =>
@@ -283,14 +274,37 @@ export default function DocumentManager({
     [documents]
   );
 
+  const { statuses: processingStatuses, markActive, refreshStatus } =
+    useDocumentProcessingPoll(activeDocumentIds, {
+      // Never kick while Reading/Analyzing — status polls can mark those stale.
+      // Post-analysis index/knowledge kicks are handled by the interval below.
+      kickProcessing: shouldKickAnalysisQueue,
+    });
+
+  const needsPostAnalysisWorker = useMemo(() => {
+    const stageNeedsWorker = Object.values(processingStatuses).some((snap) =>
+      ["indexing", "knowledge_processing", "retryable"].includes(
+        snap.processingStage
+      )
+    );
+    if (stageNeedsWorker) return true;
+    // Before the first status poll, keep draining jobs for analyzed docs.
+    return documents.some(
+      (d) =>
+        (d.analysis_status === "completed" ||
+          d.analysis_status === "needs_verification") &&
+        !processingStatuses[d.id]
+    );
+  }, [documents, processingStatuses]);
+
   useEffect(() => {
-    if (!hasQueuedDocuments) return;
+    if (!shouldKickAnalysisQueue && !needsPostAnalysisWorker) return;
     void kickDocumentProcessingJobs(2);
     const timer = window.setInterval(() => {
       void kickDocumentProcessingJobs(2);
     }, 5000);
     return () => window.clearInterval(timer);
-  }, [hasQueuedDocuments]);
+  }, [shouldKickAnalysisQueue, needsPostAnalysisWorker]);
 
   const loadDocuments = useCallback(async () => {
     if (!supabase || !profileId) return;

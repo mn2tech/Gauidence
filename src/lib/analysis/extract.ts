@@ -13,6 +13,7 @@ import {
   scoreExtractionQuality,
 } from "./extract-quality";
 import { shouldPreparePageImages } from "./inputMode";
+import { isCsvMimeOrName } from "./csvText";
 import { isJsonMimeOrName, normalizeJsonText } from "./jsonText";
 
 export type ExtractionMethod =
@@ -173,10 +174,7 @@ export async function extractDocumentText(args: {
   fileName: string;
 }): Promise<ExtractionResult> {
   const isJson = isJsonMimeOrName(args.mimeType, args.fileName);
-  const isCsv =
-    args.mimeType === "text/csv" ||
-    args.mimeType === "application/csv" ||
-    /\.csv$/i.test(args.fileName);
+  const isCsv = isCsvMimeOrName(args.mimeType, args.fileName);
   if (
     args.mimeType === "text/plain" ||
     args.mimeType === "text/markdown" ||

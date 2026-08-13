@@ -55,8 +55,20 @@ describe("processingStatus", () => {
       indexing_status: "completed",
       knowledge_status: "retryable",
     };
-    assert.equal(deriveProcessingStage(doc), "retryable");
+    assert.equal(deriveProcessingStage(doc), "ready");
     assert.equal(isDocumentSearchable(doc), true);
+    assert.equal(userFacingStatusLabel(doc), "Ready to ask Gideon");
+  });
+
+  it("still pauses when indexing is retryable", () => {
+    assert.equal(
+      deriveProcessingStage({
+        analysis_status: "completed",
+        indexing_status: "retryable",
+        knowledge_status: "pending",
+      }),
+      "retryable"
+    );
   });
 
   it("reports active processing for queued and analyzing states", () => {
