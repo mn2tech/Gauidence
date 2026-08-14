@@ -12,6 +12,7 @@ import { parseOntologyExtraction } from "../schema";
 import { formatOntologyForGideon, buildOntologyAnswerFallback } from "../formatForGideon";
 import { reviewStatusForConfidence } from "../types";
 import { sanitizeConnectorOntologyExtraction } from "../pipeline/sanitizeConnectorExtraction";
+import { fallbackOntologyFromFileName } from "../pipeline/filenameFallback";
 import { planOntologyDetach } from "../detachFromDocument";
 
 describe("normalizeEntityName", () => {
@@ -630,6 +631,26 @@ describe("formatOntologyForGideon", () => {
     assert.match(fallback!, /FROM YOUR ONTOLOGY/);
     assert.match(fallback!, /Onyx Government Services/);
     assert.match(fallback!, /SUBCONTRACTOR_TO/);
+  });
+});
+
+describe("fallbackOntologyFromFileName", () => {
+  it("builds document + subject for chart titles", () => {
+    const result = fallbackOntologyFromFileName("Bass Guitar Bass Chart.pdf");
+    assert.ok(result);
+    assert.equal(
+      result!.entities.find((e) => e.type === "document")?.name,
+      "Bass Guitar Bass Chart"
+    );
+    assert.equal(
+      result!.entities.find((e) => e.type === "asset")?.name,
+      "Bass Guitar"
+    );
+  });
+
+  it("returns null for generic names", () => {
+    assert.equal(fallbackOntologyFromFileName("scan.pdf"), null);
+    assert.equal(fallbackOntologyFromFileName("IMG_0001.png"), null);
   });
 });
 

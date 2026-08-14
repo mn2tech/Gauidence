@@ -4,6 +4,7 @@ import { jsonSchemaOutputFormat } from "@anthropic-ai/sdk/helpers/json-schema";
 import {
   createLlmClient,
   CHAT_MODEL,
+  VISUAL_ANALYSIS_MODEL,
   buildFileContent,
   type FilePayload,
 } from "@/lib/analysis/llm";
@@ -20,8 +21,9 @@ import {
   isExcelMimeOrName,
 } from "@/lib/connectors/content/extractExcel";
 import { sanitizeConnectorOntologyExtraction } from "./sanitizeConnectorExtraction";
+import { fallbackOntologyFromFileName } from "./filenameFallback";
 
-const CONNECTOR_ANALYSIS_VERSION = "connector-ontology-v3";
+const CONNECTOR_ANALYSIS_VERSION = "connector-ontology-v4";
 
 export function connectorAnalysisVersion(): string {
   return CONNECTOR_ANALYSIS_VERSION;
@@ -37,8 +39,8 @@ Rules:
 - For business invoices: do NOT create Event entities. Create one entity_type "invoice"
   (name like "Invoice 00000001") plus organization entities for issuer and recipient.
 - Invoice relationship directions (strict):
-  Invoice —[ISSUED_BY]→ issuer organization
-  Invoice —[ISSUED_TO]→ recipient organization
+    Invoice —[ISSUED_BY]→ issuer organization
+    Invoice —[ISSUED_TO]→ recipient organization
   Never reverse those directions. Do not use RELATED_TO for invoice parties.
 - Do NOT invent people attending an event unless the source clearly names them.
 - Entity types allowed: person, organization, place, event, document, purchase, restaurant, movie, product, date, project, asset, contract, invoice.
@@ -49,13 +51,19 @@ Rules:
   attributes.amount (number), attributes.currency (e.g. USD), attributes.invoice_number,
   attributes.issuer, attributes.recipient, attributes.invoice_date.
   Also put a one-line money summary in description, e.g. "Invoice 00000001 for $1,250.00 USD".
+- Charts, worksheets, music sheets, chord charts, tablature, study guides, and other
+  reference pages ARE valid knowledge sources even with little prose.
+  Always create a document entity from the visible title or file name.
+  Also extract the subject (instrument, topic, song, skill) as asset or product when labeled,
+  plus any readable titles, keys, chord names, section labels, or instructions as entities
+  with short descriptions. Prefer asset/product/document — never invent people or orgs.
 - Every relationship MUST include an evidence quote (verbatim or short paraphrase from the source, max 300 chars).
 - Include confidence 0.0-1.0 for each entity and relationship.
 - Prefer specific names. Avoid generic labels like "Receipt" or bare "Invoice" as an organization.
 - Use relationship types when they fit: OCCURRED_AT, PURCHASED_FROM, VISITED, WATCHED, ATTENDED, PART_OF, OWNED_BY, CREATED_BY, EVIDENCED_BY, MENTIONED_IN, ISSUED_BY, ISSUED_TO, RELATED_TO (last resort).
 - Do not use PURCHASED_FROM for invoice issuer/recipient (use ISSUED_BY / ISSUED_TO).
 - Also allowed when clear: WORKS_FOR, CLIENT_OF, VENDOR_OF.
-- Return empty arrays if there is insufficient evidence.
+- Only return empty arrays when the file is blank, corrupt, or has no identifiable title/subject.
 - Avoid guessing. When uncertain, omit rather than hallucinate.`;
 }
 
@@ -82,11 +90,7 @@ export async function extractOntologyFromSourceContent(args: {
     extractedText = normalizeJsonText(extractedText);
   }
 
-  if (
-    !extractedText &&
-    bytes &&
-    isExcelMimeOrName(mimeType, fileName)
-  ) {
+  if (!extractedText && bytes && isExcelMimeOrName(mimeType, fileName)) {
     const excel = extractExcelText({ bytes, fileName });
     extractedText = excel.text.trim();
     extractionMethod = "excel_sheet_text";
@@ -106,40 +110,62 @@ export async function extractOntologyFromSourceContent(args: {
       (!extractedText || extraction.quality < 0.45) &&
       (mimeType.startsWith("image/") || mimeType === "application/pdf")
     ) {
-      const multimodal = await extractOntologyMultimodal({
-        mimeType,
-        base64,
-        fileName,
-        extractedText,
-        pageImages: extraction.pageImages,
-        spaceName: args.spaceName,
-      });
+      let multimodal: OntologyExtractionResult | null = null;
+      try {
+        multimodal = await extractOntologyMultimodal({
+          mimeType,
+          base64,
+          fileName,
+          extractedText,
+          pageImages: extraction.pageImages,
+          spaceName: args.spaceName,
+        });
+      } catch (err) {
+        console.error("Connector multimodal ontology extraction failed:", err);
+      }
+
+      const resolved =
+        multimodal ?? fallbackOntologyFromFileName(fileName);
       return {
-        extraction: multimodal,
+        extraction: resolved,
         contentTextPreview: extractedText.slice(0, 200),
-        extractionMethod: multimodal ? "multimodal_ontology" : extractionMethod,
+        extractionMethod: multimodal
+          ? "multimodal_ontology"
+          : resolved
+            ? "filename_fallback"
+            : extractionMethod,
       };
     }
   }
 
   if (!extractedText) {
     return {
-      extraction: null,
+      extraction: fallbackOntologyFromFileName(fileName),
       contentTextPreview: "",
-      extractionMethod,
+      extractionMethod: "filename_fallback",
     };
   }
 
-  const extraction = await extractOntologyConnectorText({
-    sourceText: extractedText,
-    fileName,
-    spaceName: args.spaceName,
-  });
+  let extraction: OntologyExtractionResult | null = null;
+  try {
+    extraction = await extractOntologyConnectorText({
+      sourceText: extractedText,
+      fileName,
+      spaceName: args.spaceName,
+    });
+  } catch (err) {
+    console.error("Connector text ontology extraction failed:", err);
+  }
 
+  const resolved = extraction ?? fallbackOntologyFromFileName(fileName);
   return {
-    extraction,
+    extraction: resolved,
     contentTextPreview: extractedText.slice(0, 200),
-    extractionMethod,
+    extractionMethod: extraction
+      ? extractionMethod
+      : resolved
+        ? "filename_fallback"
+        : extractionMethod,
   };
 }
 
@@ -203,12 +229,13 @@ async function extractOntologyMultimodal(args: {
   const instruction = `${buildConnectorSystemPrompt()}
 
 Return ONLY JSON matching the ontology extraction schema (entities, relationships, events).
+This may be a chart, worksheet, music sheet, or scanned page — read visible labels carefully.
 File: ${args.fileName}${args.spaceName ? `\nSpace: ${args.spaceName}` : ""}`;
 
   const content = buildFileContent(file, instruction);
 
   const response = await client.messages.create({
-    model: CHAT_MODEL,
+    model: VISUAL_ANALYSIS_MODEL,
     max_tokens: 4096,
     messages: [{ role: "user", content }],
     output_config: {
