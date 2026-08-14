@@ -25,6 +25,38 @@ import {
 } from "@/lib/connectors/clientAnalyze";
 import { connectorAnalysisVersion } from "@/lib/ontology/pipeline/analysisVersion";
 
+const TRELLO_CHART_BATCH = 8;
+const TRELLO_CHART_CONCURRENCY = 3;
+
+function chartAnalyzePriority(item: SourceItem): number {
+  const name = item.name ?? "";
+  let score = 0;
+  if (/\s[-–—]\s*[A-G]/i.test(name)) score += 8;
+  if (/\.pdf$/i.test(name)) score += 5;
+  if (/\b(chord|chart)/i.test(name)) score += 4;
+  if (item.processingStatus === "discovered") score += 3;
+  if (item.processingStatus === "analyzing") score += 2;
+  return score;
+}
+
+async function runPool<T>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T) => Promise<void>
+): Promise<void> {
+  let next = 0;
+  const n = Math.max(1, Math.min(concurrency, items.length || 1));
+  await Promise.all(
+    Array.from({ length: Math.min(n, items.length) }, async () => {
+      while (next < items.length) {
+        const index = next;
+        next += 1;
+        await worker(items[index]!);
+      }
+    })
+  );
+}
+
 type CategoryCounts = {
   Images: number;
   PDF: number;
@@ -89,6 +121,8 @@ export default function ConnectionsPanel() {
   const [trelloApiKey, setTrelloApiKey] = useState("");
   const [trelloToken, setTrelloToken] = useState("");
   const [trelloSummary, setTrelloSummary] = useState<ItemSummary | null>(null);
+  const [analyzeProgress, setAnalyzeProgress] = useState<string | null>(null);
+  const [trelloNote, setTrelloNote] = useState<string | null>(null);
 
   const phoneSource = useMemo(
     () => sources.find((s) => s.sourceType === "android_storage") ?? null,
@@ -290,31 +324,52 @@ export default function ConnectionsPanel() {
         items?: Array<SourceItem & { id: string }>;
         error?: string;
       };
-      if (!itemsRes.ok || !itemsBody.items?.length) return { analyzed: 0, failed: 0 };
+      if (!itemsRes.ok || !itemsBody.items?.length) {
+        return { analyzed: 0, failed: 0, remaining: 0 };
+      }
 
       const queue = itemsBody.items.filter((item) => {
         const kind = String(item.metadata?.kind ?? "");
         return kind === "board" || kind === "attachment";
       });
 
-      // Boards are cheap text exports — refresh them. Chart images/PDFs only
-      // when new/failed so Scan Again doesn't re-download every chart.
-      const boards = queue.filter((i) => i.metadata?.kind === "board");
-      const charts = queue
+      const currentVersion = connectorAnalysisVersion();
+      const boards = queue.filter((i) => {
+        if (i.metadata?.kind !== "board") return false;
+        if (isItemNeedsAnalyze(i)) return true;
+        return (
+          i.processingStatus === "analyzed" &&
+          i.analysisVersion !== currentVersion
+        );
+      });
+      const pendingCharts = queue
         .filter((i) => {
           if (i.metadata?.kind !== "attachment") return false;
           if (isItemNeedsAnalyze(i)) return true;
           return (
             i.processingStatus === "analyzed" &&
-            i.analysisVersion !== connectorAnalysisVersion()
+            i.analysisVersion !== currentVersion
           );
         })
-        .slice(0, 80);
-      const ordered = [...boards, ...charts];
+        .sort((a, b) => chartAnalyzePriority(b) - chartAnalyzePriority(a));
+      const charts = pendingCharts.slice(0, TRELLO_CHART_BATCH);
+      const remaining = Math.max(0, pendingCharts.length - charts.length);
 
       let analyzed = 0;
       let failed = 0;
-      for (const item of ordered) {
+      let done = 0;
+      const total = boards.length + charts.length;
+      const bump = (label: string) => {
+        done += 1;
+        setAnalyzeProgress(`${label} (${done}/${total})`);
+      };
+
+      setAnalyzeProgress(
+        boards.length
+          ? `Reading ${boards.length} board${boards.length === 1 ? "" : "s"}…`
+          : null
+      );
+      for (const item of boards) {
         const result = await analyzeSourceItemClient({
           sourceId,
           item,
@@ -325,8 +380,32 @@ export default function ConnectionsPanel() {
         });
         if (result.ok) analyzed += 1;
         else if (!result.cancelled) failed += 1;
+        bump("Boards");
       }
-      return { analyzed, failed };
+
+      if (charts.length) {
+        setAnalyzeProgress(
+          `Reading chord charts 0/${charts.length} (this can take a few minutes)…`
+        );
+        await runPool(charts, TRELLO_CHART_CONCURRENCY, async (item) => {
+          const result = await analyzeSourceItemClient({
+            sourceId,
+            item,
+            profileId: profileId ?? null,
+            force:
+              item.processingStatus === "analysis_failed" ||
+              item.processingStatus === "analyzing",
+            remote: true,
+            allowUnchangedSkip: true,
+          });
+          if (result.ok) analyzed += 1;
+          else if (!result.cancelled) failed += 1;
+          bump("Charts");
+        });
+      }
+
+      setAnalyzeProgress(null);
+      return { analyzed, failed, remaining };
     },
     []
   );
@@ -375,6 +454,7 @@ export default function ConnectionsPanel() {
       }
       setScanResult(scanBody.summary ?? null);
       setBusy("trello-analyze");
+      setTrelloNote(null);
       const analyzeStats = await analyzeTrelloAfterScan(
         body.source.id,
         trelloBoundProfile.id
@@ -387,10 +467,15 @@ export default function ConnectionsPanel() {
         setError(
           "Connected and scanned, but Analyze failed. Open Browse Boards & Charts and Analyze again."
         );
+      } else if (analyzeStats.remaining > 0) {
+        setTrelloNote(
+          `This pass analyzed ${analyzeStats.analyzed} item${analyzeStats.analyzed === 1 ? "" : "s"}. ${analyzeStats.remaining} chord charts still waiting — press Scan Again to continue. You can already Ask Gideon about songs that finished.`
+        );
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't connect Trello.");
     } finally {
+      setAnalyzeProgress(null);
       setBusy(null);
     }
   }, [analyzeTrelloAfterScan, load, trelloApiKey, trelloBoundProfile, trelloToken]);
@@ -423,6 +508,7 @@ export default function ConnectionsPanel() {
     if (!trelloSource) return;
     setBusy("trello-scan");
     setError(null);
+    setTrelloNote(null);
     setScanResult(null);
     try {
       const res = await fetch(`/api/connections/${trelloSource.id}/scan`, {
@@ -446,14 +532,20 @@ export default function ConnectionsPanel() {
       }
       setScanResult(body.summary ?? null);
       setBusy("trello-analyze");
-      await analyzeTrelloAfterScan(
+      const analyzeStats = await analyzeTrelloAfterScan(
         trelloSource.id,
         trelloSource.profileId ?? trelloBoundProfile?.id
       );
       await load();
+      if (analyzeStats.remaining > 0) {
+        setTrelloNote(
+          `This pass analyzed ${analyzeStats.analyzed} item${analyzeStats.analyzed === 1 ? "" : "s"}. ${analyzeStats.remaining} chord charts still waiting — press Scan Again to continue. You can already Ask Gideon about songs that finished.`
+        );
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Trello scan failed.");
     } finally {
+      setAnalyzeProgress(null);
       setBusy(null);
     }
   }, [analyzeTrelloAfterScan, load, trelloBoundProfile?.id, trelloSource]);
@@ -849,7 +941,7 @@ export default function ConnectionsPanel() {
                           <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                             {busy === "trello-analyze"
-                              ? "Analyzing…"
+                              ? "Reading charts…"
                               : "Scanning…"}
                           </>
                         ) : (
@@ -876,6 +968,14 @@ export default function ConnectionsPanel() {
                         Disconnect
                       </button>
                     </div>
+                    {analyzeProgress ? (
+                      <p className="mt-3 text-sm text-ink-muted">
+                        {analyzeProgress}
+                      </p>
+                    ) : null}
+                    {trelloNote ? (
+                      <p className="mt-3 text-sm text-ink-muted">{trelloNote}</p>
+                    ) : null}
                   </>
                 ) : (
                   <>
@@ -1082,7 +1182,7 @@ export default function ConnectionsPanel() {
                   <>
                     <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
                     {busy === "trello-analyze"
-                      ? "Analyzing boards…"
+                      ? analyzeProgress ?? "Reading charts…"
                       : "Connecting…"}
                   </>
                 ) : (

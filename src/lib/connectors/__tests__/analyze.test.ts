@@ -63,6 +63,14 @@ describe("connector analyze support", () => {
       false
     );
     assert.equal(
+      isItemNeedsAnalyze({
+        name: "a.pdf",
+        mimeType: "application/pdf",
+        processingStatus: "analyzing",
+      }),
+      true
+    );
+    assert.equal(
       isItemAnalyzable({
         name: "a.pdf",
         mimeType: "application/pdf",

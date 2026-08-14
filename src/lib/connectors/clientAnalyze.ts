@@ -56,7 +56,8 @@ export function isItemNeedsAnalyze(
   if (!isItemAnalyzable(item)) return false;
   return (
     item.processingStatus === "discovered" ||
-    item.processingStatus === "analysis_failed"
+    item.processingStatus === "analysis_failed" ||
+    item.processingStatus === "analyzing"
   );
 }
 
