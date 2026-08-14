@@ -108,7 +108,7 @@ export function titlePhraseForOntologySearch(query: string): string | null {
     .toLowerCase()
     .replace(/[?!.,'"()]/g, " ")
     .replace(
-      /\b(what|whats|which|are|is|the|a|an|chords?|charts?|for|key|pdf|jpe?g|png|analyzed|show|me|can|you|see|please|tell|about|song|hymn|from|trello)\b/g,
+      /\b(what|whats|which|are|is|the|a|an|chords?|charts?|for|key|pdf|jpe?g|png|analyzed|show|me|can|you|see|please|tell|about|song|hymn|from|trello|want|learn|piano|keyboard|help|practice|play|teach|this|that|on)\b/g,
       " "
     )
     .replace(/\s+/g, " ")

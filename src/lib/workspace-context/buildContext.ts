@@ -50,8 +50,13 @@ import {
 import {
   expandRetrievalQuestion,
   wantsFullDailyLogQuote,
+  isPianoOrSongLearnRequest,
+  extractChartTitlesFromText,
   type ChatTurn,
 } from "@/lib/vault/expandRetrievalQuestion";
+import {
+  filterCitationsToChordCharts,
+} from "@/lib/ontology/connectorCitationIds";
 import { wantsReminderAgent } from "@/lib/reminders/propose";
 import { wantsDailyLogCapture } from "@/lib/logs/propose";
 import { wantsWorkMemoryUpdate } from "@/lib/work-memory/propose";
@@ -375,7 +380,21 @@ export async function loadWorkspaceContext(
   knowledgeCandidateCount = structuredKnowledgeBundle.count;
   const structuredKnowledgeContext = structuredKnowledgeBundle.text;
   const ontologyContext = ontologyBundle.text;
-  const connectorCitations = ontologyBundle.citations;
+  const namedCharts = extractChartTitlesFromText(retrievalQuestion);
+  let connectorCitations = ontologyBundle.citations;
+  if (isPianoOrSongLearnRequest(question) || namedCharts.length > 0) {
+    connectorCitations = filterCitationsToChordCharts(connectorCitations);
+    if (namedCharts.length) {
+      const lowered = namedCharts.map((t) => t.toLowerCase());
+      const matched = connectorCitations.filter((c) => {
+        const stem = c.fileName.replace(/\.[^.]+$/, "").toLowerCase();
+        return lowered.some(
+          (title) => stem.includes(title) || title.includes(stem.slice(0, 24))
+        );
+      });
+      if (matched.length) connectorCitations = matched;
+    }
+  }
 
   const { logs: dailyLogs, authorNames } = dailyLogsBundle;
   const logContext = formatDailyLogsForGideon(

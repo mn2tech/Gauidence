@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import {
   expandRetrievalQuestion,
   wantsFullDailyLogQuote,
+  extractChartTitlesFromText,
+  isPianoOrSongLearnRequest,
 } from "../expandRetrievalQuestion.ts";
 
 describe("expandRetrievalQuestion", () => {
@@ -25,6 +27,50 @@ describe("expandRetrievalQuestion", () => {
   it("leaves standalone questions unchanged", () => {
     const question = "show crossroadconnect daily log from July 30";
     assert.equal(expandRetrievalQuestion(question, []), question);
+  });
+
+  it("focuses piano learn requests on named chart files", () => {
+    const expanded = expandRetrievalQuestion(
+      "I want to learn this song on piano help me\nAsha Meri - Eb5 - Short version.jpg",
+      []
+    );
+    assert.match(expanded, /Focus on these songs/);
+    assert.match(expanded, /Asha Meri/);
+  });
+
+  it("pulls song titles from a recent list for vague piano help", () => {
+    const expanded = expandRetrievalQuestion(
+      "I want to learn this song on piano help me",
+      [
+        {
+          role: "assistant",
+          content:
+            "Songs/charts in your Wednesday Practice space (3):\n• Asha Meri\n• Athyunatha Simhasanamupai\n• Silent Night Holy Night",
+        },
+      ]
+    );
+    assert.match(expanded, /Asha Meri/);
+    assert.match(expanded, /Songs recently discussed/);
+  });
+});
+
+describe("extractChartTitlesFromText", () => {
+  it("reads titles from filenames", () => {
+    const titles = extractChartTitlesFromText(
+      "Asha Meri - Eb5 - Short version.jpg\nAthyunatha Simhasanamupai - G.jpg"
+    );
+    assert.ok(titles.some((t) => /Asha Meri/i.test(t)));
+    assert.ok(titles.some((t) => /Athyunatha/i.test(t)));
+  });
+});
+
+describe("isPianoOrSongLearnRequest", () => {
+  it("detects piano learn asks", () => {
+    assert.equal(
+      isPianoOrSongLearnRequest("I want to learn this song on piano help me"),
+      true
+    );
+    assert.equal(isPianoOrSongLearnRequest("what invoices are due"), false);
   });
 });
 

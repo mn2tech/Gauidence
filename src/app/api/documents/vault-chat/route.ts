@@ -10,6 +10,10 @@ import { generateVaultChatTitle } from "@/lib/chat/generateVaultChatTitle";
 import { shouldGenerateVaultChatTitle } from "@/lib/chat/vaultChatTitle";
 import { isVaultEmbeddingConfigured } from "@/lib/vault/embeddings";
 import { buildAskVaultInventory, buildInventoryQuestionAnswer, wantsVaultFileInventory, wantsSongOrChartList } from "@/lib/vault/askInventory";
+import {
+  extractChartTitlesFromText,
+  isPianoOrSongLearnRequest,
+} from "@/lib/vault/expandRetrievalQuestion";
 import { loadConnectedSuggestionContext } from "@/lib/vault/loadInventory";
 import { enqueueMissingVaultIndexing } from "@/lib/vault/ensureIndexed";
 import {
@@ -1352,6 +1356,32 @@ export async function POST(request: Request) {
             })
           : null;
 
+      const pianoClarify =
+        !inventoryAnswer &&
+        isPianoOrSongLearnRequest(question) &&
+        extractChartTitlesFromText(question).length === 0
+          ? (() => {
+              const fromHistory = extractChartTitlesFromText(
+                history
+                  .slice(-6)
+                  .map((t) => t.content)
+                  .join("\n")
+              );
+              if (fromHistory.length >= 2) {
+                return `Which song do you want to learn on piano?\n${fromHistory
+                  .slice(0, 10)
+                  .map((t) => `• ${t}`)
+                  .join(
+                    "\n"
+                  )}\n\nReply with the title (for example “Asha Meri”) and I’ll walk you through that chart.`;
+              }
+              if (fromHistory.length === 0) {
+                return `Which song from Living Waters / Wednesday Practice do you want to learn on piano? Name the title (for example “Asha Meri”) and I’ll use that chart.`;
+              }
+              return null;
+            })()
+          : null;
+
       if (inventoryAnswer) {
         answer = inventoryAnswer;
         // Song lists are inventory-only — don't attach random chart/PDF previews
@@ -1362,6 +1392,8 @@ export async function POST(request: Request) {
         ) {
           citations = connectorCitations;
         }
+      } else if (pianoClarify) {
+        answer = pianoClarify;
       } else {
         return createVaultChatStreamResponse({
           supabase,

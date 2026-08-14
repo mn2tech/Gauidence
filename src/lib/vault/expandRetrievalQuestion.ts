@@ -9,26 +9,91 @@ const DEICTIC_FOLLOWUP =
 const SHORT_DEICTIC =
   /^(and |also |)?(that|this|it|them|those)\??$/i;
 
+const LEARN_THIS_SONG =
+  /\b((learn|practice|play|teach)\b.{0,40}\b(this |that |the )?(song|chart|hymn)|help me .{0,20}(piano|keyboard|song)|(piano|keyboard).{0,30}(learn|practice|help))\b/i;
+
+/** Clean a chart filename or card title into a searchable song name. */
+export function cleanChartTitle(raw: string): string {
+  let title = raw.trim();
+  title = title.replace(/\.(jpe?g|png|gif|webp|pdf)$/i, "").trim();
+  title = title
+    .replace(/\s*-\s*[A-G](?:#|b)?(?:m|maj|min|major|minor|5)?\b.*$/i, "")
+    .replace(/\s*-\s*short version\s*$/i, "")
+    .replace(
+      /\s*[-–—]\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b.*$/i,
+      ""
+    )
+    .replace(/\s+/g, " ")
+    .trim();
+  return title;
+}
+
+/** Pull chart/song titles from filenames, bullets, or “chords for …” phrasing. */
+export function extractChartTitlesFromText(text: string): string[] {
+  const titles: string[] = [];
+  const seen = new Set<string>();
+  const push = (raw: string) => {
+    const title = cleanChartTitle(raw);
+    const key = title.toLowerCase();
+    if (title.length < 2 || seen.has(key)) return;
+    if (/^(songs?|charts?|piano|practice|wednesday|living waters)$/i.test(title)) {
+      return;
+    }
+    seen.add(key);
+    titles.push(title);
+  };
+
+  for (const match of text.matchAll(
+    /([^\n|•*]{2,120}?\.(?:jpe?g|png|gif|webp|pdf))/gi
+  )) {
+    push(match[1]!);
+  }
+  for (const match of text.matchAll(/^[•*\-]\s+(.+)$/gm)) {
+    push(match[1]!);
+  }
+  const forMatch = text.match(
+    /\b(?:chords?|key|learn|practice|play)\s+(?:for|to)\s+(.+?)(?:\?|$)/i
+  );
+  if (forMatch?.[1]) push(forMatch[1]);
+
+  return titles;
+}
+
+export function isPianoOrSongLearnRequest(question: string): boolean {
+  return LEARN_THIS_SONG.test(question.trim());
+}
+
 /** Expand a vague follow-up with recent chat turns so retrieval stays on topic. */
 export function expandRetrievalQuestion(
   question: string,
   history: ChatTurn[] = []
 ): string {
   const q = question.trim();
-  if (!q || history.length === 0) return q;
+  if (!q) return q;
+
+  const namedInQuestion = extractChartTitlesFromText(q);
+  if (namedInQuestion.length) {
+    return `${q}\n\nFocus on these songs/charts: ${namedInQuestion.join("; ")}`;
+  }
 
   const needsHistory =
     VAGUE_FOLLOWUP.test(q) ||
     DEICTIC_FOLLOWUP.test(q) ||
     SHORT_DEICTIC.test(q) ||
+    isPianoOrSongLearnRequest(q) ||
     (q.length < 48 && /\b(it|that|this|those|them|the same)\b/i.test(q));
 
-  if (!needsHistory) return q;
+  if (!needsHistory || history.length === 0) return q;
 
   const recent = history
     .slice(-6)
     .map((turn) => `${turn.role}: ${turn.content}`)
     .join("\n");
+
+  const namedInHistory = extractChartTitlesFromText(recent);
+  if (namedInHistory.length && isPianoOrSongLearnRequest(q)) {
+    return `${q}\n\nSongs recently discussed (ask which one if unclear): ${namedInHistory.slice(0, 12).join("; ")}\n\nContext from this conversation:\n${recent}`;
+  }
 
   return `${q}\n\nContext from this conversation:\n${recent}`;
 }

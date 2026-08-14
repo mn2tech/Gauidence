@@ -35,4 +35,15 @@ describe("pickConnectorImageCitations", () => {
       ["Silent Night Holy Night - C.jpg"]
     );
   });
+
+  it("does not fall back to unrelated charts when the answer names none of them", () => {
+    const picked = pickConnectorImageCitations(
+      [
+        { fileName: "Asha Meri - Eb5 - Short version.jpg" },
+        { fileName: "Athyunatha Simhasanamupai - G.jpg" },
+      ],
+      "Great choice — your space has All to Jesus I Surrender - C."
+    );
+    assert.deepEqual(picked, []);
+  });
 });
