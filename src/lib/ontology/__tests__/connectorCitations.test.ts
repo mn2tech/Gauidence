@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   connectorCitationDocumentId,
   isConnectorCitationDocumentId,
+  pickConnectorImageCitations,
 } from "../connectorCitationIds.ts";
 
 describe("connectorCitationDocumentId", () => {
@@ -15,6 +16,23 @@ describe("connectorCitationDocumentId", () => {
     assert.equal(
       isConnectorCitationDocumentId("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
       false
+    );
+  });
+});
+
+describe("pickConnectorImageCitations", () => {
+  it("keeps the chart named in the answer", () => {
+    const picked = pickConnectorImageCitations(
+      [
+        { fileName: "Ibadat Karo - G.jpg" },
+        { fileName: "Silent Night Holy Night - C.jpg" },
+        { fileName: "Just As I Am - Bb.pdf" },
+      ],
+      "Here's the full chart from Silent Night Holy Night - C.jpg - key of C:"
+    );
+    assert.deepEqual(
+      picked.map((c) => c.fileName),
+      ["Silent Night Holy Night - C.jpg"]
     );
   });
 });

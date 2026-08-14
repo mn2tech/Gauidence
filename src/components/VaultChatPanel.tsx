@@ -102,6 +102,11 @@ import {
   type GideonFocusBlock,
 } from "@/lib/gideon/focusBlock";
 import { isImageFileName } from "@/lib/vault/images";
+import {
+  connectorFilePreviewPath,
+  isConnectorCitationDocumentId,
+  pickConnectorImageCitations,
+} from "@/lib/ontology/connectorCitationIds";
 import { renderPdfThumbnailFromFile, renderPdfThumbnailFromUrl } from "@/lib/vault/pdfThumbnail";
 import { renderGideonText } from "@/components/gideonText";
 import { clipboardImageToFile } from "@/lib/vault/clipboardImage";
@@ -255,18 +260,30 @@ function VaultAttachmentCard({
   kind,
   previewUrl,
   compact = true,
+  citationKind,
+  sourceId,
+  itemId,
 }: {
   documentId: string;
   fileName: string;
   kind: "image" | "document";
   previewUrl?: string | null;
   compact?: boolean;
+  citationKind?: "vault" | "connector";
+  sourceId?: string;
+  itemId?: string;
 }) {
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [imageFailed, setImageFailed] = useState(false);
   const isImage = kind === "image" || isImageFileName(fileName);
   const isPdf = /\.pdf$/i.test(fileName);
   const pending = isPendingAttachmentId(documentId);
+  const connectorPreview =
+    (citationKind === "connector" || isConnectorCitationDocumentId(documentId)) &&
+    sourceId &&
+    itemId
+      ? connectorFilePreviewPath(sourceId, itemId)
+      : null;
   const [pdfThumb, setPdfThumb] = useState<string | null>(
     isPdf && previewUrl ? previewUrl : null
   );
@@ -275,6 +292,10 @@ function VaultAttachmentCard({
     setImageFailed(false);
     if (pending) {
       setSignedUrl(null);
+      return;
+    }
+    if (connectorPreview) {
+      setSignedUrl(connectorPreview);
       return;
     }
     let cancelled = false;
@@ -306,7 +327,7 @@ function VaultAttachmentCard({
     return () => {
       cancelled = true;
     };
-  }, [documentId, pending, isImage]);
+  }, [documentId, pending, isImage, connectorPreview]);
 
   useEffect(() => {
     if (!isPdf || pdfThumb || !signedUrl) return;
@@ -353,6 +374,7 @@ function VaultAttachmentCard({
               ? "h-full w-full object-cover object-top"
               : "max-h-72 w-full object-contain"
           }
+          onError={() => setImageFailed(true)}
         />
       ) : isImage && (pending || !signedUrl) ? (
         <div className="flex h-full items-center justify-center">
@@ -1470,11 +1492,12 @@ export default function VaultChatPanel({
       citation.sourceId &&
       citation.itemId
     ) {
-      const isPdf =
+      const isTrelloFile =
+        citation.sourceType === "trello" ||
         Boolean(citation.mimeType?.includes("pdf")) ||
-        citation.fileName.toLowerCase().endsWith(".pdf");
+        /\.(pdf|jpe?g|png|gif|webp)$/i.test(citation.fileName);
       const detailPath = `/settings/connections/${citation.sourceId}/files/${citation.itemId}`;
-      if (isPdf && citation.sourceType === "trello") {
+      if (isTrelloFile) {
         window.open(
           `/api/connections/${citation.sourceId}/items/${citation.itemId}/file`,
           "_blank",
@@ -2986,11 +3009,17 @@ export default function VaultChatPanel({
           .map((c) => [c.fileName.trim().toLowerCase(), c])
       ).values(),
     ];
+    const vaultImages = imageCitations.filter((c) => c.kind !== "connector");
+    const connectorImages = pickConnectorImageCitations(
+      imageCitations.filter((c) => c.kind === "connector"),
+      m.content ?? ""
+    );
     const sourceCitations = uniqueCitations.filter(
       (c) => !(c.isImage || isImageFileName(c.fileName))
     );
     const vaultPreviewCitations = [
-      ...imageCitations,
+      ...vaultImages,
+      ...connectorImages,
       ...sourceCitations.filter((c) => c.kind !== "connector"),
     ];
     const previewCitations = options?.hideCitationPreviews
@@ -3053,6 +3082,9 @@ export default function VaultChatPanel({
                 kind={
                   c.isImage || isImageFileName(c.fileName) ? "image" : "document"
                 }
+                citationKind={c.kind}
+                sourceId={c.sourceId}
+                itemId={c.itemId}
               />
             ))}
           </div>
