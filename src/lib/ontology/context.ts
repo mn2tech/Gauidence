@@ -304,6 +304,16 @@ function rankEntitiesByQueryTokens(
     for (const token of tokens) {
       if (hay.includes(token)) hits += token.length >= 5 ? 2 : 1;
     }
+    const tokenHits = tokens.filter((token) => hay.includes(token)).length;
+    if (tokenHits >= 2) hits += 4;
+    const props = entity.properties ?? {};
+    if (
+      tokens.some((t) => t === "chord" || t === "lyric" || t === "key") &&
+      (typeof props.musical_key === "string" ||
+        /\bkey\s+[A-G]/i.test(entity.description ?? ""))
+    ) {
+      hits += 3;
+    }
     if (entity.entity_type === "invoice" || entity.entity_type === "purchase") {
       hits += 3;
     }

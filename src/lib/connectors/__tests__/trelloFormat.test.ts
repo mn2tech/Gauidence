@@ -145,4 +145,32 @@ describe("trello board formatting", () => {
     const detailsAt = text.indexOf("Card details:");
     assert.ok(indexAt >= 0 && detailsAt > indexAt);
   });
+
+  it("keeps chord-chart line breaks and checklists in card details", () => {
+    const text = formatBoardAsAnalysisText({
+      name: "Living Waters",
+      lists: [{ id: "l1", name: "Songs" }],
+      checklists: [
+        {
+          id: "cl1",
+          name: "Progression",
+          idCard: "c1",
+          checkItems: [{ name: "Intro Gm" }, { name: "Verse Cm" }],
+        },
+      ],
+      cards: [
+        {
+          id: "c1",
+          idList: "l1",
+          name: "Ibadat Karo - Gm - Nov 21, 2021",
+          closed: false,
+          desc: "Verse:\nGm Cm D7\nChorus:\nEb F Gm",
+        },
+      ],
+    });
+    assert.match(text, /Verse:/);
+    assert.match(text, /Gm Cm D7/);
+    assert.match(text, /checklist "Progression":/);
+    assert.match(text, /- Intro Gm/);
+  });
 });

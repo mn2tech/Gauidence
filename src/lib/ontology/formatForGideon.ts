@@ -126,8 +126,24 @@ function formatEntityAttributes(
   if (facts.issuer) parts.push(`issuer:${facts.issuer}`);
   if (facts.recipient) parts.push(`recipient:${facts.recipient}`);
   if (facts.invoiceDate) parts.push(`invoice_date:${facts.invoiceDate}`);
+  const musicalKey = readStringAttr(properties, "musical_key", "key");
+  const practicedOn = readStringAttr(properties, "practiced_on");
+  if (musicalKey) parts.push(`musical_key:${musicalKey}`);
+  if (practicedOn) parts.push(`practiced_on:${practicedOn}`);
   if (!parts.length) return "";
   return ` | ${parts.join("; ")}`;
+}
+
+function readStringAttr(
+  properties: Record<string, unknown> | null | undefined,
+  ...keys: string[]
+): string | null {
+  if (!properties) return null;
+  for (const key of keys) {
+    const value = properties[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return null;
 }
 
 /**

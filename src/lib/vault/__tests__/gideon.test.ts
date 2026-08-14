@@ -31,7 +31,7 @@ describe("Gideon helpers", () => {
     assert.match(GIDEON_SYSTEM, /You are Gideon/);
     assert.match(GIDEON_SYSTEM, /Payment status is unknown/);
     assert.match(GIDEON_SYSTEM, /GENERAL KNOWLEDGE/);
-    assert.match(GIDEON_SYSTEM, /general knowledge rather than the user's Guardian spaces/i);
+    assert.match(GIDEON_SYSTEM, /Never invent typical chords for a key/i);
     assert.match(GIDEON_SYSTEM, /CURRENT DATE AND TIME is provided/i);
     assert.equal(
       GIDEON_BRAND_LINE,

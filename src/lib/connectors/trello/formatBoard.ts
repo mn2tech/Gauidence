@@ -71,7 +71,14 @@ export function formatBoardAsAnalysisText(
       `- [${list}] ${String(row.name ?? "Untitled")}${due}${labelBit}`
     );
     const desc = String(row.desc ?? "").trim();
-    if (desc) lines.push(`  ${desc.slice(0, 280).replace(/\s+/g, " ")}`);
+    if (desc) pushIndentedBlock(lines, desc, 2500);
+    const checklists = checklistsForCard(board, String(row.id ?? ""));
+    for (const cl of checklists) {
+      lines.push(`  checklist "${cl.name}":`);
+      for (const item of cl.items) {
+        lines.push(`    - ${item}`);
+      }
+    }
     const attachments = Array.isArray(row.attachments) ? row.attachments : [];
     for (const raw of attachments.slice(0, 12)) {
       if (!raw || typeof raw !== "object") continue;
@@ -105,4 +112,45 @@ export function formatBoardAsAnalysisText(
   }
 
   return lines.join("\n");
+}
+
+function pushIndentedBlock(
+  lines: string[],
+  text: string,
+  maxChars: number
+): void {
+  let used = 0;
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.replace(/\s+$/, "");
+    if (!line.trim()) continue;
+    const chunk = line.slice(0, 240);
+    if (used + chunk.length > maxChars) break;
+    lines.push(`  ${chunk}`);
+    used += chunk.length + 1;
+  }
+}
+
+function checklistsForCard(
+  board: Record<string, unknown>,
+  cardId: string
+): Array<{ name: string; items: string[] }> {
+  if (!cardId) return [];
+  const lists = Array.isArray(board.checklists) ? board.checklists : [];
+  const out: Array<{ name: string; items: string[] }> = [];
+  for (const raw of lists) {
+    if (!raw || typeof raw !== "object") continue;
+    const row = raw as Record<string, unknown>;
+    if (String(row.idCard ?? "") !== cardId) continue;
+    const items = Array.isArray(row.checkItems) ? row.checkItems : [];
+    const names = items
+      .filter((i): i is Record<string, unknown> => !!i && typeof i === "object")
+      .map((i) => String(i.name ?? "").trim())
+      .filter(Boolean)
+      .slice(0, 40);
+    out.push({
+      name: String(row.name ?? "Checklist"),
+      items: names,
+    });
+  }
+  return out;
 }

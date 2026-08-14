@@ -24,6 +24,9 @@ import {
 import {
   extractTrelloCardIndex,
   mergeCardIndexEntities,
+  mergeTrelloSongEntities,
+  parseMusicCardTitle,
+  parseTrelloBoardSongs,
 } from "../pipeline/trelloCardIndex";
 import { planOntologyDetach } from "../detachFromDocument";
 
@@ -696,6 +699,39 @@ Card details:`;
     );
     assert.equal(merged.entities.length, 3);
     assert.ok(merged.entities.some((e) => e.name === "Deevinchaevae"));
+  });
+
+  it("parses key/date from music card titles", () => {
+    const meta = parseMusicCardTitle("Ibadat Karo - Gm - Nov 21, 2021");
+    assert.equal(meta.songTitle, "Ibadat Karo");
+    assert.equal(meta.key, "Gm");
+    assert.equal(meta.practicedOn, "Nov 21, 2021");
+  });
+
+  it("stores card chord notes on the song entity", () => {
+    const text = `Trello board: The "Living Waters"
+CARD INDEX (1 items — treat each as a song/document entity when this is a music board):
+* [Songs] Ibadat Karo - Gm - Nov 21, 2021
+Card details:
+- [Songs] Ibadat Karo - Gm - Nov 21, 2021
+  Verse: Gm Cm D7
+  Chorus: Eb F Gm
+  checklist "Progression":
+    - Intro Gm
+`;
+    const songs = parseTrelloBoardSongs(text);
+    assert.equal(songs.length, 1);
+    assert.match(songs[0]!.notes, /Verse: Gm Cm D7/);
+    const merged = mergeTrelloSongEntities(
+      { entities: [], relationships: [], events: [] },
+      songs
+    );
+    const song = merged.entities[0];
+    assert.ok(song);
+    assert.equal(song!.attributes?.musical_key, "Gm");
+    assert.ok(song!.aliases?.includes("Ibadat Karo"));
+    assert.match(song!.description ?? "", /Verse: Gm Cm D7/);
+    assert.match(String(song!.attributes?.content_transcript ?? ""), /Chorus: Eb F Gm/);
   });
 });
 

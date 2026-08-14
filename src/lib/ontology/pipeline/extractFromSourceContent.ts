@@ -29,10 +29,12 @@ import { enrichOntologyWithTranscript } from "./enrichWithTranscript";
 import {
   extractTrelloCardIndex,
   mergeCardIndexEntities,
+  mergeTrelloSongEntities,
+  parseTrelloBoardSongs,
 } from "./trelloCardIndex";
 
 /** Bump when extraction quality changes so Analyze again is not skipped. */
-const CONNECTOR_ANALYSIS_VERSION = "connector-ontology-v8";
+const CONNECTOR_ANALYSIS_VERSION = "connector-ontology-v9";
 
 export function connectorAnalysisVersion(): string {
   return CONNECTOR_ANALYSIS_VERSION;
@@ -191,42 +193,11 @@ export async function extractOntologyFromSourceContent(args: {
       relationships: [],
       events: [],
     };
-    extraction = mergeCardIndexEntities(extraction, cardIndex);
-    extraction = enrichOntologyWithTranscript(
+    extraction = mergeTrelloSongEntities(
       extraction,
-      cardIndex,
-      fileName
+      parseTrelloBoardSongs(extractedText)
     );
-
-    // One bounded enrichment pass for keys/charts (optional; never blocks catalog).
-    try {
-      const enrichSlice = [
-        cardIndex,
-        "",
-        extractedText.includes("Card details:")
-          ? extractedText.slice(
-              extractedText.indexOf("Card details:"),
-              extractedText.indexOf("Card details:") + 10_000
-            )
-          : extractedText.slice(0, 10_000),
-      ].join("\n");
-      const enriched = await extractOntologyConnectorTextChunk({
-        sourceText: enrichSlice,
-        fileName,
-        spaceName: args.spaceName,
-        chunkIndex: null,
-        chunkCount: null,
-      });
-      if (enriched) {
-        extraction = mergeOntologyResults(
-          extraction,
-          sanitizeConnectorOntologyExtraction(enriched)
-        );
-        extraction = mergeCardIndexEntities(extraction, cardIndex);
-      }
-    } catch (err) {
-      console.error("Trello board enrichment pass failed:", err);
-    }
+    extraction = mergeCardIndexEntities(extraction, cardIndex);
 
     return {
       extraction,
@@ -312,39 +283,6 @@ async function extractOntologyConnectorText(input: {
 
   if (!merged.entities.length && !merged.relationships.length) return null;
   return sanitizeConnectorOntologyExtraction(merged);
-}
-
-function mergeOntologyResults(
-  base: OntologyExtractionResult,
-  extra: OntologyExtractionResult
-): OntologyExtractionResult {
-  const seen = new Set(
-    base.entities.map((e) => `${e.type}:${e.name.trim().toLowerCase()}`)
-  );
-  const entities = [...base.entities];
-  for (const e of extra.entities) {
-    const key = `${e.type}:${e.name.trim().toLowerCase()}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    entities.push(e);
-  }
-  const seenRels = new Set(
-    base.relationships.map(
-      (r) => `${r.source}|${r.type}|${r.target}`.toLowerCase()
-    )
-  );
-  const relationships = [...base.relationships];
-  for (const r of extra.relationships) {
-    const key = `${r.source}|${r.type}|${r.target}`.toLowerCase();
-    if (seenRels.has(key)) continue;
-    seenRels.add(key);
-    relationships.push(r);
-  }
-  return {
-    entities,
-    relationships,
-    events: [...base.events, ...extra.events],
-  };
 }
 
 async function extractOntologyConnectorTextChunk(input: {
