@@ -3,6 +3,8 @@ import type { User, SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { requireAccessibleGuardianProfile } from "@/lib/profiles/server";
 import { notifyClientRequestActivity } from "@/lib/client-requests/notify";
+import { loadCollaboratorMemberAccounts } from "@/lib/profiles/collaboratorMembers";
+import type { CollaboratorAccount } from "@/lib/profiles/collaboratorDisplay";
 
 export const runtime = "nodejs";
 
@@ -10,6 +12,17 @@ type Authed = { supabase: SupabaseClient; user: User };
 
 const COMMENT_SELECT =
   "id, request_id, author_user_id, content, created_at";
+
+/** Resolve a comment author label after vault access has already been verified. */
+function commentAuthorName(
+  account: CollaboratorAccount | null | undefined
+): string {
+  const name = account?.fullName?.trim();
+  if (name) return name;
+  const email = account?.email?.trim();
+  if (email) return email.split("@")[0] || email;
+  return "Someone";
+}
 
 async function requireUser(): Promise<Authed | NextResponse> {
   const supabase = await createClient();
@@ -84,27 +97,18 @@ export async function GET(_request: Request, context: RouteContext) {
     );
   }
 
+  // profiles RLS only allows reading your own row; use the admin helper
+  // (same pattern as vault collaborator labels) after access was verified.
   const authorIds = [
     ...new Set((data ?? []).map((row) => String(row.author_user_id))),
   ];
-  const authorNames = new Map<string, string>();
-  if (authorIds.length > 0) {
-    const { data: profiles } = await supabase
-      .from("profiles")
-      .select("id, full_name, email")
-      .in("id", authorIds);
-    for (const row of profiles ?? []) {
-      const name =
-        (row.full_name as string | null)?.trim() ||
-        (row.email as string | null)?.split("@")[0] ||
-        "Someone";
-      authorNames.set(String(row.id), name);
-    }
-  }
+  const authorAccounts = await loadCollaboratorMemberAccounts(authorIds);
 
   const comments = (data ?? []).map((row) => ({
     ...row,
-    author_name: authorNames.get(String(row.author_user_id)) ?? "Someone",
+    author_name: commentAuthorName(
+      authorAccounts.get(String(row.author_user_id))
+    ),
   }));
 
   return NextResponse.json({ comments });
