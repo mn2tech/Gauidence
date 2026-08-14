@@ -7,11 +7,15 @@ const INVENTORY_QUESTION_PATTERN =
   /\b(what(?:'s| is| are)?\s+(?:do\s+)?(?:i|we)\s+have\b|what(?:'s| is| are)?\s+(?:in\s+)?(?:the\s+)?(?:vault|space|workspace|uploaded|stored|files?|documents?|photos?)|list\s+(?:all\s+)?(?:files?|documents?|uploads?|photos?)|how\s+many\s+(?:files?|documents?|photos?|uploads?)|show\s+(?:me\s+)?(?:all\s+)?(?:files?|documents?|uploads?)|(?:count|browse|compare)\s+(?:files?|documents?|uploads?)|everything\s+(?:in|uploaded)|file\s+inventory)\b/i;
 
 const SONG_LIST_QUESTION_PATTERN =
-  /\b((?:list|show|give(?:\s+me)?)\s+(?:(?:me|us)\s+)?(?:the\s+)?(?:list\s+of\s+)?songs?|what songs|songs (?:are |on |in )|song list|song titles?|chord charts? (?:in|on|for|available)|set\s*lists?|living\s+waters)\b/i;
+  /\b((?:list|show|give(?:\s+me)?)\s+(?:(?:me|us)\s+)?(?:the\s+)?(?:list\s+of\s+)?songs?|what songs|songs (?:are |on |in )|song list|song titles?|which songs)\b/i;
 
-/** True when the user wants songs/charts listed from the bound Trello board or space. */
+/** True when the user wants a song/chart roster (not chords for one song). */
 export function wantsSongOrChartList(question: string): boolean {
-  return SONG_LIST_QUESTION_PATTERN.test(question.trim());
+  const q = question.trim();
+  if (/\b(chords? for|what(?:'s| is) the key|key of|lyrics for)\b/i.test(q)) {
+    return false;
+  }
+  return SONG_LIST_QUESTION_PATTERN.test(q);
 }
 
 /** True when the user is asking to list, count, browse, or compare vault files. */
@@ -254,14 +258,55 @@ function parseInventoryFileNames(inventoryText: string): {
   return { photos, documents };
 }
 
+function parseConnectedChartTitles(inventoryText: string): string[] {
+  const titles: string[] = [];
+  const seen = new Set<string>();
+  for (const line of inventoryText.split(/\n/)) {
+    const connected = line.match(
+      /^-\s+(.+?)(?:\s+·\s+(.+?))?\s+\((?:Trello|Device Storage)\b/i
+    );
+    if (!connected) continue;
+    const fileName = connected[1]!.trim();
+    const cardName = connected[2]?.trim() || "";
+    // Board dumps / pasted text are not songs.
+    if (/\.txt$/i.test(fileName) || /^pasted\b/i.test(fileName)) continue;
+    if (cardName && (/^\.txt$/i.test(cardName) || /^pasted\b/i.test(cardName))) {
+      continue;
+    }
+    const looksLikeChart =
+      /\.(jpe?g|png|gif|webp|pdf)$/i.test(fileName) ||
+      Boolean(cardName && !/\.txt$/i.test(cardName));
+    if (!looksLikeChart) continue;
+
+    const title = songTitleFromInventoryLabel(cardName || fileName);
+    const key = normalizeSongDedupeKey(title);
+    if (!title || !key || seen.has(key)) continue;
+    seen.add(key);
+    titles.push(title);
+  }
+  return titles;
+}
+
 function songTitleFromInventoryLabel(label: string): string {
   let title = label.replace(/\.(jpe?g|png|gif|webp|pdf)$/i, "").trim();
   title = title
     .replace(/\s*-\s*[A-G](?:#|b)?(?:m|maj|min|major|minor|5)?(?:\s|$)/i, " ")
     .replace(/\s*-\s*short version\s*$/i, "")
+    .replace(
+      /\s*[-–—]\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b.*$/i,
+      ""
+    )
     .replace(/\s+/g, " ")
     .trim();
   return title || label.trim();
+}
+
+function normalizeSongDedupeKey(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function formatNameList(names: string[], cap = 8): string {
@@ -306,17 +351,11 @@ export function buildInventoryQuestionAnswer(args: {
   const { photos, documents } = parseInventoryFileNames(args.fileInventoryText);
   const allFiles = [...documents, ...photos];
 
-  if (songList && allFiles.length > 0) {
-    const titles: string[] = [];
-    const seen = new Set<string>();
-    for (const label of allFiles) {
-      const title = songTitleFromInventoryLabel(label);
-      const key = title.toLowerCase();
-      if (!title || seen.has(key)) continue;
-      seen.add(key);
-      titles.push(title);
+  if (songList) {
+    const titles = parseConnectedChartTitles(args.fileInventoryText);
+    if (titles.length === 0) {
+      return `I don't see chord-chart songs in your ${space} space yet. Scan Living Waters on Connections, then ask again.`;
     }
-    if (titles.length === 0) return null;
     const cap = 40;
     const shown = titles.slice(0, cap);
     const more =

@@ -109,12 +109,19 @@ describe("ask vault inventory", () => {
       fileInventoryText: `SPACE FILE INVENTORY (Trello / connected files in Wednesday Practice — treat these as files in this space, not only on the connection):
 - Silent Night Holy Night - C.jpg · Silent Night Holy Night (Trello in this space, analyzed)
 - As the deer - C.jpg · As the deer (Trello in this space, discovered)
-- Asha Meri - Eb5 - Short version.jpg · Asha Meri (Trello in this space, analyzed)`,
+- Asha Meri - Eb5 - Short version.jpg · Asha Meri (Trello in this space, analyzed)
+- Pasted - Wednesday Practice.txt (Trello in this space, analyzed)
+- Ay hamaare Baap - Oct 10, 2021.jpg · Ay hamaare Baap - Oct 10, 2021 (Trello in this space, analyzed)
+- Ay hamaare Baap.jpg · Ay hamaare Baap (Trello in this space, discovered)`,
     });
     assert.ok(answer);
     assert.match(answer!, /Silent Night Holy Night/);
     assert.match(answer!, /As the deer/);
     assert.match(answer!, /Asha Meri/);
+    assert.match(answer!, /Ay hamaare Baap/);
+    assert.equal((answer!.match(/Ay hamaare Baap/g) ?? []).length, 1);
+    assert.doesNotMatch(answer!, /Pasted/);
+    assert.doesNotMatch(answer!, /\.txt/);
     assert.match(answer!, /Wednesday Practice/);
   });
 

@@ -9,7 +9,7 @@ import {
 import { generateVaultChatTitle } from "@/lib/chat/generateVaultChatTitle";
 import { shouldGenerateVaultChatTitle } from "@/lib/chat/vaultChatTitle";
 import { isVaultEmbeddingConfigured } from "@/lib/vault/embeddings";
-import { buildAskVaultInventory, buildInventoryQuestionAnswer, wantsVaultFileInventory } from "@/lib/vault/askInventory";
+import { buildAskVaultInventory, buildInventoryQuestionAnswer, wantsVaultFileInventory, wantsSongOrChartList } from "@/lib/vault/askInventory";
 import { loadConnectedSuggestionContext } from "@/lib/vault/loadInventory";
 import { enqueueMissingVaultIndexing } from "@/lib/vault/ensureIndexed";
 import {
@@ -1354,7 +1354,12 @@ export async function POST(request: Request) {
 
       if (inventoryAnswer) {
         answer = inventoryAnswer;
-        if (connectorCitations?.length) {
+        // Song lists are inventory-only — don't attach random chart/PDF previews
+        // from ontology search that happened to run in the same turn.
+        if (
+          !wantsSongOrChartList(question) &&
+          connectorCitations?.length
+        ) {
           citations = connectorCitations;
         }
       } else {

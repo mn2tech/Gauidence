@@ -5,6 +5,7 @@ import type { RetrievedChunk } from "@/lib/vault/retrieve";
 import { formatRetrievalContext } from "@/lib/vault/indexDocument";
 import { wantsShowPictures } from "@/lib/vault/images";
 import { loadVaultFileInventoryContext } from "@/lib/vault/loadInventory";
+import { wantsSongOrChartList } from "@/lib/vault/askInventory";
 import { mergePinnedChunks } from "@/lib/vault/retrieve";
 import { embedQuery } from "@/lib/vault/embeddings";
 import { hybridRetrieveVaultChunks } from "@/lib/vault/hybridRetrieval";
@@ -150,6 +151,7 @@ export async function loadWorkspaceContext(
     : retrievalScopes;
   const showPictures = wantsShowPictures(question);
   const transcriptionMode = wantsTranscription(question);
+  const songListOnly = wantsSongOrChartList(question);
   const reminderAgent = wantsReminderAgent(question);
   const dailyLogCaptureAgent = wantsDailyLogCapture(question, chatHistory);
   const workMemoryUpdateAgent = wantsWorkMemoryUpdate(question, {
@@ -169,7 +171,7 @@ export async function loadWorkspaceContext(
 
   const embeddingStarted = Date.now();
   const queryEmbedding =
-    load.documents && chunkCount > 0
+    load.documents && chunkCount > 0 && !songListOnly
       ? await embedQuery(retrievalQuestion).catch((embedErr) => {
           console.warn(
             "Vault chat embedding failed; continuing without document search:",
@@ -239,7 +241,7 @@ export async function loadWorkspaceContext(
     linkedContext,
     workMemoryBundleRaw,
   ] = await Promise.all([
-    load.documents && isKnowledgeEngineV2Enabled()
+    load.documents && isKnowledgeEngineV2Enabled() && !songListOnly
       ? retrieveStructuredKnowledge(supabase, {
           question: retrievalQuestion,
           profileIds: effectiveSearchIds,
@@ -248,7 +250,7 @@ export async function loadWorkspaceContext(
           text: formatKnowledgeForGideon(knowledge, profileNames),
         }))
       : Promise.resolve({ count: 0, text: "(none)" }),
-    load.documents && isGuardianOntologyEnabled()
+    load.documents && isGuardianOntologyEnabled() && !songListOnly
       ? getOntologyContext(supabase, {
           spaceId: ontologySpaceId,
           query: retrievalQuestion,
