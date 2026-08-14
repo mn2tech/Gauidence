@@ -69,6 +69,104 @@ export function guessAttachmentMime(args: {
   return mime || "application/octet-stream";
 }
 
+/** Same chart uploaded on multiple cards → one analyze job. */
+export function chartDuplicateKey(args: {
+  name?: string | null;
+  bytes?: number | null;
+}): string {
+  const name = String(args.name ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+  if (!name) return "";
+  const bytes =
+    typeof args.bytes === "number" && Number.isFinite(args.bytes)
+      ? Math.max(0, Math.floor(args.bytes))
+      : null;
+  return bytes == null ? `name:${name}` : `name:${name}|bytes:${bytes}`;
+}
+
+function chartDateScore(date?: string): number {
+  if (!date) return 0;
+  const t = Date.parse(date);
+  return Number.isFinite(t) ? t : 0;
+}
+
+/**
+ * Keep one attachment per duplicate key.
+ * Prefer the newest upload; ties keep the first seen.
+ */
+export function dedupeChartAttachments(
+  charts: TrelloAttachmentRef[]
+): TrelloAttachmentRef[] {
+  const best = new Map<string, TrelloAttachmentRef>();
+  for (const chart of charts) {
+    const key = chartDuplicateKey({ name: chart.name, bytes: chart.bytes });
+    if (!key) continue;
+    const prev = best.get(key);
+    if (!prev) {
+      best.set(key, chart);
+      continue;
+    }
+    if (chartDateScore(chart.date) > chartDateScore(prev.date)) {
+      best.set(key, chart);
+    }
+  }
+  // Preserve first-seen order of unique keys.
+  const seen = new Set<string>();
+  const out: TrelloAttachmentRef[] = [];
+  for (const chart of charts) {
+    const key = chartDuplicateKey({ name: chart.name, bytes: chart.bytes });
+    if (!key || seen.has(key)) continue;
+    const winner = best.get(key);
+    if (!winner) continue;
+    seen.add(key);
+    out.push(winner);
+  }
+  return out;
+}
+
+/**
+ * Analyze queue: drop duplicates, preferring an already-analyzed copy.
+ */
+export function pickUniqueChartsForAnalyze<
+  T extends {
+    name?: string | null;
+    sizeBytes?: number | null;
+    processingStatus?: string;
+  },
+>(charts: T[]): T[] {
+  const analyzedKeys = new Set<string>();
+  for (const chart of charts) {
+    if (chart.processingStatus !== "analyzed") continue;
+    const key = chartDuplicateKey({
+      name: chart.name,
+      bytes: chart.sizeBytes,
+    });
+    if (key) analyzedKeys.add(key);
+  }
+
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const chart of charts) {
+    const key = chartDuplicateKey({
+      name: chart.name,
+      bytes: chart.sizeBytes,
+    });
+    if (!key) {
+      out.push(chart);
+      continue;
+    }
+    if (analyzedKeys.has(key) && chart.processingStatus !== "analyzed") {
+      continue;
+    }
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(chart);
+  }
+  return out;
+}
+
 export function collectChartAttachmentsFromCards(args: {
   boardId: string;
   boardName: string;
@@ -114,7 +212,7 @@ export function collectChartAttachmentsFromCards(args: {
       });
     }
   }
-  return out;
+  return dedupeChartAttachments(out);
 }
 
 /** @deprecated Use collectChartAttachmentsFromCards — kept for existing tests. */

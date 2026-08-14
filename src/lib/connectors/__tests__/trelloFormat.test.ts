@@ -6,6 +6,7 @@ import {
   isChartAttachment,
   isImageAttachment,
   isPdfAttachment,
+  pickUniqueChartsForAnalyze,
 } from "../trello/attachments.ts";
 import { formatBoardAsAnalysisText } from "../trello/formatBoard.ts";
 
@@ -84,6 +85,109 @@ describe("trello pdf attachments", () => {
     assert.equal(charts[1]?.attachmentId, "a2");
     assert.equal(charts[1]?.mimeType, "image/jpeg");
     assert.equal(charts[1]?.cardName, "Ibadat Karo - Gm");
+  });
+
+  it("dedupes the same chart filename across cards", () => {
+    const charts = collectChartAttachmentsFromCards({
+      boardId: "b1",
+      boardName: "Living Waters",
+      cards: [
+        {
+          id: "c1",
+          name: "Asha Meri",
+          closed: false,
+          attachments: [
+            {
+              id: "a1",
+              name: "Asha Meri - Eb5 - Short version.jpg",
+              mimeType: "image/jpeg",
+              bytes: 90000,
+              date: "2024-01-01T00:00:00.000Z",
+              url: "https://example.com/a1.jpg",
+            },
+          ],
+        },
+        {
+          id: "c2",
+          name: "Asha Meri copy",
+          closed: false,
+          attachments: [
+            {
+              id: "a2",
+              name: "Asha Meri - Eb5 - Short version.jpg",
+              mimeType: "image/jpeg",
+              bytes: 90000,
+              date: "2024-06-01T00:00:00.000Z",
+              url: "https://example.com/a2.jpg",
+            },
+            {
+              id: "a3",
+              name: "Asha Meri - Eb5 - Short version.jpg",
+              mimeType: "image/jpeg",
+              bytes: 90000,
+              date: "2024-03-01T00:00:00.000Z",
+              url: "https://example.com/a3.jpg",
+            },
+          ],
+        },
+      ],
+    });
+    assert.equal(charts.length, 1);
+    assert.equal(charts[0]?.attachmentId, "a2");
+  });
+
+  it("keeps same-name charts when file size differs", () => {
+    const charts = collectChartAttachmentsFromCards({
+      boardId: "b1",
+      boardName: "Living Waters",
+      cards: [
+        {
+          id: "c1",
+          name: "Song",
+          closed: false,
+          attachments: [
+            {
+              id: "a1",
+              name: "Silent Night.jpg",
+              mimeType: "image/jpeg",
+              bytes: 1000,
+              url: "https://example.com/a1.jpg",
+            },
+            {
+              id: "a2",
+              name: "Silent Night.jpg",
+              mimeType: "image/jpeg",
+              bytes: 2000,
+              url: "https://example.com/a2.jpg",
+            },
+          ],
+        },
+      ],
+    });
+    assert.equal(charts.length, 2);
+  });
+
+  it("skips analyze duplicates when one copy is already analyzed", () => {
+    const unique = pickUniqueChartsForAnalyze([
+      {
+        name: "Asha Meri - Eb5 - Short version.jpg",
+        sizeBytes: 90000,
+        processingStatus: "analyzed",
+      },
+      {
+        name: "Asha Meri - Eb5 - Short version.jpg",
+        sizeBytes: 90000,
+        processingStatus: "discovered",
+      },
+      {
+        name: "As the deer - C.jpg",
+        sizeBytes: 1000,
+        processingStatus: "discovered",
+      },
+    ]);
+    assert.equal(unique.length, 2);
+    assert.equal(unique[0]?.processingStatus, "analyzed");
+    assert.equal(unique[1]?.name, "As the deer - C.jpg");
   });
 
   it("collects PDF attachments from open cards only", () => {

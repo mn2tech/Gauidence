@@ -29,6 +29,7 @@ import {
   isItemNeedsAnalyze,
 } from "@/lib/connectors/clientAnalyze";
 import { connectorAnalysisVersion } from "@/lib/ontology/pipeline/analysisVersion";
+import { pickUniqueChartsForAnalyze } from "@/lib/connectors/trello/attachments";
 
 const TRELLO_CHART_BATCH = 8;
 const TRELLO_CHART_CONCURRENCY = 3;
@@ -360,9 +361,10 @@ export default function ConnectionsPanel() {
           i.analysisVersion !== currentVersion
         );
       });
-      const pendingCharts = queue
+      const attachments = queue.filter((i) => i.metadata?.kind === "attachment");
+      const uniqueAttachments = pickUniqueChartsForAnalyze(attachments);
+      const pendingCharts = uniqueAttachments
         .filter((i) => {
-          if (i.metadata?.kind !== "attachment") return false;
           if (isItemNeedsAnalyze(i)) return true;
           return (
             i.processingStatus === "analyzed" &&
