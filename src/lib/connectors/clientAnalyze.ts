@@ -64,6 +64,11 @@ function isTrelloRemoteItem(item: SourceItem): boolean {
   return item.metadata?.provider === "trello";
 }
 
+/** True when Analyze can fetch content server-side (no local folder picker). */
+export function isRemoteAnalyzeItem(item: SourceItem): boolean {
+  return isTrelloRemoteItem(item);
+}
+
 /**
  * Read bytes + POST analyze for one connected source item.
  * Trello boards/PDFs are fetched server-side (no local file picker).
@@ -74,15 +79,17 @@ export async function analyzeSourceItemClient(args: {
   force?: boolean;
   profileId?: string | null;
   readOptions?: ReadSourceOptions;
+  /** Force server-side fetch (whole Trello connection). */
+  remote?: boolean;
 }): Promise<AnalyzeClientResult | AnalyzeClientFailure> {
-  const { sourceId, item, force, profileId, readOptions } = args;
+  const { sourceId, item, force, profileId, readOptions, remote } = args;
   try {
     const shouldForce =
       force === true ||
       item.processingStatus === "analyzed" ||
       item.processingStatus === "analysis_failed";
 
-    if (isTrelloRemoteItem(item)) {
+    if (remote || isTrelloRemoteItem(item)) {
       const res = await fetch(
         `/api/connections/${sourceId}/items/${item.id}/analyze`,
         {

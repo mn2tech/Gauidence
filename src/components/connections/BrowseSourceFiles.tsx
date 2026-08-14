@@ -15,8 +15,12 @@ import {
   analyzeSourceItemClient,
   isItemAnalyzable,
   isItemNeedsAnalyze,
+  isRemoteAnalyzeItem,
 } from "@/lib/connectors/clientAnalyze";
-import { ensureBatchReadAccess } from "@/lib/connectors/content/readClient";
+import {
+  ensureBatchReadAccess,
+  type BatchReadAccess,
+} from "@/lib/connectors/content/readClient";
 import { ConnectorError } from "@/lib/connectors/types";
 import { useActiveProfile } from "@/components/ProfileProvider";
 
@@ -46,6 +50,7 @@ export default function BrowseSourceFiles({ sourceId }: Props) {
   const analyzeEnabled = isSourceItemAnalyzeEnabled();
   const { active } = useActiveProfile();
   const [items, setItems] = useState<Array<SourceItem & { id: string }>>([]);
+  const [sourceType, setSourceType] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [batchBusy, setBatchBusy] = useState(false);
@@ -74,6 +79,7 @@ export default function BrowseSourceFiles({ sourceId }: Props) {
       );
       const body = (await res.json().catch(() => ({}))) as {
         items?: Array<SourceItem & { id: string }>;
+        source?: { sourceType?: string };
         error?: string;
       };
       if (!res.ok) {
@@ -82,6 +88,7 @@ export default function BrowseSourceFiles({ sourceId }: Props) {
         return;
       }
       setItems(body.items ?? []);
+      setSourceType(body.source?.sourceType ?? null);
     } catch {
       setError("Network unavailable. Check your connection and try again.");
       setItems([]);
@@ -195,22 +202,27 @@ export default function BrowseSourceFiles({ sourceId }: Props) {
       setBatchResults(initial);
       const outcome = [...initial];
 
-      let access;
-      try {
-        access = await ensureBatchReadAccess(sourceId);
-      } catch (err) {
-        if (err instanceof ConnectorError && err.code === "cancelled") {
-          setBatchResults([]);
+      let access: BatchReadAccess = {};
+      const needsLocalAccess =
+        sourceType !== "trello" &&
+        queue.some((item) => !isRemoteAnalyzeItem(item));
+      if (needsLocalAccess) {
+        try {
+          access = await ensureBatchReadAccess(sourceId);
+        } catch (err) {
+          if (err instanceof ConnectorError && err.code === "cancelled") {
+            setBatchResults([]);
+            setBatchBusy(false);
+            return;
+          }
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Couldn't open the connected folder."
+          );
           setBatchBusy(false);
           return;
         }
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Couldn't open the connected folder."
-        );
-        setBatchBusy(false);
-        return;
       }
 
       for (let i = 0; i < queue.length; i++) {
@@ -235,6 +247,7 @@ export default function BrowseSourceFiles({ sourceId }: Props) {
           force:
             item.processingStatus === "analyzed" ||
             item.processingStatus === "analysis_failed",
+          remote: sourceType === "trello" || isRemoteAnalyzeItem(item),
           readOptions: {
             directoryHandle: access.directoryHandle,
             fileIndex: access.fileIndex,
@@ -295,7 +308,7 @@ export default function BrowseSourceFiles({ sourceId }: Props) {
       setBatchBusy(false);
       await load();
     },
-    [batchBusy, load, sourceId, active?.id]
+    [batchBusy, load, sourceId, active?.id, sourceType]
   );
 
   const analyzeSelected = useCallback(() => {

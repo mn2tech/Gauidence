@@ -65,6 +65,11 @@ export async function GET(req: Request, ctx: Ctx) {
       items: filtered,
       total: active.length,
       categories,
+      source: {
+        id: source.id,
+        sourceType: source.sourceType,
+        displayName: source.displayName,
+      },
     });
   } catch (err) {
     const message =

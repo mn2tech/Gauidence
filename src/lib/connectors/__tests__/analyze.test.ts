@@ -8,6 +8,7 @@ import { buildFileIndex } from "../content/readClient";
 import {
   isItemAnalyzable,
   isItemNeedsAnalyze,
+  isRemoteAnalyzeItem,
 } from "../clientAnalyze";
 import {
   normalizeRelationshipType,
@@ -95,6 +96,31 @@ describe("connector analyze support", () => {
     const index = buildFileIndex([file]);
     assert.equal(index.get("january/invoice.pdf"), file);
     assert.equal(index.get("invoice.pdf"), file);
+  });
+
+  it("treats Trello metadata as remote analyze", () => {
+    assert.equal(
+      isRemoteAnalyzeItem({
+        sourceId: "s1",
+        externalId: "b1",
+        name: "Living Waters",
+        sourceUri: "https://trello.com/b/x",
+        processingStatus: "discovered",
+        metadata: { provider: "trello", kind: "board" },
+      }),
+      true
+    );
+    assert.equal(
+      isRemoteAnalyzeItem({
+        sourceId: "s1",
+        externalId: "f1",
+        name: "chart.pdf",
+        sourceUri: "file://chart.pdf",
+        processingStatus: "discovered",
+        metadata: {},
+      }),
+      false
+    );
   });
 });
 
