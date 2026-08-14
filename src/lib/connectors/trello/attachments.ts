@@ -11,6 +11,7 @@ export type TrelloAttachmentRef = {
   url: string;
   bytes?: number;
   date?: string;
+  isUpload?: boolean;
 };
 
 export function isPdfAttachment(args: {
@@ -30,7 +31,10 @@ export function collectPdfAttachmentsFromCards(args: {
   boardId: string;
   boardName: string;
   cards: unknown[];
+  /** When true (default), only files uploaded to Trello — not external links. */
+  uploadedOnly?: boolean;
 }): TrelloAttachmentRef[] {
+  const uploadedOnly = args.uploadedOnly !== false;
   const out: TrelloAttachmentRef[] = [];
   for (const card of args.cards) {
     if (!card || typeof card !== "object") continue;
@@ -49,6 +53,8 @@ export function collectPdfAttachmentsFromCards(args: {
       const mimeType = String(att.mimeType ?? "");
       const url = String(att.url ?? att.fileUrl ?? "");
       if (!isPdfAttachment({ name, mimeType, url })) continue;
+      const isUpload = att.isUpload !== false;
+      if (uploadedOnly && att.isUpload === false) continue;
       out.push({
         attachmentId,
         cardId,
@@ -63,6 +69,7 @@ export function collectPdfAttachmentsFromCards(args: {
             ? Math.max(0, Math.floor(att.bytes))
             : undefined,
         date: typeof att.date === "string" ? att.date : undefined,
+        isUpload,
       });
     }
   }

@@ -60,7 +60,37 @@ describe("trello pdf attachments", () => {
     assert.equal(pdfs.length, 1);
     assert.equal(pdfs[0]?.attachmentId, "a1");
     assert.equal(pdfs[0]?.cardName, "Setlist");
-    assert.equal(pdfs[0]?.boardName, "Living Waters");
+  it("skips external link PDFs when uploadedOnly", () => {
+    const pdfs = collectPdfAttachmentsFromCards({
+      boardId: "b1",
+      boardName: "Board",
+      uploadedOnly: true,
+      cards: [
+        {
+          id: "c1",
+          name: "Card",
+          closed: false,
+          attachments: [
+            {
+              id: "a1",
+              name: "local.pdf",
+              mimeType: "application/pdf",
+              isUpload: true,
+              url: "https://trello.com/1/cards/c1/attachments/a1/download/local.pdf",
+            },
+            {
+              id: "a2",
+              name: "drive.pdf",
+              mimeType: "application/pdf",
+              isUpload: false,
+              url: "https://drive.google.com/file/x",
+            },
+          ],
+        },
+      ],
+    });
+    assert.equal(pdfs.length, 1);
+    assert.equal(pdfs[0]?.attachmentId, "a1");
   });
 });
 

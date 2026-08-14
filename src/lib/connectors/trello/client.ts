@@ -138,7 +138,7 @@ export async function listTrelloBoardCardsWithAttachments(
       filter: "open",
       fields: "id,name,closed,idList",
       attachments: "true",
-      attachment_fields: "id,name,url,mimeType,bytes,date,fileName",
+      attachment_fields: "id,name,url,mimeType,bytes,date,fileName,isUpload",
     }
   );
   return Array.isArray(cards) ? cards : [];
@@ -146,7 +146,8 @@ export async function listTrelloBoardCardsWithAttachments(
 
 /**
  * Download an uploaded Trello attachment (PDF, etc.).
- * Prefer the authenticated download endpoint; fall back to the attachment URL.
+ * Attachment /download/ URLs require OAuth Authorization header — not key/token query params.
+ * @see https://community.developer.atlassian.com/t/update-authenticated-access-to-s3/43681
  */
 export async function downloadTrelloAttachment(
   creds: TrelloCredentials,
@@ -157,48 +158,43 @@ export async function downloadTrelloAttachment(
     url?: string;
   }
 ): Promise<{ bytes: Uint8Array; contentType: string }> {
-  const safeName = encodeURIComponent(
-    args.fileName.replace(/[^\w.\- ()[\]]+/g, "_") || "attachment.pdf"
-  );
-  const downloadPath = `/cards/${encodeURIComponent(args.cardId)}/attachments/${encodeURIComponent(args.attachmentId)}/download/${safeName}`;
-  const params = new URLSearchParams({
-    key: creds.apiKey,
-    token: creds.token,
+  // Keep readable characters; encode path segment so spaces/unicode work.
+  const rawName = (args.fileName || "attachment.pdf").trim() || "attachment.pdf";
+  const pathName = encodeURIComponent(rawName);
+  const downloadUrl = `${TRELLO_API}/cards/${encodeURIComponent(args.cardId)}/attachments/${encodeURIComponent(args.attachmentId)}/download/${pathName}`;
+  const authHeader = `OAuth oauth_consumer_key="${creds.apiKey}", oauth_token="${creds.token}"`;
+
+  const res = await fetch(downloadUrl, {
+    method: "GET",
+    headers: {
+      Accept: "*/*",
+      Authorization: authHeader,
+    },
+    cache: "no-store",
+    redirect: "follow",
   });
 
-  const tryUrls = [
-    `${TRELLO_API}${downloadPath}?${params.toString()}`,
-    args.url
-      ? args.url.includes("?")
-        ? `${args.url}&${params.toString()}`
-        : `${args.url}?${params.toString()}`
-      : null,
-  ].filter(Boolean) as string[];
-
-  let lastStatus = 0;
-  let lastText = "";
-  for (const url of tryUrls) {
-    const res = await fetch(url, {
-      method: "GET",
-      headers: { Accept: "*/*" },
-      cache: "no-store",
-      redirect: "follow",
-    });
-    if (res.ok) {
-      const buf = new Uint8Array(await res.arrayBuffer());
-      const contentType =
-        res.headers.get("content-type")?.split(";")[0]?.trim() ||
-        "application/pdf";
-      return { bytes: buf, contentType };
-    }
-    lastStatus = res.status;
-    lastText = await res.text().catch(() => "");
+  if (res.ok) {
+    const buf = new Uint8Array(await res.arrayBuffer());
+    const contentType =
+      res.headers.get("content-type")?.split(";")[0]?.trim() ||
+      "application/pdf";
+    return { bytes: buf, contentType };
   }
 
+  const text = await res.text().catch(() => "");
+  if (
+    res.status === 401 ||
+    /unauthorized permission requested/i.test(text)
+  ) {
+    throw new TrelloApiError(
+      401,
+      "Trello blocked the PDF download. Reconnect with a fresh read token, then Scan Again. (Link-only attachments that aren't uploaded to Trello can't be downloaded.)"
+    );
+  }
   throw new TrelloApiError(
-    lastStatus || 502,
-    lastText.slice(0, 200) ||
-      `Couldn't download Trello attachment (${lastStatus || "error"})`
+    res.status,
+    text.slice(0, 200) || `Couldn't download Trello attachment (${res.status})`
   );
 }
 
