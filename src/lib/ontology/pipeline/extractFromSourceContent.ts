@@ -29,7 +29,7 @@ import {
 } from "./trelloCardIndex";
 
 /** Bump when extraction quality changes so Analyze again is not skipped. */
-const CONNECTOR_ANALYSIS_VERSION = "connector-ontology-v6";
+const CONNECTOR_ANALYSIS_VERSION = "connector-ontology-v7";
 
 export function connectorAnalysisVersion(): string {
   return CONNECTOR_ANALYSIS_VERSION;
@@ -160,6 +160,69 @@ export async function extractOntologyFromSourceContent(args: {
     };
   }
 
+  const cardIndex = extractTrelloCardIndex(extractedText);
+  if (cardIndex) {
+    // Fast path for Trello boards: every card name → entity (no multi-pass timeout).
+    const boardName =
+      extractedText.match(/^Trello board:\s*(.+)$/m)?.[1]?.trim() ||
+      fileName.replace(/\.(json|txt)$/i, "") ||
+      fileName;
+    let extraction: OntologyExtractionResult = {
+      entities: [
+        {
+          type: "document",
+          name: boardName,
+          confidence: 0.9,
+          description: `Trello board with ${cardIndex.split("\n").filter((l) => l.startsWith("*")).length} open cards.`,
+        },
+      ],
+      relationships: [],
+      events: [],
+    };
+    extraction = mergeCardIndexEntities(extraction, cardIndex);
+    extraction = enrichOntologyWithTranscript(
+      extraction,
+      cardIndex,
+      fileName
+    );
+
+    // One bounded enrichment pass for keys/charts (optional; never blocks catalog).
+    try {
+      const enrichSlice = [
+        cardIndex,
+        "",
+        extractedText.includes("Card details:")
+          ? extractedText.slice(
+              extractedText.indexOf("Card details:"),
+              extractedText.indexOf("Card details:") + 10_000
+            )
+          : extractedText.slice(0, 10_000),
+      ].join("\n");
+      const enriched = await extractOntologyConnectorTextChunk({
+        sourceText: enrichSlice,
+        fileName,
+        spaceName: args.spaceName,
+        chunkIndex: null,
+        chunkCount: null,
+      });
+      if (enriched) {
+        extraction = mergeOntologyResults(
+          extraction,
+          sanitizeConnectorOntologyExtraction(enriched)
+        );
+        extraction = mergeCardIndexEntities(extraction, cardIndex);
+      }
+    } catch (err) {
+      console.error("Trello board enrichment pass failed:", err);
+    }
+
+    return {
+      extraction,
+      contentTextPreview: extractedText.slice(0, 200),
+      extractionMethod: "trello_card_index",
+    };
+  }
+
   let extraction: OntologyExtractionResult | null = null;
   try {
     extraction = await extractOntologyConnectorText({
@@ -169,19 +232,6 @@ export async function extractOntologyFromSourceContent(args: {
     });
   } catch (err) {
     console.error("Connector text ontology extraction failed:", err);
-  }
-
-  if (extraction) {
-    const cardIndex = extractTrelloCardIndex(extractedText);
-    if (cardIndex) {
-      extraction = enrichOntologyWithTranscript(
-        extraction,
-        cardIndex,
-        fileName
-      );
-      // Deterministically ensure every CARD INDEX name exists as a document entity.
-      extraction = mergeCardIndexEntities(extraction, cardIndex);
-    }
   }
 
   const resolved = extraction ?? fallbackOntologyFromFileName(fileName);
@@ -210,7 +260,7 @@ async function extractOntologyConnectorText(input: {
   if (full.length <= CHUNK) {
     chunks.push(full);
   } else {
-    for (let i = 0; i < full.length && chunks.length < 8; i += CHUNK - OVERLAP) {
+    for (let i = 0; i < full.length && chunks.length < 3; i += CHUNK - OVERLAP) {
       chunks.push(full.slice(i, i + CHUNK));
     }
   }
@@ -250,6 +300,39 @@ async function extractOntologyConnectorText(input: {
 
   if (!merged.entities.length && !merged.relationships.length) return null;
   return sanitizeConnectorOntologyExtraction(merged);
+}
+
+function mergeOntologyResults(
+  base: OntologyExtractionResult,
+  extra: OntologyExtractionResult
+): OntologyExtractionResult {
+  const seen = new Set(
+    base.entities.map((e) => `${e.type}:${e.name.trim().toLowerCase()}`)
+  );
+  const entities = [...base.entities];
+  for (const e of extra.entities) {
+    const key = `${e.type}:${e.name.trim().toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    entities.push(e);
+  }
+  const seenRels = new Set(
+    base.relationships.map(
+      (r) => `${r.source}|${r.type}|${r.target}`.toLowerCase()
+    )
+  );
+  const relationships = [...base.relationships];
+  for (const r of extra.relationships) {
+    const key = `${r.source}|${r.type}|${r.target}`.toLowerCase();
+    if (seenRels.has(key)) continue;
+    seenRels.add(key);
+    relationships.push(r);
+  }
+  return {
+    entities,
+    relationships,
+    events: [...base.events, ...extra.events],
+  };
 }
 
 async function extractOntologyConnectorTextChunk(input: {

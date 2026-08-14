@@ -65,7 +65,7 @@ export async function scanTrelloSource(
       sourceId: source.id,
       externalId: board.id,
       name: board.name || "Untitled board",
-      mimeType: "application/json",
+      mimeType: "text/plain",
       sourceUri: uri,
       modifiedAt: board.dateLastActivity ?? undefined,
       metadata: {
@@ -136,12 +136,13 @@ export async function loadTrelloBoardAnalysisContent(
   }
   const board = await fetchTrelloBoardExport(creds, boardId);
   const text = formatBoardAsAnalysisText(board);
-  const filename = `${String(board.name ?? "trello-board").replace(/[^\w.\- ]+/g, "_")}.json`;
-  const bytes = new TextEncoder().encode(JSON.stringify(board));
+  const filename = `${String(board.name ?? "trello-board").replace(/[^\w.\- ]+/g, "_")}.txt`;
+  // Hash/analyze the formatted text — not the raw board JSON (can be huge).
+  const bytes = new TextEncoder().encode(text);
   return {
     text,
     filename,
-    mimeType: "application/json",
+    mimeType: "text/plain",
     bytes,
   };
 }

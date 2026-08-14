@@ -45,7 +45,7 @@ export function isItemAnalyzable(
   item: Pick<SourceItem, "name" | "mimeType" | "processingStatus">
 ): boolean {
   if (item.processingStatus === "unavailable") return false;
-  if (item.processingStatus === "analyzing") return false;
+  // Allow retry when a previous request left the row stuck in analyzing.
   return isAnalyzeSupportedMime(item.mimeType, item.name);
 }
 
@@ -67,6 +67,25 @@ function isTrelloRemoteItem(item: SourceItem): boolean {
 /** True when Analyze can fetch content server-side (no local folder picker). */
 export function isRemoteAnalyzeItem(item: SourceItem): boolean {
   return isTrelloRemoteItem(item);
+}
+
+async function markAnalysisFailed(
+  sourceId: string,
+  itemId: string,
+  message: string
+): Promise<void> {
+  try {
+    await fetch(`/api/connections/${sourceId}/items/${itemId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        processingStatus: "analysis_failed",
+        analysisError: message.slice(0, 500),
+      }),
+    });
+  } catch {
+    // Best-effort status recovery after timeouts.
+  }
 }
 
 /**
@@ -107,9 +126,11 @@ export async function analyzeSourceItemClient(args: {
         code?: string;
       };
       if (!res.ok) {
+        const message = body.error ?? "Analysis failed.";
+        await markAnalysisFailed(sourceId, item.id, message);
         return {
           ok: false,
-          error: body.error ?? "Analysis failed.",
+          error: message,
           code: body.code,
         };
       }
@@ -154,9 +175,11 @@ export async function analyzeSourceItemClient(args: {
       code?: string;
     };
     if (!res.ok) {
+      const message = body.error ?? "Analysis failed.";
+      await markAnalysisFailed(sourceId, item.id, message);
       return {
         ok: false,
-        error: body.error ?? "Analysis failed.",
+        error: message,
         code: body.code,
       };
     }
@@ -180,9 +203,12 @@ export async function analyzeSourceItemClient(args: {
         cancelled: true,
       };
     }
+    const message =
+      err instanceof Error ? err.message : "Analysis failed.";
+    await markAnalysisFailed(sourceId, item.id, message);
     return {
       ok: false,
-      error: err instanceof Error ? err.message : "Analysis failed.",
+      error: message,
       code: err instanceof ConnectorError ? err.code : undefined,
     };
   }

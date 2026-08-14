@@ -210,6 +210,8 @@ export default function SourceFileDetail({ sourceId, itemId }: Props) {
         sourceId,
         item,
         profileId: active?.id,
+        remote: isTrelloRemote,
+        force: true,
       });
       if (!result.ok) {
         if (result.cancelled) {
@@ -240,10 +242,11 @@ export default function SourceFileDetail({ sourceId, itemId }: Props) {
       } else {
         setError(err instanceof Error ? err.message : "Analysis failed.");
       }
+      await load();
     } finally {
       setAnalyzing(false);
     }
-  }, [item, load, sourceId, active?.id]);
+  }, [item, load, sourceId, active?.id, isTrelloRemote]);
 
   const setReview = useCallback(
     async (
@@ -411,7 +414,9 @@ export default function SourceFileDetail({ sourceId, itemId }: Props) {
           ) : null}
           <p className="text-xs text-ink-muted">
             {isTrelloRemote
-              ? "Guardian fetches this attachment from Trello to analyze and preview. The file is not copied into Guardian vault storage."
+              ? String(item.metadata?.kind ?? "") === "attachment"
+                ? "Guardian fetches this attachment from Trello to analyze and preview. The file is not copied into Guardian vault storage."
+                : "Guardian reads this Trello board’s cards and attachments metadata to build knowledge. Nothing is copied into Guardian vault storage."
               : "Guardian reads this file temporarily to extract knowledge. The original stays on your device — nothing is copied into Guardian storage. If folder access expired, your browser will ask you to pick this one file again."}
           </p>
           {!supported ? (
@@ -422,6 +427,11 @@ export default function SourceFileDetail({ sourceId, itemId }: Props) {
           {!accessible ? (
             <p className="text-xs text-amber-800">
               This file is unavailable. Reconnect the folder and scan again.
+            </p>
+          ) : null}
+          {item.analysisError && !error ? (
+            <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+              {item.analysisError}
             </p>
           ) : null}
           {error ? (

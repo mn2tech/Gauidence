@@ -51,6 +51,8 @@ export interface SourceItem {
   modifiedAt?: string;
   metadata?: Record<string, unknown>;
   processingStatus: SourceItemProcessingStatus;
+  /** Safe user-facing error when analysis_failed. */
+  analysisError?: string | null;
 }
 
 export interface ScanResultSummary {
