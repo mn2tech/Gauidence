@@ -24,6 +24,7 @@ import {
   GIDEON_CHIEF_OF_STAFF_SYSTEM,
   GIDEON_CONVERSATION_CONTEXT_NOTE,
 } from "@/lib/gideon/chiefOfStaff";
+import { FOCUS_BLOCK_SYSTEM_NOTE } from "@/lib/gideon/focusBlock";
 import type { WorkspaceContextData } from "./types";
 
 function blockIsPresent(text: string | undefined): boolean {
@@ -60,6 +61,7 @@ export function buildGideonSystemPrompt(
     intent,
     loaded,
     calendarNote,
+    focusBlockNote,
     confirmationRequired,
   } = promptOptions;
 
@@ -110,6 +112,11 @@ export function buildGideonSystemPrompt(
   const confirmationNote = confirmationRequired
     ? `\n${GIDEON_CALENDAR_CONFIRMATION_NOTE}\n`
     : "";
+  const focusNote = focusBlockNote
+    ? `\n${FOCUS_BLOCK_SYSTEM_NOTE}\n${focusBlockNote}\n`
+    : intent === "chief_of_staff" || intent === "combined"
+      ? `\n${FOCUS_BLOCK_SYSTEM_NOTE}\n`
+      : "";
   const knowledgeModeNote = searchedKnowledge
     ? ""
     : `\nNo Guardian document search ran for this turn. Do not invent files or quotes from the user's spaces.\n`;
@@ -182,6 +189,7 @@ ${GIDEON_CONVERSATION_CONTEXT_NOTE}
 ${chiefOfStaffNote}
 ${knowledgeModeNote}
 ${confirmationNote}
+${focusNote}
 ${calendarNote}
 ${searchedKnowledge ? allVaultsNote : ""}
 ${pictureNote}

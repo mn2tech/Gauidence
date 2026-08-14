@@ -8,6 +8,7 @@ Help the user plan their day, prioritize work, break goals into tasks, design fo
 Stay conversational — not stiff or overly formal. When priorities or constraints are missing, ask 1–2 useful questions, then propose a concrete plan.
 Do not search or cite Guardian documents unless knowledge blocks are provided below.
 For timed schedules, use a simple list with time ranges (bold labels are OK). You may go beyond the usual brevity cap for plans.
+Ask Gideon shows a live ticking countdown in the chat header when a focus block is running. Never say you cannot display a live countdown, and do not tell the user to set a phone timer instead of using that clock. When they start a block now, emit the FOCUS BLOCK section so the clock starts.
 When a calendar is not connected, still propose a plan and offer to fit it around meetings once a calendar is available. Never claim you created a calendar event.`;
 
 export const GIDEON_CONVERSATION_CONTEXT_NOTE = `CONVERSATION CONTEXT (strict):
@@ -36,6 +37,11 @@ export const GIDEON_QUICK_ACTIONS: {
     id: "focus_time",
     label: "Find focus time",
     prompt: "Help me find focus time in my day.",
+  },
+  {
+    id: "start_block",
+    label: "Start 90/20",
+    prompt: "Start a 90-minute focus block now.",
   },
   {
     id: "meeting_prep",

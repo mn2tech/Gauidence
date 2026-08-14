@@ -42,6 +42,19 @@ describe("Gideon intent router — acceptance", () => {
     assert.equal(shouldSearchGuardianKnowledge(route), false);
   });
 
+  it("remaining time / start block is Chief of Staff, no Guardian search", () => {
+    const remaining = classifyGideonIntent({
+      question: "How much time is left?",
+    });
+    assert.equal(remaining.intent, "chief_of_staff");
+    assert.equal(shouldSearchGuardianKnowledge(remaining), false);
+    const start = classifyGideonIntent({
+      question: "Start a 90-minute focus block now.",
+    });
+    assert.equal(start.intent, "chief_of_staff");
+    assert.equal(shouldSearchGuardianKnowledge(start), false);
+  });
+
   it("Test 5: meetings today is calendar, no document retrieval", () => {
     const route = classifyGideonIntent({
       question: "What meetings do I have today?",

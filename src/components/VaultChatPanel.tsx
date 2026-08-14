@@ -92,6 +92,15 @@ import {
   GIDEON_CHIEF_OF_STAFF_TAGLINE,
   GIDEON_QUICK_ACTIONS,
 } from "@/lib/gideon/chiefOfStaff";
+import GideonFocusCountdown from "@/components/GideonFocusCountdown";
+import {
+  latestFocusBlockFromMessages,
+  parseFocusBlockStart,
+  readStoredFocusBlock,
+  stripFocusBlockSection,
+  writeStoredFocusBlock,
+  type GideonFocusBlock,
+} from "@/lib/gideon/focusBlock";
 import { isImageFileName } from "@/lib/vault/images";
 import { renderPdfThumbnailFromFile, renderPdfThumbnailFromUrl } from "@/lib/vault/pdfThumbnail";
 import { renderGideonText } from "@/components/gideonText";
@@ -637,6 +646,8 @@ export default function VaultChatPanel({
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [messages, setMessages] = useState<VaultMessage[]>([]);
+  const [focusBlock, setFocusBlock] = useState<GideonFocusBlock | null>(null);
+  const dismissedFocusEndsAtRef = useRef<string | null>(null);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [input, setInput] = useState("");
   const [loadingHistory, setLoadingHistory] = useState(true);
@@ -767,6 +778,27 @@ export default function VaultChatPanel({
   useEffect(() => {
     if (requestedChatId) requestedChatIdRef.current = requestedChatId;
   }, [requestedChatId]);
+  useEffect(() => {
+    setFocusBlock(readStoredFocusBlock());
+  }, []);
+  useEffect(() => {
+    writeStoredFocusBlock(focusBlock);
+  }, [focusBlock]);
+  useEffect(() => {
+    const fromMessages = latestFocusBlockFromMessages(messages, timeZone);
+    if (
+      !fromMessages ||
+      fromMessages.endsAt === dismissedFocusEndsAtRef.current
+    ) {
+      return;
+    }
+    setFocusBlock((prev) => {
+      if (prev && Date.parse(prev.startsAt) >= Date.parse(fromMessages.startsAt)) {
+        return prev;
+      }
+      return fromMessages;
+    });
+  }, [messages, timeZone]);
   useEffect(() => {
     if (draftAppliedRef.current || !requestedDraft?.trim() || isScopedPanel) return;
     draftAppliedRef.current = true;
@@ -2417,6 +2449,21 @@ export default function VaultChatPanel({
     setThinkingSteps([]);
     setThinkingActiveIndex(0);
 
+    const lastAssistant = [...messages]
+      .reverse()
+      .find((m) => m.role === "assistant")?.content;
+    const startedBlock = parseFocusBlockStart(
+      question,
+      new Date(),
+      timeZone,
+      lastAssistant
+    );
+    if (startedBlock) {
+      dismissedFocusEndsAtRef.current = null;
+      setFocusBlock(startedBlock);
+    }
+    const blockForRequest = startedBlock ?? focusBlock;
+
     const isRegenerate = Boolean(options?.regenerateAssistantId);
     const optimisticId = `local-${Date.now()}`;
     const userContent = options?.userDisplayContent?.trim() ?? question;
@@ -2452,6 +2499,7 @@ export default function VaultChatPanel({
             : {}),
           ...(agentModeEnabled ? { agentMode: true } : {}),
           searchScope: meta?.searchScope ?? "workspace",
+          ...(blockForRequest ? { focusBlock: blockForRequest } : {}),
         },
         vaultProfileId ?? profileId
       );
@@ -2903,12 +2951,14 @@ export default function VaultChatPanel({
       active?.profile_type === "client" ? active.id : null
     );
     const proposedSpaceCreate = parseProposedSpaceCreate(m.content);
-    const displayContent = stripProposedSpaceCreateSection(
-      stripProposedDailyLogSection(
-        stripProposedClientRequestCreateSection(
-          stripProposedClientRequestReplySection(
-            stripProposedWorkMemoryUpdateSection(
-              stripProposedReminderSection(m.content)
+    const displayContent = stripFocusBlockSection(
+      stripProposedSpaceCreateSection(
+        stripProposedDailyLogSection(
+          stripProposedClientRequestCreateSection(
+            stripProposedClientRequestReplySection(
+              stripProposedWorkMemoryUpdateSection(
+                stripProposedReminderSection(m.content)
+              )
             )
           )
         )
@@ -4801,6 +4851,17 @@ export default function VaultChatPanel({
             </button>
           </div>
         </header>
+
+        {focusBlock ? (
+          <GideonFocusCountdown
+            block={focusBlock}
+            timeZone={timeZone}
+            onStop={() => {
+              dismissedFocusEndsAtRef.current = focusBlock.endsAt;
+              setFocusBlock(null);
+            }}
+          />
+        ) : null}
 
         {whyOpen && (
           <div className="shrink-0 border-b border-stone-200 bg-stone-50 px-4 py-3 text-xs leading-relaxed text-ink-muted sm:px-8">

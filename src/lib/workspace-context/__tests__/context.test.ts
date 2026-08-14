@@ -142,6 +142,7 @@ describe("buildGideonSystemPrompt", () => {
         intent: "conversation",
         loaded: GIDEON_LOAD_NONE,
         calendarNote: "",
+        focusBlockNote: "",
         confirmationRequired: false,
       },
     });

@@ -68,6 +68,9 @@ const CALENDAR_AVAILABILITY =
 const CALENDAR_WRITE =
   /\b(block\s+\d{1,2}(:\d{2})?|(block|hold|book)\b.{0,50}\b(on (my )?calendar|focus (time|block))|add .{0,30}(to|on) (my )?calendar|create (a |an )?(calendar )?event|reschedule (the |my )?(meeting|event|focus block))\b/i;
 
+const COS_TIMER =
+  /\b((how much|what(?:'s| is) the) time (is )?left|time remaining|countdown|start (a |the )?(90\s*\/\s*20 |90[- ]?minute |focus |work )?block|begin (a )?(focus|work) block)\b/i;
+
 const COS_PLAN =
   /\b(plan my (day|week|morning|afternoon)|help me plan|plan today|weekly plan|30\s*[\/-]\s*60\s*[\/-]\s*90|set my priorities|prioritiz|competing priorit|break .{0,40} into tasks|next actions|prepare for (a |the |my )?(meeting|call)|protect focus|reduce (unnecessary )?meetings?|accountability|thinking partner)\b/i;
 
@@ -171,7 +174,12 @@ function isChiefOfStaff(q: string): boolean {
   if (DEFINITION_QUESTION.test(q) && !COS_HELP_ME.test(q) && !COS_PLAN.test(q)) {
     return false;
   }
-  return COS_PLAN.test(q) || COS_SCHEDULE.test(q) || COS_HELP_ME.test(q);
+  return (
+    COS_PLAN.test(q) ||
+    COS_SCHEDULE.test(q) ||
+    COS_TIMER.test(q) ||
+    COS_HELP_ME.test(q)
+  );
 }
 
 function isTask(q: string): boolean {

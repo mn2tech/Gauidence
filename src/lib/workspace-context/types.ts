@@ -66,6 +66,7 @@ export type WorkspacePromptOptions = {
   intent: GideonIntent;
   loaded: GideonLoadFlags;
   calendarNote: string;
+  focusBlockNote: string;
   confirmationRequired: boolean;
 };
 

@@ -71,6 +71,14 @@ import {
   resolveGideonLoad,
   routeGideonRequest,
 } from "@/lib/gideon/orchestrator";
+import {
+  buildFocusRemainingAnswer,
+  formatFocusBlockPromptNote,
+  isFocusRemainingQuestion,
+  isValidFocusBlock,
+  parseFocusBlockStart,
+  type GideonFocusBlock,
+} from "@/lib/gideon/focusBlock";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -837,6 +845,7 @@ export async function POST(request: Request) {
   let setSearchScopeRaw: unknown;
   let profileIdRaw: unknown;
   let agentMode = false;
+  let focusBlockRaw: unknown;
   try {
     const body = await request.json();
     questionRaw = body.question;
@@ -849,6 +858,7 @@ export async function POST(request: Request) {
     setSearchScopeRaw = body.searchScope;
     profileIdRaw = body.profileId;
     agentMode = body.agentMode === true;
+    focusBlockRaw = body.focusBlock;
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
@@ -885,6 +895,11 @@ export async function POST(request: Request) {
   }
 
   const userTz = await getUserTimeZone(supabase, user.id);
+  const clientFocusBlock: GideonFocusBlock | null = isValidFocusBlock(
+    focusBlockRaw
+  )
+    ? focusBlockRaw
+    : null;
 
   const accessibleProfiles = await listGuardianProfiles(supabase, user.id);
   const scopeCandidates = accessibleProfiles.map((p) => ({
@@ -1192,10 +1207,32 @@ export async function POST(request: Request) {
     chatHistory: history,
   };
 
+  const lastAssistant = [...history]
+    .reverse()
+    .find((turn) => turn.role === "assistant")?.content;
+  const startedFocusBlock = parseFocusBlockStart(
+    question,
+    new Date(),
+    userTz,
+    lastAssistant
+  );
+  const activeFocusBlock = startedFocusBlock ?? clientFocusBlock;
+  const focusBlockNote = formatFocusBlockPromptNote(
+    activeFocusBlock,
+    new Date(),
+    userTz
+  );
+
   if (isSimpleTodayDateQuestion(question) && !attachmentDocumentId) {
     answer = buildTodayDateAnswer(userTz);
   } else if (isSimpleCurrentTimeQuestion(question) && !attachmentDocumentId) {
     answer = buildCurrentTimeAnswer(userTz);
+  } else if (
+    isFocusRemainingQuestion(question) &&
+    activeFocusBlock &&
+    !attachmentDocumentId
+  ) {
+    answer = buildFocusRemainingAnswer(activeFocusBlock, userTz);
   } else if (!attachmentDocumentId) {
     const directAnswer = await runDirectAction(actionCtx);
     if (directAnswer) {
@@ -1258,6 +1295,7 @@ export async function POST(request: Request) {
         load: loadFlags,
         intent: gideonRoute.intent,
         calendarNote,
+        focusBlockNote,
         confirmationRequired: gideonRoute.confirmationRequired,
       });
 

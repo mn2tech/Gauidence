@@ -95,6 +95,7 @@ export type LoadWorkspaceContextArgs = {
   load?: GideonLoadFlags;
   intent?: GideonIntent;
   calendarNote?: string;
+  focusBlockNote?: string;
   confirmationRequired?: boolean;
 };
 
@@ -124,6 +125,7 @@ export async function loadWorkspaceContext(
   const load = args.load ?? GIDEON_LOAD_FULL;
   const intent = args.intent ?? "knowledge_search";
   const calendarNote = args.calendarNote ?? "";
+  const focusBlockNote = args.focusBlockNote ?? "";
   const confirmationRequired = args.confirmationRequired ?? false;
 
   const retrievalQuestion = expandRetrievalQuestion(question, chatHistory);
@@ -521,6 +523,7 @@ Active space in the UI: ${activeProfile.display_name}. Document search includes 
       intent,
       loaded: load,
       calendarNote,
+      focusBlockNote,
       confirmationRequired,
     },
   };
