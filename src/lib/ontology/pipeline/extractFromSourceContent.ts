@@ -21,7 +21,10 @@ import {
   isExcelMimeOrName,
 } from "@/lib/connectors/content/extractExcel";
 import { sanitizeConnectorOntologyExtraction } from "./sanitizeConnectorExtraction";
-import { fallbackOntologyFromFileName } from "./filenameFallback";
+import {
+  fallbackOntologyFromFileName,
+  looksLikeChartOrSheetFile,
+} from "./filenameFallback";
 import { enrichOntologyWithTranscript } from "./enrichWithTranscript";
 import {
   extractTrelloCardIndex,
@@ -29,7 +32,7 @@ import {
 } from "./trelloCardIndex";
 
 /** Bump when extraction quality changes so Analyze again is not skipped. */
-const CONNECTOR_ANALYSIS_VERSION = "connector-ontology-v7";
+const CONNECTOR_ANALYSIS_VERSION = "connector-ontology-v8";
 
 export function connectorAnalysisVersion(): string {
   return CONNECTOR_ANALYSIS_VERSION;
@@ -107,19 +110,28 @@ export async function extractOntologyFromSourceContent(args: {
     extractionMethod = "excel_sheet_text";
   }
 
-  if (!extractedText && base64) {
+  const isVisualDoc =
+    mimeType.startsWith("image/") ||
+    mimeType === "application/pdf" ||
+    /\.(pdf|png|jpe?g|webp|gif)$/i.test(fileName);
+  const forceChartVision = looksLikeChartOrSheetFile(fileName) && isVisualDoc;
+
+  if (base64 && isVisualDoc && (!extractedText || forceChartVision)) {
     const extraction = await extractDocumentText({
       mimeType,
       base64,
       fileName,
     });
-    extractedText = extraction.text.trim();
-    extractionMethod = extraction.method;
+    if (!extractedText) {
+      extractedText = extraction.text.trim();
+      extractionMethod = extraction.method;
+    }
 
-    // Images / scanned PDFs: vision transcript → ontology (not filename-only).
+    // Images / scanned / chart PDFs: vision transcript → ontology.
     if (
-      (!extractedText || extraction.quality < 0.45) &&
-      (mimeType.startsWith("image/") || mimeType === "application/pdf")
+      forceChartVision ||
+      !extractedText ||
+      extraction.quality < 0.45
     ) {
       let multimodal: OntologyExtractionResult | null = null;
       let method = extractionMethod;
@@ -396,9 +408,7 @@ async function extractOntologyMultimodal(args: {
   // 1) Vision OCR / transcript — critical for chord charts and image PDFs.
   let transcript = "";
   try {
-    const looksLikeChart = /\b(chart|chord|tab|score|sheet|scale|lesson)\b/i.test(
-      args.fileName
-    );
+    const looksLikeChart = looksLikeChartOrSheetFile(args.fileName);
     const ocr = await transcribeDocument({
       client,
       fileName: args.fileName,

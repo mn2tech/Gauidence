@@ -9,6 +9,7 @@ import {
   connectorAnalysisVersion,
   extractOntologyFromSourceContent,
 } from "./extractFromSourceContent";
+import { fallbackOntologyFromFileName } from "./filenameFallback";
 import {
   listOntologyForSourceItem,
   persistConnectorOntologyExtraction,
@@ -175,13 +176,19 @@ export async function analyzeSourceItem(
       .eq("id", profileId)
       .maybeSingle();
 
-    const { extraction } = await extractOntologyFromSourceContent({
+    // Prefer catalog name — upload File.name can be generic ("file") and
+    // would defeat filename fallback for chart PDFs.
+    const fileName = item.name || args.content.filename || "file";
+    const { extraction: rawExtraction } = await extractOntologyFromSourceContent({
       content: {
         ...args.content,
-        filename: args.content.filename || item.name,
+        filename: fileName,
       },
       spaceName: profile?.display_name ?? null,
     });
+
+    const extraction =
+      rawExtraction ?? fallbackOntologyFromFileName(fileName);
 
     if (!extraction) {
       await supabase

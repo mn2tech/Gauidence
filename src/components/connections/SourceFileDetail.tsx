@@ -429,7 +429,10 @@ export default function SourceFileDetail({ sourceId, itemId }: Props) {
               This file is unavailable. Reconnect the folder and scan again.
             </p>
           ) : null}
-          {item.analysisError && !error ? (
+          {item.analysisError &&
+          !error &&
+          (item.processingStatus === "analysis_failed" ||
+            item.processingStatus === "analyzing") ? (
             <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
               {item.analysisError}
             </p>

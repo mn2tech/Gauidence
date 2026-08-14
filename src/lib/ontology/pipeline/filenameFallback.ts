@@ -37,6 +37,13 @@ export function fallbackOntologyFromFileName(
   return { entities, relationships: [], events: [] };
 }
 
+/** Music / reference sheets need vision even when a weak text layer exists. */
+export function looksLikeChartOrSheetFile(fileName: string): boolean {
+  return /\b(chart|chord|tab|score|sheet|scale|lesson|bass|guitar|piano|drums?|ukulele|music)\b/i.test(
+    fileName
+  );
+}
+
 function stripExtension(fileName: string): string {
   const trimmed = fileName.trim();
   const dot = trimmed.lastIndexOf(".");

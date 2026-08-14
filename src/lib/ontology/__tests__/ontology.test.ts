@@ -13,7 +13,10 @@ import { parseOntologyExtraction } from "../schema";
 import { formatOntologyForGideon, buildOntologyAnswerFallback } from "../formatForGideon";
 import { reviewStatusForConfidence } from "../types";
 import { sanitizeConnectorOntologyExtraction } from "../pipeline/sanitizeConnectorExtraction";
-import { fallbackOntologyFromFileName } from "../pipeline/filenameFallback";
+import {
+  fallbackOntologyFromFileName,
+  looksLikeChartOrSheetFile,
+} from "../pipeline/filenameFallback";
 import {
   enrichOntologyWithTranscript,
   readContentTranscript,
@@ -713,6 +716,16 @@ describe("fallbackOntologyFromFileName", () => {
   it("returns null for generic names", () => {
     assert.equal(fallbackOntologyFromFileName("scan.pdf"), null);
     assert.equal(fallbackOntologyFromFileName("IMG_0001.png"), null);
+  });
+});
+
+describe("looksLikeChartOrSheetFile", () => {
+  it("detects bass/chart filenames", () => {
+    assert.equal(
+      looksLikeChartOrSheetFile("Bass Guitar Bass Chart.pdf"),
+      true
+    );
+    assert.equal(looksLikeChartOrSheetFile("invoice-0001.pdf"), false);
   });
 });
 

@@ -130,6 +130,10 @@ export async function upsertScanResults(
       modified_at: item.modifiedAt ?? null,
       metadata: item.metadata ?? {},
       processing_status: item.processingStatus,
+      // Resetting to discovered must not keep a stale failure banner.
+      ...(item.processingStatus === "discovered"
+        ? { analysis_error: null }
+        : {}),
     }));
 
     // Upsert in chunks to avoid payload limits.
