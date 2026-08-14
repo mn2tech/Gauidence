@@ -11,10 +11,15 @@ describe("trello pdf attachments", () => {
     assert.equal(isPdfAttachment({ mimeType: "application/pdf" }), true);
     assert.equal(isPdfAttachment({ name: "chords.PDF" }), true);
     assert.equal(
-      isPdfAttachment({ url: "https://trello.com/1/cards/x/attachments/y/download/a.pdf" }),
+      isPdfAttachment({
+        url: "https://trello.com/1/cards/x/attachments/y/download/a.pdf",
+      }),
       true
     );
-    assert.equal(isPdfAttachment({ name: "photo.png", mimeType: "image/png" }), false);
+    assert.equal(
+      isPdfAttachment({ name: "photo.png", mimeType: "image/png" }),
+      false
+    );
   });
 
   it("collects PDF attachments from open cards only", () => {
@@ -60,6 +65,9 @@ describe("trello pdf attachments", () => {
     assert.equal(pdfs.length, 1);
     assert.equal(pdfs[0]?.attachmentId, "a1");
     assert.equal(pdfs[0]?.cardName, "Setlist");
+    assert.equal(pdfs[0]?.boardName, "Living Waters");
+  });
+
   it("skips external link PDFs when uploadedOnly", () => {
     const pdfs = collectPdfAttachmentsFromCards({
       boardId: "b1",
