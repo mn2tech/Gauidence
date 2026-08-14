@@ -166,6 +166,17 @@ describe("Gideon intent router — follow-ups and tools", () => {
       question: "Can you see the analyzed PDF?",
     });
     assert.equal(shouldSearchGuardianKnowledge(pdf), true);
+
+    const songs = classifyGideonIntent({
+      question: "What songs are on The Living Waters?",
+    });
+    assert.equal(songs.intent, "knowledge_search");
+    assert.equal(shouldSearchGuardianKnowledge(songs), true);
+
+    const list = classifyGideonIntent({
+      question: "give me the list of songs",
+    });
+    assert.equal(shouldSearchGuardianKnowledge(list), true);
   });
 
   it("forces knowledge when an attachment is present", () => {

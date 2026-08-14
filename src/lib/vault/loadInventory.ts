@@ -6,6 +6,7 @@ import {
   formatVaultFileSummaryForGideon,
   formatBoundConnectedFilesForGideon,
   wantsVaultFileInventory,
+  wantsSongOrChartList,
   RECENT_VAULT_FILE_PREVIEW,
   type VaultFileInventoryRow,
 } from "./askInventory";
@@ -182,7 +183,10 @@ export async function loadVaultFileInventoryContext(
         supabase,
         userId,
         searchProfileIds,
-        profileNames
+        profileNames,
+        {
+          songList: wantsSongOrChartList(question),
+        }
       )
     : "";
   if (!connected) return vaultText;
@@ -194,7 +198,8 @@ async function loadBoundConnectedFilesForGideon(
   supabase: SupabaseClient,
   userId: string,
   spaceIds: string[],
-  profileNames: Record<string, string>
+  profileNames: Record<string, string>,
+  options?: { songList?: boolean }
 ): Promise<string> {
   const { data: sources } = await supabase
     .from("connected_sources")
@@ -226,15 +231,23 @@ async function loadBoundConnectedFilesForGideon(
     })
   );
 
-  const { data: items } = await supabase
+  const songList = Boolean(options?.songList);
+  let query = supabase
     .from("source_items")
     .select(
       "id, name, mime_type, processing_status, source_id, external_id, metadata"
     )
     .in("source_id", sourceIds)
-    .eq("processing_status", "analyzed")
     .order("updated_at", { ascending: false })
-    .limit(80);
+    .limit(songList ? 400 : 80);
+
+  if (songList) {
+    query = query.neq("processing_status", "unavailable");
+  } else {
+    query = query.eq("processing_status", "analyzed");
+  }
+
+  const { data: items } = await query;
   if (!items?.length) return "";
 
   const sourceById = new Map(
@@ -248,6 +261,8 @@ async function loadBoundConnectedFilesForGideon(
         item.metadata && typeof item.metadata === "object"
           ? (item.metadata as Record<string, unknown>)
           : {};
+      // itemBelongsToTrelloBoard rejects unavailable; for song lists we already
+      // filtered those out, so pass analyzed so board metadata still matches.
       return itemBelongsToTrelloBoard(
         {
           externalId:
@@ -257,6 +272,15 @@ async function loadBoundConnectedFilesForGideon(
         },
         selectedBoardId
       );
+    })
+    .filter((item) => {
+      if (!songList) return true;
+      const kind = String(
+        item.metadata && typeof item.metadata === "object"
+          ? (item.metadata as Record<string, unknown>).kind ?? ""
+          : ""
+      );
+      return kind === "attachment";
     })
     .map((item) => {
       const src = sourceById.get(item.source_id as string);
@@ -269,7 +293,7 @@ async function loadBoundConnectedFilesForGideon(
         cardName:
           typeof meta.cardName === "string" ? meta.cardName : null,
         sourceType: String(src?.source_type ?? ""),
-        processingStatus: "analyzed",
+        processingStatus: String(item.processing_status ?? "analyzed"),
       };
     });
   if (!files.length) return "";

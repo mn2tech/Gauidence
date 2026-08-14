@@ -1342,10 +1342,11 @@ export async function POST(request: Request) {
       }));
 
       const inventoryAnswer =
-        wantsVaultFileInventory(question) && explicitSpaceName
+        wantsVaultFileInventory(question) &&
+        (explicitSpaceName || active.display_name)
           ? buildInventoryQuestionAnswer({
               question,
-              spaceDisplayName: explicitSpaceName,
+              spaceDisplayName: explicitSpaceName || active.display_name,
               fileInventoryText: workspaceContext.blocks.fileInventory,
               dailyLogsText: workspaceContext.blocks.dailyLogs,
             })

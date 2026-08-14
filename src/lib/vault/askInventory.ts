@@ -6,9 +6,18 @@ export const RECENT_VAULT_FILE_PREVIEW = 5;
 const INVENTORY_QUESTION_PATTERN =
   /\b(what(?:'s| is| are)?\s+(?:do\s+)?(?:i|we)\s+have\b|what(?:'s| is| are)?\s+(?:in\s+)?(?:the\s+)?(?:vault|space|workspace|uploaded|stored|files?|documents?|photos?)|list\s+(?:all\s+)?(?:files?|documents?|uploads?|photos?)|how\s+many\s+(?:files?|documents?|photos?|uploads?)|show\s+(?:me\s+)?(?:all\s+)?(?:files?|documents?|uploads?)|(?:count|browse|compare)\s+(?:files?|documents?|uploads?)|everything\s+(?:in|uploaded)|file\s+inventory)\b/i;
 
+const SONG_LIST_QUESTION_PATTERN =
+  /\b((?:list|show|give(?:\s+me)?)\s+(?:(?:me|us)\s+)?(?:the\s+)?(?:list\s+of\s+)?songs?|what songs|songs (?:are |on |in )|song list|song titles?|chord charts? (?:in|on|for|available)|set\s*lists?|living\s+waters)\b/i;
+
+/** True when the user wants songs/charts listed from the bound Trello board or space. */
+export function wantsSongOrChartList(question: string): boolean {
+  return SONG_LIST_QUESTION_PATTERN.test(question.trim());
+}
+
 /** True when the user is asking to list, count, browse, or compare vault files. */
 export function wantsVaultFileInventory(question: string): boolean {
-  return INVENTORY_QUESTION_PATTERN.test(question.trim());
+  const q = question.trim();
+  return INVENTORY_QUESTION_PATTERN.test(q) || wantsSongOrChartList(q);
 }
 
 export type AskVaultFileRow = {
@@ -233,8 +242,26 @@ function parseInventoryFileNames(inventoryText: string): {
         ...photoMatch[1]!.split(/,\s*/).map((n) => n.trim()).filter(Boolean)
       );
     }
+    // Connected Trello/device rows: "- file.jpg · Card Name (Trello in this space, analyzed)"
+    const connected = line.match(
+      /^-\s+(.+?)(?:\s+·\s+(.+?))?\s+\((?:Trello|Device Storage)\b/i
+    );
+    if (connected) {
+      const label = (connected[2] || connected[1] || "").trim();
+      if (label) documents.push(label);
+    }
   }
   return { photos, documents };
+}
+
+function songTitleFromInventoryLabel(label: string): string {
+  let title = label.replace(/\.(jpe?g|png|gif|webp|pdf)$/i, "").trim();
+  title = title
+    .replace(/\s*-\s*[A-G](?:#|b)?(?:m|maj|min|major|minor|5)?(?:\s|$)/i, " ")
+    .replace(/\s*-\s*short version\s*$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return title || label.trim();
 }
 
 function formatNameList(names: string[], cap = 8): string {
@@ -265,6 +292,7 @@ export function buildInventoryQuestionAnswer(args: {
     logsText.length > 0 &&
     logsText !== "(none)" &&
     topicMentionedInText(logsText, topic!);
+  const songList = wantsSongOrChartList(args.question);
 
   if (args.fileInventoryText.startsWith("(no documents")) {
     if (logsRelevant) {
@@ -277,6 +305,26 @@ export function buildInventoryQuestionAnswer(args: {
 
   const { photos, documents } = parseInventoryFileNames(args.fileInventoryText);
   const allFiles = [...documents, ...photos];
+
+  if (songList && allFiles.length > 0) {
+    const titles: string[] = [];
+    const seen = new Set<string>();
+    for (const label of allFiles) {
+      const title = songTitleFromInventoryLabel(label);
+      const key = title.toLowerCase();
+      if (!title || seen.has(key)) continue;
+      seen.add(key);
+      titles.push(title);
+    }
+    if (titles.length === 0) return null;
+    const cap = 40;
+    const shown = titles.slice(0, cap);
+    const more =
+      titles.length > cap
+        ? ` (+${titles.length - cap} more — ask for the next page)`
+        : "";
+    return `Songs/charts in your ${space} space (${titles.length}):\n${shown.map((t) => `• ${t}`).join("\n")}${more}`;
+  }
 
   if (topic) {
     const matchingFiles = allFiles.filter((name) =>

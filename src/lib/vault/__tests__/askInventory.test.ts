@@ -95,6 +95,27 @@ describe("ask vault inventory", () => {
     );
     assert.equal(wantsVaultFileInventory("What files are uploaded?"), true);
     assert.equal(wantsVaultFileInventory("When is my passport due?"), false);
+    assert.equal(
+      wantsVaultFileInventory("What songs are on The Living Waters?"),
+      true
+    );
+    assert.equal(wantsVaultFileInventory("give me the list of songs"), true);
+  });
+
+  it("lists songs from connected Trello inventory lines", () => {
+    const answer = buildInventoryQuestionAnswer({
+      question: "What songs are on The Living Waters?",
+      spaceDisplayName: "Wednesday Practice",
+      fileInventoryText: `SPACE FILE INVENTORY (Trello / connected files in Wednesday Practice — treat these as files in this space, not only on the connection):
+- Silent Night Holy Night - C.jpg · Silent Night Holy Night (Trello in this space, analyzed)
+- As the deer - C.jpg · As the deer (Trello in this space, discovered)
+- Asha Meri - Eb5 - Short version.jpg · Asha Meri (Trello in this space, analyzed)`,
+    });
+    assert.ok(answer);
+    assert.match(answer!, /Silent Night Holy Night/);
+    assert.match(answer!, /As the deer/);
+    assert.match(answer!, /Asha Meri/);
+    assert.match(answer!, /Wednesday Practice/);
   });
 
   it("builds a scoped inventory answer about a topic", () => {
