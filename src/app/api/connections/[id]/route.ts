@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import {
   disconnectConnectedSource,
   getConnectedSource,
+  getConnectedSourceWithSecrets,
   updateConnectedSource,
 } from "@/lib/connectors/services/connectedSources";
 import type { ConnectedSourceStatus } from "@/lib/connectors/types";
@@ -64,6 +65,8 @@ export async function PATCH(req: Request, ctx: Ctx) {
     settings?: Record<string, unknown>;
     lastScanAt?: string | null;
     profileId?: string | null;
+    trelloBoardId?: string | null;
+    trelloBoardName?: string | null;
   };
   try {
     body = await req.json();
@@ -76,7 +79,35 @@ export async function PATCH(req: Request, ctx: Ctx) {
     if (!existing) {
       return NextResponse.json({ error: "Connection not found." }, { status: 404 });
     }
-    const source = await updateConnectedSource(supabase, user.id, id, body);
+
+    let settings = body.settings;
+    if (body.trelloBoardId !== undefined) {
+      if (existing.sourceType !== "trello") {
+        return NextResponse.json(
+          { error: "Only Trello connections can save a board." },
+          { status: 400 }
+        );
+      }
+      const withSecrets = await getConnectedSourceWithSecrets(
+        supabase,
+        user.id,
+        id
+      );
+      const boardId = String(body.trelloBoardId ?? "").trim();
+      settings = {
+        ...(withSecrets?.settings ?? existing.settings),
+        boardId: boardId || null,
+        boardName: String(body.trelloBoardName ?? "").trim() || null,
+      };
+    }
+
+    const source = await updateConnectedSource(supabase, user.id, id, {
+      status: body.status,
+      displayName: body.displayName,
+      settings,
+      lastScanAt: body.lastScanAt,
+      profileId: body.profileId,
+    });
     return NextResponse.json({ source });
   } catch (err) {
     const message =

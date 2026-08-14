@@ -12,6 +12,10 @@ import {
 import { formatBoardAsAnalysisText } from "./formatBoard";
 import { collectChartAttachmentsFromCards } from "./attachments";
 import { guessMimeFromName } from "@/lib/connectors/content/types";
+import {
+  boardsForTrelloScan,
+  trelloSelectedBoardId,
+} from "./selectedBoard";
 
 export function getTrelloCredentials(
   source: Pick<ConnectedSource, "settings">
@@ -52,7 +56,10 @@ export async function scanTrelloSource(
     );
   }
 
-  const boards = await listTrelloBoards(creds);
+  const boards = boardsForTrelloScan(
+    await listTrelloBoards(creds),
+    trelloSelectedBoardId(source.settings)
+  );
   const items: SourceItem[] = [];
 
   for (const board of boards) {

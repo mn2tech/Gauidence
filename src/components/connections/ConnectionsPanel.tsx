@@ -20,6 +20,11 @@ import {
   TRELLO_PREFERRED_SPACE_NAME,
 } from "@/lib/connectors/trello/boundSpace";
 import {
+  itemBelongsToTrelloBoard,
+  trelloSelectedBoardId,
+  trelloSelectedBoardName,
+} from "@/lib/connectors/trello/selectedBoard";
+import {
   analyzeSourceItemClient,
   isItemNeedsAnalyze,
 } from "@/lib/connectors/clientAnalyze";
@@ -123,6 +128,16 @@ export default function ConnectionsPanel() {
   const [trelloSummary, setTrelloSummary] = useState<ItemSummary | null>(null);
   const [analyzeProgress, setAnalyzeProgress] = useState<string | null>(null);
   const [trelloNote, setTrelloNote] = useState<string | null>(null);
+  const [trelloBoards, setTrelloBoards] = useState<Array<{ id: string; name: string }>>(
+    []
+  );
+  const [trelloBoardId, setTrelloBoardId] = useState("");
+  const [trelloModalStep, setTrelloModalStep] = useState<"creds" | "board">(
+    "creds"
+  );
+  const [pendingTrelloSourceId, setPendingTrelloSourceId] = useState<string | null>(
+    null
+  );
 
   const phoneSource = useMemo(
     () => sources.find((s) => s.sourceType === "android_storage") ?? null,
@@ -318,7 +333,11 @@ export default function ConnectionsPanel() {
   }, [load, phoneSource]);
 
   const analyzeTrelloAfterScan = useCallback(
-    async (sourceId: string, profileId: string | null | undefined) => {
+    async (
+      sourceId: string,
+      profileId: string | null | undefined,
+      selectedBoardId?: string | null
+    ) => {
       const itemsRes = await fetch(`/api/connections/${sourceId}/items`);
       const itemsBody = (await itemsRes.json().catch(() => ({}))) as {
         items?: Array<SourceItem & { id: string }>;
@@ -328,10 +347,9 @@ export default function ConnectionsPanel() {
         return { analyzed: 0, failed: 0, remaining: 0 };
       }
 
-      const queue = itemsBody.items.filter((item) => {
-        const kind = String(item.metadata?.kind ?? "");
-        return kind === "board" || kind === "attachment";
-      });
+      const queue = itemsBody.items.filter((item) =>
+        itemBelongsToTrelloBoard(item, selectedBoardId ?? null)
+      );
 
       const currentVersion = connectorAnalysisVersion();
       const boards = queue.filter((i) => {
@@ -410,6 +428,27 @@ export default function ConnectionsPanel() {
     []
   );
 
+  const fetchTrelloBoardList = useCallback(async (sourceId: string) => {
+    const res = await fetch(`/api/connections/${sourceId}/trello/boards`);
+    const body = (await res.json().catch(() => ({}))) as {
+      boards?: Array<{ id: string; name: string }>;
+      selectedBoardId?: string | null;
+      error?: string;
+      message?: string;
+    };
+    if (!res.ok) {
+      throw new Error(body.message ?? body.error ?? "Couldn't list Trello boards.");
+    }
+    const boards = body.boards ?? [];
+    setTrelloBoards(boards);
+    const selected =
+      body.selectedBoardId && boards.some((b) => b.id === body.selectedBoardId)
+        ? body.selectedBoardId
+        : boards[0]?.id ?? "";
+    setTrelloBoardId(selected);
+    return boards;
+  }, []);
+
   const connectTrello = useCallback(async () => {
     setBusy("trello-connect");
     setError(null);
@@ -437,7 +476,44 @@ export default function ConnectionsPanel() {
       if (!res.ok || !body.source) {
         throw new Error(body.error ?? "Couldn't connect Trello.");
       }
-      const scanRes = await fetch(`/api/connections/${body.source.id}/scan`, {
+      setPendingTrelloSourceId(body.source.id);
+      await fetchTrelloBoardList(body.source.id);
+      setTrelloModalStep("board");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't connect Trello.");
+    } finally {
+      setBusy(null);
+    }
+  }, [fetchTrelloBoardList, load, trelloApiKey, trelloBoundProfile, trelloToken]);
+
+  const scanSelectedTrelloBoard = useCallback(async () => {
+    const sourceId = pendingTrelloSourceId ?? trelloSource?.id;
+    if (!sourceId) return;
+    const board = trelloBoards.find((b) => b.id === trelloBoardId);
+    if (!trelloBoardId || !board) {
+      setError("Pick a Trello board to scan.");
+      return;
+    }
+    setBusy("trello-scan");
+    setError(null);
+    setTrelloNote(null);
+    try {
+      const patchRes = await fetch(`/api/connections/${sourceId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          trelloBoardId: board.id,
+          trelloBoardName: board.name,
+        }),
+      });
+      const patchBody = (await patchRes.json().catch(() => ({}))) as {
+        error?: string;
+      };
+      if (!patchRes.ok) {
+        throw new Error(patchBody.error ?? "Couldn't save that Trello board.");
+      }
+      const scanRes = await fetch(`/api/connections/${sourceId}/scan`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
@@ -447,21 +523,29 @@ export default function ConnectionsPanel() {
         error?: string;
         message?: string;
       };
+      if (scanRes.status === 403 || scanBody.error === "permission_revoked") {
+        await load();
+        throw new Error(
+          scanBody.message ?? "Trello access was revoked. Reconnect with a new token."
+        );
+      }
       if (!scanRes.ok) {
         throw new Error(
-          scanBody.message ?? scanBody.error ?? "Connected, but board scan failed."
+          scanBody.message ?? scanBody.error ?? "Couldn't scan that Trello board."
         );
       }
       setScanResult(scanBody.summary ?? null);
       setBusy("trello-analyze");
-      setTrelloNote(null);
       const analyzeStats = await analyzeTrelloAfterScan(
-        body.source.id,
-        trelloBoundProfile.id
+        sourceId,
+        trelloBoundProfile?.id ?? trelloSource?.profileId,
+        board.id
       );
       setTrelloModalOpen(false);
+      setTrelloModalStep("creds");
       setTrelloApiKey("");
       setTrelloToken("");
+      setPendingTrelloSourceId(null);
       await load();
       if (analyzeStats.failed > 0 && analyzeStats.analyzed === 0) {
         setError(
@@ -469,16 +553,25 @@ export default function ConnectionsPanel() {
         );
       } else if (analyzeStats.remaining > 0) {
         setTrelloNote(
-          `This pass analyzed ${analyzeStats.analyzed} item${analyzeStats.analyzed === 1 ? "" : "s"}. ${analyzeStats.remaining} chord charts still waiting — press Scan Again to continue. You can already Ask Gideon about songs that finished.`
+          `This pass analyzed ${analyzeStats.analyzed} item${analyzeStats.analyzed === 1 ? "" : "s"} from ${board.name}. ${analyzeStats.remaining} chord charts still waiting — press Scan Again to continue.`
         );
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't connect Trello.");
+      setError(err instanceof Error ? err.message : "Couldn't scan that Trello board.");
     } finally {
       setAnalyzeProgress(null);
       setBusy(null);
     }
-  }, [analyzeTrelloAfterScan, load, trelloApiKey, trelloBoundProfile, trelloToken]);
+  }, [
+    analyzeTrelloAfterScan,
+    load,
+    pendingTrelloSourceId,
+    trelloBoardId,
+    trelloBoards,
+    trelloBoundProfile?.id,
+    trelloSource?.id,
+    trelloSource?.profileId,
+  ]);
 
   const bindTrelloToPreferredSpace = useCallback(async () => {
     if (!trelloSource || !trelloBoundProfile) return;
@@ -506,6 +599,24 @@ export default function ConnectionsPanel() {
 
   const scanTrelloAgain = useCallback(async () => {
     if (!trelloSource) return;
+    const selectedId = trelloSelectedBoardId(trelloSource.settings);
+    if (!selectedId) {
+      setBusy("trello-boards");
+      setError(null);
+      try {
+        await fetchTrelloBoardList(trelloSource.id);
+        setPendingTrelloSourceId(trelloSource.id);
+        setTrelloModalStep("board");
+        setTrelloModalOpen(true);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Couldn't list Trello boards."
+        );
+      } finally {
+        setBusy(null);
+      }
+      return;
+    }
     setBusy("trello-scan");
     setError(null);
     setTrelloNote(null);
@@ -534,7 +645,8 @@ export default function ConnectionsPanel() {
       setBusy("trello-analyze");
       const analyzeStats = await analyzeTrelloAfterScan(
         trelloSource.id,
-        trelloSource.profileId ?? trelloBoundProfile?.id
+        trelloSource.profileId ?? trelloBoundProfile?.id,
+        selectedId
       );
       await load();
       if (analyzeStats.remaining > 0) {
@@ -548,7 +660,31 @@ export default function ConnectionsPanel() {
       setAnalyzeProgress(null);
       setBusy(null);
     }
-  }, [analyzeTrelloAfterScan, load, trelloBoundProfile?.id, trelloSource]);
+  }, [
+    analyzeTrelloAfterScan,
+    fetchTrelloBoardList,
+    load,
+    trelloBoundProfile?.id,
+    trelloSource,
+  ]);
+
+  const openTrelloBoardPicker = useCallback(async () => {
+    if (!trelloSource) return;
+    setBusy("trello-boards");
+    setError(null);
+    try {
+      await fetchTrelloBoardList(trelloSource.id);
+      setPendingTrelloSourceId(trelloSource.id);
+      setTrelloModalStep("board");
+      setTrelloModalOpen(true);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Couldn't list Trello boards."
+      );
+    } finally {
+      setBusy(null);
+    }
+  }, [fetchTrelloBoardList, trelloSource]);
 
   const disconnectTrello = useCallback(async () => {
     if (!trelloSource) return;
@@ -582,6 +718,11 @@ export default function ConnectionsPanel() {
     trelloSource?.status === "connected" || trelloSource?.status === "error";
   const trelloRevoked = trelloSource?.status === "permission_revoked";
   const trelloUsername = String(trelloSource?.settings?.username ?? "");
+  const trelloBoardName =
+    trelloSelectedBoardName(trelloSource?.settings) ??
+    trelloBoards.find((b) => b.id === trelloSelectedBoardId(trelloSource?.settings))
+      ?.name ??
+    null;
   return (
     <div className="space-y-6">
       <section className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
@@ -855,7 +996,10 @@ export default function ConnectionsPanel() {
                     </p>
                     <button
                       type="button"
-                      onClick={() => setTrelloModalOpen(true)}
+                      onClick={() => {
+                        setTrelloModalStep("creds");
+                        setTrelloModalOpen(true);
+                      }}
                       disabled={busy !== null}
                       className="mt-4 inline-flex items-center justify-center rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-60"
                     >
@@ -878,6 +1022,12 @@ export default function ConnectionsPanel() {
                         </dd>
                       </div>
                       <div className="flex justify-between gap-4">
+                        <dt className="text-ink-muted">Board</dt>
+                        <dd className="font-medium text-foreground">
+                          {trelloBoardName ?? "Pick a board to scan"}
+                        </dd>
+                      </div>
+                      <div className="flex justify-between gap-4">
                         <dt className="text-ink-muted">Bound space</dt>
                         <dd className="font-medium text-foreground">
                           {trelloSource.profileId &&
@@ -892,7 +1042,7 @@ export default function ConnectionsPanel() {
                         </dd>
                       </div>
                       <div className="flex justify-between gap-4">
-                        <dt className="text-ink-muted">Boards discovered</dt>
+                        <dt className="text-ink-muted">Items on board</dt>
                         <dd className="font-medium text-foreground">
                           {trelloSummary?.total ?? "—"}
                         </dd>
@@ -908,7 +1058,11 @@ export default function ConnectionsPanel() {
                     </dl>
                     {trelloSource.profileId ? (
                       <p className="mt-3 text-sm text-ink-muted">
-                        Charts analyze into{" "}
+                        Charts from{" "}
+                        <span className="font-medium text-foreground">
+                          {trelloBoardName ?? "the selected board"}
+                        </span>{" "}
+                        analyze into{" "}
                         <span className="font-medium text-foreground">
                           {profiles.find((p) => p.id === trelloSource.profileId)
                             ?.display_name ?? "the bound space"}
@@ -968,7 +1122,25 @@ export default function ConnectionsPanel() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => setTrelloModalOpen(true)}
+                        onClick={() => void openTrelloBoardPicker()}
+                        disabled={busy !== null}
+                        className="inline-flex items-center justify-center rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-foreground hover:bg-stone-50 disabled:opacity-60"
+                      >
+                        {busy === "trello-boards" ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Loading boards…
+                          </>
+                        ) : (
+                          "Change board"
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTrelloModalStep("creds");
+                          setTrelloModalOpen(true);
+                        }}
                         disabled={busy !== null}
                         className="inline-flex items-center justify-center rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-foreground hover:bg-stone-50 disabled:opacity-60"
                       >
@@ -999,8 +1171,9 @@ export default function ConnectionsPanel() {
                       Not Connected
                     </p>
                     <p className="mt-2 text-sm text-ink-muted">
-                      Connect with your Trello API key and token. Boards and
-                      chord-chart images (JPG/PNG) or PDFs analyze into{" "}
+                      Connect with your Trello API key and token, then pick one
+                      board. Chord-chart images (JPG/PNG) or PDFs on that board
+                      analyze into{" "}
                       <span className="font-medium text-foreground">
                         {trelloBoundProfile?.display_name ??
                           "your active space"}
@@ -1014,7 +1187,10 @@ export default function ConnectionsPanel() {
                     ) : null}
                     <button
                       type="button"
-                      onClick={() => setTrelloModalOpen(true)}
+                      onClick={() => {
+                        setTrelloModalStep("creds");
+                        setTrelloModalOpen(true);
+                      }}
                       disabled={busy !== null || !trelloBoundProfile}
                       className="mt-4 inline-flex items-center justify-center rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-60"
                     >
@@ -1140,8 +1316,61 @@ export default function ConnectionsPanel() {
               id="trello-connect-title"
               className="text-lg font-semibold text-foreground"
             >
-              Connect Trello
+              {trelloModalStep === "board" ? "Choose a Trello board" : "Connect Trello"}
             </h3>
+            {trelloModalStep === "board" ? (
+              <>
+                <p className="mt-2 text-sm text-ink-muted">
+                  Guardian will scan and analyze only this board — including
+                  chord-chart JPGs, PNGs, and PDFs on its cards.
+                </p>
+                <label className="mt-4 block text-sm font-medium text-foreground">
+                  Board
+                  <select
+                    value={trelloBoardId}
+                    onChange={(e) => setTrelloBoardId(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm"
+                  >
+                    {trelloBoards.map((board) => (
+                      <option key={board.id} value={board.id}>
+                        {board.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="mt-6 flex flex-wrap justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTrelloModalOpen(false);
+                      setTrelloModalStep("creds");
+                      setPendingTrelloSourceId(null);
+                    }}
+                    className="rounded-full border border-stone-200 px-4 py-2 text-sm font-semibold text-foreground hover:bg-stone-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void scanSelectedTrelloBoard()}
+                    disabled={busy !== null || !trelloBoardId}
+                    className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-60"
+                  >
+                    {busy === "trello-scan" || busy === "trello-analyze" ? (
+                      <>
+                        <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
+                        {busy === "trello-analyze"
+                          ? analyzeProgress ?? "Reading charts…"
+                          : "Scanning…"}
+                      </>
+                    ) : (
+                      "Scan this board"
+                    )}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
             <p className="mt-2 text-sm text-ink-muted">
               Paste your Power-Up API key and user token. Boards analyze into{" "}
               <span className="font-medium text-foreground">
@@ -1176,8 +1405,10 @@ export default function ConnectionsPanel() {
                 type="button"
                 onClick={() => {
                   setTrelloModalOpen(false);
+                  setTrelloModalStep("creds");
                   setTrelloApiKey("");
                   setTrelloToken("");
+                  setPendingTrelloSourceId(null);
                 }}
                 className="rounded-full border border-stone-200 px-4 py-2 text-sm font-semibold text-foreground hover:bg-stone-50"
               >
@@ -1205,6 +1436,8 @@ export default function ConnectionsPanel() {
                 )}
               </button>
             </div>
+              </>
+            )}
           </div>
         </div>
       ) : null}
