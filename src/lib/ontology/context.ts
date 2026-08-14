@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { isInvoiceAggregateQuery, isSongCatalogQuery, isConnectedChartQuery, tokenizeForOntologySearch } from "./normalize";
+import { isInvoiceAggregateQuery, isSongCatalogQuery, isConnectedChartQuery, tokenizeForOntologySearch, titlePhraseForOntologySearch } from "./normalize";
 import { getPathsBetweenMatchedEntities } from "./paths";
 import type { OntologyContext, OntologyEntity } from "./types";
 import {
@@ -37,23 +37,44 @@ export async function getOntologyContext(
   const listSongs = isSongCatalogQuery(trimmed);
   const listCharts = isConnectedChartQuery(trimmed);
   const searchTerms = tokenizeForOntologySearch(trimmed);
-  if (!searchTerms.length && !listInvoices && !listSongs && !listCharts) return empty;
+  const titlePhrase = titlePhraseForOntologySearch(trimmed)?.replace(
+    /[%_\\]/g,
+    "\\$&"
+  );
+  if (!searchTerms.length && !listInvoices && !listSongs && !listCharts && !titlePhrase) {
+    return empty;
+  }
 
   const safeTerms = searchTerms.map((term) =>
     term.replace(/[%_\\]/g, "\\$&").slice(0, 48)
   );
 
-  const entityQueries = safeTerms.map((term) =>
-    supabase
-      .from("ontology_entities")
-      .select(ONTOLOGY_ENTITY_SELECT)
-      .eq("profile_id", args.spaceId)
-      .in("review_status", ONTOLOGY_VISIBLE_REVIEW_STATUSES)
-      .or(
-        `name.ilike.%${term}%,canonical_name.ilike.%${term}%,description.ilike.%${term}%`
-      )
-      .limit(listInvoices || listSongs ? 16 : 8)
-  );
+  const entityQueries = [
+    ...safeTerms.map((term) =>
+      supabase
+        .from("ontology_entities")
+        .select(ONTOLOGY_ENTITY_SELECT)
+        .eq("profile_id", args.spaceId)
+        .in("review_status", ONTOLOGY_VISIBLE_REVIEW_STATUSES)
+        .or(
+          `name.ilike.%${term}%,canonical_name.ilike.%${term}%,description.ilike.%${term}%`
+        )
+        .limit(listInvoices || listSongs || listCharts ? 16 : 8)
+    ),
+    ...(titlePhrase
+      ? [
+          supabase
+            .from("ontology_entities")
+            .select(ONTOLOGY_ENTITY_SELECT)
+            .eq("profile_id", args.spaceId)
+            .in("review_status", ONTOLOGY_VISIBLE_REVIEW_STATUSES)
+            .or(
+              `name.ilike.%${titlePhrase}%,canonical_name.ilike.%${titlePhrase}%,description.ilike.%${titlePhrase}%`
+            )
+            .limit(8),
+        ]
+      : []),
+  ];
   const aliasQueries = safeTerms.map((term) =>
     supabase
       .from("ontology_entity_aliases")
@@ -75,6 +96,7 @@ export async function getOntologyContext(
             listInvoices,
             listSongs,
             listCharts,
+            titlePhrase: titlePhrase ?? undefined,
           })
         : Promise.resolve([] as OntologyEntity[]),
       listInvoices
@@ -204,6 +226,7 @@ async function findConnectorEntitiesForQuery(
     listInvoices?: boolean;
     listSongs?: boolean;
     listCharts?: boolean;
+    titlePhrase?: string;
   }
 ): Promise<OntologyEntity[]> {
   const { data: sources } = await supabase
@@ -238,9 +261,12 @@ async function findConnectorEntitiesForQuery(
       .eq("processing_status", "analyzed")
       .limit(args.listSongs || args.listCharts ? 80 : 40);
     itemIds = (items ?? []).map((i) => i.id as string);
-  } else if (args.terms.length) {
-    // Match source file/board names…
-    const orName = args.terms.map((t) => `name.ilike.%${t}%`).join(",");
+  } else if (args.terms.length || args.titlePhrase) {
+    const nameTerms = [
+      ...args.terms,
+      ...(args.titlePhrase ? [args.titlePhrase] : []),
+    ];
+    const orName = nameTerms.map((t) => `name.ilike.%${t}%`).join(",");
     const { data: items } = await supabase
       .from("source_items")
       .select("id, name, processing_status")
@@ -260,7 +286,7 @@ async function findConnectorEntitiesForQuery(
       .limit(80);
     const analyzedIds = (analyzed ?? []).map((i) => i.id as string);
     if (analyzedIds.length) {
-      const orEntity = args.terms
+      const orEntity = nameTerms
         .map(
           (t) =>
             `name.ilike.%${t}%,canonical_name.ilike.%${t}%,description.ilike.%${t}%`

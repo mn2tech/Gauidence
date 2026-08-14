@@ -23,6 +23,7 @@ import {
   analyzeSourceItemClient,
   isItemNeedsAnalyze,
 } from "@/lib/connectors/clientAnalyze";
+import { connectorAnalysisVersion } from "@/lib/ontology/pipeline/analysisVersion";
 
 type CategoryCounts = {
   Images: number;
@@ -300,10 +301,14 @@ export default function ConnectionsPanel() {
       // when new/failed so Scan Again doesn't re-download every chart.
       const boards = queue.filter((i) => i.metadata?.kind === "board");
       const charts = queue
-        .filter(
-          (i) =>
-            i.metadata?.kind === "attachment" && isItemNeedsAnalyze(i)
-        )
+        .filter((i) => {
+          if (i.metadata?.kind !== "attachment") return false;
+          if (isItemNeedsAnalyze(i)) return true;
+          return (
+            i.processingStatus === "analyzed" &&
+            i.analysisVersion !== connectorAnalysisVersion()
+          );
+        })
         .slice(0, 80);
       const ordered = [...boards, ...charts];
 

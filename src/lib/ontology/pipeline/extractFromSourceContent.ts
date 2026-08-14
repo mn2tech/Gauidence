@@ -25,20 +25,16 @@ import {
   fallbackOntologyFromFileName,
   looksLikeChartOrSheetFile,
 } from "./filenameFallback";
-import { enrichOntologyWithTranscript } from "./enrichWithTranscript";
+import { enrichOntologyWithTranscript, longestExtractionTranscript } from "./enrichWithTranscript";
 import {
   extractTrelloCardIndex,
   mergeCardIndexEntities,
   mergeTrelloSongEntities,
   parseTrelloBoardSongs,
 } from "./trelloCardIndex";
+import { connectorAnalysisVersion } from "./analysisVersion";
 
-/** Bump when extraction quality changes so Analyze again is not skipped. */
-const CONNECTOR_ANALYSIS_VERSION = "connector-ontology-v11";
-
-export function connectorAnalysisVersion(): string {
-  return CONNECTOR_ANALYSIS_VERSION;
-}
+export { connectorAnalysisVersion };
 
 function buildConnectorSystemPrompt(): string {
   return `You are Guardian's Ontology Extraction engine for connected device files.
@@ -160,13 +156,25 @@ export async function extractOntologyFromSourceContent(args: {
 
       const resolved =
         multimodal ?? fallbackOntologyFromFileName(fileName);
+      const existingTranscript = resolved
+        ? longestExtractionTranscript(resolved)
+        : null;
+      const layer = extractedText.trim();
+      const withText =
+        resolved &&
+        layer.length >= 12 &&
+        layer.length > (existingTranscript?.length ?? 0)
+          ? enrichOntologyWithTranscript(resolved, layer, fileName)
+          : resolved;
       return {
-        extraction: resolved,
+        extraction: withText,
         contentTextPreview: extractedText.slice(0, 200),
         extractionMethod: multimodal
           ? method
-          : resolved
-            ? "filename_fallback"
+          : withText
+            ? extractedText.trim().length >= 12
+              ? "text_layer_transcript"
+              : "filename_fallback"
             : extractionMethod,
       };
     }

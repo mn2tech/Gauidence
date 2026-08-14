@@ -9,6 +9,7 @@ import type {
 } from "../types";
 import { reviewStatusForConfidence } from "../types";
 import { looksLikeInfraOrFolderLabel } from "../formatForGideon";
+import { longestExtractionTranscript } from "./enrichWithTranscript";
 
 export type PersistConnectorOntologyInput = {
   userId: string;
@@ -39,6 +40,7 @@ export async function persistConnectorOntologyExtraction(
 
   const entityNameMap = new Map<string, string>();
 
+  const transcript = longestExtractionTranscript(input.extraction);
   const docEntity = await resolveOntologyEntity(supabase, {
     spaceId: input.profileId,
     entityType: "document",
@@ -47,7 +49,12 @@ export async function persistConnectorOntologyExtraction(
     sourceId: input.sourceItemId,
     createdBy: input.userId,
     confidence: 1,
-    description: `Connected source file (${input.analysisVersion})`,
+    description: transcript
+      ? `Connected chart "${input.fileName}".\n\nChart / reference content:\n${transcript.slice(0, 3000)}`
+      : `Connected source file (${input.analysisVersion})`,
+    properties: transcript
+      ? { content_transcript: transcript.slice(0, 3500) }
+      : {},
   });
   if (docEntity.created) stats.entitiesCreated += 1;
   else stats.entitiesMatched += 1;

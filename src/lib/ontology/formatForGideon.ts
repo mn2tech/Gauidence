@@ -50,7 +50,7 @@ export function formatOntologyForGideon(ctx: OntologyContext): string {
           : "";
       const descLimit =
         entity.entity_type === "document" || readContentTranscript(entity.properties)
-          ? 600
+          ? 1200
           : 160;
       const desc = entity.description
         ? ` — ${entity.description.slice(0, descLimit)}`
@@ -65,15 +65,9 @@ export function formatOntologyForGideon(ctx: OntologyContext): string {
       );
     }
 
-    const contentBlocks = entities
-      .map((entity) => {
-        const transcript = readContentTranscript(entity.properties);
-        if (!transcript) return null;
-        return `CONNECTED FILE CONTENT (${entity.name}):\n${transcript.slice(0, 3000)}`;
-      })
-      .filter((b): b is string => Boolean(b));
+    const contentBlocks = rankConnectedFileContent(entities);
     if (contentBlocks.length) {
-      blocks.push("", ...contentBlocks.slice(0, 2));
+      blocks.push("", ...contentBlocks.slice(0, 6));
     }
   }
 
@@ -517,14 +511,43 @@ function findRelatedName(
 
 function rankEntitiesForPrompt(entities: OntologyEntity[]): OntologyEntity[] {
   const score = (e: OntologyEntity) => {
-    if (e.entity_type === "invoice" || e.entity_type === "purchase") return 100;
-    if (e.entity_type === "organization" || e.entity_type === "person") return 80;
-    if (e.entity_type === "document" || e.entity_type === "contract") return 60;
-    if (e.entity_type === "event" && /\binvoice\b/i.test(e.name)) return 10;
-    if (isGenericInvoiceOrg(e)) return 5;
-    return 40;
+    let s = 0;
+    if (e.entity_type === "invoice" || e.entity_type === "purchase") s += 100;
+    else if (e.entity_type === "organization" || e.entity_type === "person") s += 80;
+    else if (e.entity_type === "document" || e.entity_type === "contract") s += 60;
+    else if (e.entity_type === "event" && /\binvoice\b/i.test(e.name)) s += 10;
+    else s += 40;
+    if (isGenericInvoiceOrg(e)) s = 5;
+    const transcript = readContentTranscript(e.properties);
+    if (transcript && transcript.length >= 40) s += 50;
+    if (/\b(chord|verse|chorus|chart \/ reference content)\b/i.test(e.description ?? "")) {
+      s += 20;
+    }
+    return s;
   };
   return [...entities].sort((a, b) => score(b) - score(a));
+}
+
+function rankConnectedFileContent(entities: OntologyEntity[]): string[] {
+  const scored = entities
+    .map((entity) => {
+      const transcript =
+        readContentTranscript(entity.properties) ??
+        (/\b(chart \/ reference content|card notes|verse|chorus)\b/i.test(
+          entity.description ?? ""
+        )
+          ? (entity.description ?? "").trim()
+          : "");
+      if (!transcript || transcript.length < 12) return null;
+      if (/^connected source file\b/i.test(transcript)) return null;
+      return {
+        len: transcript.length,
+        block: `CONNECTED FILE CONTENT (${entity.name}):\n${transcript.slice(0, 3000)}`,
+      };
+    })
+    .filter((b): b is { len: number; block: string } => Boolean(b));
+  scored.sort((a, b) => b.len - a.len);
+  return scored.map((s) => s.block);
 }
 
 function isGenericInvoiceOrg(entity: OntologyEntity): boolean {

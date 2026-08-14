@@ -39,7 +39,15 @@ export function fallbackOntologyFromFileName(
 
 /** Music / reference sheets need vision even when a weak text layer exists. */
 export function looksLikeChartOrSheetFile(fileName: string): boolean {
-  return /\b(chart|chord|tab|score|sheet|scale|lesson|bass|guitar|piano|drums?|ukulele|music)\b/i.test(
+  if (
+    /\b(chart|chord|tab|score|sheet|scale|lesson|bass|guitar|piano|drums?|ukulele|music)\b/i.test(
+      fileName
+    )
+  ) {
+    return true;
+  }
+  // Music titles like "Just As I Am - Bb.pdf"
+  return /\s[-–—]\s*[A-G](?:#|b)?m?(?:aj7|7|sus4)?\.(pdf|png|jpe?g|webp)$/i.test(
     fileName
   );
 }

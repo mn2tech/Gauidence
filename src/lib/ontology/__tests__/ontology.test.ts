@@ -9,6 +9,7 @@ import {
   nameSimilarity,
   normalizeEntityName,
   tokenizeForOntologySearch,
+  titlePhraseForOntologySearch,
 } from "../normalize";
 import { parseOntologyExtraction } from "../schema";
 import { formatOntologyForGideon, buildOntologyAnswerFallback } from "../formatForGideon";
@@ -80,6 +81,15 @@ describe("isSongCatalogQuery", () => {
     assert.equal(isSongCatalogQuery("now show me songs"), true);
     assert.equal(isSongCatalogQuery("list all songs"), true);
     assert.equal(isSongCatalogQuery("what key is Ae reethi"), false);
+  });
+});
+
+describe("titlePhraseForOntologySearch", () => {
+  it("keeps song titles that tokenize would drop", () => {
+    assert.equal(
+      titlePhraseForOntologySearch("What are the chords for Just As I Am?"),
+      "just as i am"
+    );
   });
 });
 
@@ -447,6 +457,51 @@ describe("formatOntologyForGideon", () => {
     );
   });
 
+  it("puts chart transcripts in CONNECTED FILE CONTENT", () => {
+    const text = formatOntologyForGideon({
+      matchedEntities: [
+        {
+          id: "f1",
+          profile_id: "p1",
+          entity_type: "document",
+          name: "Just As I Am - Bb.pdf",
+          canonical_name: "just as i am bb pdf",
+          description: "Connected source file (v11)",
+          properties: {},
+          confidence: 1,
+          source_type: "connector",
+          source_id: "s1",
+          created_by: null,
+          created_at: "2026-01-01T00:00:00Z",
+          updated_at: "2026-01-01T00:00:00Z",
+        },
+        {
+          id: "s1",
+          profile_id: "p1",
+          entity_type: "document",
+          name: "Just As I Am - Bb",
+          canonical_name: "just as i am bb",
+          description: "Chart / reference content:\nVerse: Bb Eb F\nChorus: Bb Gm Eb F",
+          properties: {
+            content_transcript: "Verse: Bb Eb F\nChorus: Bb Gm Eb F",
+          },
+          confidence: 0.9,
+          source_type: "connector",
+          source_id: "s1",
+          created_by: null,
+          created_at: "2026-01-01T00:00:00Z",
+          updated_at: "2026-01-01T00:00:00Z",
+        },
+      ],
+      relationships: [],
+      evidence: [],
+      entityNames: {},
+      paths: [],
+    });
+    assert.match(text, /CONNECTED FILE CONTENT \(Just As I Am - Bb\)/);
+    assert.match(text, /Verse: Bb Eb F/);
+  });
+
   it("formats entities, relationships, and evidence for the prompt", () => {
     const text = formatOntologyForGideon({
       matchedEntities: [
@@ -802,6 +857,7 @@ describe("looksLikeChartOrSheetFile", () => {
       looksLikeChartOrSheetFile("Bass Guitar Bass Chart.pdf"),
       true
     );
+    assert.equal(looksLikeChartOrSheetFile("Just As I Am - Bb.pdf"), true);
     assert.equal(looksLikeChartOrSheetFile("invoice-0001.pdf"), false);
   });
 });

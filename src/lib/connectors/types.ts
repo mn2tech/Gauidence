@@ -53,6 +53,8 @@ export interface SourceItem {
   processingStatus: SourceItemProcessingStatus;
   /** Safe user-facing error when analysis_failed. */
   analysisError?: string | null;
+  /** Last connector analysis version that produced ontology for this item. */
+  analysisVersion?: string | null;
 }
 
 export interface ScanResultSummary {

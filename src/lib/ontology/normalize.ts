@@ -99,6 +99,24 @@ export function tokenizeForOntologySearch(query: string): string[] {
   return unique;
 }
 
+/**
+ * Remaining title-like phrase after dropping question words.
+ * "What are the chords for Just As I Am?" → "just as i am"
+ */
+export function titlePhraseForOntologySearch(query: string): string | null {
+  const stripped = query
+    .toLowerCase()
+    .replace(/[?!.,'"()]/g, " ")
+    .replace(
+      /\b(what|whats|which|are|is|the|a|an|chords?|charts?|for|key|pdf|jpe?g|png|analyzed|show|me|can|you|see|please|tell|about|song|hymn|from|trello)\b/g,
+      " "
+    )
+    .replace(/\s+/g, " ")
+    .trim();
+  if (stripped.length < 4) return null;
+  return stripped.slice(0, 80);
+}
+
 /** Lightweight plural → singular for ontology search tokens. */
 export function singularizeOntologyToken(token: string): string {
   const t = token.toLowerCase();

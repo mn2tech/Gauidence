@@ -15,6 +15,7 @@ type SourceItemRow = {
   metadata: Record<string, unknown> | null;
   processing_status: SourceItem["processingStatus"];
   analysis_error?: string | null;
+  analysis_version?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -32,6 +33,7 @@ export function mapSourceItem(row: SourceItemRow): SourceItem & { id: string } {
     metadata: row.metadata ?? {},
     processingStatus: row.processing_status,
     analysisError: row.analysis_error ?? null,
+    analysisVersion: row.analysis_version ?? null,
   };
 }
 

@@ -55,3 +55,21 @@ export function readContentTranscript(
   const raw = properties[TRANSCRIPT_ATTR];
   return typeof raw === "string" && raw.trim() ? raw.trim() : null;
 }
+
+/** Longest chart transcript in an extraction (for the connected file entity). */
+export function longestExtractionTranscript(
+  extraction: OntologyExtractionResult
+): string | null {
+  let best = "";
+  for (const entity of extraction.entities) {
+    const fromAttr =
+      typeof entity.attributes?.content_transcript === "string"
+        ? entity.attributes.content_transcript.trim()
+        : "";
+    const fromDesc = (entity.description ?? "").trim();
+    const candidate =
+      fromAttr.length >= fromDesc.length ? fromAttr : fromDesc;
+    if (candidate.length > best.length) best = candidate;
+  }
+  return best.length >= 12 ? best.slice(0, TRANSCRIPT_MAX) : null;
+}
