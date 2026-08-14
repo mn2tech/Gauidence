@@ -34,7 +34,7 @@ import {
 } from "./trelloCardIndex";
 
 /** Bump when extraction quality changes so Analyze again is not skipped. */
-const CONNECTOR_ANALYSIS_VERSION = "connector-ontology-v10";
+const CONNECTOR_ANALYSIS_VERSION = "connector-ontology-v11";
 
 export function connectorAnalysisVersion(): string {
   return CONNECTOR_ANALYSIS_VERSION;
@@ -116,7 +116,12 @@ export async function extractOntologyFromSourceContent(args: {
     mimeType.startsWith("image/") ||
     mimeType === "application/pdf" ||
     /\.(pdf|png|jpe?g|webp|gif)$/i.test(fileName);
-  const forceChartVision = looksLikeChartOrSheetFile(fileName) && isVisualDoc;
+  const trelloChart =
+    args.content.metadata?.provider === "trello" &&
+    args.content.metadata?.kind === "attachment";
+  const forceChartVision =
+    (looksLikeChartOrSheetFile(fileName) || Boolean(trelloChart)) &&
+    isVisualDoc;
 
   if (base64 && isVisualDoc && (!extractedText || forceChartVision)) {
     const extraction = await extractDocumentText({
@@ -145,6 +150,7 @@ export async function extractOntologyFromSourceContent(args: {
           extractedText,
           pageImages: extraction.pageImages,
           spaceName: args.spaceName,
+          treatAsChart: forceChartVision,
         });
         multimodal = result.extraction;
         method = result.method;
@@ -337,6 +343,7 @@ async function extractOntologyMultimodal(args: {
   extractedText: string;
   pageImages: Array<{ page: number; dataUrl: string }>;
   spaceName?: string | null;
+  treatAsChart?: boolean;
 }): Promise<{
   extraction: OntologyExtractionResult | null;
   method: string;
@@ -346,7 +353,8 @@ async function extractOntologyMultimodal(args: {
   // 1) Vision OCR / transcript — critical for chord charts and image PDFs.
   let transcript = "";
   try {
-    const looksLikeChart = looksLikeChartOrSheetFile(args.fileName);
+    const looksLikeChart =
+      args.treatAsChart === true || looksLikeChartOrSheetFile(args.fileName);
     const ocr = await transcribeDocument({
       client,
       fileName: args.fileName,

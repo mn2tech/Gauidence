@@ -47,6 +47,13 @@ const KNOWLEDGE_EXPLICIT =
 const KNOWLEDGE_SOURCE =
   /\b(handbook|contract|invoice|invoices|policy|agreement|nda|lease|receipt|warranty|uploaded|(my|the|our) documents?|(my|the|our) files?|daily logs?|client requests?|trello|chord charts?)\b/i;
 
+/** Song/chart questions must search Guardian even when they start with "what is/are". */
+const KNOWLEDGE_MUSIC =
+  /\b(chords?|chord charts?|set\s*lists?|hymns?|lyrics|what key|which key|key of|trello)\b/i;
+
+const KNOWLEDGE_CONNECTED =
+  /\b(analyzed (pdf|file|chart|attachment|jpg|jpeg|png)|the (pdf|jpg|jpeg|png)|connected (file|trello|source)|trello (board|pdf|chart|attachment))\b/i;
+
 const KNOWLEDGE_SAY =
   /\bwhat does (the |my |our |this )?.{0,80}\b(say|mention|cover|require)\b/i;
 
@@ -158,7 +165,9 @@ function isKnowledgeQuestion(q: string): boolean {
     KNOWLEDGE_SUMMARIZE.test(q) ||
     KNOWLEDGE_ATTENTION.test(q) ||
     KNOWLEDGE_FIND.test(q) ||
-    KNOWLEDGE_SOURCE.test(q)
+    KNOWLEDGE_SOURCE.test(q) ||
+    KNOWLEDGE_MUSIC.test(q) ||
+    KNOWLEDGE_CONNECTED.test(q)
   );
 }
 

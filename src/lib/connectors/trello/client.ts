@@ -178,7 +178,7 @@ export async function downloadTrelloAttachment(
     const buf = new Uint8Array(await res.arrayBuffer());
     const contentType =
       res.headers.get("content-type")?.split(";")[0]?.trim() ||
-      "application/pdf";
+      "application/octet-stream";
     return { bytes: buf, contentType };
   }
 
@@ -189,7 +189,7 @@ export async function downloadTrelloAttachment(
   ) {
     throw new TrelloApiError(
       401,
-      "Trello blocked the PDF download. Reconnect with a fresh read token, then Scan Again. (Link-only attachments that aren't uploaded to Trello can't be downloaded.)"
+      "Trello blocked the chart download. Reconnect with a fresh read token, then Scan Again. (Link-only attachments that aren't uploaded to Trello can't be downloaded.)"
     );
   }
   throw new TrelloApiError(

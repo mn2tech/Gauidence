@@ -118,7 +118,7 @@ export function mergeCardIndexEntities(
 }
 
 /**
- * When a Trello PDF attachment is analyzed, fold its transcript onto the
+ * When a Trello chart attachment (JPG/PNG/PDF) is analyzed, fold its transcript onto the
  * parent card/song entity so Gideon answers by song name (not only PDF name).
  */
 export function mergeTrelloAttachmentOntoSong(

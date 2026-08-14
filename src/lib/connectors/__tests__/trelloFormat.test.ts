@@ -1,7 +1,10 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  collectChartAttachmentsFromCards,
   collectPdfAttachmentsFromCards,
+  isChartAttachment,
+  isImageAttachment,
   isPdfAttachment,
 } from "../trello/attachments.ts";
 import { formatBoardAsAnalysisText } from "../trello/formatBoard.ts";
@@ -20,6 +23,67 @@ describe("trello pdf attachments", () => {
       isPdfAttachment({ name: "photo.png", mimeType: "image/png" }),
       false
     );
+  });
+
+  it("detects chord-chart images by mime, name, or url", () => {
+    assert.equal(isImageAttachment({ mimeType: "image/jpeg" }), true);
+    assert.equal(isImageAttachment({ name: "chords.JPG" }), true);
+    assert.equal(
+      isImageAttachment({
+        url: "https://trello.com/1/cards/x/attachments/y/download/chart.png",
+      }),
+      true
+    );
+    assert.equal(isChartAttachment({ name: "verse.jpg" }), true);
+    assert.equal(isChartAttachment({ name: "notes.pdf" }), true);
+    assert.equal(isImageAttachment({ name: "notes.pdf" }), false);
+  });
+
+  it("collects PDF and JPG attachments from open cards", () => {
+    const charts = collectChartAttachmentsFromCards({
+      boardId: "b1",
+      boardName: "Living Waters",
+      cards: [
+        {
+          id: "c1",
+          name: "Ibadat Karo - Gm",
+          closed: false,
+          attachments: [
+            {
+              id: "a1",
+              name: "chords.pdf",
+              mimeType: "application/pdf",
+              url: "https://example.com/chords.pdf",
+              bytes: 12000,
+            },
+            {
+              id: "a2",
+              name: "cover.jpg",
+              mimeType: "image/jpeg",
+              url: "https://example.com/cover.jpg",
+            },
+          ],
+        },
+        {
+          id: "c2",
+          name: "Archived",
+          closed: true,
+          attachments: [
+            {
+              id: "a3",
+              name: "old.jpg",
+              mimeType: "image/jpeg",
+              url: "https://example.com/old.jpg",
+            },
+          ],
+        },
+      ],
+    });
+    assert.equal(charts.length, 2);
+    assert.equal(charts[0]?.attachmentId, "a1");
+    assert.equal(charts[1]?.attachmentId, "a2");
+    assert.equal(charts[1]?.mimeType, "image/jpeg");
+    assert.equal(charts[1]?.cardName, "Ibadat Karo - Gm");
   });
 
   it("collects PDF attachments from open cards only", () => {

@@ -10,7 +10,8 @@ import {
   verifyTrelloCredentials,
 } from "./client";
 import { formatBoardAsAnalysisText } from "./formatBoard";
-import { collectPdfAttachmentsFromCards } from "./attachments";
+import { collectChartAttachmentsFromCards } from "./attachments";
+import { guessMimeFromName } from "@/lib/connectors/content/types";
 
 export function getTrelloCredentials(
   source: Pick<ConnectedSource, "settings">
@@ -80,30 +81,30 @@ export async function scanTrelloSource(
 
     try {
       const cards = await listTrelloBoardCardsWithAttachments(creds, board.id);
-      const pdfs = collectPdfAttachmentsFromCards({
+      const charts = collectChartAttachmentsFromCards({
         boardId: board.id,
         boardName: board.name || "Untitled board",
         cards,
       });
-      for (const pdf of pdfs) {
+      for (const chart of charts) {
         items.push({
           sourceId: source.id,
-          externalId: `att:${pdf.attachmentId}`,
-          name: pdf.name,
-          mimeType: "application/pdf",
+          externalId: `att:${chart.attachmentId}`,
+          name: chart.name,
+          mimeType: chart.mimeType,
           sourceUri:
-            pdf.url ||
-            `trello://card/${pdf.cardId}/attachment/${pdf.attachmentId}`,
-          sizeBytes: pdf.bytes,
-          modifiedAt: pdf.date,
+            chart.url ||
+            `trello://card/${chart.cardId}/attachment/${chart.attachmentId}`,
+          sizeBytes: chart.bytes,
+          modifiedAt: chart.date,
           metadata: {
             provider: "trello",
             kind: "attachment",
-            attachmentId: pdf.attachmentId,
-            cardId: pdf.cardId,
-            cardName: pdf.cardName,
-            boardId: pdf.boardId,
-            boardName: pdf.boardName,
+            attachmentId: chart.attachmentId,
+            cardId: chart.cardId,
+            cardName: chart.cardName,
+            boardId: chart.boardId,
+            boardName: chart.boardName,
           },
           processingStatus: "discovered",
         });
@@ -111,7 +112,7 @@ export async function scanTrelloSource(
     } catch (err) {
       // Board listing still succeeds if one board's attachments fail.
       console.warn(
-        "Trello PDF attachment scan failed for board",
+        "Trello chart attachment scan failed for board",
         board.id,
         err instanceof Error ? err.message : err
       );
@@ -169,20 +170,24 @@ export async function loadTrelloAttachmentAnalysisContent(
   if (!cardId || !attachmentId) {
     throw new Error("This Trello attachment is missing card/attachment ids. Scan again.");
   }
-  const fileName = item.name || "attachment.pdf";
+  const fileName = item.name || "attachment";
   const url = typeof meta.url === "string" ? meta.url : undefined;
-  // Prefer URL from source item if present in metadata via scan — we store url in sourceUri.
   const downloaded = await downloadTrelloAttachment(creds, {
     cardId,
     attachmentId,
     fileName,
     url,
   });
+  const fromHeader = downloaded.contentType.split(";")[0]?.trim() || "";
+  const mimeType =
+    fromHeader.startsWith("image/") || fromHeader === "application/pdf"
+      ? fromHeader === "image/jpg"
+        ? "image/jpeg"
+        : fromHeader
+      : guessMimeFromName(fileName);
   return {
     filename: fileName,
-    mimeType: downloaded.contentType.includes("pdf")
-      ? "application/pdf"
-      : downloaded.contentType || "application/pdf",
+    mimeType: mimeType || "application/octet-stream",
     bytes: downloaded.bytes,
   };
 }

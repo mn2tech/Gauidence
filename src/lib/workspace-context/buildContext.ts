@@ -330,7 +330,8 @@ export async function loadWorkspaceContext(
           supabase,
           effectiveSearchIds,
           profileNames,
-          retrievalQuestion
+          retrievalQuestion,
+          user.id
         )
       : Promise.resolve("(none)"),
     load.schedule

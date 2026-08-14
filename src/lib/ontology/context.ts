@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { isInvoiceAggregateQuery, isSongCatalogQuery, tokenizeForOntologySearch } from "./normalize";
+import { isInvoiceAggregateQuery, isSongCatalogQuery, isConnectedChartQuery, tokenizeForOntologySearch } from "./normalize";
 import { getPathsBetweenMatchedEntities } from "./paths";
 import type { OntologyContext, OntologyEntity } from "./types";
 import {
@@ -35,8 +35,9 @@ export async function getOntologyContext(
 
   const listInvoices = isInvoiceAggregateQuery(trimmed);
   const listSongs = isSongCatalogQuery(trimmed);
+  const listCharts = isConnectedChartQuery(trimmed);
   const searchTerms = tokenizeForOntologySearch(trimmed);
-  if (!searchTerms.length && !listInvoices && !listSongs) return empty;
+  if (!searchTerms.length && !listInvoices && !listSongs && !listCharts) return empty;
 
   const safeTerms = searchTerms.map((term) =>
     term.replace(/[%_\\]/g, "\\$&").slice(0, 48)
@@ -73,6 +74,7 @@ export async function getOntologyContext(
             preferSpaceId: args.spaceId,
             listInvoices,
             listSongs,
+            listCharts,
           })
         : Promise.resolve([] as OntologyEntity[]),
       listInvoices
@@ -116,7 +118,7 @@ export async function getOntologyContext(
   const ranked = rankEntitiesByQueryTokens([...byId.values()], searchTerms);
   const entities = listInvoices
     ? preferInvoicesFirst(ranked).slice(0, 20)
-    : listSongs
+    : listSongs || listCharts
       ? preferSongCatalogFirst(ranked).slice(0, 40)
       : ranked.slice(0, 5);
   if (!entities.length) return empty;
@@ -201,6 +203,7 @@ async function findConnectorEntitiesForQuery(
     preferSpaceId: string;
     listInvoices?: boolean;
     listSongs?: boolean;
+    listCharts?: boolean;
   }
 ): Promise<OntologyEntity[]> {
   const { data: sources } = await supabase
@@ -224,14 +227,16 @@ async function findConnectorEntitiesForQuery(
     ...new Set([args.preferSpaceId, ...boundProfileIds]),
   ];
 
+  const listConnectorCatalog = args.listInvoices || args.listSongs;
+
   let itemIds: string[] = [];
-  if (args.listInvoices || args.listSongs) {
+  if (listConnectorCatalog) {
     const { data: items } = await supabase
       .from("source_items")
       .select("id, name, processing_status")
       .in("source_id", sourceIds)
       .eq("processing_status", "analyzed")
-      .limit(args.listSongs ? 80 : 40);
+      .limit(args.listSongs || args.listCharts ? 80 : 40);
     itemIds = (items ?? []).map((i) => i.id as string);
   } else if (args.terms.length) {
     // Match source file/board names…
@@ -290,7 +295,7 @@ async function findConnectorEntitiesForQuery(
     .eq("source_type", "connector")
     .in("source_id", itemIds)
     .in("review_status", ONTOLOGY_VISIBLE_REVIEW_STATUSES)
-    .limit(args.listSongs ? 80 : args.listInvoices ? 40 : 20);
+    .limit(args.listSongs || args.listCharts ? 80 : args.listInvoices ? 40 : 20);
 
   if (args.listInvoices) {
     entityQuery = entityQuery.in("entity_type", [
@@ -299,7 +304,7 @@ async function findConnectorEntitiesForQuery(
       "document",
       "organization",
     ]);
-  } else if (args.listSongs) {
+  } else if (args.listSongs || args.listCharts) {
     entityQuery = entityQuery.in("entity_type", [
       "document",
       "product",

@@ -150,6 +150,24 @@ describe("Gideon intent router — follow-ups and tools", () => {
     assert.equal(shouldSearchGuardianKnowledge(route), true);
   });
 
+  it("searches Guardian for Trello chord and analyzed-PDF questions", () => {
+    const chords = classifyGideonIntent({
+      question: "What are the chords for Ibadat Karo?",
+    });
+    assert.equal(chords.intent, "knowledge_search");
+    assert.equal(shouldSearchGuardianKnowledge(chords), true);
+
+    const key = classifyGideonIntent({
+      question: "What key is Ae reethi?",
+    });
+    assert.equal(shouldSearchGuardianKnowledge(key), true);
+
+    const pdf = classifyGideonIntent({
+      question: "Can you see the analyzed PDF?",
+    });
+    assert.equal(shouldSearchGuardianKnowledge(pdf), true);
+  });
+
   it("forces knowledge when an attachment is present", () => {
     const route = classifyGideonIntent({
       question: "What is this?",

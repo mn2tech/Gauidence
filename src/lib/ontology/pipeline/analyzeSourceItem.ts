@@ -181,10 +181,18 @@ export async function analyzeSourceItem(
     // Prefer catalog name — upload File.name can be generic ("file") and
     // would defeat filename fallback for chart PDFs.
     const fileName = item.name || args.content.filename || "file";
+    const itemMeta =
+      item.metadata && typeof item.metadata === "object"
+        ? (item.metadata as Record<string, unknown>)
+        : {};
     const { extraction: rawExtraction } = await extractOntologyFromSourceContent({
       content: {
         ...args.content,
         filename: fileName,
+        metadata: {
+          ...(args.content.metadata ?? {}),
+          ...itemMeta,
+        },
       },
       spaceName: profile?.display_name ?? null,
     });
@@ -192,10 +200,7 @@ export async function analyzeSourceItem(
     let extraction =
       rawExtraction ?? fallbackOntologyFromFileName(fileName);
 
-    const meta =
-      item.metadata && typeof item.metadata === "object"
-        ? (item.metadata as Record<string, unknown>)
-        : {};
+    const meta = itemMeta;
     const cardName = String(meta.cardName ?? "").trim();
     if (
       extraction &&

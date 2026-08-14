@@ -146,6 +146,14 @@ export function isSongCatalogQuery(query: string): boolean {
   return /\b(all|list|show|what|which|every|full|complete|names?|now)\b/.test(q);
 }
 
+/** True when the user is asking about analyzed Trello/Device charts or PDFs. */
+export function isConnectedChartQuery(query: string): boolean {
+  const q = query.toLowerCase();
+  return /\b(trello|chord charts?|chords?|pdf|jpg|jpeg|png|analyzed|attachment|set\s*lists?)\b/.test(
+    q
+  );
+}
+
 /** Levenshtein distance for conservative fuzzy matching. */
 export function levenshteinDistance(a: string, b: string): number {
   if (a === b) return 0;

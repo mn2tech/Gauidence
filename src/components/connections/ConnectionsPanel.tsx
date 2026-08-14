@@ -296,16 +296,16 @@ export default function ConnectionsPanel() {
         return kind === "board" || kind === "attachment";
       });
 
-      // Boards are cheap text exports — refresh them. PDFs only when new/failed
-      // so Scan Again doesn't re-download every chart.
+      // Boards are cheap text exports — refresh them. Chart images/PDFs only
+      // when new/failed so Scan Again doesn't re-download every chart.
       const boards = queue.filter((i) => i.metadata?.kind === "board");
-      const pdfs = queue
+      const charts = queue
         .filter(
           (i) =>
             i.metadata?.kind === "attachment" && isItemNeedsAnalyze(i)
         )
-        .slice(0, 25);
-      const ordered = [...boards, ...pdfs];
+        .slice(0, 80);
+      const ordered = [...boards, ...charts];
 
       let analyzed = 0;
       let failed = 0;
@@ -380,7 +380,7 @@ export default function ConnectionsPanel() {
       await load();
       if (analyzeStats.failed > 0 && analyzeStats.analyzed === 0) {
         setError(
-          "Connected and scanned, but Analyze failed. Open Browse Boards & PDFs and Analyze again."
+          "Connected and scanned, but Analyze failed. Open Browse Boards & Charts and Analyze again."
         );
       }
     } catch (err) {
@@ -832,7 +832,7 @@ export default function ConnectionsPanel() {
                         href={`/settings/connections/${trelloSource.id}`}
                         className="inline-flex items-center justify-center rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-foreground hover:bg-stone-50"
                       >
-                        Browse Boards & PDFs
+                        Browse Boards & Charts
                       </Link>
                       <button
                         type="button"
@@ -879,8 +879,8 @@ export default function ConnectionsPanel() {
                       Not Connected
                     </p>
                     <p className="mt-2 text-sm text-ink-muted">
-                      Connect with your Trello API key and token. Boards and PDF
-                      chord charts analyze into{" "}
+                      Connect with your Trello API key and token. Boards and
+                      chord-chart images (JPG/PNG) or PDFs analyze into{" "}
                       <span className="font-medium text-foreground">
                         {trelloBoundProfile?.display_name ??
                           "your active space"}

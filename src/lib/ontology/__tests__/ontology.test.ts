@@ -5,6 +5,7 @@ import {
   isFuzzyMatchAllowed,
   isInvoiceAggregateQuery,
   isSongCatalogQuery,
+  isConnectedChartQuery,
   nameSimilarity,
   normalizeEntityName,
   tokenizeForOntologySearch,
@@ -79,6 +80,14 @@ describe("isSongCatalogQuery", () => {
     assert.equal(isSongCatalogQuery("now show me songs"), true);
     assert.equal(isSongCatalogQuery("list all songs"), true);
     assert.equal(isSongCatalogQuery("what key is Ae reethi"), false);
+  });
+});
+
+describe("isConnectedChartQuery", () => {
+  it("detects Trello chart and analyzed PDF questions", () => {
+    assert.equal(isConnectedChartQuery("What are the chords for Ibadat Karo?"), true);
+    assert.equal(isConnectedChartQuery("Can you see the analyzed PDF?"), true);
+    assert.equal(isConnectedChartQuery("what is the weather"), false);
   });
 });
 
