@@ -34,7 +34,7 @@ import {
 } from "./trelloCardIndex";
 
 /** Bump when extraction quality changes so Analyze again is not skipped. */
-const CONNECTOR_ANALYSIS_VERSION = "connector-ontology-v9";
+const CONNECTOR_ANALYSIS_VERSION = "connector-ontology-v10";
 
 export function connectorAnalysisVersion(): string {
   return CONNECTOR_ANALYSIS_VERSION;

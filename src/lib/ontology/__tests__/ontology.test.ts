@@ -24,6 +24,7 @@ import {
 import {
   extractTrelloCardIndex,
   mergeCardIndexEntities,
+  mergeTrelloAttachmentOntoSong,
   mergeTrelloSongEntities,
   parseMusicCardTitle,
   parseTrelloBoardSongs,
@@ -732,6 +733,37 @@ Card details:
     assert.ok(song!.aliases?.includes("Ibadat Karo"));
     assert.match(song!.description ?? "", /Verse: Gm Cm D7/);
     assert.match(String(song!.attributes?.content_transcript ?? ""), /Chorus: Eb F Gm/);
+  });
+
+  it("folds PDF transcript onto the Trello card/song entity", () => {
+    const merged = mergeTrelloAttachmentOntoSong(
+      {
+        entities: [
+          {
+            type: "document",
+            name: "living-waters-chords",
+            confidence: 0.8,
+            description: "Chart content",
+            attributes: {
+              content_transcript: "Verse: Gm Cm D7\nChorus: Eb F Gm",
+            },
+          },
+        ],
+        relationships: [],
+        events: [],
+      },
+      {
+        cardName: "Ibadat Karo - Gm - Nov 21, 2021",
+        fileName: "living-waters-chords.pdf",
+      }
+    );
+    const song = merged.entities.find((e) =>
+      e.name.toLowerCase().includes("ibadat")
+    );
+    assert.ok(song);
+    assert.equal(song!.attributes?.musical_key, "Gm");
+    assert.match(String(song!.attributes?.content_transcript ?? ""), /Gm Cm D7/);
+    assert.ok(song!.aliases?.some((a) => /living-waters-chords/i.test(a)));
   });
 });
 

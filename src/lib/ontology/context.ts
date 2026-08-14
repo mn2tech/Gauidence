@@ -205,13 +205,24 @@ async function findConnectorEntitiesForQuery(
 ): Promise<OntologyEntity[]> {
   const { data: sources } = await supabase
     .from("connected_sources")
-    .select("id")
+    .select("id, profile_id")
     .eq("user_id", args.userId)
     .neq("status", "disconnected")
     .limit(20);
 
   const sourceIds = (sources ?? []).map((s) => s.id as string);
   if (!sourceIds.length) return [];
+
+  const boundProfileIds = [
+    ...new Set(
+      (sources ?? [])
+        .map((s) => s.profile_id as string | null)
+        .filter((id): id is string => Boolean(id))
+    ),
+  ];
+  const searchProfileIds = [
+    ...new Set([args.preferSpaceId, ...boundProfileIds]),
+  ];
 
   let itemIds: string[] = [];
   if (args.listInvoices || args.listSongs) {
@@ -223,6 +234,7 @@ async function findConnectorEntitiesForQuery(
       .limit(args.listSongs ? 80 : 40);
     itemIds = (items ?? []).map((i) => i.id as string);
   } else if (args.terms.length) {
+    // Match source file/board names…
     const orName = args.terms.map((t) => `name.ilike.%${t}%`).join(",");
     const { data: items } = await supabase
       .from("source_items")
@@ -232,6 +244,43 @@ async function findConnectorEntitiesForQuery(
       .or(orName)
       .limit(12);
     itemIds = (items ?? []).map((i) => i.id as string);
+
+    // …and also song/entity names from already-analyzed connector items
+    // (board name "Living Waters" won't match "Ibadat Karo").
+    const { data: analyzed } = await supabase
+      .from("source_items")
+      .select("id")
+      .in("source_id", sourceIds)
+      .eq("processing_status", "analyzed")
+      .limit(80);
+    const analyzedIds = (analyzed ?? []).map((i) => i.id as string);
+    if (analyzedIds.length) {
+      const orEntity = args.terms
+        .map(
+          (t) =>
+            `name.ilike.%${t}%,canonical_name.ilike.%${t}%,description.ilike.%${t}%`
+        )
+        .join(",");
+      let entityByName = supabase
+        .from("ontology_entities")
+        .select(ONTOLOGY_ENTITY_SELECT)
+        .eq("source_type", "connector")
+        .in("source_id", analyzedIds)
+        .in("review_status", ONTOLOGY_VISIBLE_REVIEW_STATUSES)
+        .or(orEntity)
+        .limit(20);
+      if (searchProfileIds.length) {
+        entityByName = entityByName.in("profile_id", searchProfileIds);
+      }
+      const { data: named } = await entityByName;
+      if (named?.length) {
+        return [...(named as OntologyEntity[])].sort((a, b) => {
+          const ap = a.profile_id === args.preferSpaceId ? 1 : 0;
+          const bp = b.profile_id === args.preferSpaceId ? 1 : 0;
+          return bp - ap;
+        });
+      }
+    }
   }
   if (!itemIds.length) return [];
 

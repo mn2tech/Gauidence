@@ -10,6 +10,7 @@ import {
   extractOntologyFromSourceContent,
 } from "./extractFromSourceContent";
 import { fallbackOntologyFromFileName } from "./filenameFallback";
+import { mergeTrelloAttachmentOntoSong } from "./trelloCardIndex";
 import {
   listOntologyForSourceItem,
   persistConnectorOntologyExtraction,
@@ -70,7 +71,7 @@ export async function analyzeSourceItem(
   const { data: item } = await supabase
     .from("source_items")
     .select(
-      "id, source_id, name, mime_type, processing_status, content_hash, analysis_version"
+      "id, source_id, name, mime_type, processing_status, content_hash, analysis_version, metadata"
     )
     .eq("id", args.itemId)
     .eq("source_id", args.sourceId)
@@ -129,12 +130,13 @@ export async function analyzeSourceItem(
   }
 
   // Idempotency: same content hash AND same analysis version already analyzed.
+  // Require a real analysis_version — null/undefined must not skip.
   if (
     !args.force &&
     item.processing_status === "analyzed" &&
     item.content_hash &&
     item.content_hash === args.contentHash &&
-    (item.analysis_version ?? version) === version
+    item.analysis_version === version
   ) {
     const existing = await listOntologyForSourceItem(
       supabase,
@@ -187,8 +189,25 @@ export async function analyzeSourceItem(
       spaceName: profile?.display_name ?? null,
     });
 
-    const extraction =
+    let extraction =
       rawExtraction ?? fallbackOntologyFromFileName(fileName);
+
+    const meta =
+      item.metadata && typeof item.metadata === "object"
+        ? (item.metadata as Record<string, unknown>)
+        : {};
+    const cardName = String(meta.cardName ?? "").trim();
+    if (
+      extraction &&
+      String(meta.provider ?? "") === "trello" &&
+      String(meta.kind ?? "") === "attachment" &&
+      cardName
+    ) {
+      extraction = mergeTrelloAttachmentOntoSong(extraction, {
+        cardName,
+        fileName,
+      });
+    }
 
     if (!extraction) {
       await supabase

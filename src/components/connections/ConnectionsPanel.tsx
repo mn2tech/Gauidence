@@ -12,24 +12,17 @@ import {
   Shield,
 } from "lucide-react";
 import { AndroidStorageConnector } from "@/lib/connectors/android/AndroidStorageConnector";
-import { ConnectorError, type ConnectedSource, type ScanResultSummary } from "@/lib/connectors/types";
+import { ConnectorError, type ConnectedSource, type ScanResultSummary, type SourceItem } from "@/lib/connectors/types";
 import { formatLastScanned } from "@/lib/connectors/services/sourceItems";
 import { useActiveProfile } from "@/components/ProfileProvider";
-
-const TRELLO_BOUND_SPACE_NAME = "Wednesday Practice";
-
-function findTrelloBoundProfile<T extends { id: string; display_name: string }>(
-  profiles: T[]
-): T | null {
-  const target = TRELLO_BOUND_SPACE_NAME.toLowerCase();
-  return (
-    profiles.find((p) => p.display_name.trim().toLowerCase() === target) ??
-    profiles.find((p) =>
-      p.display_name.trim().toLowerCase().includes("wednesday practice")
-    ) ??
-    null
-  );
-}
+import {
+  findTrelloBoundProfile,
+  TRELLO_PREFERRED_SPACE_NAME,
+} from "@/lib/connectors/trello/boundSpace";
+import {
+  analyzeSourceItemClient,
+  isItemNeedsAnalyze,
+} from "@/lib/connectors/clientAnalyze";
 
 type CategoryCounts = {
   Images: number;
@@ -78,10 +71,10 @@ function StatusDot({
 }
 
 export default function ConnectionsPanel() {
-  const { profiles } = useActiveProfile();
+  const { profiles, active } = useActiveProfile();
   const trelloBoundProfile = useMemo(
-    () => findTrelloBoundProfile(profiles),
-    [profiles]
+    () => findTrelloBoundProfile(profiles, active),
+    [profiles, active]
   );
   const [sources, setSources] = useState<ConnectedSource[]>([]);
   const [summary, setSummary] = useState<ItemSummary | null>(null);
@@ -289,6 +282,50 @@ export default function ConnectionsPanel() {
     }
   }, [load, phoneSource]);
 
+  const analyzeTrelloAfterScan = useCallback(
+    async (sourceId: string, profileId: string | null | undefined) => {
+      const itemsRes = await fetch(`/api/connections/${sourceId}/items`);
+      const itemsBody = (await itemsRes.json().catch(() => ({}))) as {
+        items?: Array<SourceItem & { id: string }>;
+        error?: string;
+      };
+      if (!itemsRes.ok || !itemsBody.items?.length) return { analyzed: 0, failed: 0 };
+
+      const queue = itemsBody.items.filter((item) => {
+        const kind = String(item.metadata?.kind ?? "");
+        return kind === "board" || kind === "attachment";
+      });
+
+      // Boards are cheap text exports — refresh them. PDFs only when new/failed
+      // so Scan Again doesn't re-download every chart.
+      const boards = queue.filter((i) => i.metadata?.kind === "board");
+      const pdfs = queue
+        .filter(
+          (i) =>
+            i.metadata?.kind === "attachment" && isItemNeedsAnalyze(i)
+        )
+        .slice(0, 25);
+      const ordered = [...boards, ...pdfs];
+
+      let analyzed = 0;
+      let failed = 0;
+      for (const item of ordered) {
+        const result = await analyzeSourceItemClient({
+          sourceId,
+          item,
+          profileId: profileId ?? null,
+          force: item.processingStatus === "analysis_failed",
+          remote: true,
+          allowUnchangedSkip: true,
+        });
+        if (result.ok) analyzed += 1;
+        else if (!result.cancelled) failed += 1;
+      }
+      return { analyzed, failed };
+    },
+    []
+  );
+
   const connectTrello = useCallback(async () => {
     setBusy("trello-connect");
     setError(null);
@@ -296,7 +333,7 @@ export default function ConnectionsPanel() {
     try {
       if (!trelloBoundProfile) {
         throw new Error(
-          `Create a space named "${TRELLO_BOUND_SPACE_NAME}" first, then connect Trello.`
+          "Create a space first, then connect Trello (it will bind to your active space)."
         );
       }
       const res = await fetch("/api/connections", {
@@ -332,18 +369,28 @@ export default function ConnectionsPanel() {
         );
       }
       setScanResult(scanBody.summary ?? null);
+      setBusy("trello-analyze");
+      const analyzeStats = await analyzeTrelloAfterScan(
+        body.source.id,
+        trelloBoundProfile.id
+      );
       setTrelloModalOpen(false);
       setTrelloApiKey("");
       setTrelloToken("");
       await load();
+      if (analyzeStats.failed > 0 && analyzeStats.analyzed === 0) {
+        setError(
+          "Connected and scanned, but Analyze failed. Open Browse Boards & PDFs and Analyze again."
+        );
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't connect Trello.");
     } finally {
       setBusy(null);
     }
-  }, [load, trelloApiKey, trelloBoundProfile, trelloToken]);
+  }, [analyzeTrelloAfterScan, load, trelloApiKey, trelloBoundProfile, trelloToken]);
 
-  const bindTrelloToWednesdayPractice = useCallback(async () => {
+  const bindTrelloToPreferredSpace = useCallback(async () => {
     if (!trelloSource || !trelloBoundProfile) return;
     setBusy("trello-bind");
     setError(null);
@@ -393,13 +440,18 @@ export default function ConnectionsPanel() {
         throw new Error(body.error ?? "Couldn't scan Trello boards.");
       }
       setScanResult(body.summary ?? null);
+      setBusy("trello-analyze");
+      await analyzeTrelloAfterScan(
+        trelloSource.id,
+        trelloSource.profileId ?? trelloBoundProfile?.id
+      );
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Trello scan failed.");
     } finally {
       setBusy(null);
     }
-  }, [load, trelloSource]);
+  }, [analyzeTrelloAfterScan, load, trelloBoundProfile?.id, trelloSource]);
 
   const disconnectTrello = useCallback(async () => {
     if (!trelloSource) return;
@@ -762,7 +814,7 @@ export default function ConnectionsPanel() {
                       trelloSource.profileId !== trelloBoundProfile.id ? (
                         <button
                           type="button"
-                          onClick={() => void bindTrelloToWednesdayPractice()}
+                          onClick={() => void bindTrelloToPreferredSpace()}
                           disabled={busy !== null}
                           className="inline-flex items-center justify-center rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-60"
                         >
@@ -772,7 +824,7 @@ export default function ConnectionsPanel() {
                               Binding…
                             </>
                           ) : (
-                            `Bind to ${TRELLO_BOUND_SPACE_NAME}`
+                            `Bind to ${trelloBoundProfile.display_name}`
                           )}
                         </button>
                       ) : null}
@@ -788,10 +840,12 @@ export default function ConnectionsPanel() {
                         disabled={busy !== null}
                         className="inline-flex items-center justify-center rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-foreground hover:bg-stone-50 disabled:opacity-60"
                       >
-                        {busy === "trello-scan" ? (
+                        {busy === "trello-scan" || busy === "trello-analyze" ? (
                           <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Scanning…
+                            {busy === "trello-analyze"
+                              ? "Analyzing…"
+                              : "Scanning…"}
                           </>
                         ) : (
                           <>
@@ -825,17 +879,17 @@ export default function ConnectionsPanel() {
                       Not Connected
                     </p>
                     <p className="mt-2 text-sm text-ink-muted">
-                      Connect with your Trello API key and token to import open
-                      boards and PDF attachments into{" "}
+                      Connect with your Trello API key and token. Boards and PDF
+                      chord charts analyze into{" "}
                       <span className="font-medium text-foreground">
-                        {TRELLO_BOUND_SPACE_NAME}
+                        {trelloBoundProfile?.display_name ??
+                          "your active space"}
                       </span>
-                      .
+                      so Gideon can answer from them like files in that space.
                     </p>
                     {!trelloBoundProfile ? (
                       <p className="mt-2 text-sm text-amber-800">
-                        Create a space named &quot;{TRELLO_BOUND_SPACE_NAME}
-                        &quot; first, then connect.
+                        Create a space first, then connect Trello.
                       </p>
                     ) : null}
                     <button
@@ -971,7 +1025,7 @@ export default function ConnectionsPanel() {
             <p className="mt-2 text-sm text-ink-muted">
               Paste your Power-Up API key and user token. Boards analyze into{" "}
               <span className="font-medium text-foreground">
-                {trelloBoundProfile?.display_name ?? TRELLO_BOUND_SPACE_NAME}
+                {trelloBoundProfile?.display_name ?? "your active space"}
               </span>
               .
             </p>
@@ -1019,10 +1073,12 @@ export default function ConnectionsPanel() {
                 }
                 className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-60"
               >
-                {busy === "trello-connect" ? (
+                {busy === "trello-connect" || busy === "trello-analyze" ? (
                   <>
                     <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
-                    Connecting…
+                    {busy === "trello-analyze"
+                      ? "Analyzing boards…"
+                      : "Connecting…"}
                   </>
                 ) : (
                   "Connect"

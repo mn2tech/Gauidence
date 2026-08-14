@@ -100,13 +100,15 @@ export async function analyzeSourceItemClient(args: {
   readOptions?: ReadSourceOptions;
   /** Force server-side fetch (whole Trello connection). */
   remote?: boolean;
+  /** When true, already-analyzed items may skip if content hash is unchanged. */
+  allowUnchangedSkip?: boolean;
 }): Promise<AnalyzeClientResult | AnalyzeClientFailure> {
-  const { sourceId, item, force, profileId, readOptions, remote } = args;
+  const { sourceId, item, force, profileId, readOptions, remote, allowUnchangedSkip } = args;
   try {
     const shouldForce =
       force === true ||
-      item.processingStatus === "analyzed" ||
-      item.processingStatus === "analysis_failed";
+      item.processingStatus === "analysis_failed" ||
+      (!allowUnchangedSkip && item.processingStatus === "analyzed");
 
     if (remote || isTrelloRemoteItem(item)) {
       const res = await fetch(

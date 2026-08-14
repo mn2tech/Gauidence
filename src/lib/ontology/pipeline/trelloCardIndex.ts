@@ -117,6 +117,58 @@ export function mergeCardIndexEntities(
   return { ...extraction, entities };
 }
 
+/**
+ * When a Trello PDF attachment is analyzed, fold its transcript onto the
+ * parent card/song entity so Gideon answers by song name (not only PDF name).
+ */
+export function mergeTrelloAttachmentOntoSong(
+  extraction: OntologyExtractionResult,
+  args: { cardName: string; fileName: string }
+): OntologyExtractionResult {
+  const cardName = args.cardName.trim();
+  if (!cardName) return extraction;
+
+  const meta = parseMusicCardTitle(cardName);
+  const transcript =
+    extraction.entities
+      .map((e) => {
+        const t = e.attributes?.content_transcript;
+        return typeof t === "string" ? t.trim() : "";
+      })
+      .find((t) => t.length >= 12) ??
+    extraction.entities
+      .map((e) => (e.description ?? "").trim())
+      .find((d) => /chord|chart|verse|chorus|[A-G][#b]?m?\d?/i.test(d)) ??
+    "";
+
+  const pdfBase = args.fileName.replace(/\.[^.]+$/, "").trim() || args.fileName;
+  const song: TrelloParsedSong = {
+    list: "",
+    name: cardName,
+    songTitle: meta.songTitle,
+    key: meta.key,
+    practicedOn: meta.practicedOn,
+    notes: transcript
+      ? `Chord chart PDF: ${args.fileName}\n${transcript}`
+      : `Chord chart PDF: ${args.fileName}`,
+    attachments: [args.fileName],
+  };
+
+  const merged = mergeTrelloSongEntities(extraction, [song]);
+  const idx = merged.entities.findIndex(
+    (e) => e.name.trim().toLowerCase() === cardName.toLowerCase()
+  );
+  if (idx < 0) return merged;
+
+  const prev = merged.entities[idx]!;
+  merged.entities[idx] = {
+    ...prev,
+    aliases: uniqueStrings([...(prev.aliases ?? []), pdfBase, meta.songTitle]),
+    confidence: Math.max(prev.confidence, transcript.length >= 12 ? 0.9 : 0.8),
+  };
+  return merged;
+}
+
 /** Overlay parsed Trello card notes/keys onto song entities. */
 export function mergeTrelloSongEntities(
   extraction: OntologyExtractionResult,
