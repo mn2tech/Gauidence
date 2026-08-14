@@ -12,6 +12,7 @@ import {
 } from "@/lib/connectors/services/sourceItems";
 import { analyzeSourceItemClient } from "@/lib/connectors/clientAnalyze";
 import { isAnalyzeSupportedMime } from "@/lib/connectors/content/types";
+import { readSourceItemContent } from "@/lib/connectors/content/readClient";
 import { useActiveProfile } from "@/components/ProfileProvider";
 
 type Props = {
@@ -55,6 +56,10 @@ export default function SourceFileDetail({ sourceId, itemId }: Props) {
   const [analyzing, setAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [reviewBusy, setReviewBusy] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewAttempted, setPreviewAttempted] = useState(false);
   const analyzeEnabled = isSourceItemAnalyzeEnabled();
 
   const load = useCallback(async () => {
@@ -104,6 +109,97 @@ export default function SourceFileDetail({ sourceId, itemId }: Props) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    setPreviewUrl((prev) => {
+      if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
+      return null;
+    });
+    setPreviewError(null);
+    setPreviewAttempted(false);
+    setPreviewLoading(false);
+  }, [itemId, sourceId]);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
+  const isPdf =
+    Boolean(item?.mimeType?.includes("pdf")) ||
+    Boolean(item?.name?.toLowerCase().endsWith(".pdf"));
+  const isTrelloRemote = source?.sourceType === "trello";
+
+  const loadPdfPreview = useCallback(async () => {
+    if (!item?.id || !isPdf) return;
+    setPreviewAttempted(true);
+    setPreviewLoading(true);
+    setPreviewError(null);
+    try {
+      if (isTrelloRemote) {
+        // Stream inline from Guardian API (Trello → Guardian → browser).
+        setPreviewUrl((prev) => {
+          if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
+          return `/api/connections/${sourceId}/items/${item.id}/file`;
+        });
+        return;
+      }
+
+      const content = await readSourceItemContent(item);
+      if (!content.bytes) {
+        throw new Error("Couldn't read this PDF from your device.");
+      }
+      const ab = content.bytes.buffer.slice(
+        content.bytes.byteOffset,
+        content.bytes.byteOffset + content.bytes.byteLength
+      ) as ArrayBuffer;
+      const blob = new Blob([ab], {
+        type: content.mimeType || "application/pdf",
+      });
+      const objectUrl = URL.createObjectURL(blob);
+      setPreviewUrl((prev) => {
+        if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
+        return objectUrl;
+      });
+    } catch (err) {
+      if (err instanceof ConnectorError && err.code === "cancelled") {
+        setPreviewError(null);
+        setPreviewAttempted(false);
+      } else {
+        setPreviewError(
+          err instanceof Error ? err.message : "Couldn't open PDF preview."
+        );
+      }
+    } finally {
+      setPreviewLoading(false);
+    }
+  }, [isPdf, isTrelloRemote, item, sourceId]);
+
+  // Trello PDFs can load immediately via the file API.
+  useEffect(() => {
+    if (
+      !item ||
+      !isPdf ||
+      !isTrelloRemote ||
+      previewUrl ||
+      previewLoading ||
+      previewAttempted
+    ) {
+      return;
+    }
+    void loadPdfPreview();
+  }, [
+    item,
+    isPdf,
+    isTrelloRemote,
+    previewUrl,
+    previewLoading,
+    previewAttempted,
+    loadPdfPreview,
+  ]);
 
   const runAnalyze = useCallback(async () => {
     if (!item?.id) return;
@@ -229,12 +325,21 @@ export default function SourceFileDetail({ sourceId, itemId }: Props) {
 
   const folder =
     (item.metadata?.parentFolder as string | undefined) ||
-    String(source?.settings?.folderName ?? "—");
+    (typeof item.metadata?.boardName === "string"
+      ? item.metadata.boardName
+      : null) ||
+    String(source?.settings?.folderName ?? source?.displayName ?? "—");
   const type = classifyFileType(item.name, item.mimeType);
   const supported = isAnalyzeSupportedMime(item.mimeType, item.name);
   const accessible = item.processingStatus !== "unavailable";
   const canAnalyze =
     analyzeEnabled && accessible && supported && !analyzing;
+  const sourceLabel =
+    source?.sourceType === "trello"
+      ? "Trello"
+      : source?.sourceType === "guardian"
+        ? "Guardian"
+        : "Device Storage";
 
   return (
     <div className="space-y-6">
@@ -254,7 +359,7 @@ export default function SourceFileDetail({ sourceId, itemId }: Props) {
         <dl className="mt-6 space-y-3 text-sm">
           <div className="flex justify-between gap-4 border-b border-stone-100 pb-3">
             <dt className="text-ink-muted">Source</dt>
-            <dd className="font-medium text-foreground">Device Storage</dd>
+            <dd className="font-medium text-foreground">{sourceLabel}</dd>
           </div>
           <div className="flex justify-between gap-4 border-b border-stone-100 pb-3">
             <dt className="text-ink-muted">Folder</dt>
@@ -305,10 +410,9 @@ export default function SourceFileDetail({ sourceId, itemId }: Props) {
             </button>
           ) : null}
           <p className="text-xs text-ink-muted">
-            Guardian reads this file temporarily to extract knowledge. The
-            original stays on your device — nothing is copied into Guardian
-            storage. If folder access expired, your browser will ask you to
-            pick this one file again.
+            {isTrelloRemote
+              ? "Guardian fetches this attachment from Trello to analyze and preview. The file is not copied into Guardian vault storage."
+              : "Guardian reads this file temporarily to extract knowledge. The original stays on your device — nothing is copied into Guardian storage. If folder access expired, your browser will ask you to pick this one file again."}
           </p>
           {!supported ? (
             <p className="text-xs text-amber-800">
@@ -327,6 +431,51 @@ export default function SourceFileDetail({ sourceId, itemId }: Props) {
           ) : null}
         </div>
       </section>
+
+      {isPdf ? (
+        <section className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold text-foreground">PDF preview</h2>
+            {!previewUrl ? (
+              <button
+                type="button"
+                onClick={() => void loadPdfPreview()}
+                disabled={previewLoading || !accessible}
+                className="rounded-full border border-stone-200 px-4 py-2 text-sm font-semibold hover:bg-stone-50 disabled:opacity-50"
+              >
+                {previewLoading ? (
+                  <span className="inline-flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading…
+                  </span>
+                ) : isTrelloRemote ? (
+                  "Load via API"
+                ) : (
+                  "Open from device"
+                )}
+              </button>
+            ) : null}
+          </div>
+          {previewError ? (
+            <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+              {previewError}
+            </p>
+          ) : null}
+          {previewUrl ? (
+            <iframe
+              title={`Preview of ${item.name}`}
+              src={previewUrl}
+              className="mt-4 h-[min(70vh,720px)] w-full rounded-xl border border-stone-200 bg-stone-50"
+            />
+          ) : !previewLoading && !previewError ? (
+            <p className="mt-3 text-sm text-ink-muted">
+              {isTrelloRemote
+                ? "Fetch this PDF through Guardian’s file API to display it here."
+                : "Read the PDF from your connected folder to display it here."}
+            </p>
+          ) : null}
+        </section>
+      ) : null}
 
       {analysis ? (
         <section className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
