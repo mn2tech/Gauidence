@@ -212,6 +212,11 @@ type Citation = {
   fileName: string;
   profileName?: string;
   isImage?: boolean;
+  kind?: "vault" | "connector";
+  sourceId?: string;
+  itemId?: string;
+  sourceType?: string;
+  mimeType?: string | null;
 };
 
 type VaultMessageAttachment = {
@@ -1423,7 +1428,32 @@ export default function VaultChatPanel({
     }
   };
 
-  const viewSource = async (documentId: string, fileName: string) => {
+  const viewSource = async (citation: Citation) => {
+    if (
+      citation.kind === "connector" &&
+      citation.sourceId &&
+      citation.itemId
+    ) {
+      const isPdf =
+        Boolean(citation.mimeType?.includes("pdf")) ||
+        citation.fileName.toLowerCase().endsWith(".pdf");
+      const detailPath = `/settings/connections/${citation.sourceId}/files/${citation.itemId}`;
+      if (isPdf && citation.sourceType === "trello") {
+        window.open(
+          `/api/connections/${citation.sourceId}/items/${citation.itemId}/file`,
+          "_blank",
+          "noopener,noreferrer"
+        );
+        return;
+      }
+      // Device Storage (and non-PDF attachments): open the file detail page
+      // where the user can preview / re-grant folder access.
+      window.open(detailPath, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    const documentId = citation.documentId;
+    const fileName = citation.fileName;
     const supabase = createClient();
     if (!supabase) return;
     const { data: doc } = await supabase
@@ -2905,10 +2935,17 @@ export default function VaultChatPanel({
     const sourceCitations = uniqueCitations.filter(
       (c) => !(c.isImage || isImageFileName(c.fileName))
     );
+    const vaultPreviewCitations = [
+      ...imageCitations,
+      ...sourceCitations.filter((c) => c.kind !== "connector"),
+    ];
     const previewCitations = options?.hideCitationPreviews
       ? []
-      : [...imageCitations, ...sourceCitations];
-    const linkOnlyCitations = options?.hideCitationPreviews ? [] : sourceCitations;
+      : vaultPreviewCitations;
+    const linkOnlyCitations = options?.hideCitationPreviews
+      ? []
+      : sourceCitations;
+
     const alreadySetReminder = confirmedReminderIds.has(m.id);
     const confirmingReminder = confirmingReminderId === m.id;
     const alreadySavedDailyLog = confirmedDailyLogIds.has(m.id);
@@ -3453,10 +3490,10 @@ export default function VaultChatPanel({
                 </span>
                 <button
                   type="button"
-                  onClick={() => void viewSource(c.documentId, c.fileName)}
+                  onClick={() => void viewSource(c)}
                   className="inline-flex items-center gap-1 rounded-full border border-stone-300 bg-white px-2.5 py-1 font-semibold text-brand transition hover:bg-stone-50"
                 >
-                  View source
+                  {c.kind === "connector" ? "Open file" : "View source"}
                   <ExternalLink className="h-3 w-3" />
                 </button>
               </div>

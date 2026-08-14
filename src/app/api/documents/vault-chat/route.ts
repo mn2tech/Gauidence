@@ -77,6 +77,11 @@ type ChatMessageRow = {
     fileName: string;
     profileName?: string;
     isImage?: boolean;
+    kind?: "vault" | "connector";
+    sourceId?: string;
+    itemId?: string;
+    sourceType?: string;
+    mimeType?: string | null;
   }[];
   vaultScope?: {
     profileId: string;
@@ -1143,6 +1148,11 @@ export async function POST(request: Request) {
     fileName: string;
     profileName?: string;
     isImage?: boolean;
+    kind?: "vault" | "connector";
+    sourceId?: string;
+    itemId?: string;
+    sourceType?: string;
+    mimeType?: string | null;
   }[] = [];
   let answer: string | undefined;
   let attachedFileName: string | undefined;
@@ -1212,7 +1222,7 @@ export async function POST(request: Request) {
         : null;
       attachedFileName = attachedDoc?.fileName;
 
-      const { chunks, context: workspaceContext, explicitSpaceName } =
+      const { chunks, context: workspaceContext, explicitSpaceName, connectorCitations } =
         await loadWorkspaceContext({
         supabase,
         user,
@@ -1250,6 +1260,9 @@ export async function POST(request: Request) {
 
       if (inventoryAnswer) {
         answer = inventoryAnswer;
+        if (connectorCitations?.length) {
+          citations = connectorCitations;
+        }
       } else {
         return createVaultChatStreamResponse({
           supabase,
@@ -1276,6 +1289,7 @@ export async function POST(request: Request) {
           detectedActions,
           explicitSpaceName,
           ontologyBlock: workspaceContext.blocks.ontology,
+          connectorCitations,
         });
       }
     } catch (err) {

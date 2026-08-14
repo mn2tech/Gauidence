@@ -97,6 +97,11 @@ export type VaultCitation = {
   profileName?: string;
   /** True when the source file is an image (UI may show inline preview). */
   isImage?: boolean;
+  kind?: "vault" | "connector";
+  sourceId?: string;
+  itemId?: string;
+  sourceType?: string;
+  mimeType?: string | null;
 };
 
 /**

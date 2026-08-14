@@ -7,6 +7,15 @@ export type VaultChatCitation = {
   fileName: string;
   profileName?: string;
   isImage?: boolean;
+  /** Vault document (default) or connected-source file from ontology. */
+  kind?: "vault" | "connector";
+  /** connected_sources.id when kind=connector */
+  sourceId?: string;
+  /** source_items.id when kind=connector */
+  itemId?: string;
+  /** android_storage | trello | … */
+  sourceType?: string;
+  mimeType?: string | null;
 };
 
 export type VaultChatStreamMessage = {

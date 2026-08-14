@@ -19,6 +19,8 @@ import { retrieveStructuredKnowledge } from "@/lib/knowledge/v2/retrieve";
 import { formatKnowledgeForGideon } from "@/lib/knowledge/v2/formatForGideon";
 import { getOntologyContext } from "@/lib/ontology/context";
 import { formatOntologyForGideon } from "@/lib/ontology/formatForGideon";
+import { resolveConnectorSourceCitations } from "@/lib/ontology/connectorCitations";
+import type { VaultChatCitation } from "@/lib/vault/vaultChatStream";
 import {
   formatClientRequestsForGideon,
   loadActiveClientRequestsForGideon,
@@ -91,6 +93,8 @@ export type WorkspaceContextResult = {
   context: WorkspaceContextData;
   chunks: RetrievedChunk[];
   explicitSpaceName?: string | null;
+  /** Connected-source files matched via ontology (openable from Ask Gideon). */
+  connectorCitations?: VaultChatCitation[];
 };
 
 /** Fetch retrieval results and formatted context blocks for Gideon. */
@@ -235,15 +239,29 @@ export async function loadWorkspaceContext(
           query: retrievalQuestion,
           userId: user.id,
         })
-          .then((ontology) => formatOntologyForGideon(ontology))
+          .then(async (ontology) => {
+            const text = formatOntologyForGideon(ontology);
+            const citations = await resolveConnectorSourceCitations(
+              supabase,
+              ontology,
+              user.id
+            );
+            return { text, citations };
+          })
           .catch((err) => {
             console.warn(
               "Ontology context for Gideon failed; continuing without it:",
               err instanceof Error ? err.message : "error"
             );
-            return "(none)";
+            return {
+              text: "(none)",
+              citations: [] as VaultChatCitation[],
+            };
           })
-      : Promise.resolve("(none)"),
+      : Promise.resolve({
+          text: "(none)",
+          citations: [] as VaultChatCitation[],
+        }),
     retrieveRelevantDailyLogs(supabase, {
       profileId: activeProfile.id,
       profileIds: effectiveSearchIds,
@@ -320,7 +338,8 @@ export async function loadWorkspaceContext(
 
   knowledgeCandidateCount = structuredKnowledgeBundle.count;
   const structuredKnowledgeContext = structuredKnowledgeBundle.text;
-  const ontologyContext = ontologyBundle;
+  const ontologyContext = ontologyBundle.text;
+  const connectorCitations = ontologyBundle.citations;
 
   const { logs: dailyLogs, authorNames } = dailyLogsBundle;
   const logContext = formatDailyLogsForGideon(
@@ -485,5 +504,10 @@ Active space in the UI: ${activeProfile.display_name}. Document search includes 
     knowledgeCandidateCount,
   });
 
-  return { context, chunks, explicitSpaceName: explicitSpace?.display_name ?? null };
+  return {
+    context,
+    chunks,
+    explicitSpaceName: explicitSpace?.display_name ?? null,
+    connectorCitations,
+  };
 }

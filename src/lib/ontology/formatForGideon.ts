@@ -85,7 +85,11 @@ export function formatOntologyForGideon(ctx: OntologyContext): string {
     for (const ev of ctx.evidence.slice(0, 5)) {
       const text = (ev.evidence_text ?? "").trim().slice(0, 120);
       if (!text) continue;
-      blocks.push(`- "${text}"`);
+      const connectorNote =
+        ev.source_type === "connector"
+          ? " [connected source — user can Open file from citations]"
+          : "";
+      blocks.push(`- "${text}"${connectorNote}`);
     }
   }
 

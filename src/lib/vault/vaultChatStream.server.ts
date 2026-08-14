@@ -82,6 +82,8 @@ export type VaultChatStreamArgs = {
   explicitSpaceName?: string | null;
   /** Formatted ontology block from workspace context; used if the model returns blank. */
   ontologyBlock?: string | null;
+  /** Connected-source files from ontology — always attach as openable citations. */
+  connectorCitations?: VaultChatStreamMessage["citations"];
 };
 
 export function createVaultChatStreamResponse(
@@ -213,6 +215,14 @@ export function createVaultChatStreamResponse(
           }
           if (selected.length === 0 && imageOnes.length > 0) {
             selected = imageOnes;
+          }
+        }
+        if (args.connectorCitations?.length) {
+          const seen = new Set(selected.map((c) => c.documentId));
+          for (const c of args.connectorCitations) {
+            if (!c.documentId || seen.has(c.documentId)) continue;
+            selected.push(c);
+            seen.add(c.documentId);
           }
         }
         const citations = markImageCitations(dedupeVaultCitations(selected));
