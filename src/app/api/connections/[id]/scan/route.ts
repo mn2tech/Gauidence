@@ -8,6 +8,10 @@ import { upsertScanResults } from "@/lib/connectors/services/sourceItems";
 import type { SourceItem } from "@/lib/connectors/types";
 import { scanTrelloSource } from "@/lib/connectors/trello/scan";
 import { TrelloApiError } from "@/lib/connectors/trello/client";
+import {
+  itemBelongsToTrelloBoard,
+  trelloSelectedBoardId,
+} from "@/lib/connectors/trello/selectedBoard";
 import { rehomeSourceItemsOntologyToSpace } from "@/lib/ontology/pipeline/persistConnectorOntology";
 
 export const runtime = "nodejs";
@@ -53,14 +57,30 @@ export async function POST(req: Request, ctx: Ctx) {
       const items = await scanTrelloSource(source);
       const summary = await upsertScanResults(supabase, id, items);
       if (source.profileId) {
+        const selectedBoardId = trelloSelectedBoardId(source.settings);
         const { data: analyzed } = await supabase
           .from("source_items")
-          .select("id")
+          .select("id, external_id, metadata, processing_status")
           .eq("source_id", id)
           .eq("processing_status", "analyzed")
-          .limit(200);
+          .limit(500);
+        const sourceItemIds = (analyzed ?? [])
+          .filter((row) =>
+            itemBelongsToTrelloBoard(
+              {
+                externalId: row.external_id as string,
+                processingStatus: row.processing_status as string,
+                metadata:
+                  row.metadata && typeof row.metadata === "object"
+                    ? (row.metadata as Record<string, unknown>)
+                    : {},
+              },
+              selectedBoardId
+            )
+          )
+          .map((row) => row.id as string);
         await rehomeSourceItemsOntologyToSpace(supabase, {
-          sourceItemIds: (analyzed ?? []).map((row) => row.id as string),
+          sourceItemIds,
           profileId: source.profileId,
         });
       }

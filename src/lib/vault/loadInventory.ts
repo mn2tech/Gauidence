@@ -15,6 +15,7 @@ import {
 } from "./inventoryCache";
 import { chartSuggestionTitle } from "./gideon";
 import {
+  itemBelongsToTrelloBoard,
   trelloSelectedBoardId,
   trelloSelectedBoardName,
 } from "@/lib/connectors/trello/selectedBoard";
@@ -47,26 +48,55 @@ export async function loadConnectedSuggestionContext(
     .limit(20);
   if (!sources?.length) return empty;
 
-  const relevant = sources.filter((source) => {
-    const bound = source.profile_id as string | null;
-    if (!bound) return true;
-    return bound === profileId;
-  });
+  // Only sources explicitly bound to this space (not every unbound connector).
+  const relevant = sources.filter(
+    (source) => (source.profile_id as string | null) === profileId
+  );
   if (!relevant.length) return empty;
 
   const sourceIds = relevant.map((s) => s.id as string);
+  const boardBySource = new Map(
+    relevant.map((source) => {
+      const settings =
+        source.settings && typeof source.settings === "object"
+          ? (source.settings as Record<string, unknown>)
+          : {};
+      return [source.id as string, trelloSelectedBoardId(settings)] as const;
+    })
+  );
+
   const { data: items } = await supabase
     .from("source_items")
-    .select("id, name, mime_type, processing_status, source_id, metadata")
+    .select("id, name, mime_type, processing_status, source_id, external_id, metadata")
     .in("source_id", sourceIds)
     .eq("processing_status", "analyzed")
     .order("updated_at", { ascending: false })
-    .limit(40);
+    .limit(80);
   if (!items?.length) return empty;
+
+  const onSelectedBoard = items.filter((item) => {
+    const src = relevant.find((s) => s.id === item.source_id);
+    if (!src || src.source_type !== "trello") return true;
+    const selectedBoardId = boardBySource.get(item.source_id as string) ?? null;
+    if (!selectedBoardId) return true;
+    const meta =
+      item.metadata && typeof item.metadata === "object"
+        ? (item.metadata as Record<string, unknown>)
+        : {};
+    return itemBelongsToTrelloBoard(
+      {
+        externalId: typeof item.external_id === "string" ? item.external_id : undefined,
+        processingStatus: "analyzed",
+        metadata: meta,
+      },
+      selectedBoardId
+    );
+  });
+  if (!onSelectedBoard.length) return empty;
 
   const songTitles: string[] = [];
   const seen = new Set<string>();
-  for (const item of items) {
+  for (const item of onSelectedBoard) {
     const meta =
       item.metadata && typeof item.metadata === "object"
         ? (item.metadata as Record<string, unknown>)
@@ -97,10 +127,10 @@ export async function loadConnectedSuggestionContext(
   }
 
   return {
-    chartCount: items.length,
+    chartCount: onSelectedBoard.length,
     songTitles,
     boardName,
-    hasConnectedCharts: items.length > 0,
+    hasConnectedCharts: onSelectedBoard.length > 0,
   };
 }
 
@@ -168,7 +198,7 @@ async function loadBoundConnectedFilesForGideon(
 ): Promise<string> {
   const { data: sources } = await supabase
     .from("connected_sources")
-    .select("id, source_type, display_name, profile_id")
+    .select("id, source_type, display_name, profile_id, settings")
     .eq("user_id", userId)
     .neq("status", "disconnected")
     .limit(20);
@@ -176,15 +206,31 @@ async function loadBoundConnectedFilesForGideon(
 
   const relevant = sources.filter((source) => {
     const bound = source.profile_id as string | null;
-    if (!bound) return true;
-    return spaceIds.includes(bound);
+    return Boolean(bound && spaceIds.includes(bound));
   });
   if (!relevant.length) return "";
 
   const sourceIds = relevant.map((s) => s.id as string);
+  const boardBySource = new Map(
+    relevant.map((source) => {
+      const settings =
+        source.settings && typeof source.settings === "object"
+          ? (source.settings as Record<string, unknown>)
+          : {};
+      return [
+        source.id as string,
+        source.source_type === "trello"
+          ? trelloSelectedBoardId(settings)
+          : null,
+      ] as const;
+    })
+  );
+
   const { data: items } = await supabase
     .from("source_items")
-    .select("id, name, mime_type, processing_status, source_id, metadata")
+    .select(
+      "id, name, mime_type, processing_status, source_id, external_id, metadata"
+    )
     .in("source_id", sourceIds)
     .eq("processing_status", "analyzed")
     .order("updated_at", { ascending: false })
@@ -194,20 +240,39 @@ async function loadBoundConnectedFilesForGideon(
   const sourceById = new Map(
     relevant.map((s) => [s.id as string, s] as const)
   );
-  const files = items.map((item) => {
-    const src = sourceById.get(item.source_id as string);
-    const meta =
-      item.metadata && typeof item.metadata === "object"
-        ? (item.metadata as Record<string, unknown>)
-        : {};
-    return {
-      name: String(item.name ?? "file"),
-      cardName:
-        typeof meta.cardName === "string" ? meta.cardName : null,
-      sourceType: String(src?.source_type ?? ""),
-      processingStatus: "analyzed",
-    };
-  });
+  const files = items
+    .filter((item) => {
+      const selectedBoardId = boardBySource.get(item.source_id as string);
+      if (!selectedBoardId) return true;
+      const meta =
+        item.metadata && typeof item.metadata === "object"
+          ? (item.metadata as Record<string, unknown>)
+          : {};
+      return itemBelongsToTrelloBoard(
+        {
+          externalId:
+            typeof item.external_id === "string" ? item.external_id : undefined,
+          processingStatus: "analyzed",
+          metadata: meta,
+        },
+        selectedBoardId
+      );
+    })
+    .map((item) => {
+      const src = sourceById.get(item.source_id as string);
+      const meta =
+        item.metadata && typeof item.metadata === "object"
+          ? (item.metadata as Record<string, unknown>)
+          : {};
+      return {
+        name: String(item.name ?? "file"),
+        cardName:
+          typeof meta.cardName === "string" ? meta.cardName : null,
+        sourceType: String(src?.source_type ?? ""),
+        processingStatus: "analyzed",
+      };
+    });
+  if (!files.length) return "";
 
   const spaceNames = [
     ...new Set(

@@ -3,6 +3,10 @@ import { createClient } from "@/lib/supabase/server";
 import { getConnectedSource } from "@/lib/connectors/services/connectedSources";
 import { listSourceItems } from "@/lib/connectors/services/sourceItems";
 import { countByCategory } from "@/lib/connectors/classify";
+import {
+  itemBelongsToTrelloBoard,
+  trelloSelectedBoardId,
+} from "@/lib/connectors/trello/selectedBoard";
 
 export const runtime = "nodejs";
 
@@ -37,7 +41,22 @@ export async function GET(req: Request, ctx: Ctx) {
   const summaryOnly = url.searchParams.get("summary") === "1";
 
   try {
-    const items = await listSourceItems(supabase, id, { search, status });
+    const selectedBoardId =
+      source.sourceType === "trello"
+        ? trelloSelectedBoardId(source.settings)
+        : null;
+    const items = (await listSourceItems(supabase, id, { search, status })).filter(
+      (item) => {
+        if (source.sourceType !== "trello" || !selectedBoardId) return true;
+        // Keep unavailable rows for cleanup UI; board filter uses metadata.
+        if (item.processingStatus === "unavailable") {
+          const kind = String(item.metadata?.kind ?? "");
+          if (kind === "board") return item.externalId === selectedBoardId;
+          return String(item.metadata?.boardId ?? "") === selectedBoardId;
+        }
+        return itemBelongsToTrelloBoard(item, selectedBoardId);
+      }
+    );
     const active = items.filter((i) => i.processingStatus !== "unavailable");
     const categories = countByCategory(
       active.map((i) => ({ name: i.name, mimeType: i.mimeType }))
@@ -50,6 +69,7 @@ export async function GET(req: Request, ctx: Ctx) {
           .length,
         categories,
         lastScanAt: source.lastScanAt,
+        boardId: selectedBoardId,
       });
     }
 
