@@ -33,7 +33,8 @@ describe("Gideon helpers", () => {
     assert.match(GIDEON_SYSTEM, /GENERAL KNOWLEDGE/);
     assert.match(GIDEON_SYSTEM, /Never invent typical chords for a key/i);
     assert.match(GIDEON_SYSTEM, /chord-chart images/i);
-    assert.match(GIDEON_SYSTEM, /you CAN see it/i);
+    assert.match(GIDEON_SYSTEM, /treat them as files in this space/i);
+    assert.match(GIDEON_SYSTEM, /analyzed Trello chart/i);
     assert.match(GIDEON_SYSTEM, /CURRENT DATE AND TIME is provided/i);
     assert.equal(
       GIDEON_BRAND_LINE,

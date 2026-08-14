@@ -8,6 +8,7 @@ import { upsertScanResults } from "@/lib/connectors/services/sourceItems";
 import type { SourceItem } from "@/lib/connectors/types";
 import { scanTrelloSource } from "@/lib/connectors/trello/scan";
 import { TrelloApiError } from "@/lib/connectors/trello/client";
+import { rehomeSourceItemsOntologyToSpace } from "@/lib/ontology/pipeline/persistConnectorOntology";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -51,6 +52,18 @@ export async function POST(req: Request, ctx: Ctx) {
     try {
       const items = await scanTrelloSource(source);
       const summary = await upsertScanResults(supabase, id, items);
+      if (source.profileId) {
+        const { data: analyzed } = await supabase
+          .from("source_items")
+          .select("id")
+          .eq("source_id", id)
+          .eq("processing_status", "analyzed")
+          .limit(200);
+        await rehomeSourceItemsOntologyToSpace(supabase, {
+          sourceItemIds: (analyzed ?? []).map((row) => row.id as string),
+          profileId: source.profileId,
+        });
+      }
       return NextResponse.json({ summary });
     } catch (err) {
       if (err instanceof TrelloApiError && (err.status === 401 || err.status === 403)) {

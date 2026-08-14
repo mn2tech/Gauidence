@@ -6,6 +6,7 @@ import {
   isInvoiceAggregateQuery,
   isSongCatalogQuery,
   isConnectedChartQuery,
+  connectorOntologyUsesCatalog,
   nameSimilarity,
   normalizeEntityName,
   tokenizeForOntologySearch,
@@ -98,6 +99,26 @@ describe("isConnectedChartQuery", () => {
     assert.equal(isConnectedChartQuery("What are the chords for Ibadat Karo?"), true);
     assert.equal(isConnectedChartQuery("Can you see the analyzed PDF?"), true);
     assert.equal(isConnectedChartQuery("what is the weather"), false);
+  });
+});
+
+describe("connectorOntologyUsesCatalog", () => {
+  it("looks up a song title instead of dumping the board", () => {
+    assert.equal(
+      connectorOntologyUsesCatalog({
+        listCharts: true,
+        titlePhrase: "just as i am",
+      }),
+      false
+    );
+    assert.equal(
+      connectorOntologyUsesCatalog({ listCharts: true }),
+      true
+    );
+    assert.equal(
+      connectorOntologyUsesCatalog({ listSongs: true, titlePhrase: "x" }),
+      true
+    );
   });
 });
 

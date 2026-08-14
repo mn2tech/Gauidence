@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { isInvoiceAggregateQuery, isSongCatalogQuery, isConnectedChartQuery, tokenizeForOntologySearch, titlePhraseForOntologySearch } from "./normalize";
+import { isInvoiceAggregateQuery, isSongCatalogQuery, isConnectedChartQuery, tokenizeForOntologySearch, titlePhraseForOntologySearch, connectorOntologyUsesCatalog } from "./normalize";
 import { getPathsBetweenMatchedEntities } from "./paths";
 import type { OntologyContext, OntologyEntity } from "./types";
 import {
@@ -15,8 +15,9 @@ import {
  * Load ontology context for Gideon (1-hop + optional 2-hop paths).
  * Excludes rejected review items. Optimized for chat latency.
  *
- * Also pulls connector-analyzed entities that match connected filenames
- * across the user's spaces (Device Storage is account-scoped).
+ * Also pulls connector-analyzed entities from Trello / Device Storage.
+ * Those rows live on the connection; Gideon in the bound space must still
+ * see them even if they were first written to another profile.
  */
 export async function getOntologyContext(
   supabase: SupabaseClient,
@@ -239,18 +240,17 @@ async function findConnectorEntitiesForQuery(
   const sourceIds = (sources ?? []).map((s) => s.id as string);
   if (!sourceIds.length) return [];
 
-  const boundProfileIds = [
-    ...new Set(
-      (sources ?? [])
-        .map((s) => s.profile_id as string | null)
-        .filter((id): id is string => Boolean(id))
-    ),
-  ];
-  const searchProfileIds = [
-    ...new Set([args.preferSpaceId, ...boundProfileIds]),
-  ];
+  const listConnectorCatalog = connectorOntologyUsesCatalog({
+    listInvoices: args.listInvoices,
+    listSongs: args.listSongs,
+    listCharts: args.listCharts,
+    titlePhrase: args.titlePhrase,
+  });
 
-  const listConnectorCatalog = args.listInvoices || args.listSongs;
+  const nameTerms = [
+    ...args.terms,
+    ...(args.titlePhrase ? [args.titlePhrase] : []),
+  ];
 
   let itemIds: string[] = [];
   if (listConnectorCatalog) {
@@ -261,12 +261,13 @@ async function findConnectorEntitiesForQuery(
       .eq("processing_status", "analyzed")
       .limit(args.listSongs || args.listCharts ? 80 : 40);
     itemIds = (items ?? []).map((i) => i.id as string);
-  } else if (args.terms.length || args.titlePhrase) {
-    const nameTerms = [
-      ...args.terms,
-      ...(args.titlePhrase ? [args.titlePhrase] : []),
-    ];
-    const orName = nameTerms.map((t) => `name.ilike.%${t}%`).join(",");
+  } else if (nameTerms.length) {
+    const orName = nameTerms
+      .flatMap((t) => [
+        `name.ilike.%${t}%`,
+        `metadata->>cardName.ilike.%${t}%`,
+      ])
+      .join(",");
     const { data: items } = await supabase
       .from("source_items")
       .select("id, name, processing_status")
@@ -275,9 +276,11 @@ async function findConnectorEntitiesForQuery(
       .or(orName)
       .limit(12);
     itemIds = (items ?? []).map((i) => i.id as string);
+  }
 
-    // …and also song/entity names from already-analyzed connector items
-    // (board name "Living Waters" won't match "Ibadat Karo").
+  const byId = new Map<string, OntologyEntity>();
+
+  if (nameTerms.length) {
     const { data: analyzed } = await supabase
       .from("source_items")
       .select("id")
@@ -292,7 +295,7 @@ async function findConnectorEntitiesForQuery(
             `name.ilike.%${t}%,canonical_name.ilike.%${t}%,description.ilike.%${t}%`
         )
         .join(",");
-      let entityByName = supabase
+      const { data: named } = await supabase
         .from("ontology_entities")
         .select(ONTOLOGY_ENTITY_SELECT)
         .eq("source_type", "connector")
@@ -300,51 +303,46 @@ async function findConnectorEntitiesForQuery(
         .in("review_status", ONTOLOGY_VISIBLE_REVIEW_STATUSES)
         .or(orEntity)
         .limit(20);
-      if (searchProfileIds.length) {
-        entityByName = entityByName.in("profile_id", searchProfileIds);
-      }
-      const { data: named } = await entityByName;
-      if (named?.length) {
-        return [...(named as OntologyEntity[])].sort((a, b) => {
-          const ap = a.profile_id === args.preferSpaceId ? 1 : 0;
-          const bp = b.profile_id === args.preferSpaceId ? 1 : 0;
-          return bp - ap;
-        });
+      for (const row of (named as OntologyEntity[] | null) ?? []) {
+        byId.set(row.id, row);
       }
     }
   }
-  if (!itemIds.length) return [];
 
-  let entityQuery = supabase
-    .from("ontology_entities")
-    .select(ONTOLOGY_ENTITY_SELECT)
-    .eq("source_type", "connector")
-    .in("source_id", itemIds)
-    .in("review_status", ONTOLOGY_VISIBLE_REVIEW_STATUSES)
-    .limit(args.listSongs || args.listCharts ? 80 : args.listInvoices ? 40 : 20);
+  if (itemIds.length) {
+    let entityQuery = supabase
+      .from("ontology_entities")
+      .select(ONTOLOGY_ENTITY_SELECT)
+      .eq("source_type", "connector")
+      .in("source_id", itemIds)
+      .in("review_status", ONTOLOGY_VISIBLE_REVIEW_STATUSES)
+      .limit(args.listSongs || args.listCharts ? 80 : args.listInvoices ? 40 : 20);
 
-  if (args.listInvoices) {
-    entityQuery = entityQuery.in("entity_type", [
-      "invoice",
-      "purchase",
-      "document",
-      "organization",
-    ]);
-  } else if (args.listSongs || args.listCharts) {
-    entityQuery = entityQuery.in("entity_type", [
-      "document",
-      "product",
-      "asset",
-      "movie",
-      "project",
-      "event",
-    ]);
+    if (args.listInvoices) {
+      entityQuery = entityQuery.in("entity_type", [
+        "invoice",
+        "purchase",
+        "document",
+        "organization",
+      ]);
+    } else if (args.listSongs || args.listCharts) {
+      entityQuery = entityQuery.in("entity_type", [
+        "document",
+        "product",
+        "asset",
+        "movie",
+        "project",
+        "event",
+      ]);
+    }
+
+    const { data: entities } = await entityQuery;
+    for (const row of (entities as OntologyEntity[] | null) ?? []) {
+      byId.set(row.id, row);
+    }
   }
 
-  const { data: entities } = await entityQuery;
-
-  const rows = (entities as OntologyEntity[] | null) ?? [];
-  return [...rows].sort((a, b) => {
+  return [...byId.values()].sort((a, b) => {
     const ap = a.profile_id === args.preferSpaceId ? 1 : 0;
     const bp = b.profile_id === args.preferSpaceId ? 1 : 0;
     return bp - ap;

@@ -65,6 +65,40 @@ export type VaultFileInventoryRow = {
   profile_id: string;
 };
 
+export type BoundConnectedFileRow = {
+  name: string;
+  cardName?: string | null;
+  sourceType: string;
+  processingStatus: string;
+};
+
+/**
+ * Trello / Device Storage files bound to the active space.
+ * Ask Gideon should treat these as files in this space, not only on Connections.
+ */
+export function formatBoundConnectedFilesForGideon(
+  files: BoundConnectedFileRow[],
+  spaceNames: string[]
+): string {
+  if (!files.length) return "";
+  const spaceLabel =
+    spaceNames.map((n) => n.trim()).filter(Boolean).join(", ") || "this space";
+  const lines = [
+    `SPACE FILE INVENTORY (Trello / connected files in ${spaceLabel} — treat these as files in this space, not only on the connection):`,
+  ];
+  for (const file of files) {
+    const card =
+      typeof file.cardName === "string" && file.cardName.trim()
+        ? ` · ${file.cardName.trim()}`
+        : "";
+    const kind = file.sourceType === "trello" ? "Trello" : "Device Storage";
+    lines.push(
+      `- ${file.name}${card} (${kind} in this space, ${file.processingStatus})`
+    );
+  }
+  return lines.join("\n");
+}
+
 /** File list for Ask Gideon — answers "what's uploaded" without relying on RAG excerpts. */
 export function formatVaultFileListForGideon(
   files: VaultFileInventoryRow[],

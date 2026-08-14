@@ -14,6 +14,7 @@ import { mergeTrelloAttachmentOntoSong } from "./trelloCardIndex";
 import {
   listOntologyForSourceItem,
   persistConnectorOntologyExtraction,
+  rehomeConnectorOntologyToSpace,
 } from "./persistConnectorOntology";
 import type { OntologyPersistStats } from "../types";
 
@@ -53,7 +54,7 @@ export async function analyzeSourceItem(
 
   const { data: source } = await supabase
     .from("connected_sources")
-    .select("id, user_id, profile_id, status")
+    .select("id, user_id, profile_id, status, source_type")
     .eq("id", args.sourceId)
     .eq("user_id", args.user.id)
     .maybeSingle();
@@ -105,7 +106,12 @@ export async function analyzeSourceItem(
     );
   }
 
-  let profileId = args.profileId || source.profile_id || null;
+  // Trello must land in the bound space so Ask Gideon in that space can see it.
+  let profileId =
+    (source.source_type === "trello" ? source.profile_id : null) ||
+    args.profileId ||
+    source.profile_id ||
+    null;
   if (profileId) {
     const editable = await requireEditableGuardianProfile(
       supabase,
@@ -129,6 +135,15 @@ export async function analyzeSourceItem(
     profileId = profile.id;
   }
 
+  if (source.profile_id !== profileId) {
+    await supabase
+      .from("connected_sources")
+      .update({ profile_id: profileId })
+      .eq("id", args.sourceId)
+      .eq("user_id", args.user.id);
+    source.profile_id = profileId;
+  }
+
   // Idempotency: same content hash AND same analysis version already analyzed.
   // Require a real analysis_version — null/undefined must not skip.
   if (
@@ -138,29 +153,39 @@ export async function analyzeSourceItem(
     item.content_hash === args.contentHash &&
     item.analysis_version === version
   ) {
+    const moved = await rehomeConnectorOntologyToSpace(supabase, {
+      sourceItemId: item.id,
+      profileId,
+    });
     const existing = await listOntologyForSourceItem(
       supabase,
       profileId,
       item.id
     );
-    return {
-      skipped: true,
-      reason: "unchanged",
-      profileId,
-      stats: {
-        entitiesCreated: 0,
-        entitiesMatched: existing.entities.length,
-        relationshipsCreated: 0,
-        evidenceCreated: 0,
-        eventsCreated: 0,
-      },
-      entitiesFound: existing.entities.length,
-      relationshipsFound: existing.relationships.length,
-      confidenceLabel: confidenceLabelFromItems(existing.entities, existing.relationships),
-      analysisVersion: item.analysis_version ?? version,
-      entities: existing.entities,
-      relationships: existing.relationships,
-    };
+    if (existing.entities.length > 0) {
+      return {
+        skipped: true,
+        reason: moved > 0 ? "rehomed" : "unchanged",
+        profileId,
+        stats: {
+          entitiesCreated: 0,
+          entitiesMatched: existing.entities.length,
+          relationshipsCreated: 0,
+          evidenceCreated: 0,
+          eventsCreated: 0,
+        },
+        entitiesFound: existing.entities.length,
+        relationshipsFound: existing.relationships.length,
+        confidenceLabel: confidenceLabelFromItems(
+          existing.entities,
+          existing.relationships
+        ),
+        analysisVersion: item.analysis_version ?? version,
+        entities: existing.entities,
+        relationships: existing.relationships,
+      };
+    }
+    // Analyzed on the connection, but nothing in this space — extract again.
   }
 
   await supabase
@@ -251,15 +276,6 @@ export async function analyzeSourceItem(
         analysis_version: version,
       })
       .eq("id", item.id);
-
-    // Keep connection linked to the space used for ontology.
-    if (!source.profile_id) {
-      await supabase
-        .from("connected_sources")
-        .update({ profile_id: profileId })
-        .eq("id", args.sourceId)
-        .eq("user_id", args.user.id);
-    }
 
     const listed = await listOntologyForSourceItem(
       supabase,

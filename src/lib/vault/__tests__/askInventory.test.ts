@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   buildAskVaultInventory,
   buildInventoryQuestionAnswer,
+  formatBoundConnectedFilesForGideon,
   formatVaultFileListForGideon,
   wantsVaultFileInventory,
 } from "../askInventory.ts";
@@ -65,6 +66,24 @@ describe("ask vault inventory", () => {
     assert.match(text, /Photos \(1\): logo\.png/);
     assert.match(text, /NM2TECH/);
     assert.match(text, /invoice\.pdf/);
+  });
+
+  it("formats Trello files as belonging to the bound space", () => {
+    const text = formatBoundConnectedFilesForGideon(
+      [
+        {
+          name: "Just As I Am - Bb.pdf",
+          cardName: "Just As I Am",
+          sourceType: "trello",
+          processingStatus: "analyzed",
+        },
+      ],
+      ["Wednesday Practice"]
+    );
+    assert.match(text, /SPACE FILE INVENTORY/);
+    assert.match(text, /Wednesday Practice/);
+    assert.match(text, /Just As I Am - Bb\.pdf/);
+    assert.match(text, /Trello in this space/);
   });
 
   it("detects inventory-style questions", () => {

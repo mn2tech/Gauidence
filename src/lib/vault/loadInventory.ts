@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   formatVaultFileListForGideon,
   formatVaultFileSummaryForGideon,
+  formatBoundConnectedFilesForGideon,
   wantsVaultFileInventory,
   RECENT_VAULT_FILE_PREVIEW,
   type VaultFileInventoryRow,
@@ -57,55 +58,78 @@ export async function loadVaultFileInventoryContext(
   }
 
   const connected = userId
-    ? await loadConnectedAnalyzedFilesForGideon(supabase, userId)
+    ? await loadBoundConnectedFilesForGideon(
+        supabase,
+        userId,
+        searchProfileIds,
+        profileNames
+      )
     : "";
   if (!connected) return vaultText;
   if (vaultText.startsWith("(no documents")) return connected;
   return `${vaultText}\n\n${connected}`;
 }
 
-async function loadConnectedAnalyzedFilesForGideon(
+async function loadBoundConnectedFilesForGideon(
   supabase: SupabaseClient,
-  userId: string
+  userId: string,
+  spaceIds: string[],
+  profileNames: Record<string, string>
 ): Promise<string> {
   const { data: sources } = await supabase
     .from("connected_sources")
-    .select("id, source_type, display_name")
+    .select("id, source_type, display_name, profile_id")
     .eq("user_id", userId)
     .neq("status", "disconnected")
     .limit(20);
   if (!sources?.length) return "";
 
-  const sourceIds = sources.map((s) => s.id as string);
+  const relevant = sources.filter((source) => {
+    const bound = source.profile_id as string | null;
+    if (!bound) return true;
+    return spaceIds.includes(bound);
+  });
+  if (!relevant.length) return "";
+
+  const sourceIds = relevant.map((s) => s.id as string);
   const { data: items } = await supabase
     .from("source_items")
     .select("id, name, mime_type, processing_status, source_id, metadata")
     .in("source_id", sourceIds)
     .eq("processing_status", "analyzed")
     .order("updated_at", { ascending: false })
-    .limit(40);
+    .limit(80);
   if (!items?.length) return "";
 
   const sourceById = new Map(
-    sources.map((s) => [s.id as string, s] as const)
+    relevant.map((s) => [s.id as string, s] as const)
   );
-  const lines = [
-    "CONNECTED FILES (analyzed Trello / Device Storage — these are available even if they are not uploaded into the space):",
-  ];
-  for (const item of items) {
+  const files = items.map((item) => {
     const src = sourceById.get(item.source_id as string);
-    const kind = src?.source_type === "trello" ? "Trello" : "Device Storage";
     const meta =
       item.metadata && typeof item.metadata === "object"
         ? (item.metadata as Record<string, unknown>)
         : {};
-    const card =
-      typeof meta.cardName === "string" && meta.cardName.trim()
-        ? ` · ${meta.cardName.trim()}`
-        : "";
-    lines.push(`- ${String(item.name ?? "file")}${card} (${kind}, analyzed)`);
-  }
-  return lines.join("\n");
+    return {
+      name: String(item.name ?? "file"),
+      cardName:
+        typeof meta.cardName === "string" ? meta.cardName : null,
+      sourceType: String(src?.source_type ?? ""),
+      processingStatus: "analyzed",
+    };
+  });
+
+  const spaceNames = [
+    ...new Set(
+      relevant
+        .map((s) => {
+          const pid = s.profile_id as string | null;
+          return pid ? profileNames[pid] : null;
+        })
+        .filter((n): n is string => Boolean(n))
+    ),
+  ];
+  return formatBoundConnectedFilesForGideon(files, spaceNames);
 }
 
 async function loadProfileFileCounts(

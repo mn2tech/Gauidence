@@ -906,6 +906,21 @@ export default function ConnectionsPanel() {
                         </dd>
                       </div>
                     </dl>
+                    {trelloSource.profileId ? (
+                      <p className="mt-3 text-sm text-ink-muted">
+                        Charts analyze into{" "}
+                        <span className="font-medium text-foreground">
+                          {profiles.find((p) => p.id === trelloSource.profileId)
+                            ?.display_name ?? "the bound space"}
+                        </span>
+                        . Ask Gideon there — not from Connections.
+                      </p>
+                    ) : (
+                      <p className="mt-3 text-sm text-amber-800">
+                        Bind Trello to a space so Ask Gideon can see scanned
+                        charts there.
+                      </p>
+                    )}
                     <div className="mt-5 flex flex-wrap gap-2">
                       {trelloBoundProfile &&
                       trelloSource.profileId !== trelloBoundProfile.id ? (

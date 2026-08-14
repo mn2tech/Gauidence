@@ -172,6 +172,20 @@ export function isConnectedChartQuery(query: string): boolean {
   );
 }
 
+/**
+ * Full connector catalog (all analyzed items) vs a single title lookup.
+ * Title-phrase chord questions must not dump the whole board.
+ */
+export function connectorOntologyUsesCatalog(args: {
+  listInvoices?: boolean;
+  listSongs?: boolean;
+  listCharts?: boolean;
+  titlePhrase?: string | null;
+}): boolean {
+  if (args.listInvoices || args.listSongs) return true;
+  return Boolean(args.listCharts && !args.titlePhrase);
+}
+
 /** Levenshtein distance for conservative fuzzy matching. */
 export function levenshteinDistance(a: string, b: string): number {
   if (a === b) return 0;

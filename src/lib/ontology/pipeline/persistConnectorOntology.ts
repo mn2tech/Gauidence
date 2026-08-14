@@ -350,6 +350,65 @@ async function ensureRelationship(
   });
 }
 
+/**
+ * Move connector ontology into the bound space.
+ * Scan/Analyze used to leave knowledge on another profile (or none), so
+ * Ask Gideon in the bound space could not see an already-analyzed chart.
+ */
+export async function rehomeConnectorOntologyToSpace(
+  supabase: SupabaseClient,
+  args: { sourceItemId: string; profileId: string }
+): Promise<number> {
+  return rehomeSourceItemsOntologyToSpace(supabase, {
+    sourceItemIds: [args.sourceItemId],
+    profileId: args.profileId,
+  });
+}
+
+export async function rehomeSourceItemsOntologyToSpace(
+  supabase: SupabaseClient,
+  args: { sourceItemIds: string[]; profileId: string }
+): Promise<number> {
+  const sourceItemIds = [...new Set(args.sourceItemIds.filter(Boolean))];
+  if (!sourceItemIds.length) return 0;
+
+  const { data: entities } = await supabase
+    .from("ontology_entities")
+    .select("id, profile_id")
+    .eq("source_type", "connector")
+    .in("source_id", sourceItemIds);
+
+  const toMove = (entities ?? []).filter(
+    (row) => row.profile_id !== args.profileId
+  );
+  if (!toMove.length) return 0;
+  const ids = toMove.map((row) => row.id as string);
+
+  await supabase.from("ontology_entity_aliases").delete().in("entity_id", ids);
+
+  await supabase
+    .from("ontology_entities")
+    .update({ profile_id: args.profileId })
+    .in("id", ids);
+
+  await supabase
+    .from("ontology_relationships")
+    .update({ profile_id: args.profileId })
+    .in("source_entity_id", ids);
+  await supabase
+    .from("ontology_relationships")
+    .update({ profile_id: args.profileId })
+    .in("target_entity_id", ids);
+
+  await supabase
+    .from("ontology_evidence")
+    .update({ profile_id: args.profileId })
+    .eq("source_type", "connector")
+    .in("source_id", sourceItemIds);
+
+  return ids.length;
+}
+
 /** Load ontology rows previously written for a source item. */
 export async function listOntologyForSourceItem(
   supabase: SupabaseClient,
