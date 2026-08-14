@@ -126,4 +126,23 @@ describe("trello board formatting", () => {
     });
     assert.match(text, /attachment \(PDF\): chords\.pdf/);
   });
+
+  it("puts a CARD INDEX of every open card before details", () => {
+    const text = formatBoardAsAnalysisText({
+      name: "Living Waters",
+      lists: [{ id: "l1", name: "Songs" }],
+      cards: [
+        { id: "c1", idList: "l1", name: "Ae reethi", closed: false },
+        { id: "c2", idList: "l1", name: "Deevinchaevae", closed: false },
+        { id: "c3", idList: "l1", name: "Archived one", closed: true },
+      ],
+    });
+    assert.match(text, /CARD INDEX \(2 items/);
+    assert.match(text, /\* \[Songs\] Ae reethi/);
+    assert.match(text, /\* \[Songs\] Deevinchaevae/);
+    assert.doesNotMatch(text, /Archived one/);
+    const indexAt = text.indexOf("CARD INDEX");
+    const detailsAt = text.indexOf("Card details:");
+    assert.ok(indexAt >= 0 && detailsAt > indexAt);
+  });
 });

@@ -23,9 +23,13 @@ import {
 import { sanitizeConnectorOntologyExtraction } from "./sanitizeConnectorExtraction";
 import { fallbackOntologyFromFileName } from "./filenameFallback";
 import { enrichOntologyWithTranscript } from "./enrichWithTranscript";
+import {
+  extractTrelloCardIndex,
+  mergeCardIndexEntities,
+} from "./trelloCardIndex";
 
 /** Bump when extraction quality changes so Analyze again is not skipped. */
-const CONNECTOR_ANALYSIS_VERSION = "connector-ontology-v5";
+const CONNECTOR_ANALYSIS_VERSION = "connector-ontology-v6";
 
 export function connectorAnalysisVersion(): string {
   return CONNECTOR_ANALYSIS_VERSION;
@@ -61,6 +65,9 @@ Rules:
   Also extract the subject (instrument, topic, song, skill) as asset or product when labeled.
   Create product entities for distinct chord names, keys, or labeled sections when clearly shown.
   Prefer asset/product/document — never invent people or orgs.
+- For Trello music boards / setlists: create one document (or product) entity for EVERY
+  song/card name in CARD INDEX. Do not stop after a few songs. Include key/chart details
+  from Card details when present. Also create one document entity for the board itself.
 - Every relationship MUST include an evidence quote (verbatim or short paraphrase from the source, max 300 chars).
 - Include confidence 0.0-1.0 for each entity and relationship.
 - Prefer specific names. Avoid generic labels like "Receipt" or bare "Invoice" as an organization.
@@ -164,6 +171,19 @@ export async function extractOntologyFromSourceContent(args: {
     console.error("Connector text ontology extraction failed:", err);
   }
 
+  if (extraction) {
+    const cardIndex = extractTrelloCardIndex(extractedText);
+    if (cardIndex) {
+      extraction = enrichOntologyWithTranscript(
+        extraction,
+        cardIndex,
+        fileName
+      );
+      // Deterministically ensure every CARD INDEX name exists as a document entity.
+      extraction = mergeCardIndexEntities(extraction, cardIndex);
+    }
+  }
+
   const resolved = extraction ?? fallbackOntologyFromFileName(fileName);
   return {
     extraction: resolved,
@@ -181,20 +201,83 @@ async function extractOntologyConnectorText(input: {
   fileName: string;
   spaceName?: string | null;
 }): Promise<OntologyExtractionResult | null> {
-  const text = input.sourceText.trim().slice(0, 12_000);
+  const full = input.sourceText.trim();
+  if (!full) return null;
+
+  const CHUNK = 10_000;
+  const OVERLAP = 400;
+  const chunks: string[] = [];
+  if (full.length <= CHUNK) {
+    chunks.push(full);
+  } else {
+    for (let i = 0; i < full.length && chunks.length < 8; i += CHUNK - OVERLAP) {
+      chunks.push(full.slice(i, i + CHUNK));
+    }
+  }
+
+  const merged: OntologyExtractionResult = {
+    entities: [],
+    relationships: [],
+    events: [],
+  };
+  const seenEntities = new Set<string>();
+  const seenRels = new Set<string>();
+
+  for (let i = 0; i < chunks.length; i++) {
+    const chunk = chunks[i]!;
+    const part = await extractOntologyConnectorTextChunk({
+      sourceText: chunk,
+      fileName: input.fileName,
+      spaceName: input.spaceName,
+      chunkIndex: chunks.length > 1 ? i + 1 : null,
+      chunkCount: chunks.length > 1 ? chunks.length : null,
+    });
+    if (!part) continue;
+    for (const e of part.entities) {
+      const key = `${e.type}:${e.name.trim().toLowerCase()}`;
+      if (seenEntities.has(key)) continue;
+      seenEntities.add(key);
+      merged.entities.push(e);
+    }
+    for (const r of part.relationships) {
+      const key = `${r.source}|${r.type}|${r.target}`.toLowerCase();
+      if (seenRels.has(key)) continue;
+      seenRels.add(key);
+      merged.relationships.push(r);
+    }
+    merged.events.push(...part.events);
+  }
+
+  if (!merged.entities.length && !merged.relationships.length) return null;
+  return sanitizeConnectorOntologyExtraction(merged);
+}
+
+async function extractOntologyConnectorTextChunk(input: {
+  sourceText: string;
+  fileName: string;
+  spaceName?: string | null;
+  chunkIndex?: number | null;
+  chunkCount?: number | null;
+}): Promise<OntologyExtractionResult | null> {
+  const text = input.sourceText.trim();
   if (!text) return null;
+
+  const chunkNote =
+    input.chunkIndex && input.chunkCount
+      ? `\n(Part ${input.chunkIndex} of ${input.chunkCount} — extract every song/card in this part; do not skip names.)`
+      : "";
 
   const client = createLlmClient();
   const response = await client.messages.create({
     model: CHAT_MODEL,
-    max_tokens: 4096,
+    max_tokens: 8192,
     system: buildConnectorSystemPrompt(),
     messages: [
       {
         role: "user",
         content: `Extract ontology from this connected file (${input.fileName})${
           input.spaceName ? ` for space "${input.spaceName}"` : ""
-        }:\n\n${text}`,
+        }${chunkNote}:\n\n${text}`,
       },
     ],
     output_config: {
@@ -211,8 +294,7 @@ async function extractOntologyConnectorText(input: {
   } catch {
     return null;
   }
-  const extraction = parseOntologyExtraction(parsed);
-  return extraction ? sanitizeConnectorOntologyExtraction(extraction) : null;
+  return parseOntologyExtraction(parsed);
 }
 
 async function extractOntologyMultimodal(args: {

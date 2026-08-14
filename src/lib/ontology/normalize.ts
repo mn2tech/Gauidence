@@ -127,6 +127,25 @@ export function isInvoiceAggregateQuery(query: string): boolean {
   );
 }
 
+/**
+ * True when the user wants a full song / setlist / chord-chart catalog
+ * (not a single-song lookup).
+ */
+export function isSongCatalogQuery(query: string): boolean {
+  const q = query.toLowerCase().trim();
+  if (
+    /^(songs?|hymns?|set\s*lists?|chord\s*charts?|show me songs?|list songs?|all songs?)$/i.test(
+      q
+    )
+  ) {
+    return true;
+  }
+  if (!/\b(songs?|hymns?|tracks?|set\s*lists?|playlist|chord\s*charts?)\b/.test(q)) {
+    return false;
+  }
+  return /\b(all|list|show|what|which|every|full|complete|names?|now)\b/.test(q);
+}
+
 /** Levenshtein distance for conservative fuzzy matching. */
 export function levenshteinDistance(a: string, b: string): number {
   if (a === b) return 0;

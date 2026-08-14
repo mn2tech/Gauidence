@@ -4,6 +4,7 @@ import {
   isAmbiguousPersonName,
   isFuzzyMatchAllowed,
   isInvoiceAggregateQuery,
+  isSongCatalogQuery,
   nameSimilarity,
   normalizeEntityName,
   tokenizeForOntologySearch,
@@ -17,6 +18,10 @@ import {
   enrichOntologyWithTranscript,
   readContentTranscript,
 } from "../pipeline/enrichWithTranscript";
+import {
+  extractTrelloCardIndex,
+  mergeCardIndexEntities,
+} from "../pipeline/trelloCardIndex";
 import { planOntologyDetach } from "../detachFromDocument";
 
 describe("normalizeEntityName", () => {
@@ -59,6 +64,14 @@ describe("isInvoiceAggregateQuery", () => {
       true
     );
     assert.equal(isInvoiceAggregateQuery("what is KPAC"), false);
+  });
+});
+
+describe("isSongCatalogQuery", () => {
+  it("detects song list questions", () => {
+    assert.equal(isSongCatalogQuery("now show me songs"), true);
+    assert.equal(isSongCatalogQuery("list all songs"), true);
+    assert.equal(isSongCatalogQuery("what key is Ae reethi"), false);
   });
 });
 
@@ -663,6 +676,23 @@ describe("enrichOntologyWithTranscript", () => {
       readContentTranscript(doc!.attributes ?? {}),
       "Key of E\nChords: E A B7\nOpen E string root"
     );
+  });
+});
+
+describe("trello card index entities", () => {
+  it("merges every CARD INDEX song name", () => {
+    const index = `CARD INDEX (3 items):
+* [Songs] Ae reethi nee runam
+* [Songs] Yehova nee naamamu
+* [Songs] Deevinchaevae
+Card details:`;
+    assert.ok(extractTrelloCardIndex(index));
+    const merged = mergeCardIndexEntities(
+      { entities: [], relationships: [], events: [] },
+      index
+    );
+    assert.equal(merged.entities.length, 3);
+    assert.ok(merged.entities.some((e) => e.name === "Deevinchaevae"));
   });
 });
 

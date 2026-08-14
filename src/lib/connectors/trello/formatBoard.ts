@@ -41,6 +41,18 @@ export function formatBoardAsAnalysisText(
   });
   lines.push(`Cards (${openCards.length} open / ${cards.length} total):`);
 
+  // Compact index FIRST so ontology truncation still keeps every song/card name.
+  lines.push(
+    `CARD INDEX (${openCards.length} items — treat each as a song/document entity when this is a music board):`
+  );
+  for (const card of openCards) {
+    if (!card || typeof card !== "object") continue;
+    const row = card as Record<string, unknown>;
+    const list = listName.get(String(row.idList ?? "")) ?? "Unknown list";
+    lines.push(`* [${list}] ${String(row.name ?? "Untitled")}`);
+  }
+  lines.push("Card details:");
+
   const maxChars = 80_000;
   for (const card of openCards) {
     if (!card || typeof card !== "object") continue;

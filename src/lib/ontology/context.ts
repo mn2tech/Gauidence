@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { isInvoiceAggregateQuery, tokenizeForOntologySearch } from "./normalize";
+import { isInvoiceAggregateQuery, isSongCatalogQuery, tokenizeForOntologySearch } from "./normalize";
 import { getPathsBetweenMatchedEntities } from "./paths";
 import type { OntologyContext, OntologyEntity } from "./types";
 import {
@@ -34,8 +34,9 @@ export async function getOntologyContext(
   if (!trimmed) return empty;
 
   const listInvoices = isInvoiceAggregateQuery(trimmed);
+  const listSongs = isSongCatalogQuery(trimmed);
   const searchTerms = tokenizeForOntologySearch(trimmed);
-  if (!searchTerms.length && !listInvoices) return empty;
+  if (!searchTerms.length && !listInvoices && !listSongs) return empty;
 
   const safeTerms = searchTerms.map((term) =>
     term.replace(/[%_\\]/g, "\\$&").slice(0, 48)
@@ -50,7 +51,7 @@ export async function getOntologyContext(
       .or(
         `name.ilike.%${term}%,canonical_name.ilike.%${term}%,description.ilike.%${term}%`
       )
-      .limit(listInvoices ? 12 : 8)
+      .limit(listInvoices || listSongs ? 16 : 8)
   );
   const aliasQueries = safeTerms.map((term) =>
     supabase
@@ -71,6 +72,7 @@ export async function getOntologyContext(
             terms: safeTerms.length ? safeTerms : ["invoice"],
             preferSpaceId: args.spaceId,
             listInvoices,
+            listSongs,
           })
         : Promise.resolve([] as OntologyEntity[]),
       listInvoices
@@ -114,7 +116,9 @@ export async function getOntologyContext(
   const ranked = rankEntitiesByQueryTokens([...byId.values()], searchTerms);
   const entities = listInvoices
     ? preferInvoicesFirst(ranked).slice(0, 20)
-    : ranked.slice(0, 5);
+    : listSongs
+      ? preferSongCatalogFirst(ranked).slice(0, 40)
+      : ranked.slice(0, 5);
   if (!entities.length) return empty;
 
   // Relationships/evidence stay space-scoped for the matched entity's profile when possible.
@@ -196,6 +200,7 @@ async function findConnectorEntitiesForQuery(
     terms: string[];
     preferSpaceId: string;
     listInvoices?: boolean;
+    listSongs?: boolean;
   }
 ): Promise<OntologyEntity[]> {
   const { data: sources } = await supabase
@@ -209,13 +214,13 @@ async function findConnectorEntitiesForQuery(
   if (!sourceIds.length) return [];
 
   let itemIds: string[] = [];
-  if (args.listInvoices) {
+  if (args.listInvoices || args.listSongs) {
     const { data: items } = await supabase
       .from("source_items")
       .select("id, name, processing_status")
       .in("source_id", sourceIds)
       .eq("processing_status", "analyzed")
-      .limit(40);
+      .limit(args.listSongs ? 80 : 40);
     itemIds = (items ?? []).map((i) => i.id as string);
   } else if (args.terms.length) {
     const orName = args.terms.map((t) => `name.ilike.%${t}%`).join(",");
@@ -236,7 +241,7 @@ async function findConnectorEntitiesForQuery(
     .eq("source_type", "connector")
     .in("source_id", itemIds)
     .in("review_status", ONTOLOGY_VISIBLE_REVIEW_STATUSES)
-    .limit(args.listInvoices ? 40 : 20);
+    .limit(args.listSongs ? 80 : args.listInvoices ? 40 : 20);
 
   if (args.listInvoices) {
     entityQuery = entityQuery.in("entity_type", [
@@ -244,6 +249,15 @@ async function findConnectorEntitiesForQuery(
       "purchase",
       "document",
       "organization",
+    ]);
+  } else if (args.listSongs) {
+    entityQuery = entityQuery.in("entity_type", [
+      "document",
+      "product",
+      "asset",
+      "movie",
+      "project",
+      "event",
     ]);
   }
 
@@ -262,6 +276,21 @@ function preferInvoicesFirst(entities: OntologyEntity[]): OntologyEntity[] {
     const ai = a.entity_type === "invoice" || a.entity_type === "purchase" ? 1 : 0;
     const bi = b.entity_type === "invoice" || b.entity_type === "purchase" ? 1 : 0;
     return bi - ai;
+  });
+}
+
+function preferSongCatalogFirst(entities: OntologyEntity[]): OntologyEntity[] {
+  return [...entities].sort((a, b) => {
+    const score = (e: OntologyEntity) => {
+      let s = 0;
+      if (e.entity_type === "document" || e.entity_type === "product") s += 4;
+      if (e.entity_type === "asset" || e.entity_type === "movie") s += 3;
+      // Prefer song titles over the board container itself.
+      if (!/\btrello board\b/i.test(e.name) && e.entity_type === "document") s += 2;
+      if (/\b(chart|chord|lyrics|key)\b/i.test(e.description ?? "")) s += 1;
+      return s;
+    };
+    return score(b) - score(a);
   });
 }
 

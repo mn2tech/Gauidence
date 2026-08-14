@@ -41,7 +41,9 @@ export function formatOntologyForGideon(ctx: OntologyContext): string {
     blocks.push("MATCHED ENTITIES:");
     // Keep prompt compact: prefer invoices/orgs/people over duplicate events.
     const entities = rankEntitiesForPrompt(ctx.matchedEntities);
-    for (const entity of entities.slice(0, invoices.length > 1 ? 12 : 5)) {
+    const entityLimit =
+      entities.length > 12 ? Math.min(entities.length, 40) : invoices.length > 1 ? 12 : 5;
+    for (const entity of entities.slice(0, entityLimit)) {
       const conf =
         entity.confidence != null
           ? ` | confidence:${Number(entity.confidence).toFixed(2)}`
