@@ -47,11 +47,16 @@ export async function transcribeDocument(args: {
   mimeType: string;
   base64: string;
   pageImages: PageImage[];
+  /** Override default invoice-oriented OCR system prompt. */
+  system?: string;
+  userHint?: string;
 }): Promise<{ text: string; quality: number; issues: string[]; method: "vision_ocr" }> {
   const content: ContentPart[] = [
     {
       type: "text",
-      text: `Transcribe this document (${args.fileName}) verbatim. Preserve lists one item per line. Preserve invoice table columns and all digits.`,
+      text:
+        args.userHint?.trim() ||
+        `Transcribe this document (${args.fileName}) verbatim. Preserve lists one item per line. Preserve invoice table columns and all digits.`,
     },
   ];
 
@@ -87,7 +92,7 @@ export async function transcribeDocument(args: {
   }
 
   const text = await runPlainText(args.client, {
-    system: OCR_SYSTEM,
+    system: args.system?.trim() || OCR_SYSTEM,
     userContent: content,
     model: ANALYSIS_MODEL,
   });

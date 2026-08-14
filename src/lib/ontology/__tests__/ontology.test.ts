@@ -13,6 +13,10 @@ import { formatOntologyForGideon, buildOntologyAnswerFallback } from "../formatF
 import { reviewStatusForConfidence } from "../types";
 import { sanitizeConnectorOntologyExtraction } from "../pipeline/sanitizeConnectorExtraction";
 import { fallbackOntologyFromFileName } from "../pipeline/filenameFallback";
+import {
+  enrichOntologyWithTranscript,
+  readContentTranscript,
+} from "../pipeline/enrichWithTranscript";
 import { planOntologyDetach } from "../detachFromDocument";
 
 describe("normalizeEntityName", () => {
@@ -631,6 +635,34 @@ describe("formatOntologyForGideon", () => {
     assert.match(fallback!, /FROM YOUR ONTOLOGY/);
     assert.match(fallback!, /Onyx Government Services/);
     assert.match(fallback!, /SUBCONTRACTOR_TO/);
+  });
+});
+
+describe("enrichOntologyWithTranscript", () => {
+  it("stores chart content on the document entity", () => {
+    const enriched = enrichOntologyWithTranscript(
+      {
+        entities: [
+          {
+            type: "document",
+            name: "Bass Guitar Bass Chart",
+            confidence: 0.55,
+            description: "Connected reference file.",
+          },
+        ],
+        relationships: [],
+        events: [],
+      },
+      "Key of E\nChords: E A B7\nOpen E string root",
+      "Bass Guitar Bass Chart.pdf"
+    );
+    const doc = enriched.entities.find((e) => e.type === "document");
+    assert.ok(doc);
+    assert.match(doc!.description ?? "", /Key of E/);
+    assert.equal(
+      readContentTranscript(doc!.attributes ?? {}),
+      "Key of E\nChords: E A B7\nOpen E string root"
+    );
   });
 });
 

@@ -1,4 +1,5 @@
 import type { OntologyContext, OntologyEntity } from "./types";
+import { readContentTranscript } from "./pipeline/enrichWithTranscript";
 
 /**
  * Compact one-hop ontology block for Gideon's system prompt.
@@ -45,8 +46,12 @@ export function formatOntologyForGideon(ctx: OntologyContext): string {
         entity.confidence != null
           ? ` | confidence:${Number(entity.confidence).toFixed(2)}`
           : "";
+      const descLimit =
+        entity.entity_type === "document" || readContentTranscript(entity.properties)
+          ? 600
+          : 160;
       const desc = entity.description
-        ? ` — ${entity.description.slice(0, 160)}`
+        ? ` — ${entity.description.slice(0, descLimit)}`
         : "";
       const attrs = formatEntityAttributes(
         entity.properties,
@@ -56,6 +61,17 @@ export function formatOntologyForGideon(ctx: OntologyContext): string {
       blocks.push(
         `- ${entity.name} (${entity.entity_type})${desc}${attrs}${conf}`
       );
+    }
+
+    const contentBlocks = entities
+      .map((entity) => {
+        const transcript = readContentTranscript(entity.properties);
+        if (!transcript) return null;
+        return `CONNECTED FILE CONTENT (${entity.name}):\n${transcript.slice(0, 3000)}`;
+      })
+      .filter((b): b is string => Boolean(b));
+    if (contentBlocks.length) {
+      blocks.push("", ...contentBlocks.slice(0, 2));
     }
   }
 
