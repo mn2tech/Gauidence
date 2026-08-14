@@ -9,6 +9,7 @@ import {
   GUARDIAN_TIME_ZONE,
 } from "@/lib/timezone";
 import type { SearchScopeMode } from "@/lib/workspace-context/searchScope";
+import { looksLikeMusicPracticeSpace } from "@/lib/connectors/trello/boundSpace";
 
 export const GIDEON_BRAND_LINE =
   "Guardian watches. Gideon explains. You decide.";
@@ -272,6 +273,30 @@ export type VaultDocHint = {
   fileName?: string | null;
   title?: string | null;
 };
+
+/** Optional space + connected-source signals for suggestion chips. */
+export type GideonSuggestionContext = {
+  spaceName?: string | null;
+  boardName?: string | null;
+  songTitles?: string[];
+  hasConnectedCharts?: boolean;
+};
+
+/** Clean a chart/card name into a short song title for chips. */
+export function chartSuggestionTitle(input: {
+  name?: string | null;
+  cardName?: string | null;
+}): string | null {
+  const raw = (input.cardName || input.name || "").trim();
+  if (!raw) return null;
+  let title = raw.replace(/\.(jpe?g|png|gif|webp|pdf)$/i, "").trim();
+  title = title
+    .replace(/\s*-\s*[A-G](?:#|b)?(?:m|maj|min|major|minor)?\s*$/i, "")
+    .trim();
+  if (title.length < 2) return null;
+  if (title.length > 42) return `${title.slice(0, 39).trimEnd()}…`;
+  return title;
+}
 
 export type SuggestionProfileKind =
   | "personal"
@@ -927,9 +952,22 @@ ${personality}`;
  */
 export function buildGideonSuggestions(
   docs: VaultDocHint[],
-  profileKind: SuggestionProfileKind = "personal"
+  profileKind: SuggestionProfileKind = "personal",
+  context: GideonSuggestionContext = {}
 ): string[] {
-  if (docs.length === 0) return [];
+  const songTitles = [
+    ...new Set(
+      (context.songTitles ?? [])
+        .map((t) => t.trim())
+        .filter((t) => t.length >= 2)
+    ),
+  ].slice(0, 4);
+  const musicSpace =
+    looksLikeMusicPracticeSpace(context.spaceName) ||
+    Boolean(context.hasConnectedCharts) ||
+    songTitles.length > 0;
+
+  if (docs.length === 0 && !musicSpace) return [];
 
   const types = new Set(
     docs
@@ -957,84 +995,105 @@ export function buildGideonSuggestions(
     profileKind === "pet" ||
     profileKind === "hobby";
 
-  if (hasAttention) {
-    suggestions.push("What needs my attention this month?");
-  }
-
-  if (isTeacher) {
-    suggestions.push("What lesson materials are in this space?");
-    suggestions.push("Summarize my latest class notes.");
-    suggestions.push("Are there upcoming conference or grading deadlines?");
-  } else if (isSchool) {
-    suggestions.push("What school documents are in this space?");
-    suggestions.push("Are there any upcoming school deadlines?");
-    suggestions.push("Summarize the latest school document.");
-  } else if (profileKind === "vehicle") {
-    suggestions.push("When does insurance or registration renew?");
-    suggestions.push("What vehicle documents are in this space?");
-    suggestions.push("Which documents expire soon?");
-  } else if (profileKind === "home") {
-    suggestions.push("What home documents are in this space?");
-    suggestions.push("When is the next mortgage, rent, or insurance date?");
-    suggestions.push("Which documents expire soon?");
-  } else if (profileKind === "pet") {
-    suggestions.push("What pet records are in this space?");
-    suggestions.push("Any upcoming vet or vaccination dates?");
-    suggestions.push("Summarize the latest pet document.");
-  } else if (profileKind === "hobby") {
-    suggestions.push("What hobby or sport documents are in this space?");
-    suggestions.push("Any upcoming games, lessons, or renewals?");
-    suggestions.push("Summarize the latest hobby document.");
-  } else if (profileKind === "business" || profileKind === "non_profit") {
-    suggestions.push("How many employees are linked to this profile?");
-    suggestions.push("How many clients are linked to this profile?");
-    if (types.has("invoice") || docs.length > 0) {
-      suggestions.push("Which invoices are due soon?");
-      if (types.has("invoice")) {
-        suggestions.push("How much am I expecting to receive?");
-      }
+  if (musicSpace) {
+    const board =
+      context.boardName?.trim() ||
+      (looksLikeMusicPracticeSpace(context.spaceName)
+        ? context.spaceName!.trim()
+        : null);
+    if (board) {
+      suggestions.push(`What songs are on ${board}?`);
+    } else {
+      suggestions.push("What songs and chord charts are in this space?");
     }
-    if (types.has("contract") || docs.length > 0) {
-      suggestions.push("Which contracts need attention?");
+    for (const song of songTitles.slice(0, 2)) {
+      suggestions.push(`What are the chords for ${song}?`);
     }
-    suggestions.push("What needs my attention this month?");
-  } else if (isBiz) {
-    if (types.has("invoice") || docs.length > 0) {
-      suggestions.push("Which invoices are due soon?");
-      if (types.has("invoice")) {
-        suggestions.push("How much am I expecting to receive?");
-      }
+    if (songTitles[2]) {
+      suggestions.push(`What key is ${songTitles[2]}?`);
+    } else if (context.hasConnectedCharts) {
+      suggestions.push("Which chord charts have been analyzed?");
     }
-    if (types.has("contract") || docs.length > 0) {
-      suggestions.push("Which contracts need attention?");
-    }
-    suggestions.push("What needs my attention this month?");
+    suggestions.push("Help me prepare for practice with these charts.");
   } else {
-    suggestions.push("When is my next important deadline?");
-    suggestions.push("Which documents expire soon?");
-    suggestions.push("Show me upcoming important dates.");
-  }
-
-  if (!isSchool && !isAsset && types.has("invoice")) {
-    if (!suggestions.includes("How much am I expecting to receive?")) {
-      suggestions.push("How much am I expecting to receive?");
+    if (hasAttention) {
+      suggestions.push("What needs my attention this month?");
     }
-    suggestions.push("What are my upcoming invoice due dates?");
-  }
-  if (types.has("insurance")) {
-    suggestions.push("Which insurance policies renew or expire soon?");
-  }
-  if (types.has("contract") && !isBiz) {
-    suggestions.push("Which contracts have upcoming end dates?");
-  }
-  if (types.has("receipt")) {
-    suggestions.push("Summarize my recent receipts.");
+
+    if (isTeacher) {
+      suggestions.push("What lesson materials are in this space?");
+      suggestions.push("Summarize my latest class notes.");
+      suggestions.push("Are there upcoming conference or grading deadlines?");
+    } else if (isSchool) {
+      suggestions.push("What school documents are in this space?");
+      suggestions.push("Are there any upcoming school deadlines?");
+      suggestions.push("Summarize the latest school document.");
+    } else if (profileKind === "vehicle") {
+      suggestions.push("When does insurance or registration renew?");
+      suggestions.push("What vehicle documents are in this space?");
+      suggestions.push("Which documents expire soon?");
+    } else if (profileKind === "home") {
+      suggestions.push("What home documents are in this space?");
+      suggestions.push("When is the next mortgage, rent, or insurance date?");
+      suggestions.push("Which documents expire soon?");
+    } else if (profileKind === "pet") {
+      suggestions.push("What pet records are in this space?");
+      suggestions.push("Any upcoming vet or vaccination dates?");
+      suggestions.push("Summarize the latest pet document.");
+    } else if (profileKind === "hobby") {
+      suggestions.push("What hobby or sport documents are in this space?");
+      suggestions.push("Any upcoming games, lessons, or renewals?");
+      suggestions.push("Summarize the latest hobby document.");
+    } else if (profileKind === "business" || profileKind === "non_profit") {
+      suggestions.push("How many employees are linked to this profile?");
+      suggestions.push("How many clients are linked to this profile?");
+      if (types.has("invoice")) {
+        suggestions.push("Which invoices are due soon?");
+        suggestions.push("How much am I expecting to receive?");
+      }
+      if (types.has("contract")) {
+        suggestions.push("Which contracts need attention?");
+      }
+      if (hasAttention || (!types.has("invoice") && !types.has("contract"))) {
+        suggestions.push("What needs my attention this month?");
+      }
+    } else if (isBiz) {
+      if (types.has("invoice")) {
+        suggestions.push("Which invoices are due soon?");
+        suggestions.push("How much am I expecting to receive?");
+      }
+      if (types.has("contract")) {
+        suggestions.push("Which contracts need attention?");
+      }
+      suggestions.push("What needs my attention this month?");
+    } else {
+      suggestions.push("When is my next important deadline?");
+      suggestions.push("Which documents expire soon?");
+      suggestions.push("Show me upcoming important dates.");
+    }
+
+    if (!isSchool && !isAsset && types.has("invoice")) {
+      if (!suggestions.includes("How much am I expecting to receive?")) {
+        suggestions.push("How much am I expecting to receive?");
+      }
+      suggestions.push("What are my upcoming invoice due dates?");
+    }
+    if (types.has("insurance")) {
+      suggestions.push("Which insurance policies renew or expire soon?");
+    }
+    if (types.has("contract") && !isBiz) {
+      suggestions.push("Which contracts have upcoming end dates?");
+    }
+    if (types.has("receipt")) {
+      suggestions.push("Summarize my recent receipts.");
+    }
+
+    suggestions.push("Summarize my most recent document.");
+    if (!isSchool) {
+      suggestions.push("Which documents need verification?");
+    }
   }
 
-  suggestions.push("Summarize my most recent document.");
-  if (!isSchool) {
-    suggestions.push("Which documents need verification?");
-  }
   // Dedupe while preserving order; cap at 5
   const seen = new Set<string>();
   const out: string[] = [];

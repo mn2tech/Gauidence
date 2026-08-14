@@ -10,6 +10,7 @@ import { generateVaultChatTitle } from "@/lib/chat/generateVaultChatTitle";
 import { shouldGenerateVaultChatTitle } from "@/lib/chat/vaultChatTitle";
 import { isVaultEmbeddingConfigured } from "@/lib/vault/embeddings";
 import { buildAskVaultInventory, buildInventoryQuestionAnswer, wantsVaultFileInventory } from "@/lib/vault/askInventory";
+import { loadConnectedSuggestionContext } from "@/lib/vault/loadInventory";
 import { enqueueMissingVaultIndexing } from "@/lib/vault/ensureIndexed";
 import {
   buildGideonSuggestions,
@@ -24,6 +25,8 @@ import {
   wantsTranscription,
   type VaultDocHint,
 } from "@/lib/vault/gideon";
+import { looksLikeMusicPracticeSpace } from "@/lib/connectors/trello/boundSpace";
+import { buildGideonQuickActions } from "@/lib/gideon/chiefOfStaff";
 import { loadAttachedVaultDocument } from "@/lib/vault/attachedDocument";
 import { wantsShowPictures } from "@/lib/vault/images";
 import { chatScopedProfilePayload } from "@/lib/vault/detectVaultScope";
@@ -528,6 +531,11 @@ export async function GET(request: Request) {
       supabase,
       active.id
     );
+    const connectedHints = await loadConnectedSuggestionContext(
+      supabase,
+      user.id,
+      active.id
+    );
 
     const docCount = inventory.documentCount + inventory.photoCount;
     const logCount = inventory.logCount;
@@ -535,28 +543,39 @@ export async function GET(request: Request) {
     let suggestions: string[] = [];
     let guidance = null;
     const profileKind = suggestionKindFrom(active.profile_type);
+    const musicPractice =
+      looksLikeMusicPracticeSpace(active.display_name) ||
+      connectedHints.hasConnectedCharts;
+    const quickActions = buildGideonQuickActions({ musicPractice });
 
-    if (docCount > 0) {
-      const { data: extracted } = await supabase
-        .from("extracted_data")
-        .select("document_id, document_type, guardian_status, title")
-        .eq("profile_id", active.id);
-      const nameById = new Map(docs.map((d) => [d.id, d.file_name]));
-      const hints: VaultDocHint[] = (extracted ?? []).map((row) => ({
-        documentType: row.document_type,
-        guardianStatus: row.guardian_status,
-        title: row.title,
-        fileName: nameById.get(row.document_id) ?? null,
-      }));
-      if (hints.length === 0) {
+    if (docCount > 0 || connectedHints.hasConnectedCharts) {
+      const hints: VaultDocHint[] = [];
+      if (docCount > 0) {
+        const { data: extracted } = await supabase
+          .from("extracted_data")
+          .select("document_id, document_type, guardian_status, title")
+          .eq("profile_id", active.id);
+        const nameById = new Map(docs.map((d) => [d.id, d.file_name]));
         hints.push(
-          ...(docs.map((d) => ({ fileName: d.file_name })) as VaultDocHint[])
+          ...(extracted ?? []).map((row) => ({
+            documentType: row.document_type,
+            guardianStatus: row.guardian_status,
+            title: row.title,
+            fileName: nameById.get(row.document_id) ?? null,
+          }))
         );
+        if (hints.length === 0) {
+          hints.push(
+            ...(docs.map((d) => ({ fileName: d.file_name })) as VaultDocHint[])
+          );
+        }
       }
-      suggestions = buildGideonSuggestions(
-        hints,
-        profileKind
-      );
+      suggestions = buildGideonSuggestions(hints, profileKind, {
+        spaceName: active.display_name,
+        boardName: connectedHints.boardName,
+        songTitles: connectedHints.songTitles,
+        hasConnectedCharts: connectedHints.hasConnectedCharts,
+      });
     } else if (logCount > 0) {
       suggestions = buildGideonLogSuggestions(profileKind);
     } else {
@@ -569,7 +588,14 @@ export async function GET(request: Request) {
         label: guide.label,
         suggestedUploads: guide.suggestedUploads,
       };
-      suggestions = guide.suggestions;
+      suggestions = musicPractice
+        ? buildGideonSuggestions([], profileKind, {
+            spaceName: active.display_name,
+            boardName: connectedHints.boardName,
+            songTitles: connectedHints.songTitles,
+            hasConnectedCharts: false,
+          })
+        : guide.suggestions;
     }
 
     const template = getVaultTemplate(profileKind);
@@ -633,6 +659,8 @@ export async function GET(request: Request) {
         photoNamesMore: inventory.photoNamesMore,
         logNamesMore: inventory.logNamesMore,
         suggestions,
+        quickActions,
+        connectedItemCount: connectedHints.chartCount,
         guidance,
         profileId: active.id,
         profileName: active.display_name,

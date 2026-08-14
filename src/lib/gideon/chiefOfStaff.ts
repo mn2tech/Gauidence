@@ -22,11 +22,13 @@ Creating, moving, or deleting events requires an explicit yes from the user afte
 Never claim an event was created or updated unless a tool result confirms it.
 If no calendar is connected, say so plainly, keep the plan in chat, and offer a Guardian reminder if they want something saved.`;
 
-export const GIDEON_QUICK_ACTIONS: {
+export type GideonQuickAction = {
   id: string;
   label: string;
   prompt: string;
-}[] = [
+};
+
+export const GIDEON_QUICK_ACTIONS: GideonQuickAction[] = [
   { id: "plan_day", label: "Plan my day", prompt: "Help me plan today." },
   {
     id: "priorities",
@@ -54,3 +56,28 @@ export const GIDEON_QUICK_ACTIONS: {
     prompt: "Search Guardian for what I should know from my spaces right now.",
   },
 ];
+
+const MUSIC_PRACTICE_QUICK_ACTIONS: GideonQuickAction[] = [
+  GIDEON_QUICK_ACTIONS[0]!, // Plan my day
+  GIDEON_QUICK_ACTIONS[3]!, // Start 90/20
+  {
+    id: "practice_prep",
+    label: "Prepare for practice",
+    prompt:
+      "Help me prepare for practice — what songs and chord charts should I review in this space?",
+  },
+  {
+    id: "find_chords",
+    label: "Find chords",
+    prompt: "What chord charts are available in this space?",
+  },
+  GIDEON_QUICK_ACTIONS[5]!, // Ask Guardian
+];
+
+/** Chief-of-staff chips; music/practice spaces get practice-oriented actions. */
+export function buildGideonQuickActions(opts?: {
+  musicPractice?: boolean;
+}): GideonQuickAction[] {
+  if (opts?.musicPractice) return MUSIC_PRACTICE_QUICK_ACTIONS;
+  return GIDEON_QUICK_ACTIONS;
+}

@@ -15,6 +15,7 @@ import {
   gideonChatContextLabel,
   parseGideonSections,
   withVaultPersonality,
+  chartSuggestionTitle,
   GIDEON_SYSTEM,
   GIDEON_BRAND_LINE,
   EMPTY_VAULT_HEADLINE,
@@ -115,6 +116,45 @@ describe("Gideon helpers", () => {
 
   it("returns no suggestions for an empty vault", () => {
     assert.deepEqual(buildGideonSuggestions([]), []);
+  });
+
+  it("suggests song and chord chips for music spaces and analyzed charts", () => {
+    const bySpace = buildGideonSuggestions([], "personal", {
+      spaceName: "Wednesday Practice",
+    });
+    assert.ok(bySpace.some((q) => /songs|chord|practice/i.test(q)));
+    assert.ok(!bySpace.some((q) => /invoice/i.test(q)));
+
+    const byCharts = buildGideonSuggestions([], "business", {
+      spaceName: "Acme Ops",
+      boardName: "The Living Waters",
+      hasConnectedCharts: true,
+      songTitles: ["Silent Night Holy Night", "Ibadat Karo", "Just As I Am"],
+    });
+    assert.ok(byCharts.some((q) => /Living Waters/i.test(q)));
+    assert.ok(byCharts.some((q) => /chords for Silent Night/i.test(q)));
+    assert.ok(byCharts.some((q) => /key is Just As I Am/i.test(q)));
+    assert.ok(!byCharts.some((q) => /invoice/i.test(q)));
+    assert.ok(byCharts.length <= 5);
+  });
+
+  it("does not invent invoice chips for business spaces without invoices", () => {
+    const biz = buildGideonSuggestions(
+      [{ documentType: "other", fileName: "notes.pdf" }],
+      "business"
+    );
+    assert.ok(biz.some((q) => /employees|clients|attention/i.test(q)));
+    assert.ok(!biz.some((q) => /invoice|contracts need/i.test(q)));
+  });
+
+  it("cleans chart titles for suggestion chips", () => {
+    assert.equal(
+      chartSuggestionTitle({
+        cardName: "Silent Night Holy Night - C",
+        name: "Silent Night Holy Night - C.jpg",
+      }),
+      "Silent Night Holy Night"
+    );
   });
 
   it("returns trust-first onboarding guidance for empty vaults", () => {

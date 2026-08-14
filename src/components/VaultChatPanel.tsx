@@ -91,6 +91,7 @@ import {
 import {
   GIDEON_CHIEF_OF_STAFF_TAGLINE,
   GIDEON_QUICK_ACTIONS,
+  type GideonQuickAction,
 } from "@/lib/gideon/chiefOfStaff";
 import GideonFocusCountdown from "@/components/GideonFocusCountdown";
 import {
@@ -470,6 +471,8 @@ type Meta = {
   photoNamesMore?: number;
   logNamesMore?: number;
   suggestions: string[];
+  quickActions?: GideonQuickAction[];
+  connectedItemCount?: number;
   profileId?: string;
   profileName?: string;
   askContextLabel?: string;
@@ -3612,8 +3615,12 @@ export default function VaultChatPanel({
   const docCount = meta?.documentCount ?? 0;
   const photoCount = meta?.photoCount ?? 0;
   const logCount = meta?.logCount ?? 0;
+  const connectedCount = meta?.connectedItemCount ?? 0;
   const fileCount = docCount + photoCount;
-  const emptyVault = fileCount === 0 && logCount === 0;
+  const emptyVault = fileCount === 0 && logCount === 0 && connectedCount === 0;
+  const quickActions = meta?.quickActions?.length
+    ? meta.quickActions
+    : GIDEON_QUICK_ACTIONS;
   const showExpandedWelcome = emptyVault && !gideonWelcomeSeen;
   const showMinimalWelcome = !showExpandedWelcome;
   const logsOnly = fileCount === 0 && logCount > 0;
@@ -3682,7 +3689,7 @@ export default function VaultChatPanel({
                 {GIDEON_CHIEF_OF_STAFF_TAGLINE}
               </p>
               <div className="flex flex-wrap gap-2">
-                {GIDEON_QUICK_ACTIONS.map((action) => (
+                {quickActions.map((action) => (
                   <button
                     key={action.id}
                     type="button"
@@ -3740,7 +3747,7 @@ export default function VaultChatPanel({
                 {meta?.guidance?.intro ?? WELCOME_AI_MEMORY_BODY}
               </p>
               <div className="flex flex-wrap gap-2 pt-1">
-                {GIDEON_QUICK_ACTIONS.map((action) => (
+                {quickActions.map((action) => (
                   <button
                     key={`expanded-${action.id}`}
                     type="button"
@@ -3759,7 +3766,7 @@ export default function VaultChatPanel({
               {GIDEON_RETURNING_PROMPT}
             </p>
             <div className="flex flex-wrap gap-2">
-              {GIDEON_QUICK_ACTIONS.map((action) => (
+              {quickActions.map((action) => (
                 <button
                   key={`welcome-${action.id}`}
                   type="button"

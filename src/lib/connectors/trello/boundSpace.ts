@@ -5,6 +5,12 @@ export const TRELLO_PREFERRED_SPACE_NAME = "Wednesday Practice";
 const SOFT_MATCH =
   /\b(wednesday\s*practice|living\s*waters|practice|set\s*list|setlist|chord|music|worship|songs?)\b/i;
 
+/** True when a space name looks like music, worship, or practice. */
+export function looksLikeMusicPracticeSpace(name?: string | null): boolean {
+  if (!name?.trim()) return false;
+  return SOFT_MATCH.test(name.trim());
+}
+
 /**
  * Pick which Guardian space Trello ontology should write into.
  * Exact preferred name → soft music/practice match → active → first space.
@@ -20,7 +26,7 @@ export function findTrelloBoundProfile<
   if (exact) return exact;
 
   const soft =
-    profiles.find((p) => SOFT_MATCH.test(p.display_name.trim())) ?? null;
+    profiles.find((p) => looksLikeMusicPracticeSpace(p.display_name)) ?? null;
   if (soft) return soft;
 
   if (active && profiles.some((p) => p.id === active.id)) return active;

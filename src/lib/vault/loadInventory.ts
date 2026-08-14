@@ -13,6 +13,96 @@ import {
   getCachedProfileFileCounts,
   setCachedProfileFileCounts,
 } from "./inventoryCache";
+import { chartSuggestionTitle } from "./gideon";
+import {
+  trelloSelectedBoardId,
+  trelloSelectedBoardName,
+} from "@/lib/connectors/trello/selectedBoard";
+
+export type ConnectedSuggestionContext = {
+  chartCount: number;
+  songTitles: string[];
+  boardName: string | null;
+  hasConnectedCharts: boolean;
+};
+
+/** Analyzed Trello/device charts bound to a space — for Ask Gideon chips. */
+export async function loadConnectedSuggestionContext(
+  supabase: SupabaseClient,
+  userId: string,
+  profileId: string
+): Promise<ConnectedSuggestionContext> {
+  const empty: ConnectedSuggestionContext = {
+    chartCount: 0,
+    songTitles: [],
+    boardName: null,
+    hasConnectedCharts: false,
+  };
+
+  const { data: sources } = await supabase
+    .from("connected_sources")
+    .select("id, source_type, display_name, profile_id, settings")
+    .eq("user_id", userId)
+    .neq("status", "disconnected")
+    .limit(20);
+  if (!sources?.length) return empty;
+
+  const relevant = sources.filter((source) => {
+    const bound = source.profile_id as string | null;
+    if (!bound) return true;
+    return bound === profileId;
+  });
+  if (!relevant.length) return empty;
+
+  const sourceIds = relevant.map((s) => s.id as string);
+  const { data: items } = await supabase
+    .from("source_items")
+    .select("id, name, mime_type, processing_status, source_id, metadata")
+    .in("source_id", sourceIds)
+    .eq("processing_status", "analyzed")
+    .order("updated_at", { ascending: false })
+    .limit(40);
+  if (!items?.length) return empty;
+
+  const songTitles: string[] = [];
+  const seen = new Set<string>();
+  for (const item of items) {
+    const meta =
+      item.metadata && typeof item.metadata === "object"
+        ? (item.metadata as Record<string, unknown>)
+        : {};
+    const title = chartSuggestionTitle({
+      name: typeof item.name === "string" ? item.name : null,
+      cardName: typeof meta.cardName === "string" ? meta.cardName : null,
+    });
+    if (!title) continue;
+    const key = title.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    songTitles.push(title);
+    if (songTitles.length >= 4) break;
+  }
+
+  let boardName: string | null = null;
+  for (const source of relevant) {
+    if (source.source_type !== "trello") continue;
+    const settings =
+      source.settings && typeof source.settings === "object"
+        ? (source.settings as Record<string, unknown>)
+        : {};
+    if (trelloSelectedBoardId(settings)) {
+      boardName = trelloSelectedBoardName(settings);
+      if (boardName) break;
+    }
+  }
+
+  return {
+    chartCount: items.length,
+    songTitles,
+    boardName,
+    hasConnectedCharts: items.length > 0,
+  };
+}
 
 export async function loadVaultFileInventoryContext(
   supabase: SupabaseClient,
