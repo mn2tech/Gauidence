@@ -21,9 +21,11 @@ import {
   isSimpleTodayDateQuestion,
   getVaultTemplate,
   firstNameFrom,
+  wantsTranscription,
   type VaultDocHint,
 } from "@/lib/vault/gideon";
 import { loadAttachedVaultDocument } from "@/lib/vault/attachedDocument";
+import { wantsShowPictures } from "@/lib/vault/images";
 import { chatScopedProfilePayload } from "@/lib/vault/detectVaultScope";
 import {
   listGuardianProfiles,
@@ -64,6 +66,11 @@ import {
   suggestionKindFrom,
   type SearchScopeMode,
 } from "@/lib/workspace-context";
+import {
+  loadCalendarPromptNote,
+  resolveGideonLoad,
+  routeGideonRequest,
+} from "@/lib/gideon/orchestrator";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -1104,7 +1111,7 @@ export async function POST(request: Request) {
   const history = historySource
     .filter((m) => m.role === "user" || m.role === "assistant")
     // Keep recent turns only — long history dominates token cost.
-    .slice(-Math.min(CHAT_HISTORY_MAX_TURNS, 6) * 2)
+    .slice(-Math.min(CHAT_HISTORY_MAX_TURNS, 8) * 2)
     .map((m) => ({
       role: m.role as "user" | "assistant",
       content: String(m.content).slice(0, 1200),
@@ -1222,6 +1229,21 @@ export async function POST(request: Request) {
         : null;
       attachedFileName = attachedDoc?.fileName;
 
+      const gideonRoute = routeGideonRequest({
+        question,
+        history,
+        hasAttachment: Boolean(attachedDoc),
+        forceKnowledge:
+          wantsVaultFileInventory(question) ||
+          wantsTranscription(question) ||
+          wantsShowPictures(question),
+      });
+      const loadFlags = resolveGideonLoad(gideonRoute);
+      const calendarNote = await loadCalendarPromptNote({
+        route: gideonRoute,
+        timeZone: userTz,
+      });
+
       const { chunks, context: workspaceContext, explicitSpaceName, connectorCitations } =
         await loadWorkspaceContext({
         supabase,
@@ -1233,6 +1255,10 @@ export async function POST(request: Request) {
         attachedDoc,
         chunkCount: chunkCount ?? 0,
         chatHistory: history,
+        load: loadFlags,
+        intent: gideonRoute.intent,
+        calendarNote,
+        confirmationRequired: gideonRoute.confirmationRequired,
       });
 
       workspaceContext.promptOptions.agentMode = agentMode;
@@ -1242,6 +1268,7 @@ export async function POST(request: Request) {
       const thinkingSteps = buildGideonThinkingSteps({
         actionCtx,
         meta: workspaceMeta,
+        route: gideonRoute,
       });
       const detectedActions = getMatchingActions(actionCtx).map((action) => ({
         id: action.id,

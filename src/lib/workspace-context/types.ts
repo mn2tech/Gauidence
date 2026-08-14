@@ -1,5 +1,7 @@
 import type { GuardianProfile, GuardianProfileType } from "@/lib/profiles/types";
 import type { SuggestionProfileKind } from "@/lib/vault/gideon";
+import type { GideonIntent } from "@/lib/gideon/intent";
+import type { GideonLoadFlags } from "@/lib/gideon/capabilities";
 import type { SearchScopeMode } from "./searchScope";
 
 /** A vault/profile in the current search scope. */
@@ -61,6 +63,10 @@ export type WorkspacePromptOptions = {
   focusedWorkMemory: boolean;
   agentMode: boolean;
   fullLogQuote: boolean;
+  intent: GideonIntent;
+  loaded: GideonLoadFlags;
+  calendarNote: string;
+  confirmationRequired: boolean;
 };
 
 export type WorkspaceContextData = WorkspaceContextMeta & {

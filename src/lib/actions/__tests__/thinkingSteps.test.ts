@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { buildGideonThinkingSteps } from "../thinkingSteps.ts";
 import type { WorkspaceContextMeta } from "@/lib/workspace-context/types";
+import { classifyGideonIntent } from "@/lib/gideon/intent";
 
 const meta: WorkspaceContextMeta = {
   activeProfile: {
@@ -16,6 +17,7 @@ const meta: WorkspaceContextMeta = {
   searchProfileIds: ["p1"],
   chatHomeProfileId: "p1",
   chatScopedProfileId: null,
+  searchScope: "workspace",
   scopedProfile: null,
   profileKind: "business",
   chatContextLabel: "NM2TECH business vault",
@@ -23,16 +25,36 @@ const meta: WorkspaceContextMeta = {
 };
 
 describe("buildGideonThinkingSteps", () => {
-  it("includes workspace search step for vault queries", () => {
+  it("uses Searching Guardian for knowledge questions", () => {
+    const route = classifyGideonIntent({
+      question: "What does the uploaded employee handbook say about PTO?",
+    });
     const steps = buildGideonThinkingSteps({
       actionCtx: {
-        question: "find my passport",
+        question: "What does the uploaded employee handbook say about PTO?",
         userId: "u1",
         activeProfile: meta.activeProfile,
       },
       meta,
+      route,
     });
-    assert.ok(steps.some((s) => s.includes("Searching NM2TECH")));
-    assert.ok(steps.includes("Preparing answer"));
+    assert.ok(steps.includes("Searching Guardian..."));
+    assert.ok(!steps.some((s) => /RAG|vector|routing/i.test(s)));
+  });
+
+  it("does not claim a Guardian search for conversation", () => {
+    const route = classifyGideonIntent({
+      question: "What is the Pomodoro technique?",
+    });
+    const steps = buildGideonThinkingSteps({
+      actionCtx: {
+        question: "What is the Pomodoro technique?",
+        userId: "u1",
+        activeProfile: meta.activeProfile,
+      },
+      meta,
+      route,
+    });
+    assert.deepEqual(steps, ["Thinking..."]);
   });
 });

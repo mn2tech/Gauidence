@@ -86,3 +86,69 @@ describe("resolveWorkspaceScopes", () => {
     assert.ok(meta.searchProfileIds.includes("p2"));
   });
 });
+
+describe("buildGideonSystemPrompt", () => {
+  it("omits retrieval blocks when Guardian knowledge was not loaded", async () => {
+    const { buildGideonSystemPrompt } = await import("../formatSystemPrompt.ts");
+    const { GIDEON_LOAD_NONE } = await import("@/lib/gideon/capabilities");
+    const system = buildGideonSystemPrompt({
+      activeProfile: {
+        id: "p1",
+        display_name: "NM2TECH",
+        profile_type: "business",
+        parent_profile_id: null,
+      },
+      retrievalScopes: [{ id: "p1", display_name: "NM2TECH", profile_type: "business" }],
+      accessibleProfiles: [],
+      profileNames: { p1: "NM2TECH" },
+      searchProfileIds: ["p1"],
+      chatHomeProfileId: "p1",
+      chatScopedProfileId: null,
+      searchScope: "workspace",
+      scopedProfile: null,
+      profileKind: "business",
+      chatContextLabel: "label",
+      vaultScopeNote: "note",
+      blocks: {
+        excerpts: "(none)",
+        fileInventory: "(none)",
+        attachedDocument: "(none)",
+        dailyLogs: "(none)",
+        clientRequests: "(none)",
+        proposals: "(none)",
+        schedule: "(none)",
+        linkedProfiles: "(none)",
+        vaultMap: "(none)",
+        workMemory: "(none — user has no active work projects)",
+        structuredKnowledge: "(none)",
+        ontology: "(none)",
+      },
+      promptOptions: {
+        timeZone: "America/New_York",
+        showPictures: false,
+        reminderAgent: false,
+        dailyLogCaptureAgent: false,
+        workMemoryUpdateAgent: false,
+        clientRequestReplyAgent: false,
+        clientRequestCreateAgent: false,
+        spaceCreateAgent: false,
+        transcriptionMode: false,
+        hasAttachedDocument: false,
+        allVaultsNote: "Search this space",
+        vaultEmptyNote: "No document excerpts matched",
+        focusedWorkMemory: false,
+        agentMode: false,
+        fullLogQuote: false,
+        intent: "conversation",
+        loaded: GIDEON_LOAD_NONE,
+        calendarNote: "",
+        confirmationRequired: false,
+      },
+    });
+    assert.doesNotMatch(system, /--- RETRIEVED EXCERPTS ---/);
+    assert.doesNotMatch(system, /No document excerpts matched/);
+    assert.match(system, /No Guardian document search ran/);
+    assert.match(system, /CONVERSATION CONTEXT/);
+  });
+});
+

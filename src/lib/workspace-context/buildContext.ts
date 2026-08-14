@@ -76,6 +76,11 @@ import { loadCollaboratorMemberAccounts } from "@/lib/profiles/collaboratorMembe
 import type { LinkedVaultProfile } from "@/lib/vault/rollup";
 import { loadLinkedOrgContext } from "./linkedProfiles";
 import type { WorkspaceContextData, WorkspaceContextMeta } from "./types";
+import {
+  GIDEON_LOAD_FULL,
+  type GideonLoadFlags,
+} from "@/lib/gideon/capabilities";
+import type { GideonIntent } from "@/lib/gideon/intent";
 
 export type LoadWorkspaceContextArgs = {
   supabase: SupabaseClient;
@@ -87,6 +92,10 @@ export type LoadWorkspaceContextArgs = {
   attachedDoc?: AttachedVaultDocument | null;
   chunkCount?: number;
   chatHistory?: ChatTurn[];
+  load?: GideonLoadFlags;
+  intent?: GideonIntent;
+  calendarNote?: string;
+  confirmationRequired?: boolean;
 };
 
 export type WorkspaceContextResult = {
@@ -112,6 +121,10 @@ export async function loadWorkspaceContext(
     chunkCount = 0,
     chatHistory = [],
   } = args;
+  const load = args.load ?? GIDEON_LOAD_FULL;
+  const intent = args.intent ?? "knowledge_search";
+  const calendarNote = args.calendarNote ?? "";
+  const confirmationRequired = args.confirmationRequired ?? false;
 
   const retrievalQuestion = expandRetrievalQuestion(question, chatHistory);
   const fullLogQuote = wantsFullDailyLogQuote(question);
@@ -154,7 +167,7 @@ export async function loadWorkspaceContext(
 
   const embeddingStarted = Date.now();
   const queryEmbedding =
-    chunkCount > 0
+    load.documents && chunkCount > 0
       ? await embedQuery(retrievalQuestion).catch((embedErr) => {
           console.warn(
             "Vault chat embedding failed; continuing without document search:",
@@ -224,7 +237,7 @@ export async function loadWorkspaceContext(
     linkedContext,
     workMemoryBundleRaw,
   ] = await Promise.all([
-    isKnowledgeEngineV2Enabled()
+    load.documents && isKnowledgeEngineV2Enabled()
       ? retrieveStructuredKnowledge(supabase, {
           question: retrievalQuestion,
           profileIds: effectiveSearchIds,
@@ -233,7 +246,7 @@ export async function loadWorkspaceContext(
           text: formatKnowledgeForGideon(knowledge, profileNames),
         }))
       : Promise.resolve({ count: 0, text: "(none)" }),
-    isGuardianOntologyEnabled()
+    load.documents && isGuardianOntologyEnabled()
       ? getOntologyContext(supabase, {
           spaceId: ontologySpaceId,
           query: retrievalQuestion,
@@ -262,34 +275,41 @@ export async function loadWorkspaceContext(
           text: "(none)",
           citations: [] as VaultChatCitation[],
         }),
-    retrieveRelevantDailyLogs(supabase, {
-      profileId: activeProfile.id,
-      profileIds: effectiveSearchIds,
-      profileNames,
-      question: retrievalQuestion,
-      limit:
-        effectiveRetrievalScopes.length > 1
-          ? fullLogQuote
-            ? 8
-            : 6
-          : fullLogQuote
-            ? 6
-            : 4,
-    }),
-    retrieveRelevantClientRequests(supabase, {
-      clientProfileIds,
-      profileNames,
-      question: retrievalQuestion,
-      limit: effectiveRetrievalScopes.length > 1 ? 6 : 4,
-    }),
-    includeActiveRequests
+    load.logs
+      ? retrieveRelevantDailyLogs(supabase, {
+          profileId: activeProfile.id,
+          profileIds: effectiveSearchIds,
+          profileNames,
+          question: retrievalQuestion,
+          limit:
+            effectiveRetrievalScopes.length > 1
+              ? fullLogQuote
+                ? 8
+                : 6
+              : fullLogQuote
+                ? 6
+                : 4,
+        })
+      : Promise.resolve({ logs: [], authorNames: {} as Record<string, string> }),
+    load.clientRequests
+      ? retrieveRelevantClientRequests(supabase, {
+          clientProfileIds,
+          profileNames,
+          question: retrievalQuestion,
+          limit: effectiveRetrievalScopes.length > 1 ? 6 : 4,
+        })
+      : Promise.resolve({
+          requests: [],
+          authorNames: {} as Record<string, string>,
+        }),
+    load.clientRequests && includeActiveRequests
       ? loadActiveClientRequestsForGideon(
           supabase,
           clientProfileIds,
           effectiveRetrievalScopes.length > 1 ? 8 : 6
         )
       : Promise.resolve([]),
-    loadProposals
+    load.proposals && loadProposals
       ? supabase
           .from("proposals")
           .select(PROPOSAL_SELECT)
@@ -303,37 +323,48 @@ export async function loadWorkspaceContext(
             )
           )
       : Promise.resolve("(none)"),
-    loadVaultFileInventoryContext(
-      supabase,
-      effectiveSearchIds,
-      profileNames,
-      retrievalQuestion
-    ),
-    retrieveUpcomingAlertsForGideon(supabase, {
-      profileIds: effectiveSearchIds,
-      profileNames,
-      question: retrievalQuestion,
-      timeZone,
-      limit: effectiveRetrievalScopes.length > 1 ? 12 : 10,
-    }),
-    loadLinkedOrgContext(supabase, user.id, activeProfile),
-    workProjectId
-      ? (async () => {
-          const focused = await loadWorkMemoryProjectForGideon(
-            supabase,
-            user.id,
-            workProjectId
-          );
-          if (focused) {
-            return { focused: true as const, bundle: focused };
-          }
-          const bundle = await loadWorkMemoryForGideon(supabase, user.id);
-          return { focused: false as const, bundle };
-        })()
-      : loadWorkMemoryForGideon(supabase, user.id).then((bundle) => ({
+    load.documents
+      ? loadVaultFileInventoryContext(
+          supabase,
+          effectiveSearchIds,
+          profileNames,
+          retrievalQuestion
+        )
+      : Promise.resolve("(none)"),
+    load.schedule
+      ? retrieveUpcomingAlertsForGideon(supabase, {
+          profileIds: effectiveSearchIds,
+          profileNames,
+          question: retrievalQuestion,
+          timeZone,
+          limit: effectiveRetrievalScopes.length > 1 ? 12 : 10,
+        })
+      : Promise.resolve([]),
+    load.linkedProfiles
+      ? loadLinkedOrgContext(supabase, user.id, activeProfile)
+      : Promise.resolve("(none)"),
+    load.workMemory
+      ? workProjectId
+        ? (async () => {
+            const focused = await loadWorkMemoryProjectForGideon(
+              supabase,
+              user.id,
+              workProjectId
+            );
+            if (focused) {
+              return { focused: true as const, bundle: focused };
+            }
+            const bundle = await loadWorkMemoryForGideon(supabase, user.id);
+            return { focused: false as const, bundle };
+          })()
+        : loadWorkMemoryForGideon(supabase, user.id).then((bundle) => ({
+            focused: false as const,
+            bundle,
+          }))
+      : Promise.resolve({
           focused: false as const,
-          bundle,
-        })),
+          bundle: { projects: [], sessionsByProject: new Map() },
+        }),
   ]);
 
   knowledgeCandidateCount = structuredKnowledgeBundle.count;
@@ -391,11 +422,13 @@ export async function loadWorkspaceContext(
         user.user_metadata?.name ??
         user.email
     ) ?? "You";
-  const vaultMapContext = formatVaultMapForGideon(
-    meta.accessibleProfiles,
-    vaultMapOwnerLabel,
-    activeProfile.id
-  );
+  const vaultMapContext = load.vaultMap
+    ? formatVaultMapForGideon(
+        meta.accessibleProfiles,
+        vaultMapOwnerLabel,
+        activeProfile.id
+      )
+    : "(none)";
 
   const workMemoryBundle = workMemoryBundleRaw.bundle;
   const focusedWorkMemory = workMemoryBundleRaw.focused;
@@ -485,6 +518,10 @@ Active space in the UI: ${activeProfile.display_name}. Document search includes 
       focusedWorkMemory: Boolean(focusedWorkMemory),
       agentMode: false,
       fullLogQuote,
+      intent,
+      loaded: load,
+      calendarNote,
+      confirmationRequired,
     },
   };
 

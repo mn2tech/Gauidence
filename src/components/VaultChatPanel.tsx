@@ -88,6 +88,10 @@ import {
   readGideonWelcomeSeen,
   writeGideonWelcomeSeen,
 } from "@/lib/vault/gideonWelcomeClient";
+import {
+  GIDEON_CHIEF_OF_STAFF_TAGLINE,
+  GIDEON_QUICK_ACTIONS,
+} from "@/lib/gideon/chiefOfStaff";
 import { isImageFileName } from "@/lib/vault/images";
 import { renderPdfThumbnailFromFile, renderPdfThumbnailFromUrl } from "@/lib/vault/pdfThumbnail";
 import { renderGideonText } from "@/components/gideonText";
@@ -3592,6 +3596,22 @@ export default function VaultChatPanel({
               <p className="text-sm leading-relaxed text-ink-muted">
                 {GIDEON_RETURNING_PROMPT}
               </p>
+              <p className="text-[11px] font-medium text-ink-muted">
+                {GIDEON_CHIEF_OF_STAFF_TAGLINE}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {GIDEON_QUICK_ACTIONS.map((action) => (
+                  <button
+                    key={action.id}
+                    type="button"
+                    disabled={sending || loadingHistory}
+                    onClick={() => void sendQuestion(action.prompt)}
+                    className="rounded-full border border-stone-300 bg-white px-3 py-1.5 text-left text-xs font-medium text-foreground transition hover:border-brand hover:bg-brand-light/40 disabled:opacity-50"
+                  >
+                    {action.label}
+                  </button>
+                ))}
+              </div>
               {!emptyVault && meta && meta.suggestions.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   {meta.suggestions.map((q) => (
@@ -3612,6 +3632,9 @@ export default function VaultChatPanel({
             <>
           <p className="text-base font-semibold text-foreground">
             Hi{greetName ? ` ${greetName}` : ""}, I&apos;m Gideon.
+          </p>
+          <p className="text-[11px] font-medium text-ink-muted">
+            {GIDEON_CHIEF_OF_STAFF_TAGLINE}
           </p>
           {meta?.profileName && (
             <AskWelcomeProfileSwitch fallbackName={meta.profileName} />
@@ -3634,11 +3657,39 @@ export default function VaultChatPanel({
               <p className="text-sm leading-relaxed text-ink-muted">
                 {meta?.guidance?.intro ?? WELCOME_AI_MEMORY_BODY}
               </p>
+              <div className="flex flex-wrap gap-2 pt-1">
+                {GIDEON_QUICK_ACTIONS.map((action) => (
+                  <button
+                    key={`expanded-${action.id}`}
+                    type="button"
+                    disabled={sending || loadingHistory}
+                    onClick={() => void sendQuestion(action.prompt)}
+                    className="rounded-full border border-stone-300 bg-white px-3 py-1.5 text-left text-xs font-medium text-foreground transition hover:border-brand hover:bg-brand-light/40 disabled:opacity-50"
+                  >
+                    {action.label}
+                  </button>
+                ))}
+              </div>
             </div>
           ) : (
+            <>
             <p className="text-sm leading-relaxed text-ink-muted">
               {GIDEON_RETURNING_PROMPT}
             </p>
+            <div className="flex flex-wrap gap-2">
+              {GIDEON_QUICK_ACTIONS.map((action) => (
+                <button
+                  key={`welcome-${action.id}`}
+                  type="button"
+                  disabled={sending || loadingHistory}
+                  onClick={() => void sendQuestion(action.prompt)}
+                  className="rounded-full border border-stone-300 bg-white px-3 py-1.5 text-left text-xs font-medium text-foreground transition hover:border-brand hover:bg-brand-light/40 disabled:opacity-50"
+                >
+                  {action.label}
+                </button>
+              ))}
+            </div>
+            </>
           )}
 
           {!showMinimalWelcome && !emptyVault && countBits.length > 0 ? (
@@ -3821,8 +3872,8 @@ export default function VaultChatPanel({
             <>
               <p className="text-sm leading-relaxed text-ink-muted">
                 {logsOnly
-                  ? "I'll check this profile's Daily Logs first. For other questions I can use general knowledge and clearly say when it's not from your space."
-                  : "I'll search your spaces first. If something isn't there, I can answer with general knowledge and label it clearly. What would you like to know?"}
+                  ? "Ask about Daily Logs, plan your day, or search Guardian when you need something from this space."
+                  : "Ask anything — we can talk it through, plan your day, or search Guardian when you need your files."}
               </p>
               <div className="flex flex-wrap gap-2">
                 <button
@@ -4187,10 +4238,10 @@ export default function VaultChatPanel({
                   : pendingAttachment
                     ? "Write a message…"
                     : emptyVault
-                      ? "Ask anything — paste a screenshot, or use + to scan / upload…"
+                      ? "Ask anything — plan your day, or use + to scan / upload…"
                       : logsOnly
-                        ? "Ask about Daily Logs or anything else…"
-                        : "Ask about your documents, paste a screenshot, or ask anything…"
+                        ? "Ask about Daily Logs, plan your day, or search Guardian…"
+                        : "Ask anything — plan your day, or search Guardian…"
               }
               className="block w-full resize-none border-0 bg-transparent py-1.5 text-sm leading-5 outline-none placeholder:text-ink-muted disabled:opacity-50"
             />
@@ -4625,7 +4676,7 @@ export default function VaultChatPanel({
             <div>
               <h2 className="text-base font-semibold">Ask Gideon</h2>
               <p className="text-[11px] text-ink-muted">
-                Your AI guide to everything in your vault.
+                {GIDEON_CHIEF_OF_STAFF_TAGLINE}
               </p>
             </div>
           </div>
@@ -4714,9 +4765,7 @@ export default function VaultChatPanel({
               </button>
             </div>
             <p className="truncate text-[11px] text-ink-muted">
-              {meta?.chatContextLabel ??
-                meta?.askContextLabel ??
-                "Your AI guide to everything in your spaces."}
+              {GIDEON_CHIEF_OF_STAFF_TAGLINE}
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
