@@ -78,6 +78,12 @@ import type { AttachedVaultDocument } from "@/lib/vault/attachedDocument";
 import { resolveExplicitSpaceScope } from "@/lib/vault/detectVaultScope";
 import { isOrgStyleProfile, type GuardianProfileType } from "@/lib/profiles/types";
 import { collaboratorDisplayName } from "@/lib/profiles/collaboratorDisplay";
+import { isGuardianPackEngineEnabled } from "@/lib/features/packs";
+import {
+  formatPackSkillsForPrompt,
+  loadInstalledPackSkills,
+} from "@/lib/packs/gideon";
+import { GUARDIAN_BUSINESS_PACK_SLUG } from "@/lib/packs/types";
 import { loadCollaboratorMemberAccounts } from "@/lib/profiles/collaboratorMembers";
 import type { LinkedVaultProfile } from "@/lib/vault/rollup";
 import { loadLinkedOrgContext } from "./linkedProfiles";
@@ -232,7 +238,21 @@ export async function loadWorkspaceContext(
   const loadProposals =
     isOrgStyleProfile(activeProfile.profile_type) &&
     activeProfile.profile_type !== "client" &&
-    /\b(proposal|proposals|quote|estimate)\b/i.test(retrievalQuestion);
+    /\b(proposal|proposals|quote|estimate|follow[- ]?up|outstanding|client)\b/i.test(
+      retrievalQuestion
+    );
+
+  const packSkillsPromise =
+    isGuardianPackEngineEnabled({ email: user.email }) &&
+    isOrgStyleProfile(activeProfile.profile_type)
+      ? loadInstalledPackSkills(
+          supabase,
+          ontologySpaceId,
+          GUARDIAN_BUSINESS_PACK_SLUG
+        )
+          .then(formatPackSkillsForPrompt)
+          .catch(() => "")
+      : Promise.resolve("");
 
   const [
     structuredKnowledgeBundle,
@@ -245,6 +265,7 @@ export async function loadWorkspaceContext(
     upcomingAlerts,
     linkedContext,
     workMemoryBundleRaw,
+    packSkillsNote,
   ] = await Promise.all([
     load.documents && isKnowledgeEngineV2Enabled() && !songListOnly
       ? retrieveStructuredKnowledge(supabase, {
@@ -375,6 +396,7 @@ export async function loadWorkspaceContext(
           focused: false as const,
           bundle: { projects: [], sessionsByProject: new Map() },
         }),
+    packSkillsPromise,
   ]);
 
   knowledgeCandidateCount = structuredKnowledgeBundle.count;
@@ -547,6 +569,7 @@ Active space in the UI: ${activeProfile.display_name}. Document search includes 
       calendarNote,
       focusBlockNote,
       confirmationRequired,
+      packSkillsNote: packSkillsNote || undefined,
     },
   };
 

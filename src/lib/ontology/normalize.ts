@@ -228,7 +228,11 @@ export function nameSimilarity(a: string, b: string): number {
 export function isFuzzyMatchAllowed(entityType: string): boolean {
   return (
     entityType === "organization" ||
+    entityType === "client" ||
     entityType === "project" ||
+    entityType === "contract" ||
+    entityType === "proposal" ||
+    entityType === "opportunity" ||
     entityType === "restaurant" ||
     entityType === "place"
   );

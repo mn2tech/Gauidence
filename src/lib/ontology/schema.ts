@@ -21,7 +21,7 @@ function parseEntity(value: unknown): OntologyExtractionResult["entities"][numbe
     typeof value.confidence === "number" ? value.confidence : 0.5;
 
   if (!type || !name || confidence < 0.3) return null;
-  if (!ENTITY_TYPES.has(type) && type !== "client") return null;
+  if (!ENTITY_TYPES.has(type)) return null;
 
   const aliases = Array.isArray(value.aliases)
     ? value.aliases

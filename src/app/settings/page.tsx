@@ -11,6 +11,7 @@ import StorageSection from "@/components/StorageSection";
 import ShareGuardianCard from "@/components/ShareGuardianCard";
 import { isPlatformAdmin } from "@/lib/admin";
 import { isGuardianOntologyEnabled } from "@/lib/features/ontology";
+import { isGuardianPackEngineEnabled } from "@/lib/features/packs";
 import {
   guardianReferralCode,
   guardianTryUrl,
@@ -70,6 +71,16 @@ export default async function SettingsPage() {
               Knowledge Engine →
             </a>
           </p>
+          {isGuardianPackEngineEnabled({ email: user.email }) ? (
+            <p className="mt-2">
+              <a
+                href="/settings/packs"
+                className="text-sm font-semibold text-brand hover:text-brand-dark"
+              >
+                Packs →
+              </a>
+            </p>
+          ) : null}
           {showUsage ? (
             <>
               <p className="mt-2">

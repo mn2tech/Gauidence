@@ -109,6 +109,9 @@ export function buildGideonSystemPrompt(
     intent === "chief_of_staff" || intent === "combined"
       ? `\n${GIDEON_CHIEF_OF_STAFF_SYSTEM}\n`
       : "";
+  const packSkillsNote = (promptOptions.packSkillsNote ?? "").trim()
+    ? `\n${promptOptions.packSkillsNote!.trim()}\n`
+    : "";
   const confirmationNote = confirmationRequired
     ? `\n${GIDEON_CALENDAR_CONFIRMATION_NOTE}\n`
     : "";
@@ -187,6 +190,7 @@ Active ${getContainerLabel(activeProfile.profile_type).toLowerCase()}: ${activeP
 ${buildGideonTodayNote(new Date(), timeZone)}
 ${GIDEON_CONVERSATION_CONTEXT_NOTE}
 ${chiefOfStaffNote}
+${packSkillsNote}
 ${knowledgeModeNote}
 ${confirmationNote}
 ${focusNote}

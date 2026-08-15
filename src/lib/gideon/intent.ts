@@ -66,6 +66,13 @@ const KNOWLEDGE_ATTENTION =
 const KNOWLEDGE_FIND =
   /\b(find|search|look\s+for|where\s+is|show\s+me|locate)\b.{0,40}\b(my|the|our)\b/i;
 
+/** Business Pack / organizational intelligence questions. */
+const KNOWLEDGE_BUSINESS =
+  /\b(clients?|contractors?|employees?|proposals?|contracts?|projects?|opportunit(?:y|ies)|policies|procedures?|follow[- ]?up|outstanding|expire|expiring|working with|everything we know about|who (is|are|works)|what (clients?|proposals?|contracts?|projects?|tasks?)|what did we promise|associated with|business relationships?)\b/i;
+
+const BUSINESS_ADVISORY =
+  /\b(what should i (follow up|focus|do|prioritize)|what needs (my )?attention|recommend|next steps?)\b/i;
+
 const CALENDAR_READ =
   /\b((what|which|any) (meetings?|events?|appointments?) (do i have|are there)|meetings? (do i have|today|tomorrow)|today'?s (meetings?|calendar|schedule)|what(?:'s| is) on my (calendar|schedule)|show me my (calendar|meetings?)|check my (calendar|meetings?)|my calendar)\b/i;
 
@@ -167,7 +174,8 @@ function isKnowledgeQuestion(q: string): boolean {
     KNOWLEDGE_FIND.test(q) ||
     KNOWLEDGE_SOURCE.test(q) ||
     KNOWLEDGE_MUSIC.test(q) ||
-    KNOWLEDGE_CONNECTED.test(q)
+    KNOWLEDGE_CONNECTED.test(q) ||
+    KNOWLEDGE_BUSINESS.test(q)
   );
 }
 
@@ -255,7 +263,7 @@ export function classifyGideonIntent(args: ClassifyGideonIntentArgs): GideonRout
   const knowledge = isKnowledgeQuestion(q);
   const calendarWrite = isCalendarWrite(q);
   const calendarRead = isCalendarRead(q) || calendarWrite;
-  const cos = isChiefOfStaff(q);
+  const cos = isChiefOfStaff(q) || (BUSINESS_ADVISORY.test(q) && knowledge);
   const task = isTask(q);
   const combinedSignals =
     (cos && (calendarRead || knowledge)) || AROUND_MEETINGS.test(q);

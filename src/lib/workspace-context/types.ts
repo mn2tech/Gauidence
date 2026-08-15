@@ -68,6 +68,8 @@ export type WorkspacePromptOptions = {
   calendarNote: string;
   focusBlockNote: string;
   confirmationRequired: boolean;
+  /** Pack skill prompt addons (e.g. Business Chief of Staff). */
+  packSkillsNote?: string;
 };
 
 export type WorkspaceContextData = WorkspaceContextMeta & {

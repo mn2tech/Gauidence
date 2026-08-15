@@ -23,21 +23,25 @@ function buildSystemPrompt(): string {
 Extract business-relevant entities and relationships from document text.
 
 Rules:
-- Extract only materially useful business entities: people, organizations, projects, assets, contracts, invoices.
+- Extract only materially useful business entities: people, organizations, employees, contractors, clients, contacts, opportunities, proposals, projects, contracts, policies, procedures, tasks, assets, invoices.
 - Do NOT create entities from every noun (e.g. "Monday", "document", "page", tools casually listed on a resume).
 - Every relationship MUST include an evidence quote (verbatim from the text, max 300 chars).
 - Do not invent relationships without supporting text.
 - Include confidence 0.0-1.0 for each entity and relationship.
 - Prefer specific names over pronouns.
-- Use entity types: person, organization, project, asset, contract, invoice, document.
+- Use entity types: person, organization, employee, contractor, client, contact, opportunity, proposal, project, asset, contract, policy, procedure, task, invoice, document.
+- A named customer in a proposal/contract is usually type "client" (not just organization).
+- A proposal document about work for a client should create a "proposal" entity when the proposal itself is identifiable.
 
 Relationship types (prefer the MOST SPECIFIC that fits):
-WORKS_FOR, REPORTS_TO, MANAGES, FOUNDER_OF, OWNS, HAS_PROJECT, HAS_CONTRACT, HAS_INVOICE, BELONGS_TO, SERVICES, CLIENT_OF, VENDOR_OF, PARTNER_OF, ISSUED_BY, ISSUED_TO, SUBCONTRACTOR_TO, PRIME_CONTRACTOR_FOR, MENTIONED_IN.
+WORKS_FOR, EMPLOYS, ENGAGES, SERVES, CONTACT_FOR, WORKS_ON, REPORTS_TO, MANAGES, FOUNDER_OF, OWNS, HAS_PROJECT, HAS_CONTRACT, HAS_INVOICE, PROPOSED_TO, RELATES_TO, MAY_BECOME, GOVERNS, APPLIES_TO, SUPPORTS, ASSIGNED_TO, TASK_RELATES_TO, BELONGS_TO, SERVICES, CLIENT_OF, VENDOR_OF, PARTNER_OF, ISSUED_BY, ISSUED_TO, SUBCONTRACTOR_TO, PRIME_CONTRACTOR_FOR, MENTIONED_IN.
 
+- Proposal prepared for Client X → PROPOSED_TO. Proposal that may become Project Y → MAY_BECOME.
+- Organization serves Client → SERVES. Person contact for Client → CONTACT_FOR. Person works on Project → WORKS_ON.
 - Use RELATED_TO ONLY as a last resort when a real business relationship is stated but none of the specific types fit. Do NOT use RELATED_TO for co-mentions, skill lists, vendor logos, or "tools used" on a resume/CV.
 - Do NOT link every organization mentioned in a resume to each other with RELATED_TO.
-- Person ↔ employer → WORKS_FOR (or FOUNDER_OF). Person ↔ client → CLIENT_OF / SERVICES when clear.
-- Organization ↔ organization: prefer SUBCONTRACTOR_TO, PARTNER_OF, CLIENT_OF, VENDOR_OF, SERVICES over RELATED_TO.
+- Person ↔ employer → WORKS_FOR / EMPLOYS (or FOUNDER_OF). Person ↔ client → CLIENT_OF / SERVICES / CONTACT_FOR when clear.
+- Organization ↔ organization: prefer SUBCONTRACTOR_TO, PARTNER_OF, CLIENT_OF, VENDOR_OF, SERVICES, SERVES over RELATED_TO.
 - Entity ↔ source document → MENTIONED_IN only (do not invent other document edges).
 
 - Return empty arrays if there is insufficient evidence.
