@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { PROPOSAL_SELECT } from "@/lib/proposals/types";
+import { PROPOSAL_SELECT, type Proposal } from "@/lib/proposals/types";
 import { mapProposalRow } from "@/lib/proposals/server";
 import { planBusinessQuery } from "./queryPlanner";
 import { buildEntity360 } from "./entity360";
@@ -128,7 +128,7 @@ export async function loadBusinessIntelligence(
   }
 
   // Shared proposals load when structured data is required
-  let proposals = [];
+  let proposals: Proposal[] = [];
   if (plan.requiresStructuredData) {
     const { data: proposalRows } = await args.supabase
       .from("proposals")
