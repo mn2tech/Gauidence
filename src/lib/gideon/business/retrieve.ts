@@ -1,0 +1,387 @@
+import "server-only";
+
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { PROPOSAL_SELECT } from "@/lib/proposals/types";
+import { mapProposalRow } from "@/lib/proposals/server";
+import { planBusinessQuery } from "./queryPlanner";
+import { buildEntity360 } from "./entity360";
+import {
+  describeEntityRelationships,
+  findClientsWithProposalsWithoutActiveProject,
+} from "./relationshipReasoning";
+import { rankProposalFollowUps } from "./proposalFollowUp";
+import { groupCommitmentsByClient } from "./commitments";
+import { buildAdvisoryInsights } from "./advisory";
+import {
+  formatAdvisoryForGideon,
+  formatBusinessIntelligenceBlock,
+  formatClaimsForGideon,
+  formatEntity360ForGideon,
+  formatProposalFollowUpsForGideon,
+} from "./formatForGideon";
+import {
+  formatEvidenceAnswerFromClaims,
+  mergeClaims,
+  parseClaimsJson,
+} from "./claims";
+import {
+  buildBiObservability,
+  logBusinessIntelligenceTrace,
+} from "./observability";
+import { shouldExcludeFromBusinessOntology } from "./knowledgeFilter";
+import type {
+  BusinessIntelligenceBundle,
+  BusinessQueryPlan,
+  GideonClaim,
+} from "./types";
+
+async function resolvePackSpaceIds(
+  supabase: SupabaseClient,
+  profileId: string
+): Promise<string[]> {
+  const spaceIds = new Set<string>([profileId]);
+  const { data: children } = await supabase
+    .from("guardian_profiles")
+    .select("id")
+    .eq("parent_profile_id", profileId);
+  for (const child of children ?? []) {
+    spaceIds.add(String(child.id));
+  }
+  return Array.from(spaceIds);
+}
+
+export type LoadBusinessIntelligenceArgs = {
+  supabase: SupabaseClient;
+  businessProfileId: string;
+  question: string;
+  profileNames: Record<string, string>;
+  /** Claims from the previous assistant message (for EVIDENCE_REQUEST). */
+  priorClaims?: unknown;
+  plan?: BusinessQueryPlan;
+};
+
+/**
+ * Intent-dependent Business Intelligence retrieval.
+ * Does not run every subsystem for every question.
+ */
+export async function loadBusinessIntelligence(
+  args: LoadBusinessIntelligenceArgs
+): Promise<BusinessIntelligenceBundle> {
+  const plan = args.plan ?? planBusinessQuery(args.question);
+  const spaceIds = await resolvePackSpaceIds(
+    args.supabase,
+    args.businessProfileId
+  );
+  const priorClaims = parseClaimsJson(args.priorClaims);
+
+  const sections: string[] = [];
+  let entity360 = null as BusinessIntelligenceBundle["entity360"];
+  const relationshipAnswers: string[] = [];
+  let proposalFollowUps: BusinessIntelligenceBundle["proposalFollowUps"] = [];
+  let commitmentsByClient: BusinessIntelligenceBundle["commitmentsByClient"] =
+    [];
+  let advisory: BusinessIntelligenceBundle["advisory"] = [];
+  let claims: GideonClaim[] = [];
+  let ontologyHitCount = 0;
+  let structuredHitCount = 0;
+  let evidenceSelected = 0;
+  let filteredSystemMetadata = 0;
+
+  // --- EVIDENCE_REQUEST: prior claims only ---
+  if (plan.intent === "EVIDENCE_REQUEST") {
+    const evidenceText = formatEvidenceAnswerFromClaims(priorClaims);
+    sections.push("EVIDENCE REQUEST MODE:");
+    sections.push(
+      "Answer using PRIOR CLAIMS only. Do not invent new sources or run a broad search narrative."
+    );
+    sections.push("");
+    sections.push(formatClaimsForGideon(priorClaims, "PRIOR CLAIMS"));
+    sections.push("");
+    sections.push("SUGGESTED USER-FACING ANSWER DRAFT:");
+    sections.push(evidenceText);
+    claims = priorClaims;
+    evidenceSelected = priorClaims.reduce(
+      (n, c) => n + c.evidence.length,
+      0
+    );
+
+    const observability = buildBiObservability({
+      question: args.question,
+      plan,
+      evidenceSelected,
+      claimsGenerated: claims.length,
+    });
+    logBusinessIntelligenceTrace(observability);
+
+    return {
+      plan,
+      entity360: null,
+      relationshipAnswers: [],
+      proposalFollowUps: [],
+      commitmentsByClient: [],
+      advisory: [],
+      priorClaims,
+      claims,
+      promptBlock: formatBusinessIntelligenceBlock({ plan, sections }),
+      observability,
+    };
+  }
+
+  // Shared proposals load when structured data is required
+  let proposals = [];
+  if (plan.requiresStructuredData) {
+    const { data: proposalRows } = await args.supabase
+      .from("proposals")
+      .select(PROPOSAL_SELECT)
+      .eq("business_profile_id", args.businessProfileId)
+      .order("updated_at", { ascending: false })
+      .limit(40);
+    proposals = (proposalRows ?? []).map((row) => mapProposalRow(row));
+    structuredHitCount += proposals.length;
+  }
+
+  if (plan.intent === "ENTITY_360") {
+    const mention = plan.entities[0];
+    if (mention) {
+      const built = await buildEntity360(args.supabase, {
+        spaceIds,
+        businessProfileId: args.businessProfileId,
+        mention,
+        profileNames: args.profileNames,
+      });
+      if (built) {
+        entity360 = built.entity360;
+        ontologyHitCount =
+          built.entity360.relationships.length +
+          built.entity360.people.length +
+          built.entity360.projects.length;
+        evidenceSelected = built.entity360.evidence.length;
+        claims = mergeClaims(claims, built.claims);
+        sections.push("ENTITY 360 (synthesize into a business summary; do not dump raw lists):");
+        sections.push(formatEntity360ForGideon(built.entity360));
+      } else {
+        sections.push(
+          `ENTITY 360: I could not resolve "${mention}" to a canonical Guardian entity. Say so clearly and ask a clarifying question.`
+        );
+      }
+    } else {
+      sections.push(
+        "ENTITY 360 requested but no entity mention was detected. Ask which client/organization to summarize."
+      );
+    }
+  }
+
+  if (plan.intent === "RELATIONSHIP_QUERY") {
+    const q = args.question.toLowerCase();
+    if (
+      /proposals?.{0,40}(but|without|no).{0,40}(active )?project/.test(q) ||
+      /clients?.{0,40}proposals?.{0,40}(no|without).{0,40}project/.test(q)
+    ) {
+      const result = await findClientsWithProposalsWithoutActiveProject(
+        args.supabase,
+        {
+          spaceIds,
+          businessProfileId: args.businessProfileId,
+          profileNames: args.profileNames,
+        }
+      );
+      relationshipAnswers.push(...result.lines);
+      claims = mergeClaims(claims, result.claims);
+      ontologyHitCount += result.lines.length;
+      sections.push("RELATIONSHIP ANALYSIS (proposals without active project):");
+      sections.push(result.lines.join("\n"));
+    } else {
+      const mention = plan.entities[0] ?? "client";
+      const result = await describeEntityRelationships(args.supabase, {
+        spaceIds,
+        mention,
+      });
+      relationshipAnswers.push(...result.lines);
+      claims = mergeClaims(claims, result.claims);
+      ontologyHitCount += result.lines.length;
+      sections.push("RELATIONSHIP TRAVERSAL:");
+      sections.push(result.lines.join("\n"));
+    }
+  }
+
+  if (
+    plan.intent === "PROPOSAL_ANALYSIS" ||
+    plan.intent === "ADVISORY" ||
+    plan.intent === "BUSINESS_STATUS"
+  ) {
+    const ranked = rankProposalFollowUps(proposals, {
+      profileNames: args.profileNames,
+    });
+    proposalFollowUps = ranked.candidates;
+    claims = mergeClaims(claims, ranked.claims);
+    sections.push(formatProposalFollowUpsForGideon(ranked.candidates));
+  }
+
+  if (plan.intent === "COMMITMENT_ANALYSIS" || plan.intent === "ADVISORY") {
+    // Build entity name map for commitment grouping
+    const { data: clients } = await args.supabase
+      .from("ontology_entities")
+      .select("id, name, description, entity_type")
+      .in("profile_id", spaceIds)
+      .in("entity_type", ["client", "organization"])
+      .neq("review_status", "rejected")
+      .limit(80);
+
+    const entityNames: Record<string, string> = {};
+    for (const c of clients ?? []) {
+      if (
+        shouldExcludeFromBusinessOntology({
+          name: String(c.name),
+          description: c.description ? String(c.description) : null,
+          entityType: String(c.entity_type),
+        })
+      ) {
+        filteredSystemMetadata += 1;
+        continue;
+      }
+      entityNames[String(c.id)] = String(c.name);
+    }
+
+    const grouped = await groupCommitmentsByClient(args.supabase, {
+      organizationId: args.businessProfileId,
+      entityNames,
+    });
+    commitmentsByClient = grouped.groups;
+    claims = mergeClaims(claims, grouped.claims);
+
+    if (plan.intent === "COMMITMENT_ANALYSIS") {
+      sections.push("COMMITMENTS BY CLIENT (preserve status: PROPOSED vs RECOMMENDED vs AGREED/COMMITTED):");
+      if (!grouped.groups.length) {
+        sections.push(
+          "No first-class commitments stored yet. You may note proposed deliverables from PROPOSALS if present, labeled PROPOSED — never as AGREED unless accepted."
+        );
+        if (proposals.length) {
+          sections.push("", "PROPOSAL DELIVERABLES (status from proposal only):");
+          for (const p of proposals.slice(0, 10)) {
+            const client =
+              args.profileNames[p.client_profile_id]?.trim() || "Client";
+            const status =
+              p.status === "accepted"
+                ? "AGREED"
+                : p.status === "sent" || p.status === "viewed"
+                  ? "PROPOSED"
+                  : "UNKNOWN";
+            const deliverables = p.deliverables?.length
+              ? p.deliverables.map((d) => d.title)
+              : [p.title];
+            for (const d of deliverables.slice(0, 4)) {
+              sections.push(`• ${client}: [${status}] ${d}`);
+              claims.push({
+                claim: `${client}: ${d} [${status}]`,
+                kind: "KNOWN_FACT",
+                confidence: p.status === "accepted" ? 0.85 : 0.6,
+                evidence: [
+                  {
+                    sourceId: p.id,
+                    sourceType: "proposal",
+                    label: p.title,
+                    href: `/proposals/${p.id}`,
+                    reference: status,
+                  },
+                ],
+              });
+            }
+          }
+        }
+      } else {
+        for (const g of grouped.groups) {
+          sections.push(`${g.clientName}:`);
+          for (const c of g.commitments) {
+            sections.push(
+              `  • [${c.status}] ${c.description}${c.dueDate ? ` (due ${c.dueDate})` : ""}`
+            );
+          }
+        }
+      }
+    }
+  }
+
+  if (plan.intent === "ADVISORY") {
+    const dueSoon = commitmentsByClient.flatMap((g) =>
+      g.commitments
+        .filter((c) => c.dueDate)
+        .map((c) => ({
+          clientName: g.clientName,
+          description: c.description,
+          dueDate: c.dueDate!,
+          status: c.status,
+        }))
+    );
+
+    const risks: Array<{
+      title: string;
+      summary: string;
+      entityId?: string;
+      evidenceLabel?: string;
+    }> = [];
+    if (entity360?.risks.length) {
+      for (const r of entity360.risks) {
+        risks.push({
+          title: r.name,
+          summary: r.summary ?? "Risk noted in Guardian.",
+          entityId: r.id,
+          evidenceLabel: r.name,
+        });
+      }
+    }
+
+    const built = buildAdvisoryInsights({
+      proposalFollowUps,
+      commitmentDueSoon: dueSoon,
+      risks,
+      gaps: [
+        {
+          title: "Missing information",
+          summary:
+            "Prefer stating uncertainty when Guardian lacks confirmation (e.g. remediation completion).",
+        },
+      ],
+    });
+    advisory = built.insights;
+    claims = mergeClaims(claims, built.claims);
+    sections.push(formatAdvisoryForGideon(built.insights));
+  }
+
+  if (plan.intent === "PROJECT_ANALYSIS") {
+    sections.push(
+      "PROJECT ANALYSIS: Prefer ontology project entities and HAS_PROJECT / WORKS_ON relationships. Do not invent active projects."
+    );
+  }
+
+  sections.push("");
+  sections.push(formatClaimsForGideon(claims));
+
+  const observability = buildBiObservability({
+    question: args.question,
+    plan,
+    ontologyHitCount,
+    structuredHitCount,
+    evidenceSelected: evidenceSelected || claims.reduce((n, c) => n + c.evidence.length, 0),
+    claimsGenerated: claims.length,
+    filteredSystemMetadata,
+  });
+  logBusinessIntelligenceTrace(observability);
+
+  return {
+    plan,
+    entity360,
+    relationshipAnswers,
+    proposalFollowUps,
+    commitmentsByClient,
+    advisory,
+    priorClaims,
+    claims,
+    promptBlock: formatBusinessIntelligenceBlock({ plan, sections }),
+    observability,
+  };
+}
+
+/** Whether document hybrid search should run for this BI plan. */
+export function biPlanRequiresDocumentSearch(plan: BusinessQueryPlan): boolean {
+  return plan.requiresSearch;
+}

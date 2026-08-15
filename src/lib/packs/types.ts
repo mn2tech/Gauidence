@@ -198,4 +198,4 @@ export type DashboardCardData = {
 };
 
 export const GUARDIAN_BUSINESS_PACK_SLUG = "guardian-business";
-export const GUARDIAN_BUSINESS_PACK_VERSION = "1.0.0";
+export const GUARDIAN_BUSINESS_PACK_VERSION = "1.1.0";

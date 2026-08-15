@@ -68,10 +68,10 @@ const KNOWLEDGE_FIND =
 
 /** Business Pack / organizational intelligence questions (keep narrow — avoid forcing RAG). */
 const KNOWLEDGE_BUSINESS =
-  /\b((what|which|our|my|the) clients?\b|clients? (are|do|we|we'?re)|working with|everything we know about|what proposals?\b|proposals? (are|have|outstanding)|what contracts?\b|contracts? (expire|expiring|outstanding)|what projects?\b|projects? (associated|for|with)|who (is|are) working on|what did we promise|business relationships?|show me everything we know)\b/i;
+  /\b((what|which|our|my|the) clients?\b|clients? (are|do|we|we'?re)|working with|everything we know about|what proposals?\b|proposals? (are|have|outstanding|need)|what contracts?\b|contracts? (expire|expiring|outstanding)|what projects?\b|projects? (associated|for|with)|who (is|are) working on|what did we promise|what commitments?\b|commitments? (have|did|to)|business relationships?|what relationships?\b|relationships? (do we|with)|show me everything we know|where did you get)\b/i;
 
 const BUSINESS_ADVISORY =
-  /\b(what should i (follow up|focus|do|prioritize)|what needs (my )?attention|which proposals? have not|follow[- ]?up on)\b/i;
+  /\b(what should i (follow up|focus|do|prioritize)|what needs (my )?attention|which proposals? have not|follow[- ]?up on|focus on next)\b/i;
 
 const CALENDAR_READ =
   /\b((what|which|any) (meetings?|events?|appointments?) (do i have|are there)|meetings? (do i have|today|tomorrow)|today'?s (meetings?|calendar|schedule)|what(?:'s| is) on my (calendar|schedule)|show me my (calendar|meetings?)|check my (calendar|meetings?)|my calendar)\b/i;

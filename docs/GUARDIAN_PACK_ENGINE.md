@@ -142,10 +142,10 @@ Pack
 |-------|-------|
 | Name | Guardian Business |
 | Slug | `guardian-business` |
-| Version | `1.0.0` |
+| Version | `1.1.0` (BI; `1.0.0` remains published) |
 | Pack number | 1 |
 
-Entity types include: organization, person, employee, contractor, client, contact, opportunity, proposal, contract, project, policy, procedure, task.
+Entity types include: organization, person, employee, contractor, client, contact, opportunity, proposal, contract, project, policy, procedure, task, **commitment**.
 
 Relationships include: EMPLOYS, ENGAGES, SERVES, CONTACT_FOR, WORKS_ON, HAS_PROJECT, HAS_CONTRACT, PROPOSED_TO, RELATES_TO, MAY_BECOME, GOVERNS, APPLIES_TO, SUPPORTS, ASSIGNED_TO, TASK_RELATES_TO.
 
@@ -162,14 +162,18 @@ Existing documents are never moved or duplicated. Analysis is opt-in after insta
 
 ## Gideon integration
 
-Installing Guardian Business enables the **Business Chief of Staff** skill (`pack_gideon_skills.prompt_addon`).
+Installing Guardian Business enables the **Business Chief of Staff** and **Business Intelligence** skills (`pack_gideon_skills.prompt_addon`).
 
-When a business Space has the Pack installed:
+When a business Space has the Pack installed (and Pack Engine is enabled):
 
 1. Intent router treats business questions as knowledge (and advisory as combined CoS + knowledge).
-2. `buildContext` loads pack skill prompt addons into the system prompt.
-3. Answers should distinguish **Known from Guardian data** vs **Gideon's recommendation**.
-4. Ontology + proposals + documents + connectors remain the evidence sources.
+2. **V1.1 Query Planner** classifies business intents (`ENTITY_360`, `RELATIONSHIP_QUERY`, `PROPOSAL_ANALYSIS`, `COMMITMENT_ANALYSIS`, `EVIDENCE_REQUEST`, `ADVISORY`, …) and selects retrieval strategy.
+3. `buildContext` loads a `BUSINESS INTELLIGENCE` block (Entity 360, relationship analysis, proposal follow-up scores, commitments, advisory ranks, claims) — not a raw extraction dump.
+4. Answers must distinguish **Known from Guardian data** vs **Gideon's recommendation**.
+5. Claim/evidence refs are stored on `vault_chat_messages.claims` so “Where did you get that?” uses prior claims.
+6. Ontology + proposals + documents + connectors remain evidence sources; system/process metadata is filtered from client facts.
+
+See **`docs/GIDEON_BUSINESS_INTELLIGENCE.md`** for full V1.1 architecture.
 
 ## Security model
 
@@ -188,7 +192,9 @@ GUARDIAN_ONTOLOGY_ENABLED=true
 
 ## Versioning
 
-`pack_versions` supports `1.0.0` → `1.1.0` → `2.0.0`. Installs store `pack_version_id`. Future upgrades should migrate configuration without destroying Space links (`profile_pack_spaces`).
+`pack_versions` supports `1.0.0` → `1.1.0` → `2.0.0`. Installs store `pack_version_id`. Catalog “latest” is the newest published version by `published_at`. Future upgrades should migrate configuration without destroying Space links (`profile_pack_spaces`).
+
+Migration `0083_gideon_business_intelligence.sql` seeds Guardian Business **1.1.0**, `business_commitments`, `business_insights`, and `vault_chat_messages.claims`.
 
 ## App code map
 
@@ -227,19 +233,21 @@ on conflict (slug) do update set name = excluded.name, updated_at = now();
 -- then pack_versions + child definition tables for 1.0.0
 ```
 
-## V1 success checklist
+## V1 / V1.1 success checklist
 
 1. Settings → Packs shows Guardian Business  
 2. Install on a business Space with recommended Space checkboxes  
 3. Analyze existing knowledge (explicit)  
 4. Ontology Explorer shows entities, relationships, evidence  
-5. Gideon answers “Show me everything we know about Proxdose” from ontology + evidence  
-6. Gideon answers “What should I follow up on?” with facts vs recommendations labeled  
+5. Gideon answers “Show me everything we know about Proxdose” as Entity 360 summary (not raw dump)  
+6. Gideon answers relationship / proposal / commitment / evidence / advisory acceptance questions with correct strategies  
+7. System/process metadata is not presented as client facts  
 
 ## Tests
 
 ```bash
 npx tsx --require ./scripts/stub-server-only.cjs --test src/lib/packs/__tests__/packs.test.ts
+npx tsx --require ./scripts/stub-server-only.cjs --test src/lib/gideon/business/__tests__/businessIntelligence.test.ts
 ```
 
-Covered: feature flag, Space reuse, relationship normalization, Gideon routing for business / advisory questions, skill prompt formatting.
+Covered: feature flag, Space reuse, relationship normalization, Gideon routing for business / advisory questions, skill prompt formatting, query planner intents, knowledge filter, proposal follow-up scoring, claims/evidence, advisory ranking, commitment status distinction.

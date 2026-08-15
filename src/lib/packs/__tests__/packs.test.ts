@@ -66,9 +66,9 @@ describe("pack space reuse", () => {
 });
 
 describe("pack constants", () => {
-  it("seeds Guardian Business as pack #001 v1.0.0", () => {
+  it("seeds Guardian Business as pack #001 v1.1.0", () => {
     assert.equal(GUARDIAN_BUSINESS_PACK_SLUG, "guardian-business");
-    assert.equal(GUARDIAN_BUSINESS_PACK_VERSION, "1.0.0");
+    assert.equal(GUARDIAN_BUSINESS_PACK_VERSION, "1.1.0");
   });
 });
 
@@ -156,7 +156,7 @@ describe("gideon business pack routing", () => {
 
   it("exposes business quick actions", () => {
     const actions = buildBusinessQuickActions();
-    assert.ok(actions.some((a) => /follow up/i.test(a.prompt)));
+    assert.ok(actions.some((a) => /follow-up|focus on next|proposals/i.test(a.prompt)));
   });
 });
 

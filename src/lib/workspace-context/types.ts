@@ -44,6 +44,8 @@ export type WorkspaceContextBlocks = {
   workMemory: string;
   structuredKnowledge: string;
   ontology: string;
+  /** Guardian Business Pack V1.1 — intent-based BI briefing. */
+  businessIntelligence: string;
 };
 
 /** Options that modify how the system prompt is assembled. */
@@ -75,4 +77,6 @@ export type WorkspacePromptOptions = {
 export type WorkspaceContextData = WorkspaceContextMeta & {
   blocks: WorkspaceContextBlocks;
   promptOptions: WorkspacePromptOptions;
+  /** Structured claims for persistence / evidence follow-ups (Business Pack). */
+  businessClaims?: import("@/lib/gideon/business").GideonClaim[];
 };

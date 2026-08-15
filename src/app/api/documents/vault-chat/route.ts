@@ -105,6 +105,7 @@ type ChatMessageRow = {
     sourceType?: string;
     mimeType?: string | null;
   }[];
+  claims?: unknown;
   vaultScope?: {
     profileId: string;
     profileName: string;
@@ -1091,7 +1092,7 @@ export async function POST(request: Request) {
 
   const { data: priorRows } = await supabase
     .from("vault_chat_messages")
-    .select("id, role, content, citations, created_at")
+    .select("id, role, content, citations, claims, created_at")
     .eq("chat_id", chatId)
     .order("created_at", { ascending: true });
 
@@ -1313,7 +1314,12 @@ export async function POST(request: Request) {
         timeZone: userTz,
       });
 
-      const { chunks, context: workspaceContext, explicitSpaceName, connectorCitations } =
+      const priorAssistantClaims =
+        [...(priorMessages ?? [])]
+          .reverse()
+          .find((row) => row.role === "assistant")?.claims ?? [];
+
+      const { chunks, context: workspaceContext, explicitSpaceName, connectorCitations, businessClaims } =
         await loadWorkspaceContext({
         supabase,
         user,
@@ -1329,6 +1335,7 @@ export async function POST(request: Request) {
         calendarNote,
         focusBlockNote,
         confirmationRequired: gideonRoute.confirmationRequired,
+        priorClaims: priorAssistantClaims,
       });
 
       workspaceContext.promptOptions.agentMode = agentMode;
@@ -1421,6 +1428,7 @@ export async function POST(request: Request) {
           explicitSpaceName,
           ontologyBlock: workspaceContext.blocks.ontology,
           connectorCitations,
+          claims: businessClaims ?? workspaceContext.businessClaims ?? [],
         });
       }
     } catch (err) {

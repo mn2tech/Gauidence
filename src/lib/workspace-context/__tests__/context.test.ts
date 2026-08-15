@@ -122,6 +122,7 @@ describe("buildGideonSystemPrompt", () => {
         workMemory: "(none — user has no active work projects)",
         structuredKnowledge: "(none)",
         ontology: "(none)",
+        businessIntelligence: "(none)",
       },
       promptOptions: {
         timeZone: "America/New_York",

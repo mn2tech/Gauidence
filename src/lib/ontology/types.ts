@@ -17,6 +17,7 @@ export const ONTOLOGY_ENTITY_TYPES = [
   "policy",
   "procedure",
   "task",
+  "commitment",
   "invoice",
   "document",
   "place",

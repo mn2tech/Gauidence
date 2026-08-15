@@ -84,6 +84,8 @@ export type VaultChatStreamArgs = {
   ontologyBlock?: string | null;
   /** Connected-source files from ontology — always attach as openable citations. */
   connectorCitations?: VaultChatStreamMessage["citations"];
+  /** Business Pack claim/evidence payload to persist with the assistant message. */
+  claims?: unknown;
 };
 
 export function createVaultChatStreamResponse(
@@ -254,6 +256,7 @@ export function createVaultChatStreamResponse(
               role: "assistant",
               content: answer,
               citations,
+              claims: Array.isArray(args.claims) ? args.claims : [],
             })
             .select("id, role, content, citations, created_at")
             .single();

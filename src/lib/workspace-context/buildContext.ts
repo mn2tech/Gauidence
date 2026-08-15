@@ -84,6 +84,13 @@ import {
   isBusinessAdvisoryQuestion,
   isBusinessKnowledgeQuestion,
 } from "@/lib/packs/gideon";
+import {
+  biPlanRequiresDocumentSearch,
+  isBusinessIntelligenceQuestion,
+  loadBusinessIntelligence,
+  planBusinessQuery,
+  type GideonClaim,
+} from "@/lib/gideon/business";
 import { loadCollaboratorMemberAccounts } from "@/lib/profiles/collaboratorMembers";
 import type { LinkedVaultProfile } from "@/lib/vault/rollup";
 import { loadLinkedOrgContext } from "./linkedProfiles";
@@ -109,6 +116,8 @@ export type LoadWorkspaceContextArgs = {
   calendarNote?: string;
   focusBlockNote?: string;
   confirmationRequired?: boolean;
+  /** Claims from the previous assistant turn (Business Pack evidence follow-ups). */
+  priorClaims?: unknown;
 };
 
 export type WorkspaceContextResult = {
@@ -117,6 +126,7 @@ export type WorkspaceContextResult = {
   explicitSpaceName?: string | null;
   /** Connected-source files matched via ontology (openable from Ask Gideon). */
   connectorCitations?: VaultChatCitation[];
+  businessClaims?: GideonClaim[];
 };
 
 /** Fetch retrieval results and formatted context blocks for Gideon. */
@@ -144,6 +154,22 @@ export async function loadWorkspaceContext(
   const fullLogQuote = wantsFullDailyLogQuote(question);
   const { activeProfile, retrievalScopes, searchProfileIds, profileNames } =
     meta;
+
+  const packEngineOn = isGuardianPackEngineEnabled({ email: user.email });
+  const orgSpace = isOrgStyleProfile(activeProfile.profile_type);
+  const businessPlan =
+    packEngineOn &&
+    orgSpace &&
+    activeProfile.profile_type !== "client" &&
+    (isBusinessIntelligenceQuestion(question) ||
+      isBusinessKnowledgeQuestion(question) ||
+      isBusinessAdvisoryQuestion(question))
+      ? planBusinessQuery(question)
+      : null;
+  const runDocumentSearch =
+    load.documents &&
+    (!businessPlan || biPlanRequiresDocumentSearch(businessPlan));
+
   const scopeCandidates = meta.accessibleProfiles.map((p) => ({
     id: p.id,
     display_name: p.display_name,
@@ -182,7 +208,7 @@ export async function loadWorkspaceContext(
 
   const embeddingStarted = Date.now();
   const queryEmbedding =
-    load.documents && chunkCount > 0 && !songListOnly
+    runDocumentSearch && chunkCount > 0 && !songListOnly
       ? await embedQuery(retrievalQuestion).catch((embedErr) => {
           console.warn(
             "Vault chat embedding failed; continuing without document search:",
@@ -238,18 +264,29 @@ export async function loadWorkspaceContext(
   const loadProposals =
     isOrgStyleProfile(activeProfile.profile_type) &&
     activeProfile.profile_type !== "client" &&
-    /\b(proposal|proposals|quote|estimate)\b/i.test(retrievalQuestion);
+    (Boolean(businessPlan?.requiresStructuredData) ||
+      /\b(proposal|proposals|quote|estimate)\b/i.test(retrievalQuestion));
 
   const packSkillsNote = businessPackSkillPromptNote({
-    packEngineEnabled: isGuardianPackEngineEnabled({ email: user.email }),
-    isOrgSpace: isOrgStyleProfile(activeProfile.profile_type),
+    packEngineEnabled: packEngineOn,
+    isOrgSpace: orgSpace,
     includeSkill:
       intent === "knowledge_search" ||
       intent === "combined" ||
+      Boolean(businessPlan) ||
       (intent === "chief_of_staff" &&
         (isBusinessAdvisoryQuestion(retrievalQuestion) ||
           isBusinessKnowledgeQuestion(retrievalQuestion))),
   });
+
+  const loadOntologyContext =
+    load.documents &&
+    isGuardianOntologyEnabled() &&
+    !songListOnly &&
+    businessPlan?.intent !== "EVIDENCE_REQUEST" &&
+    (businessPlan == null ||
+      businessPlan.requiresOntology ||
+      businessPlan.requiresSearch);
 
   const [
     structuredKnowledgeBundle,
@@ -262,8 +299,9 @@ export async function loadWorkspaceContext(
     upcomingAlerts,
     linkedContext,
     workMemoryBundleRaw,
+    businessIntelligenceBundle,
   ] = await Promise.all([
-    load.documents && isKnowledgeEngineV2Enabled() && !songListOnly
+    runDocumentSearch && isKnowledgeEngineV2Enabled() && !songListOnly
       ? retrieveStructuredKnowledge(supabase, {
           question: retrievalQuestion,
           profileIds: effectiveSearchIds,
@@ -272,7 +310,7 @@ export async function loadWorkspaceContext(
           text: formatKnowledgeForGideon(knowledge, profileNames),
         }))
       : Promise.resolve({ count: 0, text: "(none)" }),
-    load.documents && isGuardianOntologyEnabled() && !songListOnly
+    loadOntologyContext
       ? getOntologyContext(supabase, {
           spaceId: ontologySpaceId,
           query: retrievalQuestion,
@@ -392,6 +430,22 @@ export async function loadWorkspaceContext(
           focused: false as const,
           bundle: { projects: [], sessionsByProject: new Map() },
         }),
+    businessPlan
+      ? loadBusinessIntelligence({
+          supabase,
+          businessProfileId: activeProfile.id,
+          question: retrievalQuestion,
+          profileNames,
+          priorClaims: args.priorClaims,
+          plan: businessPlan,
+        }).catch((err) => {
+          console.warn(
+            "Business intelligence load failed; continuing without it:",
+            err instanceof Error ? err.message : "error"
+          );
+          return null;
+        })
+      : Promise.resolve(null),
   ]);
 
   knowledgeCandidateCount = structuredKnowledgeBundle.count;
@@ -542,6 +596,8 @@ Active space in the UI: ${activeProfile.display_name}. Document search includes 
         "(none — user has no active work projects)",
       structuredKnowledge: structuredKnowledgeContext,
       ontology: ontologyContext,
+      businessIntelligence:
+        businessIntelligenceBundle?.promptBlock?.trim() || "(none)",
     },
     promptOptions: {
       timeZone,
@@ -566,6 +622,7 @@ Active space in the UI: ${activeProfile.display_name}. Document search includes 
       confirmationRequired,
       packSkillsNote: packSkillsNote || undefined,
     },
+    businessClaims: businessIntelligenceBundle?.claims,
   };
 
   const contextBuildDurationMs = Date.now() - contextBuildStarted;
@@ -589,5 +646,6 @@ Active space in the UI: ${activeProfile.display_name}. Document search includes 
     chunks,
     explicitSpaceName: explicitSpace?.display_name ?? null,
     connectorCitations,
+    businessClaims: businessIntelligenceBundle?.claims,
   };
 }

@@ -186,6 +186,32 @@ export function connectorOntologyUsesCatalog(args: {
   return Boolean(args.listCharts && !args.titlePhrase);
 }
 
+/** Extract hostname-like domain from a name or URL. */
+export function extractDomainHint(text: string): string | null {
+  const trimmed = text.trim().toLowerCase();
+  const urlMatch = trimmed.match(
+    /(?:https?:\/\/)?(?:www\.)?([a-z0-9][a-z0-9-]{1,40}\.(?:com|io|net|org|co))\b/
+  );
+  return urlMatch?.[1] ?? null;
+}
+
+/**
+ * Org/client names that differ only by LLC / domain should share one key.
+ * e.g. Proxdose, PROXDOSE, Proxdose LLC, proxdose.com → "proxdose"
+ */
+export function canonicalizeOrganizationKey(name: string): string {
+  let normalized = normalizeEntityName(name);
+  const domain = extractDomainHint(name);
+  if (domain) {
+    normalized = normalizeEntityName(domain.replace(/\.[a-z.]+$/, ""));
+  }
+  normalized = normalized
+    .replace(/\b(llc|inc|corp|ltd|co|llp|plc)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return normalized;
+}
+
 /** Levenshtein distance for conservative fuzzy matching. */
 export function levenshteinDistance(a: string, b: string): number {
   if (a === b) return 0;

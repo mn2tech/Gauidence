@@ -8,6 +8,7 @@ import type {
   OntologyPersistStats,
 } from "./types";
 import { reviewStatusForConfidence } from "./types";
+import { shouldExcludeFromBusinessOntology } from "@/lib/gideon/business/knowledgeFilter";
 
 export type PersistOntologyInput = {
   userId: string;
@@ -47,6 +48,17 @@ export async function persistOntologyExtraction(
   for (const extracted of input.extraction.entities) {
     const key = normalizeEntityName(extracted.name);
     if (!key) continue;
+
+    // Keep Guardian system/process metadata out of normal business ontology.
+    if (
+      shouldExcludeFromBusinessOntology({
+        name: extracted.name,
+        description: extracted.description,
+        entityType: extracted.type,
+      })
+    ) {
+      continue;
+    }
 
     const result = await resolveOntologyEntity(supabase, {
       spaceId: input.profileId,

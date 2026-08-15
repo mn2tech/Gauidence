@@ -104,6 +104,11 @@ export function buildGideonSystemPrompt(
     blocks.ontology.trim() !== "(none)"
       ? `When ONTOLOGY has matches, always answer using those entities and relationships — including when the user sends a short name or keyword (for example "Onyx"). If INVOICE SUMMARY is present, answer in 2–5 plain sentences from that summary (amount, parties, date). Do not dump MATCHED ENTITIES or RELATIONSHIPS lists unless the user asked about connections. Never return a blank reply when ONTOLOGY is non-empty.`
       : "";
+  const businessIntelNote =
+    (blocks.businessIntelligence ?? "").trim() &&
+    (blocks.businessIntelligence ?? "").trim() !== "(none)"
+      ? `When BUSINESS INTELLIGENCE is present, prefer it for organizational answers. Synthesize Entity 360 / relationship / proposal / commitment / advisory sections into a concise business briefing. Separate Known from Guardian vs Gideon recommendation. Do not expose internal retrieval plans or system/process metadata as client facts.`
+      : "";
 
   const chiefOfStaffNote =
     intent === "chief_of_staff" || intent === "combined"
@@ -177,6 +182,11 @@ export function buildGideonSystemPrompt(
       blocks.ontology,
       searchedKnowledge
     ),
+    namedBlock(
+      "BUSINESS INTELLIGENCE (Guardian Business Pack — prefer this over raw ontology dumps for Entity 360, relationships, proposals, commitments, advisory, and evidence questions)",
+      blocks.businessIntelligence ?? "(none)",
+      true
+    ),
   ]
     .filter(Boolean)
     .join("");
@@ -200,6 +210,7 @@ ${pictureNote}
 ${searchedKnowledge ? vaultEmptyNote : ""}
 ${fullLogNote}
 ${ontologyNote}
+${businessIntelNote}
 ${actionNotes}
 ${clientRequestCreateNote}
 ${spaceCreateNote}

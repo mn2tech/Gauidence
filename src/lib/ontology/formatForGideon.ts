@@ -1,5 +1,6 @@
 import type { OntologyContext, OntologyEntity } from "./types";
 import { readContentTranscript } from "./pipeline/enrichWithTranscript";
+import { shouldExcludeFromBusinessOntology } from "@/lib/gideon/business/knowledgeFilter";
 
 /**
  * Compact one-hop ontology block for Gideon's system prompt.
@@ -19,6 +20,15 @@ export function formatOntologyForGideon(ctx: OntologyContext): string {
   const invoices = pickInvoiceEntities(ctx.matchedEntities);
   const blocks: string[] = [];
 
+  const businessEntities = ctx.matchedEntities.filter(
+    (entity) =>
+      !shouldExcludeFromBusinessOntology({
+        name: entity.name,
+        description: entity.description,
+        entityType: entity.entity_type,
+      })
+  );
+
   if (invoices.length > 0) {
     blocks.push("INVOICE SUMMARY (answer the user from this first; list each invoice, then TOTAL):");
     for (const invoice of invoices.slice(0, 12)) {
@@ -36,11 +46,11 @@ export function formatOntologyForGideon(ctx: OntologyContext): string {
     }
   }
 
-  if (ctx.matchedEntities.length > 0) {
+  if (businessEntities.length > 0) {
     if (invoices.length) blocks.push("");
     blocks.push("MATCHED ENTITIES:");
     // Keep prompt compact: prefer invoices/orgs/people over duplicate events.
-    const entities = rankEntitiesForPrompt(ctx.matchedEntities);
+    const entities = rankEntitiesForPrompt(businessEntities);
     const entityLimit =
       entities.length > 12 ? Math.min(entities.length, 40) : invoices.length > 1 ? 12 : 5;
     for (const entity of entities.slice(0, entityLimit)) {
@@ -97,6 +107,13 @@ export function formatOntologyForGideon(ctx: OntologyContext): string {
     for (const ev of ctx.evidence.slice(0, 5)) {
       const text = (ev.evidence_text ?? "").trim().slice(0, 120);
       if (!text) continue;
+      if (
+        shouldExcludeFromBusinessOntology({
+          name: text,
+        })
+      ) {
+        continue;
+      }
       const connectorNote =
         ev.source_type === "connector"
           ? " [connected source — user can Open file from citations]"

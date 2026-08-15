@@ -6,6 +6,8 @@ import {
   isFuzzyMatchAllowed,
   nameSimilarity,
   normalizeEntityName,
+  canonicalizeOrganizationKey,
+  extractDomainHint,
 } from "./normalize";
 import type {
   EntityResolutionResult,
@@ -27,6 +29,8 @@ export type ResolveOntologyEntityInput = {
   description?: string;
   properties?: Record<string, unknown>;
 };
+
+export { canonicalizeOrganizationKey, extractDomainHint };
 
 async function findByCanonicalName(
   supabase: SupabaseClient,
@@ -221,10 +225,79 @@ export async function resolveOntologyEntity(
     const entity = await mergeEntityProperties(
       supabase,
       byAlias,
-      input.properties,
+      withDomainProperty(input),
       input.description
     );
     return { entity, created: false, matchType: "alias" };
+  }
+
+  // Organization/client: Proxdose ≈ Proxdose LLC ≈ proxdose.com (single unambiguous hit only)
+  if (
+    input.entityType === "organization" ||
+    input.entityType === "client"
+  ) {
+    const orgKey = canonicalizeOrganizationKey(input.name);
+    const domain = extractDomainHint(input.name);
+    if (orgKey && orgKey !== normalized) {
+      const byOrgKey = await findByCanonicalName(
+        supabase,
+        input.spaceId,
+        input.entityType,
+        orgKey
+      );
+      if (byOrgKey) {
+        await ensureAliases(
+          supabase,
+          input.spaceId,
+          byOrgKey.id,
+          [input.name, ...(input.aliases ?? []), ...(domain ? [domain] : [])],
+          byOrgKey.canonical_name ?? orgKey
+        );
+        const entity = await mergeEntityProperties(
+          supabase,
+          byOrgKey,
+          withDomainProperty(input),
+          input.description
+        );
+        return { entity, created: false, matchType: "alias" };
+      }
+      const byOrgAlias = await findByAlias(supabase, input.spaceId, orgKey);
+      if (byOrgAlias) {
+        await ensureAliases(
+          supabase,
+          input.spaceId,
+          byOrgAlias.id,
+          [input.name, ...(input.aliases ?? []), ...(domain ? [domain] : [])],
+          byOrgAlias.canonical_name ?? orgKey
+        );
+        const entity = await mergeEntityProperties(
+          supabase,
+          byOrgAlias,
+          withDomainProperty(input),
+          input.description
+        );
+        return { entity, created: false, matchType: "alias" };
+      }
+    }
+    if (domain) {
+      const byDomainAlias = await findByAlias(supabase, input.spaceId, domain);
+      if (byDomainAlias) {
+        await ensureAliases(
+          supabase,
+          input.spaceId,
+          byDomainAlias.id,
+          [input.name, ...(input.aliases ?? []), domain],
+          byDomainAlias.canonical_name ?? normalized
+        );
+        const entity = await mergeEntityProperties(
+          supabase,
+          byDomainAlias,
+          withDomainProperty(input),
+          input.description
+        );
+        return { entity, created: false, matchType: "alias" };
+      }
+    }
   }
 
   const fuzzy = await findByFuzzyMatch(
@@ -247,17 +320,37 @@ export async function resolveOntologyEntity(
     const entity = await mergeEntityProperties(
       supabase,
       fuzzy,
-      input.properties,
+      withDomainProperty(input),
       input.description
     );
     return { entity, created: false, matchType: "fuzzy" };
   }
 
-  const entity = await createEntity(supabase, input, normalized);
-  const allAliases = [input.name, ...(input.aliases ?? [])];
+  const createInput = {
+    ...input,
+    properties: withDomainProperty(input),
+  };
+  const entity = await createEntity(supabase, createInput, normalized);
+  const domain = extractDomainHint(input.name);
+  const allAliases = [
+    input.name,
+    ...(input.aliases ?? []),
+    ...(domain ? [domain] : []),
+  ];
   await ensureAliases(supabase, input.spaceId, entity.id, allAliases, normalized);
 
   return { entity, created: true, matchType: "created" };
+}
+
+function withDomainProperty(
+  input: ResolveOntologyEntityInput
+): Record<string, unknown> | undefined {
+  const domain = extractDomainHint(input.name);
+  if (!domain && !input.properties) return input.properties;
+  return {
+    ...(input.properties ?? {}),
+    ...(domain ? { domain } : {}),
+  };
 }
 
 async function mergeEntityProperties(
