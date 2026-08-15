@@ -116,6 +116,7 @@ export type ProfilePackConfiguration = {
   selectedSpaceKeys?: string[];
   analyzedAt?: string | null;
   lastAnalyzeSelection?: AnalyzeKnowledgeSelection | null;
+  lastAnalyzeDocumentIds?: string[];
   [key: string]: unknown;
 };
 

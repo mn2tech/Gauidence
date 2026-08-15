@@ -1,17 +1,21 @@
 import { NextResponse } from "next/server";
 import {
   isPackAuthed,
+  requirePackSpaceAccess,
   requirePackSpaceManage,
   requirePackUser,
 } from "@/lib/packs/auth";
 import { getInstalledPack } from "@/lib/packs/catalog";
 import {
+  getAnalyzeProgress,
   previewAnalyzeKnowledge,
   startAnalyzeKnowledge,
 } from "@/lib/packs/analyze";
 import type { AnalyzeKnowledgeSelection } from "@/lib/packs/types";
 
 export const runtime = "nodejs";
+/** Enqueue stays bounded; keep headroom for parallel inserts. */
+export const maxDuration = 60;
 
 type Params = { params: Promise<{ slug: string }> };
 
@@ -32,6 +36,41 @@ function parseSelection(body: Record<string, unknown>): AnalyzeKnowledgeSelectio
     includeAllDocuments: body.includeAllDocuments === true,
     includeAllProposals: body.includeAllProposals === true,
   };
+}
+
+/** GET /api/packs/[slug]/analyze?profileId= — progress for last/current batch. */
+export async function GET(request: Request, { params }: Params) {
+  const auth = await requirePackUser();
+  if (!isPackAuthed(auth)) return auth;
+
+  const { slug } = await params;
+  const url = new URL(request.url);
+  const profileId = url.searchParams.get("profileId")?.trim() || "";
+  if (!profileId) {
+    return NextResponse.json(
+      { error: "profileId is required." },
+      { status: 400 }
+    );
+  }
+
+  const profile = await requirePackSpaceAccess(
+    auth.supabase,
+    auth.user.id,
+    profileId
+  );
+  if (!profile) {
+    return NextResponse.json({ error: "Space not found." }, { status: 404 });
+  }
+
+  const progress = await getAnalyzeProgress(auth.supabase, profileId, slug);
+  if (!progress) {
+    return NextResponse.json(
+      { error: "Pack is not installed on this Space." },
+      { status: 404 }
+    );
+  }
+
+  return NextResponse.json({ progress });
 }
 
 /** POST /api/packs/[slug]/analyze — preview or start knowledge analysis. */

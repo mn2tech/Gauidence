@@ -6,8 +6,30 @@ import type {
   PackDefinition,
   ProfilePackRow,
 } from "@/lib/packs/types";
+import { kickDocumentProcessingJobs } from "@/lib/documents/clientProcessing";
 
 type Tab = "overview" | "install" | "configure" | "analyze" | "success";
+
+type AnalyzeProgressState = {
+  total: number;
+  pending: number;
+  processing: number;
+  completed: number;
+  failed: number;
+  skipped: number;
+  percent: number;
+  running: boolean;
+  analyzedAt: string | null;
+};
+
+type AnalyzePreviewState = {
+  documents: Array<{ id: string; fileName: string }>;
+  proposals: Array<{ id: string; title: string }>;
+  sourceItems: Array<{ id: string; name: string }>;
+  needingOntology?: number;
+  totalDocumentsInScope?: number;
+  batchLimit?: number;
+};
 
 type Props = {
   slug: string;
@@ -33,14 +55,14 @@ export default function PackDetailPanel({
   const [successSpaces, setSuccessSpaces] = useState<
     Array<{ key: string; displayName: string; reused: boolean }>
   >([]);
-  const [analyzePreview, setAnalyzePreview] = useState<{
-    documents: Array<{ id: string; fileName: string }>;
-    proposals: Array<{ id: string; title: string }>;
-    sourceItems: Array<{ id: string; name: string }>;
-  } | null>(null);
+  const [analyzePreview, setAnalyzePreview] =
+    useState<AnalyzePreviewState | null>(null);
   const [includeAllDocuments, setIncludeAllDocuments] = useState(true);
-  const [includeAllProposals, setIncludeAllProposals] = useState(true);
+  const [includeAllProposals, setIncludeAllProposals] = useState(false);
   const [analyzeResult, setAnalyzeResult] = useState<string | null>(null);
+  const [analyzeProgress, setAnalyzeProgress] =
+    useState<AnalyzeProgressState | null>(null);
+  const [pollProgress, setPollProgress] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -85,6 +107,39 @@ export default function PackDetailPanel({
       setTab(initialTab);
     }
   }, [initialTab]);
+
+  const refreshAnalyzeProgress = useCallback(async () => {
+    try {
+      const res = await fetch(
+        `/api/packs/${encodeURIComponent(slug)}/analyze?profileId=${encodeURIComponent(profileId)}`
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.progress) {
+        setAnalyzeProgress(data.progress);
+        if (!data.progress.running) setPollProgress(false);
+      }
+    } catch {
+      // ignore transient poll errors
+    }
+  }, [slug, profileId]);
+
+  useEffect(() => {
+    if (tab === "analyze" && installation?.status === "installed") {
+      void refreshAnalyzeProgress();
+    }
+  }, [tab, installation?.status, refreshAnalyzeProgress]);
+
+  useEffect(() => {
+    if (!pollProgress) return;
+    void refreshAnalyzeProgress();
+    void kickDocumentProcessingJobs(4);
+    const id = window.setInterval(() => {
+      void refreshAnalyzeProgress();
+      void kickDocumentProcessingJobs(4);
+    }, 3000);
+    return () => window.clearInterval(id);
+  }, [pollProgress, refreshAnalyzeProgress]);
 
   const installed = installation?.status === "installed";
 
@@ -165,14 +220,19 @@ export default function PackDetailPanel({
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Analyze failed.");
       const r = data.result;
+      const remaining =
+        typeof r.remainingNeedingOntology === "number" &&
+        r.remainingNeedingOntology > 0
+          ? ` ${r.remainingNeedingOntology} more still need analysis — run again after this batch finishes.`
+          : "";
       setAnalyzeResult(
-        `Queued ${r.documentsQueued} document(s) for ontology extraction` +
-          (r.proposalsNoted ? `, noted ${r.proposalsNoted} proposal(s)` : "") +
-          (r.sourceItemsQueued
-            ? `, queued ${r.sourceItemsQueued} connected source item(s)`
-            : "") +
-          "."
+        `Queued ${r.documentsQueued} document(s) in the background.` +
+          remaining +
+          " You can leave this page; progress updates below."
       );
+      setPollProgress(true);
+      void kickDocumentProcessingJobs(4);
+      void refreshAnalyzeProgress();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Analyze failed");
     } finally {
@@ -404,9 +464,10 @@ export default function PackDetailPanel({
           <div>
             <h2 className="text-lg font-semibold">Analyze existing knowledge</h2>
             <p className="mt-1 text-sm text-ink-muted">
-              Guardian will not analyze everything automatically. Choose what to
-              include, preview the selection, then start. Analysis runs
-              asynchronously using the existing ontology pipeline.
+              Analysis runs in the background in small batches (up to{" "}
+              {analyzePreview?.batchLimit ?? 40} documents). Prefer Preview
+              first. Already-completed ontology is skipped so the app stays
+              responsive.
             </p>
           </div>
           <div className="space-y-3">
@@ -416,7 +477,7 @@ export default function PackDetailPanel({
                 checked={includeAllDocuments}
                 onChange={(e) => setIncludeAllDocuments(e.target.checked)}
               />
-              Documents in this Space and selected child Spaces
+              Documents in this Space and child Spaces that still need ontology
             </label>
             <label className="flex items-center gap-2 text-sm">
               <input
@@ -424,7 +485,7 @@ export default function PackDetailPanel({
                 checked={includeAllProposals}
                 onChange={(e) => setIncludeAllProposals(e.target.checked)}
               />
-              Proposals for this business
+              Note proposals for this business (not extracted yet)
             </label>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -442,16 +503,23 @@ export default function PackDetailPanel({
               onClick={() => void startAnalyze()}
               className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50"
             >
-              {busy ? "Working…" : "Start analysis"}
+              {busy ? "Queuing…" : "Start analysis batch"}
             </button>
           </div>
           {analyzePreview ? (
             <div className="rounded-xl border border-stone-200 bg-white p-4 text-sm">
-              <p className="font-medium">Will analyze:</p>
+              <p className="font-medium">This batch will queue:</p>
               <ul className="mt-2 list-disc space-y-1 pl-5 text-ink-muted">
-                <li>{analyzePreview.documents.length} document(s)</li>
-                <li>{analyzePreview.proposals.length} proposal(s)</li>
-                <li>{analyzePreview.sourceItems.length} connected source item(s)</li>
+                <li>
+                  {analyzePreview.documents.length} document(s)
+                  {typeof analyzePreview.needingOntology === "number"
+                    ? ` (${analyzePreview.needingOntology} still need ontology of ${analyzePreview.totalDocumentsInScope ?? "?"} in scope)`
+                    : ""}
+                </li>
+                <li>{analyzePreview.proposals.length} proposal(s) noted</li>
+                <li>
+                  {analyzePreview.sourceItems.length} connected source item(s)
+                </li>
               </ul>
               {analyzePreview.documents.length > 0 ? (
                 <ul className="mt-3 max-h-40 overflow-auto text-xs text-ink-muted">
@@ -466,6 +534,58 @@ export default function PackDetailPanel({
             <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
               {analyzeResult}
             </p>
+          ) : null}
+          {analyzeProgress && analyzeProgress.total > 0 ? (
+            <div className="rounded-xl border border-stone-200 bg-white p-4">
+              <div className="flex items-center justify-between gap-3 text-sm">
+                <p className="font-medium">
+                  {analyzeProgress.running
+                    ? "Analysis in progress"
+                    : "Last batch status"}
+                </p>
+                <p className="tabular-nums text-ink-muted">
+                  {analyzeProgress.percent}%
+                </p>
+              </div>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-stone-100">
+                <div
+                  className="h-full rounded-full bg-brand transition-[width] duration-500"
+                  style={{ width: `${analyzeProgress.percent}%` }}
+                />
+              </div>
+              <ul className="mt-3 grid grid-cols-2 gap-2 text-xs text-ink-muted sm:grid-cols-4">
+                <li>
+                  <span className="font-medium text-ink">
+                    {analyzeProgress.completed}
+                  </span>{" "}
+                  completed
+                </li>
+                <li>
+                  <span className="font-medium text-ink">
+                    {analyzeProgress.processing}
+                  </span>{" "}
+                  processing
+                </li>
+                <li>
+                  <span className="font-medium text-ink">
+                    {analyzeProgress.pending}
+                  </span>{" "}
+                  pending
+                </li>
+                <li>
+                  <span className="font-medium text-ink">
+                    {analyzeProgress.failed}
+                  </span>{" "}
+                  failed
+                </li>
+              </ul>
+              {analyzeProgress.running ? (
+                <p className="mt-3 text-xs text-ink-muted">
+                  Working in the background — safe to navigate away. This panel
+                  refreshes every few seconds.
+                </p>
+              ) : null}
+            </div>
           ) : null}
         </div>
       ) : null}
