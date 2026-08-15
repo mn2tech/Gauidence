@@ -180,25 +180,39 @@ async function enqueueNextStage(
 ): Promise<void> {
   const { completedStage } = args;
   if (completedStage === "analyze_document") {
-    if (!isVaultEmbeddingConfigured()) {
+    if (isVaultEmbeddingConfigured()) {
+      await supabase
+        .from("documents")
+        .update({ indexing_status: "pending", processing_step: "indexing" })
+        .eq("id", args.documentId);
+      await enqueueDocumentProcessingJob(supabase, {
+        ...args,
+        jobType: "index_document",
+      });
+      return;
+    }
+    // No embeddings — skip indexing but still run ontology when enabled
+    // (Pack analyze / OCR-before-ontology depends on this chain).
+    await supabase
+      .from("documents")
+      .update({ indexing_status: "skipped" })
+      .eq("id", args.documentId);
+    if (isGuardianOntologyEnabled()) {
       await supabase
         .from("documents")
         .update({
-          indexing_status: "skipped",
-          processing_step: "ready",
-          processing_completed_at: new Date().toISOString(),
+          ontology_status: "pending",
+          processing_step: "ontology",
         })
         .eq("id", args.documentId);
+      await enqueueDocumentProcessingJob(supabase, {
+        ...args,
+        jobType: "extract_ontology",
+        force: true,
+      });
       return;
     }
-    await supabase
-      .from("documents")
-      .update({ indexing_status: "pending", processing_step: "indexing" })
-      .eq("id", args.documentId);
-    await enqueueDocumentProcessingJob(supabase, {
-      ...args,
-      jobType: "index_document",
-    });
+    await enqueueKnowledgeOrReady(supabase, args);
     return;
   }
 
@@ -214,6 +228,7 @@ async function enqueueNextStage(
       await enqueueDocumentProcessingJob(supabase, {
         ...args,
         jobType: "extract_ontology",
+        force: true,
       });
       return;
     }
@@ -304,6 +319,7 @@ async function markJobFailed(
       .from("documents")
       .update({
         ontology_status: retryable ? "retryable" : "failed",
+        last_processing_error: message.slice(0, 500),
       })
       .eq("id", job.document_id);
   } else {
@@ -486,14 +502,57 @@ async function runIndexJob(
   return diagnostics;
 }
 
+async function documentHasExtractedText(
+  supabase: SupabaseClient,
+  documentId: string
+): Promise<boolean> {
+  const { data: extracted } = await supabase
+    .from("extracted_data")
+    .select("source_text, title, summary")
+    .eq("document_id", documentId)
+    .maybeSingle();
+  if (!extracted) return false;
+  const text =
+    String(extracted.source_text ?? "").trim() ||
+    [extracted.title, extracted.summary].filter(Boolean).join("\n").trim();
+  return Boolean(text);
+}
+
 async function runOntologyJob(
   supabase: SupabaseClient,
   userId: string,
   documentId: string,
   profileId: string,
   diagnostics: ProcessingDiagnostics
-): Promise<ProcessingDiagnostics> {
+): Promise<{ diagnostics: ProcessingDiagnostics; deferredForOcr: boolean }> {
   const ontologyStart = Date.now();
+
+  // Auto-OCR: if ontology was queued without text, run analysis first and
+  // let the pipeline re-chain to ontology after OCR completes.
+  if (!(await documentHasExtractedText(supabase, documentId))) {
+    await enqueueAnalyzePipeline(supabase, {
+      documentId,
+      profileId,
+      userId,
+    });
+    await supabase
+      .from("documents")
+      .update({
+        ontology_status: "pending",
+        processing_step: "queued",
+        last_processing_error: null,
+      })
+      .eq("id", documentId);
+    return {
+      diagnostics: recordDuration(
+        diagnostics,
+        "ontology_extraction_ms",
+        ontologyStart
+      ),
+      deferredForOcr: true,
+    };
+  }
+
   await supabase
     .from("documents")
     .update({
@@ -523,8 +582,14 @@ async function runOntologyJob(
       .eq("id", documentId);
   }
 
-  diagnostics = recordDuration(diagnostics, "ontology_extraction_ms", ontologyStart);
-  return diagnostics;
+  return {
+    diagnostics: recordDuration(
+      diagnostics,
+      "ontology_extraction_ms",
+      ontologyStart
+    ),
+    deferredForOcr: false,
+  };
 }
 
 async function runKnowledgeJob(
@@ -609,6 +674,7 @@ export async function processDocumentProcessingJob(
   if (!claimed) return;
 
   try {
+    let deferredForOcr = false;
     if (job.job_type === "analyze_document") {
       diagnostics = await runAnalyzeJob(
         supabase,
@@ -626,13 +692,15 @@ export async function processDocumentProcessingJob(
         diagnostics
       );
     } else if (job.job_type === "extract_ontology") {
-      diagnostics = await runOntologyJob(
+      const ontologyResult = await runOntologyJob(
         supabase,
         user.id,
         job.document_id,
         job.profile_id,
         diagnostics
       );
+      diagnostics = ontologyResult.diagnostics;
+      deferredForOcr = ontologyResult.deferredForOcr;
     } else {
       diagnostics = await runKnowledgeJob(
         supabase,
@@ -641,6 +709,27 @@ export async function processDocumentProcessingJob(
         job.profile_id,
         diagnostics
       );
+    }
+
+    if (deferredForOcr) {
+      // Keep ontology job retryable until OCR finishes and re-chains with force.
+      await supabase
+        .from("document_processing_jobs")
+        .update({
+          status: "retryable",
+          last_error: "Waiting for document OCR/analysis before ontology",
+          error_category: "deferred_ocr",
+          next_retry_at: new Date(Date.now() + 2 * 60 * 1000).toISOString(),
+          diagnostics,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", job.id);
+      await persistDocumentProcessingDiagnostics(
+        supabase,
+        job.document_id,
+        diagnostics
+      );
+      return;
     }
 
     await supabase

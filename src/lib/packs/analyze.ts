@@ -1,7 +1,10 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { enqueueDocumentProcessingJob } from "@/lib/documents/processingJobs";
+import {
+  enqueueAnalyzePipeline,
+  enqueueDocumentProcessingJob,
+} from "@/lib/documents/processingJobs";
 import { isGuardianOntologyEnabled } from "@/lib/features/ontology";
 import { getInstalledPack } from "./catalog";
 import type { AnalyzeKnowledgeSelection, ProfilePackConfiguration } from "./types";
@@ -15,20 +18,25 @@ export type AnalyzePreview = {
     fileName: string;
     profileId: string;
     ontologyStatus: string | null;
+    /** True when OCR/analysis must run before ontology. */
+    needsOcr: boolean;
   }>;
   proposals: Array<{ id: string; title: string }>;
   sourceItems: Array<{ id: string; name: string; sourceId: string }>;
   spaces: Array<{ id: string; displayName: string }>;
   /** Docs that still need ontology and have extractable text. */
   needingOntology: number;
+  /** Docs that still need ontology and will get OCR first. */
+  needingOcr: number;
   totalDocumentsInScope: number;
   batchLimit: number;
-  /** Docs that still need ontology but have no extracted text yet. */
+  /** @deprecated use needingOcr — kept for older UI clients */
   skippedNoText: number;
 };
 
 export type AnalyzeResult = {
   documentsQueued: number;
+  documentsQueuedForOcr: number;
   proposalsNoted: number;
   sourceItemsQueued: number;
   skipped: string[];
@@ -148,17 +156,21 @@ export async function previewAnalyzeKnowledge(
   const needing = allDocs.filter(
     (d) => d.ontology_status !== "completed" && extractable.has(d.id)
   );
-  const needingNoText = allDocs.filter(
+  const needingOcr = allDocs.filter(
     (d) => d.ontology_status !== "completed" && !extractable.has(d.id)
   );
-  const pool = needing.length ? needing : allDocs.filter((d) => extractable.has(d.id));
-  const batch = pool.slice(0, PACK_ANALYZE_BATCH_SIZE);
+  // Prefer docs ready for ontology; fill remaining batch slots with OCR-first docs.
+  const readyBatch = needing.slice(0, PACK_ANALYZE_BATCH_SIZE);
+  const ocrSlots = Math.max(0, PACK_ANALYZE_BATCH_SIZE - readyBatch.length);
+  const ocrBatch = needingOcr.slice(0, ocrSlots);
+  const batch = [...readyBatch, ...ocrBatch];
 
   const documents = batch.map((d) => ({
     id: String(d.id),
     fileName: String(d.file_name ?? "Document"),
     profileId: String(d.profile_id),
     ontologyStatus: d.ontology_status,
+    needsOcr: !extractable.has(d.id),
   }));
 
   let proposals: AnalyzePreview["proposals"] = [];
@@ -195,10 +207,11 @@ export async function previewAnalyzeKnowledge(
     proposals,
     sourceItems,
     spaces,
-    needingOntology: needing.length,
+    needingOntology: needing.length + needingOcr.length,
+    needingOcr: needingOcr.length,
     totalDocumentsInScope: allDocs.length,
     batchLimit: PACK_ANALYZE_BATCH_SIZE,
-    skippedNoText: needingNoText.length,
+    skippedNoText: needingOcr.length,
   };
 }
 
@@ -239,6 +252,7 @@ export async function startAnalyzeKnowledge(
   const skipped: string[] = [];
   const documentIds: string[] = [];
   let documentsQueued = 0;
+  let documentsQueuedForOcr = 0;
   let enqueueErrors = 0;
 
   // Enqueue in parallel chunks so the request returns quickly.
@@ -247,6 +261,29 @@ export async function startAnalyzeKnowledge(
     const chunk = preview.documents.slice(i, i + chunkSize);
     const results = await Promise.all(
       chunk.map(async (doc) => {
+        if (doc.needsOcr) {
+          // OCR/analysis first — pipeline chains to ontology when done.
+          const { jobId } = await enqueueAnalyzePipeline(supabase, {
+            documentId: doc.id,
+            profileId: doc.profileId,
+            userId: args.userId,
+          });
+          if (jobId) {
+            await supabase
+              .from("documents")
+              .update({
+                ontology_status: "pending",
+                last_processing_error: null,
+              })
+              .eq("id", doc.id);
+          }
+          return {
+            doc,
+            result: { enqueued: Boolean(jobId), jobId },
+            viaOcr: true,
+          };
+        }
+
         // Always force for this batch — these docs were selected because they
         // still need ontology (failed / pending / never run). force:false was
         // skipping when an old extract_ontology job row was still "completed".
@@ -266,17 +303,15 @@ export async function startAnalyzeKnowledge(
             })
             .eq("id", doc.id);
         }
-        return { doc, result };
+        return { doc, result, viaOcr: false };
       })
     );
 
-    for (const { doc, result } of results) {
+    for (const { doc, result, viaOcr } of results) {
       documentIds.push(doc.id);
-      if (result.enqueued) {
+      if (result.enqueued || result.jobId) {
         documentsQueued += 1;
-      } else if (result.jobId) {
-        // Already pending/processing — still tracking; count as queued for UX.
-        documentsQueued += 1;
+        if (viaOcr) documentsQueuedForOcr += 1;
       } else {
         enqueueErrors += 1;
         skipped.push(`document:${doc.id}`);
@@ -325,6 +360,7 @@ export async function startAnalyzeKnowledge(
     actor_user_id: args.userId,
     metadata: {
       documentsQueued,
+      documentsQueuedForOcr,
       enqueueErrors,
       proposalsNoted: preview.proposals.length,
       sourceItemsQueued,
@@ -342,6 +378,7 @@ export async function startAnalyzeKnowledge(
 
   return {
     documentsQueued,
+    documentsQueuedForOcr,
     proposalsNoted: preview.proposals.length,
     sourceItemsQueued,
     skipped,
@@ -371,13 +408,17 @@ export async function getAnalyzeProgress(
     id: string;
     file_name: string | null;
     ontology_status: string | null;
+    analysis_status: string | null;
+    processing_step: string | null;
     last_processing_error: string | null;
   }> = [];
 
   if (documentIds.length) {
     const { data } = await supabase
       .from("documents")
-      .select("id, file_name, ontology_status, last_processing_error")
+      .select(
+        "id, file_name, ontology_status, analysis_status, processing_step, last_processing_error"
+      )
       .in("id", documentIds);
     rows = (data ?? []) as typeof rows;
   } else {
@@ -386,7 +427,9 @@ export async function getAnalyzeProgress(
     });
     const { data } = await supabase
       .from("documents")
-      .select("id, file_name, ontology_status, last_processing_error")
+      .select(
+        "id, file_name, ontology_status, analysis_status, processing_step, last_processing_error"
+      )
       .in("profile_id", spaceIds)
       .limit(500);
     rows = (data ?? []) as typeof rows;
@@ -401,12 +444,29 @@ export async function getAnalyzeProgress(
   const failures: AnalyzeProgress["failures"] = [];
 
   for (const row of rows) {
-    const status = row.ontology_status ?? "pending";
+    const ontologyStatus = row.ontology_status ?? "pending";
     const fileName = String(row.file_name ?? "Document");
+    const analysisBusy = ["queued", "processing", "analyzing"].includes(
+      String(row.analysis_status ?? "")
+    );
+    const step = String(row.processing_step ?? "");
+    const reading =
+      ontologyStatus !== "completed" &&
+      ontologyStatus !== "failed" &&
+      ontologyStatus !== "skipped" &&
+      (analysisBusy ||
+        step === "queued" ||
+        step === "analyzing" ||
+        step === "indexing");
+
+    // Surface OCR/analysis phase in the UI while ontology is still waiting.
+    const status = reading
+      ? "reading"
+      : ontologyStatus === "retryable"
+        ? "failed"
+        : ontologyStatus;
     const error =
-      status === "failed" || status === "retryable"
-        ? row.last_processing_error
-        : null;
+      status === "failed" ? row.last_processing_error : null;
     documents.push({
       id: String(row.id),
       fileName,
@@ -414,8 +474,8 @@ export async function getAnalyzeProgress(
       error,
     });
     if (status === "completed") completed += 1;
-    else if (status === "processing") processing += 1;
-    else if (status === "failed" || status === "retryable") {
+    else if (status === "processing" || status === "reading") processing += 1;
+    else if (status === "failed") {
       failed += 1;
       failures.push({
         id: String(row.id),

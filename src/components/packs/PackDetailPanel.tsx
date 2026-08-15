@@ -30,10 +30,11 @@ type AnalyzeProgressState = {
 };
 
 type AnalyzePreviewState = {
-  documents: Array<{ id: string; fileName: string }>;
+  documents: Array<{ id: string; fileName: string; needsOcr?: boolean }>;
   proposals: Array<{ id: string; title: string }>;
   sourceItems: Array<{ id: string; name: string }>;
   needingOntology?: number;
+  needingOcr?: number;
   totalDocumentsInScope?: number;
   batchLimit?: number;
   skippedNoText?: number;
@@ -233,8 +234,14 @@ export default function PackDetailPanel({
         r.remainingNeedingOntology > 0
           ? ` ${r.remainingNeedingOntology} more still need analysis — run again after this batch finishes.`
           : "";
+      const ocrNote =
+        typeof r.documentsQueuedForOcr === "number" &&
+        r.documentsQueuedForOcr > 0
+          ? ` ${r.documentsQueuedForOcr} will run OCR/reading first, then ontology.`
+          : "";
       setAnalyzeResult(
         `Queued ${r.documentsQueued} document(s) in the background.` +
+          ocrNote +
           remaining +
           " You can leave this page; progress updates below."
       );
@@ -521,15 +528,16 @@ export default function PackDetailPanel({
                 <li>
                   {analyzePreview.documents.length} document(s)
                   {typeof analyzePreview.needingOntology === "number"
-                    ? ` (${analyzePreview.needingOntology} ready for ontology of ${analyzePreview.totalDocumentsInScope ?? "?"} in scope)`
+                    ? ` (${analyzePreview.needingOntology} still need analysis of ${analyzePreview.totalDocumentsInScope ?? "?"} in scope)`
                     : ""}
                 </li>
-                {typeof analyzePreview.skippedNoText === "number" &&
-                analyzePreview.skippedNoText > 0 ? (
+                {(typeof analyzePreview.needingOcr === "number"
+                  ? analyzePreview.needingOcr
+                  : analyzePreview.skippedNoText) ? (
                   <li>
-                    {analyzePreview.skippedNoText} document(s) skipped — no
-                    extracted text yet (open/analyze those files in the Space
-                    first)
+                    {(analyzePreview.needingOcr ??
+                      analyzePreview.skippedNoText) ?? 0}{" "}
+                    document(s) will run OCR/reading first, then ontology
                   </li>
                 ) : null}
                 <li>{analyzePreview.proposals.length} proposal(s) noted</li>
@@ -540,7 +548,10 @@ export default function PackDetailPanel({
               {analyzePreview.documents.length > 0 ? (
                 <ul className="mt-3 max-h-40 overflow-auto text-xs text-ink-muted">
                   {analyzePreview.documents.slice(0, 20).map((d) => (
-                    <li key={d.id}>{d.fileName}</li>
+                    <li key={d.id}>
+                      {d.fileName}
+                      {d.needsOcr ? " (OCR first)" : ""}
+                    </li>
                   ))}
                 </ul>
               ) : null}
@@ -625,13 +636,15 @@ export default function PackDetailPanel({
                     const label =
                       d.status === "completed"
                         ? "completed"
-                        : d.status === "processing"
-                          ? "processing"
-                          : d.status === "failed" || d.status === "retryable"
-                            ? "failed"
-                            : d.status === "skipped"
-                              ? "skipped"
-                              : "pending";
+                        : d.status === "reading"
+                          ? "reading"
+                          : d.status === "processing"
+                            ? "processing"
+                            : d.status === "failed" || d.status === "retryable"
+                              ? "failed"
+                              : d.status === "skipped"
+                                ? "skipped"
+                                : "pending";
                     return (
                       <li
                         key={d.id}
@@ -647,7 +660,9 @@ export default function PackDetailPanel({
                                 ? "text-red-600"
                                 : label === "completed"
                                   ? "text-emerald-700"
-                                  : "text-ink-muted"
+                                  : label === "reading"
+                                    ? "text-amber-700"
+                                    : "text-ink-muted"
                             }`}
                           >
                             {label}
@@ -664,13 +679,13 @@ export default function PackDetailPanel({
               {analyzeProgress.running ? (
                 <p className="mt-3 text-xs text-ink-muted">
                   Working in the background — safe to navigate away. This panel
-                  refreshes every few seconds.
+                  refreshes every few seconds. Docs marked reading run OCR first,
+                  then ontology.
                 </p>
               ) : analyzeProgress.failed > 0 ? (
                 <p className="mt-3 text-xs text-ink-muted">
                   Failed documents are retried when you click Start analysis
-                  batch again. Scans/photos often fail until Guardian has
-                  extracted text from them.
+                  batch again.
                 </p>
               ) : null}
             </div>
