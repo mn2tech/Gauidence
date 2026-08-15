@@ -66,12 +66,12 @@ const KNOWLEDGE_ATTENTION =
 const KNOWLEDGE_FIND =
   /\b(find|search|look\s+for|where\s+is|show\s+me|locate)\b.{0,40}\b(my|the|our)\b/i;
 
-/** Business Pack / organizational intelligence questions. */
+/** Business Pack / organizational intelligence questions (keep narrow — avoid forcing RAG). */
 const KNOWLEDGE_BUSINESS =
-  /\b(clients?|contractors?|employees?|proposals?|contracts?|projects?|opportunit(?:y|ies)|policies|procedures?|follow[- ]?up|outstanding|expire|expiring|working with|everything we know about|who (is|are|works)|what (clients?|proposals?|contracts?|projects?|tasks?)|what did we promise|associated with|business relationships?)\b/i;
+  /\b((what|which|our|my|the) clients?\b|clients? (are|do|we|we'?re)|working with|everything we know about|what proposals?\b|proposals? (are|have|outstanding)|what contracts?\b|contracts? (expire|expiring|outstanding)|what projects?\b|projects? (associated|for|with)|who (is|are) working on|what did we promise|business relationships?|show me everything we know)\b/i;
 
 const BUSINESS_ADVISORY =
-  /\b(what should i (follow up|focus|do|prioritize)|what needs (my )?attention|recommend|next steps?)\b/i;
+  /\b(what should i (follow up|focus|do|prioritize)|what needs (my )?attention|which proposals? have not|follow[- ]?up on)\b/i;
 
 const CALENDAR_READ =
   /\b((what|which|any) (meetings?|events?|appointments?) (do i have|are there)|meetings? (do i have|today|tomorrow)|today'?s (meetings?|calendar|schedule)|what(?:'s| is) on my (calendar|schedule)|show me my (calendar|meetings?)|check my (calendar|meetings?)|my calendar)\b/i;
@@ -260,10 +260,11 @@ export function classifyGideonIntent(args: ClassifyGideonIntentArgs): GideonRout
     }
   }
 
-  const knowledge = isKnowledgeQuestion(q);
+  const businessAdvisory = BUSINESS_ADVISORY.test(q);
+  const knowledge = isKnowledgeQuestion(q) || businessAdvisory;
   const calendarWrite = isCalendarWrite(q);
   const calendarRead = isCalendarRead(q) || calendarWrite;
-  const cos = isChiefOfStaff(q) || (BUSINESS_ADVISORY.test(q) && knowledge);
+  const cos = isChiefOfStaff(q) || businessAdvisory;
   const task = isTask(q);
   const combinedSignals =
     (cos && (calendarRead || knowledge)) || AROUND_MEETINGS.test(q);

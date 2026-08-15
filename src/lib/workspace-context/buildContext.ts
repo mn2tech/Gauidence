@@ -79,10 +79,7 @@ import { resolveExplicitSpaceScope } from "@/lib/vault/detectVaultScope";
 import { isOrgStyleProfile, type GuardianProfileType } from "@/lib/profiles/types";
 import { collaboratorDisplayName } from "@/lib/profiles/collaboratorDisplay";
 import { isGuardianPackEngineEnabled } from "@/lib/features/packs";
-import {
-  formatPackSkillsForPrompt,
-  loadInstalledPackSkills,
-} from "@/lib/packs/gideon";
+import { loadInstalledPackSkillPrompt } from "@/lib/packs/gideon";
 import { GUARDIAN_BUSINESS_PACK_SLUG } from "@/lib/packs/types";
 import { loadCollaboratorMemberAccounts } from "@/lib/profiles/collaboratorMembers";
 import type { LinkedVaultProfile } from "@/lib/vault/rollup";
@@ -238,21 +235,23 @@ export async function loadWorkspaceContext(
   const loadProposals =
     isOrgStyleProfile(activeProfile.profile_type) &&
     activeProfile.profile_type !== "client" &&
-    /\b(proposal|proposals|quote|estimate|follow[- ]?up|outstanding|client)\b/i.test(
-      retrievalQuestion
-    );
+    /\b(proposal|proposals|quote|estimate)\b/i.test(retrievalQuestion);
 
-  const packSkillsPromise =
+  const shouldLoadPackSkills =
     isGuardianPackEngineEnabled({ email: user.email }) &&
-    isOrgStyleProfile(activeProfile.profile_type)
-      ? loadInstalledPackSkills(
-          supabase,
-          ontologySpaceId,
-          GUARDIAN_BUSINESS_PACK_SLUG
-        )
-          .then(formatPackSkillsForPrompt)
-          .catch(() => "")
-      : Promise.resolve("");
+    isOrgStyleProfile(activeProfile.profile_type) &&
+    (intent === "knowledge_search" ||
+      intent === "combined" ||
+      intent === "chief_of_staff" ||
+      load.documents);
+
+  const packSkillsPromise = shouldLoadPackSkills
+    ? loadInstalledPackSkillPrompt(
+        supabase,
+        ontologySpaceId,
+        GUARDIAN_BUSINESS_PACK_SLUG
+      ).catch(() => "")
+    : Promise.resolve("");
 
   const [
     structuredKnowledgeBundle,

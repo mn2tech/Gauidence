@@ -129,13 +129,8 @@ describe("gideon business pack routing", () => {
   it("formats pack skill prompts", () => {
     const text = formatPackSkillsForPrompt([
       {
-        id: "1",
-        pack_version_id: "v",
-        key: "business_chief_of_staff",
-        name: "Business Chief of Staff",
-        description: "d",
-        prompt_addon: "BUSINESS CHIEF OF STAFF:\nDistinguish facts from recommendations.",
-        sort_order: 10,
+        prompt_addon:
+          "BUSINESS CHIEF OF STAFF:\nDistinguish facts from recommendations.",
       },
     ]);
     assert.match(text, /Distinguish facts from recommendations/);
