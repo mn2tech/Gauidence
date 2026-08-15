@@ -179,9 +179,19 @@ export type DashboardCardData = {
   key: string;
   title: string;
   count: number | null;
-  items: Array<{ id: string; label: string; href?: string }>;
+  items: Array<{
+    id: string;
+    label: string;
+    href?: string;
+    /** Secondary line (status, date, etc.). */
+    meta?: string;
+  }>;
   empty: string;
   detail?: string;
+  /** Highlight cards that need action. */
+  tone?: "neutral" | "attention";
+  askQuestion?: string;
+  askHref?: string;
 };
 
 export const GUARDIAN_BUSINESS_PACK_SLUG = "guardian-business";

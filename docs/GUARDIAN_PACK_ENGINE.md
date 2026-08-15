@@ -99,6 +99,18 @@ Existing documents, ontology rows, proposals, and Spaces are **not** deleted by 
 5. Optional **Analyze Existing Knowledge** — explicit selection; queues `extract_ontology` jobs.
 6. Use **Business Dashboard**, **Ontology Explorer**, or **Ask Gideon**.
 
+### Business Dashboard (live)
+
+`/settings/packs/guardian-business/dashboard` loads real counts from ontology + proposals across the business Space and child Spaces:
+
+- **Needs follow-up** — open proposals idle 7+ days, plus ontology tasks
+- **Clients / projects / contracts / tasks** — ontology entities
+- **Contracts expiring soon** — contract entities with end dates in properties (next 90 days)
+- **Open proposals** — Guardian proposals table
+- **Ontology health / recent knowledge** — entities, relationships, evidence
+
+Each card links into Ontology Explorer, Proposals, or Ask Gideon (`/ask?profileId=…&draft=…`). Empty cards never invent metrics.
+
 Installation is:
 
 - **Idempotent** — re-run does not duplicate Spaces or install rows
