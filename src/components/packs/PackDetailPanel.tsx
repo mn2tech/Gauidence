@@ -20,6 +20,7 @@ type AnalyzeProgressState = {
   percent: number;
   running: boolean;
   analyzedAt: string | null;
+  failures?: Array<{ id: string; fileName: string; error: string | null }>;
 };
 
 type AnalyzePreviewState = {
@@ -29,6 +30,7 @@ type AnalyzePreviewState = {
   needingOntology?: number;
   totalDocumentsInScope?: number;
   batchLimit?: number;
+  skippedNoText?: number;
 };
 
 type Props = {
@@ -513,9 +515,17 @@ export default function PackDetailPanel({
                 <li>
                   {analyzePreview.documents.length} document(s)
                   {typeof analyzePreview.needingOntology === "number"
-                    ? ` (${analyzePreview.needingOntology} still need ontology of ${analyzePreview.totalDocumentsInScope ?? "?"} in scope)`
+                    ? ` (${analyzePreview.needingOntology} ready for ontology of ${analyzePreview.totalDocumentsInScope ?? "?"} in scope)`
                     : ""}
                 </li>
+                {typeof analyzePreview.skippedNoText === "number" &&
+                analyzePreview.skippedNoText > 0 ? (
+                  <li>
+                    {analyzePreview.skippedNoText} document(s) skipped — no
+                    extracted text yet (open/analyze those files in the Space
+                    first)
+                  </li>
+                ) : null}
                 <li>{analyzePreview.proposals.length} proposal(s) noted</li>
                 <li>
                   {analyzePreview.sourceItems.length} connected source item(s)
@@ -602,10 +612,25 @@ export default function PackDetailPanel({
                   refreshes every few seconds.
                 </p>
               ) : analyzeProgress.failed > 0 ? (
-                <p className="mt-3 text-xs text-ink-muted">
-                  Failed documents are included in the next batch when you click
-                  Start analysis batch again.
-                </p>
+                <div className="mt-3 space-y-2 text-xs text-ink-muted">
+                  <p>
+                    Failed documents are retried when you click Start analysis
+                    batch again. Scans/photos often fail until Guardian has
+                    extracted text from them.
+                  </p>
+                  {analyzeProgress.failures?.length ? (
+                    <ul className="list-disc space-y-1 pl-4">
+                      {analyzeProgress.failures.map((f) => (
+                        <li key={f.id}>
+                          <span className="font-medium text-ink">
+                            {f.fileName}
+                          </span>
+                          {f.error ? ` — ${f.error}` : ""}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
               ) : null}
             </div>
           ) : null}

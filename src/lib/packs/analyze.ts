@@ -19,10 +19,12 @@ export type AnalyzePreview = {
   proposals: Array<{ id: string; title: string }>;
   sourceItems: Array<{ id: string; name: string; sourceId: string }>;
   spaces: Array<{ id: string; displayName: string }>;
-  /** Docs that still need ontology (shown first). */
+  /** Docs that still need ontology and have extractable text. */
   needingOntology: number;
   totalDocumentsInScope: number;
   batchLimit: number;
+  /** Docs that still need ontology but have no extracted text yet. */
+  skippedNoText: number;
 };
 
 export type AnalyzeResult = {
@@ -46,6 +48,7 @@ export type AnalyzeProgress = {
   documentIds: string[];
   running: boolean;
   analyzedAt: string | null;
+  failures: Array<{ id: string; fileName: string; error: string | null }>;
 };
 
 async function resolveSpaceIds(
@@ -119,8 +122,29 @@ export async function previewAnalyzeKnowledge(
     allDocs = (data ?? []) as typeof allDocs;
   }
 
-  const needing = allDocs.filter((d) => d.ontology_status !== "completed");
-  const pool = needing.length ? needing : allDocs;
+  // Prefer docs that already have extracted text — ontology cannot run without it.
+  const docIds = allDocs.map((d) => d.id);
+  const extractable = new Set<string>();
+  if (docIds.length) {
+    const { data: extractedRows } = await supabase
+      .from("extracted_data")
+      .select("document_id, source_text, title, summary")
+      .in("document_id", docIds);
+    for (const row of extractedRows ?? []) {
+      const text =
+        String(row.source_text ?? "").trim() ||
+        [row.title, row.summary].filter(Boolean).join("\n").trim();
+      if (text && row.document_id) extractable.add(String(row.document_id));
+    }
+  }
+
+  const needing = allDocs.filter(
+    (d) => d.ontology_status !== "completed" && extractable.has(d.id)
+  );
+  const needingNoText = allDocs.filter(
+    (d) => d.ontology_status !== "completed" && !extractable.has(d.id)
+  );
+  const pool = needing.length ? needing : allDocs.filter((d) => extractable.has(d.id));
   const batch = pool.slice(0, PACK_ANALYZE_BATCH_SIZE);
 
   const documents = batch.map((d) => ({
@@ -167,6 +191,7 @@ export async function previewAnalyzeKnowledge(
     needingOntology: needing.length,
     totalDocumentsInScope: allDocs.length,
     batchLimit: PACK_ANALYZE_BATCH_SIZE,
+    skippedNoText: needingNoText.length,
   };
 }
 
@@ -335,12 +360,17 @@ export async function getAnalyzeProgress(
       )
     : [];
 
-  let rows: Array<{ ontology_status: string | null }> = [];
+  let rows: Array<{
+    id: string;
+    file_name: string | null;
+    ontology_status: string | null;
+    last_processing_error: string | null;
+  }> = [];
 
   if (documentIds.length) {
     const { data } = await supabase
       .from("documents")
-      .select("ontology_status")
+      .select("id, file_name, ontology_status, last_processing_error")
       .in("id", documentIds);
     rows = (data ?? []) as typeof rows;
   } else {
@@ -349,7 +379,7 @@ export async function getAnalyzeProgress(
     });
     const { data } = await supabase
       .from("documents")
-      .select("ontology_status")
+      .select("id, file_name, ontology_status, last_processing_error")
       .in("profile_id", spaceIds)
       .limit(500);
     rows = (data ?? []) as typeof rows;
@@ -360,13 +390,20 @@ export async function getAnalyzeProgress(
   let completed = 0;
   let failed = 0;
   let skipped = 0;
+  const failures: AnalyzeProgress["failures"] = [];
 
   for (const row of rows) {
     const status = row.ontology_status ?? "pending";
     if (status === "completed") completed += 1;
     else if (status === "processing") processing += 1;
-    else if (status === "failed" || status === "retryable") failed += 1;
-    else if (status === "skipped") skipped += 1;
+    else if (status === "failed" || status === "retryable") {
+      failed += 1;
+      failures.push({
+        id: String(row.id),
+        fileName: String(row.file_name ?? "Document"),
+        error: row.last_processing_error,
+      });
+    } else if (status === "skipped") skipped += 1;
     else pending += 1;
   }
 
@@ -386,5 +423,6 @@ export async function getAnalyzeProgress(
     running,
     analyzedAt:
       typeof config.analyzedAt === "string" ? config.analyzedAt : null,
+    failures: failures.slice(0, 10),
   };
 }

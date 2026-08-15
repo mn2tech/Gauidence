@@ -516,7 +516,10 @@ async function runOntologyJob(
     console.error("Ontology extraction failed (non-blocking):", documentId, message);
     await supabase
       .from("documents")
-      .update({ ontology_status: "failed" })
+      .update({
+        ontology_status: "failed",
+        last_processing_error: message.slice(0, 500),
+      })
       .eq("id", documentId);
   }
 
