@@ -107,7 +107,9 @@ export default function SiteHeader() {
   const documentsNavHref = documentsHref(active?.id);
   const askHref = isEmployeeVault
     ? employeeGideonHref(active?.id)
-    : "/ask";
+    : active?.id
+      ? `/ask?profileId=${encodeURIComponent(active.id)}`
+      : "/ask";
   const researchHref = needsSetup ? "/ask" : "/research";
 
   const linkClass =

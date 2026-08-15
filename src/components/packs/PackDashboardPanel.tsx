@@ -68,7 +68,10 @@ export default function PackDashboardPanel({
           >
             Ontology Explorer →
           </a>
-          <a href="/" className="font-semibold text-brand hover:text-brand-dark">
+          <a
+            href={`/ask?profileId=${encodeURIComponent(profileId)}`}
+            className="font-semibold text-brand hover:text-brand-dark"
+          >
             Ask Gideon →
           </a>
         </p>

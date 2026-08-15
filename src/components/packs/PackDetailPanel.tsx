@@ -384,7 +384,7 @@ export default function PackDetailPanel({
               Analyze Existing Knowledge
             </button>
             <a
-              href="/"
+              href={`/ask?profileId=${encodeURIComponent(profileId)}`}
               className="rounded-lg border border-emerald-300 bg-white px-4 py-2 text-sm font-medium"
             >
               Ask Gideon
