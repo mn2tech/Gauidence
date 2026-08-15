@@ -1,19 +1,37 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { PackListItem } from "@/lib/packs/types";
 
-type Props = {
-  profileId: string;
-  profileName: string;
+type OrgSpaceOption = {
+  id: string;
+  displayName: string;
+  profileType: string;
 };
 
-export default function PacksManager({ profileId, profileName }: Props) {
+type Props = {
+  profileId: string | null;
+  profileName: string | null;
+  orgSpaces: OrgSpaceOption[];
+};
+
+export default function PacksManager({
+  profileId,
+  profileName,
+  orgSpaces,
+}: Props) {
+  const router = useRouter();
   const [packs, setPacks] = useState<PackListItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(Boolean(profileId));
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    if (!profileId) {
+      setPacks([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -40,13 +58,55 @@ export default function PacksManager({ profileId, profileName }: Props) {
   const installed = packs.filter((p) => p.installation?.status === "installed");
   const available = packs.filter((p) => p.installation?.status !== "installed");
 
+  if (orgSpaces.length === 0) {
+    return (
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-950">
+        <p className="font-semibold">Create a business Space first</p>
+        <p className="mt-2">
+          Packs install onto a business or nonprofit Space — not personal Spaces.
+        </p>
+        <p className="mt-4">
+          <a
+            href="/settings/profiles"
+            className="font-semibold text-brand hover:text-brand-dark"
+          >
+            Manage people & spaces →
+          </a>
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-10">
-      <p className="text-sm text-ink-muted">
-        Packs for <span className="font-medium text-ink">{profileName}</span>.
-        Packs teach Guardian how to understand this organization — they do not
-        duplicate your documents.
-      </p>
+      <div className="rounded-2xl border border-stone-200 bg-white p-4">
+        <label className="block text-sm font-medium text-ink">
+          Install packs for
+        </label>
+        <select
+          className="mt-2 w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm"
+          value={profileId ?? ""}
+          onChange={(e) => {
+            const next = e.target.value;
+            router.push(
+              next
+                ? `/settings/packs?profileId=${encodeURIComponent(next)}`
+                : "/settings/packs"
+            );
+          }}
+        >
+          {orgSpaces.map((space) => (
+            <option key={space.id} value={space.id}>
+              {space.displayName}
+              {space.profileType === "non_profit" ? " (Nonprofit)" : ""}
+            </option>
+          ))}
+        </select>
+        <p className="mt-2 text-xs text-ink-muted">
+          Packs teach Guardian how to understand this organization — they do not
+          duplicate your documents.
+        </p>
+      </div>
 
       {error ? (
         <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -54,7 +114,11 @@ export default function PacksManager({ profileId, profileName }: Props) {
         </p>
       ) : null}
 
-      {loading ? (
+      {!profileId ? (
+        <p className="text-sm text-ink-muted">
+          Choose a business Space above to install Packs.
+        </p>
+      ) : loading ? (
         <p className="text-sm text-ink-muted">Loading packs…</p>
       ) : (
         <>
@@ -62,6 +126,9 @@ export default function PacksManager({ profileId, profileName }: Props) {
             <h2 className="text-lg font-semibold tracking-tight">
               Installed Packs
             </h2>
+            <p className="mt-1 text-sm text-ink-muted">
+              For <span className="font-medium text-ink">{profileName}</span>
+            </p>
             {installed.length === 0 ? (
               <p className="mt-3 text-sm text-ink-muted">
                 No packs installed yet. Install Guardian Business below to get

@@ -4,8 +4,10 @@ import { createClient } from "@/lib/supabase/server";
 import { isGuardianPackEngineEnabled } from "@/lib/features/packs";
 import {
   getActiveGuardianProfile,
+  listGuardianProfiles,
   requireAccessibleGuardianProfile,
 } from "@/lib/profiles/server";
+import { isOrgStyleProfile } from "@/lib/profiles/types";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 import PackDetailPanel from "@/components/packs/PackDetailPanel";
@@ -35,16 +37,33 @@ export default async function PackDetailPage({
     redirect("/settings");
   }
 
-  let profile = await getActiveGuardianProfile(supabase, user);
+  let profile = null;
   if (query.profileId) {
-    const accessible = await requireAccessibleGuardianProfile(
+    profile = await requireAccessibleGuardianProfile(
       supabase,
       user.id,
       query.profileId
     );
-    if (accessible) profile = accessible;
   }
-  if (!profile) redirect("/settings/profiles");
+  if (!profile) {
+    profile = await getActiveGuardianProfile(supabase, user);
+  }
+
+  if (!profile || !isOrgStyleProfile(profile.profile_type)) {
+    const all = await listGuardianProfiles(supabase, user.id);
+    const org = all.find(
+      (p) =>
+        isOrgStyleProfile(p.profile_type) &&
+        (p.access_role === "owner" || p.owner_user_id === user.id)
+    );
+    if (org) {
+      const tab = query.tab ? `&tab=${encodeURIComponent(query.tab)}` : "";
+      redirect(
+        `/settings/packs/${slug}?profileId=${encodeURIComponent(org.id)}${tab}`
+      );
+    }
+    redirect("/settings/packs");
+  }
 
   return (
     <div className="flex min-h-screen flex-col">

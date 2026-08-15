@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   canAttachChildToParent,
   isGuardianProfileType,
+  isOrgStyleProfile,
   type GuardianProfileType,
 } from "@/lib/profiles/types";
 import type { PackSpaceRow } from "./types";
@@ -25,6 +26,7 @@ export async function ensureRecommendedSpace(
   args: {
     parentProfileId: string;
     ownerUserId: string;
+    parentProfileType?: GuardianProfileType;
     packSpace: PackSpaceRow;
   }
 ): Promise<EnsuredPackSpace> {
@@ -35,10 +37,14 @@ export async function ensureRecommendedSpace(
   )
     ? packSpace.profile_type
     : "other";
+  const parentType: GuardianProfileType =
+    args.parentProfileType && isOrgStyleProfile(args.parentProfileType)
+      ? args.parentProfileType
+      : "business";
 
-  if (!canAttachChildToParent(profileType, "business")) {
+  if (!canAttachChildToParent(profileType, parentType)) {
     throw new Error(
-      `Cannot nest ${profileType} under a business Space for pack Space "${packSpace.key}".`
+      `Cannot nest ${profileType} under a ${parentType} Space for pack Space "${packSpace.key}".`
     );
   }
 

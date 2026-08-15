@@ -2,7 +2,11 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isGuardianPackEngineEnabled } from "@/lib/features/packs";
-import { getActiveGuardianProfile } from "@/lib/profiles/server";
+import {
+  getActiveGuardianProfile,
+  listGuardianProfiles,
+} from "@/lib/profiles/server";
+import { isOrgStyleProfile } from "@/lib/profiles/types";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 import PacksManager from "@/components/packs/PacksManager";
@@ -29,23 +33,37 @@ export default async function PacksSettingsPage({
     redirect("/settings");
   }
 
-  const active = await getActiveGuardianProfile(supabase, user);
-  let profileId = active?.id;
-  let profileName = active?.display_name ?? "Space";
+  const [active, allProfiles] = await Promise.all([
+    getActiveGuardianProfile(supabase, user),
+    listGuardianProfiles(supabase, user.id),
+  ]);
 
-  if (params.profileId) {
-    const { data } = await supabase
-      .from("guardian_profiles")
-      .select("id, display_name")
-      .eq("id", params.profileId)
-      .maybeSingle();
-    if (data) {
-      profileId = data.id;
-      profileName = data.display_name ?? profileName;
-    }
+  const orgSpaces = allProfiles
+    .filter(
+      (p) =>
+        isOrgStyleProfile(p.profile_type) &&
+        (p.access_role === "owner" || p.owner_user_id === user.id)
+    )
+    .map((p) => ({
+      id: p.id,
+      displayName: p.display_name,
+      profileType: p.profile_type,
+    }));
+
+  let profileId = params.profileId?.trim() || "";
+  if (profileId && !orgSpaces.some((s) => s.id === profileId)) {
+    // Ignore non-org or inaccessible ids from the query string.
+    profileId = "";
+  }
+  if (!profileId && active && isOrgStyleProfile(active.profile_type)) {
+    profileId = active.id;
+  }
+  if (!profileId && orgSpaces[0]) {
+    profileId = orgSpaces[0].id;
   }
 
-  if (!profileId) redirect("/settings/profiles");
+  const selected =
+    orgSpaces.find((s) => s.id === profileId) ?? null;
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -63,7 +81,11 @@ export default async function PacksSettingsPage({
             organization.
           </p>
           <div className="mt-8">
-            <PacksManager profileId={profileId} profileName={profileName} />
+            <PacksManager
+              profileId={selected?.id ?? null}
+              profileName={selected?.displayName ?? null}
+              orgSpaces={orgSpaces}
+            />
           </div>
         </section>
       </main>

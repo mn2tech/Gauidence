@@ -136,10 +136,12 @@ export async function installPack(
   const spaceResults = [];
   const { data: parentRow } = await supabase
     .from("guardian_profiles")
-    .select("owner_user_id")
+    .select("owner_user_id, profile_type")
     .eq("id", input.profileId)
     .maybeSingle();
   const ownerUserId = String(parentRow?.owner_user_id ?? input.installedBy);
+  const parentProfileType =
+    parentRow?.profile_type === "non_profit" ? "non_profit" : "business";
 
   for (const packSpace of definition.spaces) {
     if (!selectedKeys.has(packSpace.key)) continue;
@@ -165,6 +167,7 @@ export async function installPack(
     const ensured = await ensureRecommendedSpace(supabase, {
       parentProfileId: input.profileId,
       ownerUserId,
+      parentProfileType,
       packSpace,
     });
 
