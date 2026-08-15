@@ -48,6 +48,13 @@ export type AnalyzeProgress = {
   documentIds: string[];
   running: boolean;
   analyzedAt: string | null;
+  /** Every document in the last batch, with status — for the progress UI. */
+  documents: Array<{
+    id: string;
+    fileName: string;
+    status: string;
+    error: string | null;
+  }>;
   failures: Array<{ id: string; fileName: string; error: string | null }>;
 };
 
@@ -390,21 +397,41 @@ export async function getAnalyzeProgress(
   let completed = 0;
   let failed = 0;
   let skipped = 0;
+  const documents: AnalyzeProgress["documents"] = [];
   const failures: AnalyzeProgress["failures"] = [];
 
   for (const row of rows) {
     const status = row.ontology_status ?? "pending";
+    const fileName = String(row.file_name ?? "Document");
+    const error =
+      status === "failed" || status === "retryable"
+        ? row.last_processing_error
+        : null;
+    documents.push({
+      id: String(row.id),
+      fileName,
+      status,
+      error,
+    });
     if (status === "completed") completed += 1;
     else if (status === "processing") processing += 1;
     else if (status === "failed" || status === "retryable") {
       failed += 1;
       failures.push({
         id: String(row.id),
-        fileName: String(row.file_name ?? "Document"),
+        fileName,
         error: row.last_processing_error,
       });
     } else if (status === "skipped") skipped += 1;
     else pending += 1;
+  }
+
+  // Preserve batch order when we know the queued IDs.
+  if (documentIds.length) {
+    const order = new Map(documentIds.map((id, i) => [id, i]));
+    documents.sort(
+      (a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999)
+    );
   }
 
   const total = rows.length;
@@ -423,6 +450,7 @@ export async function getAnalyzeProgress(
     running,
     analyzedAt:
       typeof config.analyzedAt === "string" ? config.analyzedAt : null,
+    documents: documents.slice(0, 40),
     failures: failures.slice(0, 10),
   };
 }

@@ -20,6 +20,12 @@ type AnalyzeProgressState = {
   percent: number;
   running: boolean;
   analyzedAt: string | null;
+  documents?: Array<{
+    id: string;
+    fileName: string;
+    status: string;
+    error: string | null;
+  }>;
   failures?: Array<{ id: string; fileName: string; error: string | null }>;
 };
 
@@ -606,31 +612,66 @@ export default function PackDetailPanel({
                   failed
                 </li>
               </ul>
+              {(analyzeProgress.documents?.length ||
+                analyzeProgress.failures?.length) ? (
+                <ul className="mt-3 max-h-48 space-y-2 overflow-auto text-xs">
+                  {(analyzeProgress.documents?.length
+                    ? analyzeProgress.documents
+                    : (analyzeProgress.failures ?? []).map((f) => ({
+                        ...f,
+                        status: "failed",
+                      }))
+                  ).map((d) => {
+                    const label =
+                      d.status === "completed"
+                        ? "completed"
+                        : d.status === "processing"
+                          ? "processing"
+                          : d.status === "failed" || d.status === "retryable"
+                            ? "failed"
+                            : d.status === "skipped"
+                              ? "skipped"
+                              : "pending";
+                    return (
+                      <li
+                        key={d.id}
+                        className="border-t border-stone-100 pt-2 first:border-0 first:pt-0"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="min-w-0 break-all font-medium text-ink">
+                            {d.fileName}
+                          </span>
+                          <span
+                            className={`shrink-0 tabular-nums ${
+                              label === "failed"
+                                ? "text-red-600"
+                                : label === "completed"
+                                  ? "text-emerald-700"
+                                  : "text-ink-muted"
+                            }`}
+                          >
+                            {label}
+                          </span>
+                        </div>
+                        {d.error ? (
+                          <p className="mt-0.5 text-ink-muted">{d.error}</p>
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : null}
               {analyzeProgress.running ? (
                 <p className="mt-3 text-xs text-ink-muted">
                   Working in the background — safe to navigate away. This panel
                   refreshes every few seconds.
                 </p>
               ) : analyzeProgress.failed > 0 ? (
-                <div className="mt-3 space-y-2 text-xs text-ink-muted">
-                  <p>
-                    Failed documents are retried when you click Start analysis
-                    batch again. Scans/photos often fail until Guardian has
-                    extracted text from them.
-                  </p>
-                  {analyzeProgress.failures?.length ? (
-                    <ul className="list-disc space-y-1 pl-4">
-                      {analyzeProgress.failures.map((f) => (
-                        <li key={f.id}>
-                          <span className="font-medium text-ink">
-                            {f.fileName}
-                          </span>
-                          {f.error ? ` — ${f.error}` : ""}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
-                </div>
+                <p className="mt-3 text-xs text-ink-muted">
+                  Failed documents are retried when you click Start analysis
+                  batch again. Scans/photos often fail until Guardian has
+                  extracted text from them.
+                </p>
               ) : null}
             </div>
           ) : null}
