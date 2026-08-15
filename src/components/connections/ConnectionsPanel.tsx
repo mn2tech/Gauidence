@@ -31,8 +31,10 @@ import {
 import { connectorAnalysisVersion } from "@/lib/ontology/pipeline/analysisVersion";
 import { pickUniqueChartsForAnalyze } from "@/lib/connectors/trello/attachments";
 
-const TRELLO_CHART_BATCH = 8;
+const TRELLO_CHART_BATCH = 12;
 const TRELLO_CHART_CONCURRENCY = 3;
+/** Safety cap so a stuck queue cannot loop forever (~12k charts). */
+const TRELLO_CHART_MAX_PASSES = 1000;
 
 function chartAnalyzePriority(item: SourceItem): number {
   const name = item.name ?? "";
@@ -339,18 +341,24 @@ export default function ConnectionsPanel() {
       profileId: string | null | undefined,
       selectedBoardId?: string | null
     ) => {
-      const itemsRes = await fetch(`/api/connections/${sourceId}/items`);
-      const itemsBody = (await itemsRes.json().catch(() => ({}))) as {
-        items?: Array<SourceItem & { id: string }>;
-        error?: string;
+      const loadBoardItems = async () => {
+        const itemsRes = await fetch(`/api/connections/${sourceId}/items`);
+        const itemsBody = (await itemsRes.json().catch(() => ({}))) as {
+          items?: Array<SourceItem & { id: string }>;
+          error?: string;
+        };
+        if (!itemsRes.ok || !itemsBody.items?.length) {
+          return [] as Array<SourceItem & { id: string }>;
+        }
+        return itemsBody.items.filter((item) =>
+          itemBelongsToTrelloBoard(item, selectedBoardId ?? null)
+        );
       };
-      if (!itemsRes.ok || !itemsBody.items?.length) {
+
+      const queue = await loadBoardItems();
+      if (!queue.length) {
         return { analyzed: 0, failed: 0, remaining: 0 };
       }
-
-      const queue = itemsBody.items.filter((item) =>
-        itemBelongsToTrelloBoard(item, selectedBoardId ?? null)
-      );
 
       const currentVersion = connectorAnalysisVersion();
       const boards = queue.filter((i) => {
@@ -361,52 +369,72 @@ export default function ConnectionsPanel() {
           i.analysisVersion !== currentVersion
         );
       });
-      const attachments = queue.filter((i) => i.metadata?.kind === "attachment");
-      const uniqueAttachments = pickUniqueChartsForAnalyze(attachments);
-      const pendingCharts = uniqueAttachments
-        .filter((i) => {
-          if (isItemNeedsAnalyze(i)) return true;
-          return (
-            i.processingStatus === "analyzed" &&
-            i.analysisVersion !== currentVersion
-          );
-        })
-        .sort((a, b) => chartAnalyzePriority(b) - chartAnalyzePriority(a));
-      const charts = pendingCharts.slice(0, TRELLO_CHART_BATCH);
-      const remaining = Math.max(0, pendingCharts.length - charts.length);
 
       let analyzed = 0;
       let failed = 0;
-      let done = 0;
-      const total = boards.length + charts.length;
-      const bump = (label: string) => {
-        done += 1;
-        setAnalyzeProgress(`${label} (${done}/${total})`);
-      };
+      let boardsDone = 0;
 
-      setAnalyzeProgress(
-        boards.length
-          ? `Reading ${boards.length} board${boards.length === 1 ? "" : "s"}…`
-          : null
-      );
-      for (const item of boards) {
-        const result = await analyzeSourceItemClient({
-          sourceId,
-          item,
-          profileId: profileId ?? null,
-          force: item.processingStatus === "analysis_failed",
-          remote: true,
-          allowUnchangedSkip: true,
-        });
-        if (result.ok) analyzed += 1;
-        else if (!result.cancelled) failed += 1;
-        bump("Boards");
+      if (boards.length) {
+        setAnalyzeProgress(
+          `Reading ${boards.length} board${boards.length === 1 ? "" : "s"}…`
+        );
+        for (const item of boards) {
+          const result = await analyzeSourceItemClient({
+            sourceId,
+            item,
+            profileId: profileId ?? null,
+            force: item.processingStatus === "analysis_failed",
+            remote: true,
+            allowUnchangedSkip: true,
+          });
+          if (result.ok) analyzed += 1;
+          else if (!result.cancelled) failed += 1;
+          boardsDone += 1;
+          setAnalyzeProgress(
+            `Boards (${boardsDone}/${boards.length})`
+          );
+        }
       }
 
-      if (charts.length) {
-        setAnalyzeProgress(
-          `Reading chord charts 0/${charts.length} (this can take a few minutes)…`
+      // Auto-continue in batches until the chart queue is empty (or stuck).
+      let remaining = 0;
+      let chartPasses = 0;
+      let chartsAnalyzedThisRun = 0;
+      let initialPending = -1;
+
+      while (chartPasses < TRELLO_CHART_MAX_PASSES) {
+        const fresh = await loadBoardItems();
+        const attachments = fresh.filter(
+          (i) => i.metadata?.kind === "attachment"
         );
+        const uniqueAttachments = pickUniqueChartsForAnalyze(attachments);
+        const pendingCharts = uniqueAttachments
+          .filter((i) => {
+            if (isItemNeedsAnalyze(i)) return true;
+            return (
+              i.processingStatus === "analyzed" &&
+              i.analysisVersion !== currentVersion
+            );
+          })
+          .sort((a, b) => chartAnalyzePriority(b) - chartAnalyzePriority(a));
+
+        if (initialPending < 0) initialPending = pendingCharts.length;
+        remaining = pendingCharts.length;
+        if (remaining === 0) break;
+
+        const charts = pendingCharts.slice(0, TRELLO_CHART_BATCH);
+        chartPasses += 1;
+        let batchDone = 0;
+        let batchOk = 0;
+
+        setAnalyzeProgress(
+          `Reading chord charts ${chartsAnalyzedThisRun}/${initialPending}` +
+            (remaining > charts.length
+              ? ` (${remaining} left) — keep this page open`
+              : "") +
+            "…"
+        );
+
         await runPool(charts, TRELLO_CHART_CONCURRENCY, async (item) => {
           const result = await analyzeSourceItemClient({
             sourceId,
@@ -418,10 +446,42 @@ export default function ConnectionsPanel() {
             remote: true,
             allowUnchangedSkip: true,
           });
-          if (result.ok) analyzed += 1;
-          else if (!result.cancelled) failed += 1;
-          bump("Charts");
+          if (result.ok) {
+            analyzed += 1;
+            batchOk += 1;
+            chartsAnalyzedThisRun += 1;
+          } else if (!result.cancelled) {
+            failed += 1;
+          }
+          batchDone += 1;
+          setAnalyzeProgress(
+            `Reading chord charts ${chartsAnalyzedThisRun}/${initialPending}` +
+              ` · batch ${batchDone}/${charts.length}` +
+              (remaining > charts.length ? ` · ${remaining - batchOk} left` : "") +
+              " — keep this page open…"
+          );
         });
+
+        // Avoid infinite retry if nothing succeeds in a full batch.
+        if (batchOk === 0) {
+          remaining = Math.max(0, remaining - charts.length);
+          break;
+        }
+      }
+
+      // Final remaining count after last refresh
+      {
+        const fresh = await loadBoardItems();
+        const uniqueAttachments = pickUniqueChartsForAnalyze(
+          fresh.filter((i) => i.metadata?.kind === "attachment")
+        );
+        remaining = uniqueAttachments.filter((i) => {
+          if (isItemNeedsAnalyze(i)) return true;
+          return (
+            i.processingStatus === "analyzed" &&
+            i.analysisVersion !== currentVersion
+          );
+        }).length;
       }
 
       setAnalyzeProgress(null);
@@ -555,7 +615,11 @@ export default function ConnectionsPanel() {
         );
       } else if (analyzeStats.remaining > 0) {
         setTrelloNote(
-          `This pass analyzed ${analyzeStats.analyzed} item${analyzeStats.analyzed === 1 ? "" : "s"} from ${board.name}. ${analyzeStats.remaining} chord charts still waiting — press Scan Again to continue.`
+          `Analyzed ${analyzeStats.analyzed} item${analyzeStats.analyzed === 1 ? "" : "s"} from ${board.name}. ${analyzeStats.remaining} chord charts still waiting (some may have failed) — press Scan Again to retry the rest.`
+        );
+      } else if (analyzeStats.analyzed > 0) {
+        setTrelloNote(
+          `Finished analyzing ${analyzeStats.analyzed} item${analyzeStats.analyzed === 1 ? "" : "s"} from ${board.name}. You can Ask Gideon about those songs.`
         );
       }
     } catch (err) {
@@ -651,9 +715,17 @@ export default function ConnectionsPanel() {
         selectedId
       );
       await load();
-      if (analyzeStats.remaining > 0) {
+      if (analyzeStats.failed > 0 && analyzeStats.analyzed === 0) {
+        setError(
+          "Scan finished, but Analyze failed. Press Scan Again or open Browse Boards & Charts."
+        );
+      } else if (analyzeStats.remaining > 0) {
         setTrelloNote(
-          `This pass analyzed ${analyzeStats.analyzed} item${analyzeStats.analyzed === 1 ? "" : "s"}. ${analyzeStats.remaining} chord charts still waiting — press Scan Again to continue. You can already Ask Gideon about songs that finished.`
+          `Analyzed ${analyzeStats.analyzed} item${analyzeStats.analyzed === 1 ? "" : "s"}. ${analyzeStats.remaining} chord charts still waiting (some may have failed) — press Scan Again to retry. You can already Ask Gideon about songs that finished.`
+        );
+      } else if (analyzeStats.analyzed > 0) {
+        setTrelloNote(
+          `Finished analyzing ${analyzeStats.analyzed} item${analyzeStats.analyzed === 1 ? "" : "s"}. You can Ask Gideon about those songs.`
         );
       }
     } catch (err) {
