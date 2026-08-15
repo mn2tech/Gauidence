@@ -7,7 +7,9 @@ import {
 } from "@/lib/documents/processingJobs";
 import { isGuardianOntologyEnabled } from "@/lib/features/ontology";
 import { getInstalledPack } from "./catalog";
+import { discoverPackSourceItems, PACK_SOURCE_ITEM_BATCH_SIZE } from "./sourceItems";
 import type { AnalyzeKnowledgeSelection, ProfilePackConfiguration } from "./types";
+import type { PackSourceItemRef } from "./sourceItems";
 
 /** Keep start-analyze HTTP fast and avoid flooding workers. */
 export const PACK_ANALYZE_BATCH_SIZE = 40;
@@ -22,7 +24,13 @@ export type AnalyzePreview = {
     needsOcr: boolean;
   }>;
   proposals: Array<{ id: string; title: string }>;
-  sourceItems: Array<{ id: string; name: string; sourceId: string }>;
+  sourceItems: Array<{
+    id: string;
+    name: string;
+    sourceId: string;
+    sourceType?: string;
+    remote?: boolean;
+  }>;
   spaces: Array<{ id: string; displayName: string }>;
   /** Docs that still need ontology and have extractable text. */
   needingOntology: number;
@@ -32,6 +40,11 @@ export type AnalyzePreview = {
   batchLimit: number;
   /** @deprecated use needingOcr — kept for older UI clients */
   skippedNoText: number;
+  needingSourceItems?: number;
+  totalSourceItemsInScope?: number;
+  remoteSourceItems?: number;
+  deviceSourceItems?: number;
+  sourceItemBatchLimit?: number;
 };
 
 export type AnalyzeResult = {
@@ -39,6 +52,9 @@ export type AnalyzeResult = {
   documentsQueuedForOcr: number;
   proposalsNoted: number;
   sourceItemsQueued: number;
+  sourceItemsRemote: PackSourceItemRef[];
+  sourceItemsDeviceSkipped: number;
+  remainingSourceItems: number;
   skipped: string[];
   documentIds: string[];
   remainingNeedingOntology: number;
@@ -63,6 +79,12 @@ export type AnalyzeProgress = {
     status: string;
     error: string | null;
   }>;
+  sourceItems: Array<{
+    id: string;
+    fileName: string;
+    status: string;
+    error: string | null;
+  }>;
   failures: Array<{ id: string; fileName: string; error: string | null }>;
 };
 
@@ -81,7 +103,8 @@ async function resolveSpaceIds(
   for (const child of childSpaces ?? []) {
     if (
       selection.spaceIds?.includes(child.id) ||
-      selection.includeAllDocuments
+      selection.includeAllDocuments ||
+      selection.includeAllSourceItems
     ) {
       spaceIds.add(String(child.id));
     }
@@ -96,7 +119,8 @@ async function resolveSpaceIds(
 export async function previewAnalyzeKnowledge(
   supabase: SupabaseClient,
   profileId: string,
-  selection: AnalyzeKnowledgeSelection
+  selection: AnalyzeKnowledgeSelection,
+  userId?: string
 ): Promise<AnalyzePreview> {
   const spaceIds = await resolveSpaceIds(supabase, profileId, selection);
 
@@ -190,15 +214,28 @@ export async function previewAnalyzeKnowledge(
   }
 
   let sourceItems: AnalyzePreview["sourceItems"] = [];
-  if (selection.sourceItemIds?.length) {
-    const { data } = await supabase
-      .from("source_items")
-      .select("id, name, source_id")
-      .in("id", selection.sourceItemIds);
-    sourceItems = (data ?? []).map((s) => ({
-      id: String(s.id),
-      name: String(s.name ?? "Item"),
-      sourceId: String(s.source_id),
+  let needingSourceItems = 0;
+  let totalSourceItemsInScope = 0;
+  let remoteSourceItems = 0;
+  let deviceSourceItems = 0;
+
+  if (userId) {
+    const discovered = await discoverPackSourceItems(supabase, {
+      userId,
+      profileId,
+      spaceIds,
+      selection,
+    });
+    needingSourceItems = discovered.remoteNeeding + discovered.deviceNeeding;
+    totalSourceItemsInScope = discovered.totalInScope;
+    remoteSourceItems = discovered.remoteNeeding;
+    deviceSourceItems = discovered.deviceNeeding;
+    sourceItems = discovered.needing.map((s) => ({
+      id: s.id,
+      name: s.name,
+      sourceId: s.sourceId,
+      sourceType: s.sourceType,
+      remote: s.remote,
     }));
   }
 
@@ -212,6 +249,11 @@ export async function previewAnalyzeKnowledge(
     totalDocumentsInScope: allDocs.length,
     batchLimit: PACK_ANALYZE_BATCH_SIZE,
     skippedNoText: needingOcr.length,
+    needingSourceItems,
+    totalSourceItemsInScope,
+    remoteSourceItems,
+    deviceSourceItems,
+    sourceItemBatchLimit: PACK_SOURCE_ITEM_BATCH_SIZE,
   };
 }
 
@@ -246,7 +288,8 @@ export async function startAnalyzeKnowledge(
   const preview = await previewAnalyzeKnowledge(
     supabase,
     args.profileId,
-    args.selection
+    args.selection,
+    args.userId
   );
 
   const skipped: string[] = [];
@@ -319,17 +362,39 @@ export async function startAnalyzeKnowledge(
     }
   }
 
-  let sourceItemsQueued = 0;
-  for (const item of preview.sourceItems.slice(0, 20)) {
-    const { error } = await supabase
+  const spaceIds = await resolveSpaceIds(
+    supabase,
+    args.profileId,
+    args.selection
+  );
+  const discoveredSources = await discoverPackSourceItems(supabase, {
+    userId: args.userId,
+    profileId: args.profileId,
+    spaceIds,
+    selection: args.selection,
+  });
+
+  const sourceItemsRemote = discoveredSources.needing.filter((s) => s.remote);
+  const sourceItemsDeviceSkipped = discoveredSources.deviceNeeding;
+  const sourceItemIds = sourceItemsRemote.map((s) => s.id);
+  const sourceItemsQueued = sourceItemsRemote.length;
+  const remainingSourceItems = Math.max(
+    0,
+    discoveredSources.remoteNeeding - sourceItemsRemote.length
+  );
+
+  // Mark remote batch as analyzing so progress polls while the client runs them.
+  if (sourceItemsRemote.length) {
+    await supabase
       .from("source_items")
       .update({
-        processing_status: "discovered",
+        processing_status: "analyzing",
         analysis_error: null,
       })
-      .eq("id", item.id);
-    if (!error) sourceItemsQueued += 1;
-    else skipped.push(`source_item:${item.id}`);
+      .in(
+        "id",
+        sourceItemsRemote.map((s) => s.id)
+      );
   }
 
   const remainingNeedingOntology = Math.max(
@@ -342,6 +407,7 @@ export async function startAnalyzeKnowledge(
     analyzedAt: new Date().toISOString(),
     lastAnalyzeSelection: args.selection,
     lastAnalyzeDocumentIds: documentIds,
+    lastAnalyzeSourceItemIds: sourceItemIds,
   };
 
   await supabase
@@ -364,13 +430,20 @@ export async function startAnalyzeKnowledge(
       enqueueErrors,
       proposalsNoted: preview.proposals.length,
       sourceItemsQueued,
+      sourceItemsDeviceSkipped,
+      remainingSourceItems,
       documentIds,
+      sourceItemIds,
       remainingNeedingOntology,
       selection: args.selection,
     },
   });
 
-  if (preview.documents.length > 0 && documentsQueued === 0) {
+  if (
+    preview.documents.length > 0 &&
+    documentsQueued === 0 &&
+    sourceItemsQueued === 0
+  ) {
     throw new Error(
       "Couldn't queue ontology jobs for these documents. Check that GUARDIAN_ONTOLOGY_ENABLED is on and document processing jobs are writable."
     );
@@ -381,6 +454,9 @@ export async function startAnalyzeKnowledge(
     documentsQueuedForOcr,
     proposalsNoted: preview.proposals.length,
     sourceItemsQueued,
+    sourceItemsRemote,
+    sourceItemsDeviceSkipped,
+    remainingSourceItems,
     skipped,
     documentIds,
     remainingNeedingOntology,
@@ -400,6 +476,11 @@ export async function getAnalyzeProgress(
   const config = installed.installation.configuration ?? {};
   const documentIds = Array.isArray(config.lastAnalyzeDocumentIds)
     ? config.lastAnalyzeDocumentIds.filter(
+        (id): id is string => typeof id === "string"
+      )
+    : [];
+  const sourceItemIds = Array.isArray(config.lastAnalyzeSourceItemIds)
+    ? config.lastAnalyzeSourceItemIds.filter(
         (id): id is string => typeof id === "string"
       )
     : [];
@@ -494,7 +575,51 @@ export async function getAnalyzeProgress(
     );
   }
 
-  const total = rows.length;
+  const sourceItems: AnalyzeProgress["sourceItems"] = [];
+  if (sourceItemIds.length) {
+    const { data: sourceRows } = await supabase
+      .from("source_items")
+      .select("id, name, processing_status, analysis_error")
+      .in("id", sourceItemIds);
+    const order = new Map(sourceItemIds.map((id, i) => [id, i]));
+    const mapped = (sourceRows ?? []).map((row) => {
+      const raw = String(row.processing_status ?? "discovered");
+      const status =
+        raw === "analyzed"
+          ? "completed"
+          : raw === "analyzing"
+            ? "processing"
+            : raw === "analysis_failed"
+              ? "failed"
+              : raw === "unavailable"
+                ? "skipped"
+                : "pending";
+      const fileName = String(row.name ?? "Connected item");
+      const error =
+        status === "failed"
+          ? ((row.analysis_error as string | null) ?? null)
+          : null;
+      if (status === "completed") completed += 1;
+      else if (status === "processing") processing += 1;
+      else if (status === "failed") {
+        failed += 1;
+        failures.push({ id: String(row.id), fileName, error });
+      } else if (status === "skipped") skipped += 1;
+      else pending += 1;
+      return {
+        id: String(row.id),
+        fileName,
+        status,
+        error,
+      };
+    });
+    mapped.sort(
+      (a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999)
+    );
+    sourceItems.push(...mapped);
+  }
+
+  const total = rows.length + sourceItems.length;
   const percent = total === 0 ? 0 : Math.round((completed / total) * 100);
   const running = pending > 0 || processing > 0;
 
@@ -511,6 +636,7 @@ export async function getAnalyzeProgress(
     analyzedAt:
       typeof config.analyzedAt === "string" ? config.analyzedAt : null,
     documents: documents.slice(0, 40),
-    failures: failures.slice(0, 10),
+    sourceItems: sourceItems.slice(0, 40),
+    failures: failures.slice(0, 15),
   };
 }

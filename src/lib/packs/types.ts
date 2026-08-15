@@ -112,14 +112,6 @@ export type ProfilePackRow = {
   configuration: ProfilePackConfiguration;
 };
 
-export type ProfilePackConfiguration = {
-  selectedSpaceKeys?: string[];
-  analyzedAt?: string | null;
-  lastAnalyzeSelection?: AnalyzeKnowledgeSelection | null;
-  lastAnalyzeDocumentIds?: string[];
-  [key: string]: unknown;
-};
-
 export type AnalyzeKnowledgeSelection = {
   spaceIds?: string[];
   documentIds?: string[];
@@ -127,6 +119,17 @@ export type AnalyzeKnowledgeSelection = {
   proposalIds?: string[];
   includeAllDocuments?: boolean;
   includeAllProposals?: boolean;
+  /** Discover connected source items bound to this business / child Spaces. */
+  includeAllSourceItems?: boolean;
+};
+
+export type ProfilePackConfiguration = {
+  selectedSpaceKeys?: string[];
+  analyzedAt?: string | null;
+  lastAnalyzeSelection?: AnalyzeKnowledgeSelection | null;
+  lastAnalyzeDocumentIds?: string[];
+  lastAnalyzeSourceItemIds?: string[];
+  [key: string]: unknown;
 };
 
 export type ProfilePackSpaceRow = {

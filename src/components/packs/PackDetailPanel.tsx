@@ -7,6 +7,8 @@ import type {
   ProfilePackRow,
 } from "@/lib/packs/types";
 import { kickDocumentProcessingJobs } from "@/lib/documents/clientProcessing";
+import { analyzeSourceItemClient } from "@/lib/connectors/clientAnalyze";
+import type { SourceItem } from "@/lib/connectors/types";
 
 type Tab = "overview" | "install" | "configure" | "analyze" | "success";
 
@@ -26,18 +28,48 @@ type AnalyzeProgressState = {
     status: string;
     error: string | null;
   }>;
+  sourceItems?: Array<{
+    id: string;
+    fileName: string;
+    status: string;
+    error: string | null;
+  }>;
   failures?: Array<{ id: string; fileName: string; error: string | null }>;
 };
 
 type AnalyzePreviewState = {
   documents: Array<{ id: string; fileName: string; needsOcr?: boolean }>;
   proposals: Array<{ id: string; title: string }>;
-  sourceItems: Array<{ id: string; name: string }>;
+  sourceItems: Array<{
+    id: string;
+    name: string;
+    sourceId?: string;
+    remote?: boolean;
+    sourceType?: string;
+  }>;
   needingOntology?: number;
   needingOcr?: number;
   totalDocumentsInScope?: number;
   batchLimit?: number;
   skippedNoText?: number;
+  needingSourceItems?: number;
+  totalSourceItemsInScope?: number;
+  remoteSourceItems?: number;
+  deviceSourceItems?: number;
+  sourceItemBatchLimit?: number;
+};
+
+type RemoteSourceItemPayload = {
+  id: string;
+  name: string;
+  sourceId: string;
+  remote: boolean;
+  processingStatus: string;
+  mimeType: string | null;
+  sourceUri: string;
+  externalId: string;
+  metadata: Record<string, unknown>;
+  analysisVersion: string | null;
 };
 
 type Props = {
@@ -68,10 +100,14 @@ export default function PackDetailPanel({
     useState<AnalyzePreviewState | null>(null);
   const [includeAllDocuments, setIncludeAllDocuments] = useState(true);
   const [includeAllProposals, setIncludeAllProposals] = useState(false);
+  const [includeAllSourceItems, setIncludeAllSourceItems] = useState(true);
   const [analyzeResult, setAnalyzeResult] = useState<string | null>(null);
   const [analyzeProgress, setAnalyzeProgress] =
     useState<AnalyzeProgressState | null>(null);
   const [pollProgress, setPollProgress] = useState(false);
+  const [sourceAnalyzeNote, setSourceAnalyzeNote] = useState<string | null>(
+    null
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -186,8 +222,67 @@ export default function PackDetailPanel({
     () => ({
       includeAllDocuments,
       includeAllProposals,
+      includeAllSourceItems,
     }),
-    [includeAllDocuments, includeAllProposals]
+    [includeAllDocuments, includeAllProposals, includeAllSourceItems]
+  );
+
+  const runRemoteSourceItems = useCallback(
+    async (items: RemoteSourceItemPayload[]) => {
+      if (!items.length) return;
+      setSourceAnalyzeNote(
+        `Analyzing ${items.length} connected item(s) into ontology…`
+      );
+      let done = 0;
+      let ok = 0;
+      let failed = 0;
+      const concurrency = 3;
+      let next = 0;
+      await Promise.all(
+        Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+          while (next < items.length) {
+            const index = next;
+            next += 1;
+            const row = items[index]!;
+            const item: SourceItem & { id: string } = {
+              id: row.id,
+              sourceId: row.sourceId,
+              externalId: row.externalId,
+              name: row.name,
+              mimeType: row.mimeType ?? undefined,
+              sourceUri: row.sourceUri,
+              metadata: row.metadata,
+              processingStatus: row.processingStatus as SourceItem["processingStatus"],
+              analysisVersion: row.analysisVersion,
+            };
+            const result = await analyzeSourceItemClient({
+              sourceId: row.sourceId,
+              item,
+              profileId,
+              force:
+                row.processingStatus === "analysis_failed" ||
+                row.processingStatus === "analyzing",
+              remote: true,
+              allowUnchangedSkip: true,
+            });
+            done += 1;
+            if (result.ok) ok += 1;
+            else failed += 1;
+            setSourceAnalyzeNote(
+              `Connected sources ${done}/${items.length} · ${ok} ok · ${failed} failed — keep this page open`
+            );
+            void refreshAnalyzeProgress();
+          }
+        })
+      );
+      setSourceAnalyzeNote(
+        `Connected sources finished: ${ok} analyzed` +
+          (failed ? `, ${failed} failed` : "") +
+          ". Run again for the next batch if more remain."
+      );
+      void refreshAnalyzeProgress();
+    },
+    [profileId, refreshAnalyzeProgress]
   );
 
   const previewAnalyze = async () => {
@@ -217,6 +312,7 @@ export default function PackDetailPanel({
     setBusy(true);
     setError(null);
     setAnalyzeResult(null);
+    setSourceAnalyzeNote(null);
     try {
       const res = await fetch(`/api/packs/${encodeURIComponent(slug)}/analyze`, {
         method: "POST",
@@ -232,22 +328,45 @@ export default function PackDetailPanel({
       const remaining =
         typeof r.remainingNeedingOntology === "number" &&
         r.remainingNeedingOntology > 0
-          ? ` ${r.remainingNeedingOntology} more still need analysis — run again after this batch finishes.`
+          ? ` ${r.remainingNeedingOntology} more documents still need analysis — run again after this batch finishes.`
           : "";
       const ocrNote =
         typeof r.documentsQueuedForOcr === "number" &&
         r.documentsQueuedForOcr > 0
           ? ` ${r.documentsQueuedForOcr} will run OCR/reading first, then ontology.`
           : "";
+      const sourceNote =
+        typeof r.sourceItemsQueued === "number" && r.sourceItemsQueued > 0
+          ? ` ${r.sourceItemsQueued} connected item(s) will analyze into ontology now.`
+          : "";
+      const deviceNote =
+        typeof r.sourceItemsDeviceSkipped === "number" &&
+        r.sourceItemsDeviceSkipped > 0
+          ? ` ${r.sourceItemsDeviceSkipped} device-storage file(s) need Connections (folder access).`
+          : "";
+      const moreSources =
+        typeof r.remainingSourceItems === "number" &&
+        r.remainingSourceItems > 0
+          ? ` ${r.remainingSourceItems} more connected items after this batch.`
+          : "";
       setAnalyzeResult(
         `Queued ${r.documentsQueued} document(s) in the background.` +
           ocrNote +
+          sourceNote +
+          deviceNote +
           remaining +
-          " You can leave this page; progress updates below."
+          moreSources +
+          " You can leave this page for documents; keep it open for connected sources."
       );
       setPollProgress(true);
       void kickDocumentProcessingJobs(4);
       void refreshAnalyzeProgress();
+      const remote = Array.isArray(r.sourceItemsRemote)
+        ? (r.sourceItemsRemote as RemoteSourceItemPayload[])
+        : [];
+      if (remote.length) {
+        void runRemoteSourceItems(remote);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Analyze failed");
     } finally {
@@ -502,6 +621,14 @@ export default function PackDetailPanel({
               />
               Note proposals for this business (not extracted yet)
             </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={includeAllSourceItems}
+                onChange={(e) => setIncludeAllSourceItems(e.target.checked)}
+              />
+              Connected sources bound to this Space (Trello boards &amp; charts)
+            </label>
           </div>
           <div className="flex flex-wrap gap-3">
             <button
@@ -543,7 +670,25 @@ export default function PackDetailPanel({
                 <li>{analyzePreview.proposals.length} proposal(s) noted</li>
                 <li>
                   {analyzePreview.sourceItems.length} connected source item(s)
+                  this batch
+                  {typeof analyzePreview.needingSourceItems === "number"
+                    ? ` (${analyzePreview.needingSourceItems} need analysis of ${analyzePreview.totalSourceItemsInScope ?? "?"} in scope)`
+                    : ""}
                 </li>
+                {typeof analyzePreview.remoteSourceItems === "number" &&
+                analyzePreview.remoteSourceItems > 0 ? (
+                  <li>
+                    {analyzePreview.remoteSourceItems} Trello/remote item(s) can
+                    run from this page
+                  </li>
+                ) : null}
+                {typeof analyzePreview.deviceSourceItems === "number" &&
+                analyzePreview.deviceSourceItems > 0 ? (
+                  <li>
+                    {analyzePreview.deviceSourceItems} device-storage file(s)
+                    need Settings → Connections (folder access)
+                  </li>
+                ) : null}
               </ul>
               {analyzePreview.documents.length > 0 ? (
                 <ul className="mt-3 max-h-40 overflow-auto text-xs text-ink-muted">
@@ -555,11 +700,28 @@ export default function PackDetailPanel({
                   ))}
                 </ul>
               ) : null}
+              {analyzePreview.sourceItems.length > 0 ? (
+                <ul className="mt-3 max-h-40 overflow-auto text-xs text-ink-muted">
+                  {analyzePreview.sourceItems.slice(0, 20).map((s) => (
+                    <li key={s.id}>
+                      {s.name}
+                      {s.remote === false
+                        ? " (device — use Connections)"
+                        : " (connected)"}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
             </div>
           ) : null}
           {analyzeResult ? (
             <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
               {analyzeResult}
+            </p>
+          ) : null}
+          {sourceAnalyzeNote ? (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+              {sourceAnalyzeNote}
             </p>
           ) : null}
           {analyzeProgress && analyzeProgress.total > 0 ? (
@@ -624,15 +786,19 @@ export default function PackDetailPanel({
                 </li>
               </ul>
               {(analyzeProgress.documents?.length ||
+                analyzeProgress.sourceItems?.length ||
                 analyzeProgress.failures?.length) ? (
                 <ul className="mt-3 max-h-48 space-y-2 overflow-auto text-xs">
-                  {(analyzeProgress.documents?.length
-                    ? analyzeProgress.documents
-                    : (analyzeProgress.failures ?? []).map((f) => ({
-                        ...f,
-                        status: "failed",
-                      }))
-                  ).map((d) => {
+                  {[
+                    ...(analyzeProgress.documents ?? []).map((d) => ({
+                      ...d,
+                      kind: "doc" as const,
+                    })),
+                    ...(analyzeProgress.sourceItems ?? []).map((d) => ({
+                      ...d,
+                      kind: "conn" as const,
+                    })),
+                  ].map((d) => {
                     const label =
                       d.status === "completed"
                         ? "completed"
@@ -647,11 +813,12 @@ export default function PackDetailPanel({
                                 : "pending";
                     return (
                       <li
-                        key={d.id}
+                        key={`${d.kind}-${d.id}`}
                         className="border-t border-stone-100 pt-2 first:border-0 first:pt-0"
                       >
                         <div className="flex items-start justify-between gap-2">
                           <span className="min-w-0 break-all font-medium text-ink">
+                            {d.kind === "conn" ? "⊕ " : ""}
                             {d.fileName}
                           </span>
                           <span
@@ -678,14 +845,13 @@ export default function PackDetailPanel({
               ) : null}
               {analyzeProgress.running ? (
                 <p className="mt-3 text-xs text-ink-muted">
-                  Working in the background — safe to navigate away. This panel
-                  refreshes every few seconds. Docs marked reading run OCR first,
-                  then ontology.
+                  Documents run in the background; connected sources need this
+                  page open. Docs marked reading run OCR first, then ontology.
                 </p>
               ) : analyzeProgress.failed > 0 ? (
                 <p className="mt-3 text-xs text-ink-muted">
-                  Failed documents are retried when you click Start analysis
-                  batch again.
+                  Failed items are retried when you click Start analysis batch
+                  again.
                 </p>
               ) : null}
             </div>

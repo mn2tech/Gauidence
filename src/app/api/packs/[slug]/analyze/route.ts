@@ -35,6 +35,7 @@ function parseSelection(body: Record<string, unknown>): AnalyzeKnowledgeSelectio
       : undefined,
     includeAllDocuments: body.includeAllDocuments === true,
     includeAllProposals: body.includeAllProposals === true,
+    includeAllSourceItems: body.includeAllSourceItems === true,
   };
 }
 
@@ -123,7 +124,8 @@ export async function POST(request: Request, { params }: Params) {
       const preview = await previewAnalyzeKnowledge(
         auth.supabase,
         profileId,
-        selection
+        selection,
+        auth.user.id
       );
       return NextResponse.json({ preview });
     }

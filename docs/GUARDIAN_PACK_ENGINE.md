@@ -96,7 +96,7 @@ Existing documents, ontology rows, proposals, and Spaces are **not** deleted by 
 2. Selects **Guardian Business** → View.
 3. **Recommended setup** — checkboxes for Spaces (Clients, Contracts, …).
 4. **Install** — idempotent upsert of `profile_packs` + ensure Spaces (reuse by display name).
-5. Optional **Analyze Existing Knowledge** — explicit selection; queues `extract_ontology` jobs.
+5. Optional **Analyze Existing Knowledge** — documents (background ontology jobs) plus connected sources bound to the Space (Trello/remote run from Pack Analyze; device storage still via Connections).
 6. Use **Business Dashboard**, **Ontology Explorer**, or **Ask Gideon**.
 
 ### Business Dashboard (live)
