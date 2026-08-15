@@ -79,8 +79,11 @@ import { resolveExplicitSpaceScope } from "@/lib/vault/detectVaultScope";
 import { isOrgStyleProfile, type GuardianProfileType } from "@/lib/profiles/types";
 import { collaboratorDisplayName } from "@/lib/profiles/collaboratorDisplay";
 import { isGuardianPackEngineEnabled } from "@/lib/features/packs";
-import { loadInstalledPackSkillPrompt } from "@/lib/packs/gideon";
-import { GUARDIAN_BUSINESS_PACK_SLUG } from "@/lib/packs/types";
+import {
+  businessPackSkillPromptNote,
+  isBusinessAdvisoryQuestion,
+  isBusinessKnowledgeQuestion,
+} from "@/lib/packs/gideon";
 import { loadCollaboratorMemberAccounts } from "@/lib/profiles/collaboratorMembers";
 import type { LinkedVaultProfile } from "@/lib/vault/rollup";
 import { loadLinkedOrgContext } from "./linkedProfiles";
@@ -237,21 +240,16 @@ export async function loadWorkspaceContext(
     activeProfile.profile_type !== "client" &&
     /\b(proposal|proposals|quote|estimate)\b/i.test(retrievalQuestion);
 
-  const shouldLoadPackSkills =
-    isGuardianPackEngineEnabled({ email: user.email }) &&
-    isOrgStyleProfile(activeProfile.profile_type) &&
-    (intent === "knowledge_search" ||
+  const packSkillsNote = businessPackSkillPromptNote({
+    packEngineEnabled: isGuardianPackEngineEnabled({ email: user.email }),
+    isOrgSpace: isOrgStyleProfile(activeProfile.profile_type),
+    includeSkill:
+      intent === "knowledge_search" ||
       intent === "combined" ||
-      intent === "chief_of_staff" ||
-      load.documents);
-
-  const packSkillsPromise = shouldLoadPackSkills
-    ? loadInstalledPackSkillPrompt(
-        supabase,
-        ontologySpaceId,
-        GUARDIAN_BUSINESS_PACK_SLUG
-      ).catch(() => "")
-    : Promise.resolve("");
+      (intent === "chief_of_staff" &&
+        (isBusinessAdvisoryQuestion(retrievalQuestion) ||
+          isBusinessKnowledgeQuestion(retrievalQuestion))),
+  });
 
   const [
     structuredKnowledgeBundle,
@@ -264,7 +262,6 @@ export async function loadWorkspaceContext(
     upcomingAlerts,
     linkedContext,
     workMemoryBundleRaw,
-    packSkillsNote,
   ] = await Promise.all([
     load.documents && isKnowledgeEngineV2Enabled() && !songListOnly
       ? retrieveStructuredKnowledge(supabase, {
@@ -395,7 +392,6 @@ export async function loadWorkspaceContext(
           focused: false as const,
           bundle: { projects: [], sessionsByProject: new Map() },
         }),
-    packSkillsPromise,
   ]);
 
   knowledgeCandidateCount = structuredKnowledgeBundle.count;

@@ -107,9 +107,7 @@ export default function SiteHeader() {
   const documentsNavHref = documentsHref(active?.id);
   const askHref = isEmployeeVault
     ? employeeGideonHref(active?.id)
-    : active?.id
-      ? `/ask?profileId=${encodeURIComponent(active.id)}`
-      : "/ask";
+    : "/ask";
   const researchHref = needsSetup ? "/ask" : "/research";
 
   const linkClass =
@@ -176,7 +174,12 @@ export default function SiteHeader() {
                 </>
               ) : null}
               {showGideon ? (
-                <Link href={askHref} className="hover:text-foreground" data-analytics="nav_ask_gideon">
+                <Link
+                  href={askHref}
+                  prefetch={false}
+                  className="hover:text-foreground"
+                  data-analytics="nav_ask_gideon"
+                >
                   Ask Gideon
                 </Link>
               ) : null}
@@ -359,7 +362,7 @@ export default function SiteHeader() {
                   </>
                 ) : null}
                 {showGideon ? (
-                  <Link href={askHref} className={linkClass}>
+                  <Link href={askHref} prefetch={false} className={linkClass}>
                     Ask Gideon
                   </Link>
                 ) : null}

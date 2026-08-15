@@ -6,6 +6,7 @@ import {
   isBusinessKnowledgeQuestion,
   formatPackSkillsForPrompt,
   buildBusinessQuickActions,
+  businessPackSkillPromptNote,
 } from "../gideon";
 import {
   GUARDIAN_BUSINESS_PACK_SLUG,
@@ -134,6 +135,23 @@ describe("gideon business pack routing", () => {
       },
     ]);
     assert.match(text, /Distinguish facts from recommendations/);
+  });
+
+  it("builds zero-DB skill notes for org spaces", () => {
+    const note = businessPackSkillPromptNote({
+      packEngineEnabled: true,
+      isOrgSpace: true,
+      includeSkill: true,
+    });
+    assert.match(note, /Known from Guardian data/);
+    assert.equal(
+      businessPackSkillPromptNote({
+        packEngineEnabled: true,
+        isOrgSpace: false,
+        includeSkill: true,
+      }),
+      ""
+    );
   });
 
   it("exposes business quick actions", () => {

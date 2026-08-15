@@ -1,10 +1,27 @@
 /**
- * Pack-aware Gideon helpers — Business Chief of Staff skill loading
- * and question classification (pure where possible for unit tests).
+ * Pack-aware Gideon helpers — Business Chief of Staff skill text
+ * and question classification (pure; safe for unit tests / hot paths).
+ *
+ * Hot path rule: never hit the database from Ask Gideon context assembly.
+ * Skill prompt is a static constant (same text seeded in pack_gideon_skills).
  */
 
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { GUARDIAN_BUSINESS_PACK_SLUG } from "./types";
+
+export { GUARDIAN_BUSINESS_PACK_SLUG };
+
+/** Same wording as guardian-business pack_gideon_skills.prompt_addon (v1.0.0). */
+export const BUSINESS_CHIEF_OF_STAFF_PROMPT = `BUSINESS CHIEF OF STAFF (Guardian Business Pack):
+You help the user understand and operate their business using Guardian data.
+Distinguish clearly between:
+1) Known from Guardian data (ontology entities, relationships, evidence, documents, proposals, connected sources)
+2) Gideon's recommendation (advisory judgment based on available context)
+
+Never fabricate organizational facts. If evidence is thin, say what is known and what is missing.
+Prefer citing evidence (document names, proposal titles, source items) when stating facts.
+For relationship questions, use ontology relationships and linked Spaces.
+For analytical questions (outstanding proposals, contracts expiring, tasks needing attention), reason over available structured data and recent activity — do not invent deadlines or clients.
+For advisory questions ("what should I follow up on?"), give practical next steps labeled as recommendations.`;
 
 /** Business knowledge / relationship questions that need ontology + search. */
 const BUSINESS_KNOWLEDGE =
@@ -22,73 +39,20 @@ export function isBusinessAdvisoryQuestion(question: string): boolean {
   return BUSINESS_ADVISORY.test(question.trim());
 }
 
-type SkillCacheEntry = { prompt: string; expiresAt: number };
-const skillPromptCache = new Map<string, SkillCacheEntry>();
-const SKILL_CACHE_TTL_MS = 5 * 60 * 1000;
-
-/**
- * Lightweight skill prompt load for hot Gideon path.
- * Does NOT load the full pack definition (entity types, dashboard, etc.).
- */
-export async function loadInstalledPackSkillPrompt(
-  supabase: SupabaseClient,
-  profileId: string,
-  packSlug: string = GUARDIAN_BUSINESS_PACK_SLUG
-): Promise<string> {
-  const cacheKey = `${profileId}:${packSlug}`;
-  const cached = skillPromptCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) {
-    return cached.prompt;
-  }
-
-  const { data: pack } = await supabase
-    .from("packs")
-    .select("id")
-    .eq("slug", packSlug)
-    .maybeSingle();
-  if (!pack?.id) {
-    skillPromptCache.set(cacheKey, { prompt: "", expiresAt: Date.now() + SKILL_CACHE_TTL_MS });
+/** Zero-DB pack skill note for Gideon system prompt. */
+export function businessPackSkillPromptNote(options: {
+  packEngineEnabled: boolean;
+  isOrgSpace: boolean;
+  includeSkill: boolean;
+}): string {
+  if (
+    !options.packEngineEnabled ||
+    !options.isOrgSpace ||
+    !options.includeSkill
+  ) {
     return "";
   }
-
-  const { data: installation } = await supabase
-    .from("profile_packs")
-    .select("pack_version_id")
-    .eq("profile_id", profileId)
-    .eq("pack_id", pack.id)
-    .eq("status", "installed")
-    .maybeSingle();
-  if (!installation?.pack_version_id) {
-    skillPromptCache.set(cacheKey, { prompt: "", expiresAt: Date.now() + SKILL_CACHE_TTL_MS });
-    return "";
-  }
-
-  const { data: skills } = await supabase
-    .from("pack_gideon_skills")
-    .select("prompt_addon")
-    .eq("pack_version_id", installation.pack_version_id)
-    .order("sort_order");
-
-  const prompt = (skills ?? [])
-    .map((s) => String(s.prompt_addon ?? "").trim())
-    .filter(Boolean)
-    .join("\n\n");
-
-  skillPromptCache.set(cacheKey, {
-    prompt,
-    expiresAt: Date.now() + SKILL_CACHE_TTL_MS,
-  });
-  return prompt;
-}
-
-/** @deprecated Prefer loadInstalledPackSkillPrompt on hot paths. */
-export async function loadInstalledPackSkills(
-  supabase: SupabaseClient,
-  profileId: string,
-  packSlug: string = GUARDIAN_BUSINESS_PACK_SLUG
-): Promise<Array<{ prompt_addon: string }>> {
-  const prompt = await loadInstalledPackSkillPrompt(supabase, profileId, packSlug);
-  return prompt ? [{ prompt_addon: prompt }] : [];
+  return BUSINESS_CHIEF_OF_STAFF_PROMPT;
 }
 
 export function formatPackSkillsForPrompt(
