@@ -541,16 +541,33 @@ export default function PackDetailPanel({
                 <p className="font-medium">
                   {analyzeProgress.running
                     ? "Analysis in progress"
-                    : "Last batch status"}
+                    : analyzeProgress.failed > 0 &&
+                        analyzeProgress.completed === 0
+                      ? "Last batch failed — start again to retry"
+                      : "Last batch status"}
                 </p>
                 <p className="tabular-nums text-ink-muted">
-                  {analyzeProgress.percent}%
+                  {analyzeProgress.percent}% complete
                 </p>
               </div>
               <div className="mt-3 h-2 overflow-hidden rounded-full bg-stone-100">
                 <div
-                  className="h-full rounded-full bg-brand transition-[width] duration-500"
-                  style={{ width: `${analyzeProgress.percent}%` }}
+                  className={`h-full rounded-full transition-[width] duration-500 ${
+                    analyzeProgress.failed > 0 &&
+                    analyzeProgress.completed === 0 &&
+                    !analyzeProgress.running
+                      ? "bg-red-500"
+                      : "bg-brand"
+                  }`}
+                  style={{
+                    width: `${
+                      analyzeProgress.running || analyzeProgress.completed > 0
+                        ? Math.max(analyzeProgress.percent, analyzeProgress.running ? 4 : 0)
+                        : analyzeProgress.failed > 0
+                          ? 100
+                          : analyzeProgress.percent
+                    }%`,
+                  }}
                 />
               </div>
               <ul className="mt-3 grid grid-cols-2 gap-2 text-xs text-ink-muted sm:grid-cols-4">
@@ -583,6 +600,11 @@ export default function PackDetailPanel({
                 <p className="mt-3 text-xs text-ink-muted">
                   Working in the background — safe to navigate away. This panel
                   refreshes every few seconds.
+                </p>
+              ) : analyzeProgress.failed > 0 ? (
+                <p className="mt-3 text-xs text-ink-muted">
+                  Failed documents are included in the next batch when you click
+                  Start analysis batch again.
                 </p>
               ) : null}
             </div>

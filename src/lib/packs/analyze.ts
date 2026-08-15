@@ -10,7 +10,12 @@ import type { AnalyzeKnowledgeSelection, ProfilePackConfiguration } from "./type
 export const PACK_ANALYZE_BATCH_SIZE = 40;
 
 export type AnalyzePreview = {
-  documents: Array<{ id: string; fileName: string; profileId: string }>;
+  documents: Array<{
+    id: string;
+    fileName: string;
+    profileId: string;
+    ontologyStatus: string | null;
+  }>;
   proposals: Array<{ id: string; title: string }>;
   sourceItems: Array<{ id: string; name: string; sourceId: string }>;
   spaces: Array<{ id: string; displayName: string }>;
@@ -122,6 +127,7 @@ export async function previewAnalyzeKnowledge(
     id: String(d.id),
     fileName: String(d.file_name ?? "Document"),
     profileId: String(d.profile_id),
+    ontologyStatus: d.ontology_status,
   }));
 
   let proposals: AnalyzePreview["proposals"] = [];
@@ -166,7 +172,7 @@ export async function previewAnalyzeKnowledge(
 
 /**
  * Queue a bounded batch of ontology jobs (async). Prefer docs that still need
- * ontology. Does not force re-extraction of completed docs unless none remain.
+ * ontology. Force re-queue for failed/stale jobs so retries actually run.
  */
 export async function startAnalyzeKnowledge(
   supabase: SupabaseClient,
@@ -201,6 +207,7 @@ export async function startAnalyzeKnowledge(
   const skipped: string[] = [];
   const documentIds: string[] = [];
   let documentsQueued = 0;
+  let enqueueErrors = 0;
 
   // Enqueue in parallel chunks so the request returns quickly.
   const chunkSize = 8;
@@ -208,19 +215,24 @@ export async function startAnalyzeKnowledge(
     const chunk = preview.documents.slice(i, i + chunkSize);
     const results = await Promise.all(
       chunk.map(async (doc) => {
+        // Always force for this batch — these docs were selected because they
+        // still need ontology (failed / pending / never run). force:false was
+        // skipping when an old extract_ontology job row was still "completed".
         const result = await enqueueDocumentProcessingJob(supabase, {
           documentId: doc.id,
           profileId: doc.profileId,
           userId: args.userId,
           jobType: "extract_ontology",
-          force: false,
+          force: true,
         });
-        if (result.enqueued) {
+        if (result.enqueued || result.jobId) {
           await supabase
             .from("documents")
-            .update({ ontology_status: "pending" })
-            .eq("id", doc.id)
-            .neq("ontology_status", "processing");
+            .update({
+              ontology_status: "pending",
+              last_processing_error: null,
+            })
+            .eq("id", doc.id);
         }
         return { doc, result };
       })
@@ -228,8 +240,15 @@ export async function startAnalyzeKnowledge(
 
     for (const { doc, result } of results) {
       documentIds.push(doc.id);
-      if (result.enqueued) documentsQueued += 1;
-      else skipped.push(`document:${doc.id}`);
+      if (result.enqueued) {
+        documentsQueued += 1;
+      } else if (result.jobId) {
+        // Already pending/processing — still tracking; count as queued for UX.
+        documentsQueued += 1;
+      } else {
+        enqueueErrors += 1;
+        skipped.push(`document:${doc.id}`);
+      }
     }
   }
 
@@ -274,6 +293,7 @@ export async function startAnalyzeKnowledge(
     actor_user_id: args.userId,
     metadata: {
       documentsQueued,
+      enqueueErrors,
       proposalsNoted: preview.proposals.length,
       sourceItemsQueued,
       documentIds,
@@ -281,6 +301,12 @@ export async function startAnalyzeKnowledge(
       selection: args.selection,
     },
   });
+
+  if (preview.documents.length > 0 && documentsQueued === 0) {
+    throw new Error(
+      "Couldn't queue ontology jobs for these documents. Check that GUARDIAN_ONTOLOGY_ENABLED is on and document processing jobs are writable."
+    );
+  }
 
   return {
     documentsQueued,
@@ -345,8 +371,7 @@ export async function getAnalyzeProgress(
   }
 
   const total = rows.length;
-  const done = completed + failed + skipped;
-  const percent = total === 0 ? 100 : Math.round((done / total) * 100);
+  const percent = total === 0 ? 0 : Math.round((completed / total) * 100);
   const running = pending > 0 || processing > 0;
 
   return {
