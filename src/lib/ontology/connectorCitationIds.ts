@@ -33,6 +33,48 @@ function chartStem(fileName: string): string {
     .toLowerCase();
 }
 
+/** Key mentioned in Gideon’s answer or the user question (e.g. "Key C"). */
+export function extractMusicalKeyFromText(text: string): string | null {
+  const m =
+    text.match(/\bkey\s*[:\-]?\s*([A-G](?:#|b)?m?(?:aj|in)?)\b/i) ||
+    text.match(/\bin\s+([A-G](?:#|b)?m?)\b/i);
+  if (!m?.[1]) return null;
+  return m[1].replace(/maj|in$/i, "").replace(/aj$/i, "");
+}
+
+function chartLabelHasKey(label: string, key: string): boolean {
+  const base = key.replace(/m$/i, "");
+  const escaped = base.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(
+    `[-–—]\\s*${escaped}(?:m|maj|min|major|minor)?\\b|\\bkey\\s*${escaped}\\b`,
+    "i"
+  ).test(label);
+}
+
+/**
+ * When several charts match the same song, prefer the key named in the text
+ * (e.g. answer says Key C → keep the C chart, drop Bb).
+ */
+export function preferChartsMatchingKeyInText<T extends NamedCitation>(
+  citations: T[],
+  text: string,
+  limit = 2
+): T[] {
+  if (!citations.length) return [];
+  if (citations.length === 1) return citations.slice(0, limit);
+  const key = extractMusicalKeyFromText(text);
+  if (!key) return citations.slice(0, limit);
+  const keyed = citations.filter((c) => {
+    const labels = [c.cardName, c.fileName]
+      .map((v) => (typeof v === "string" ? v.trim() : ""))
+      .filter(Boolean)
+      .join(" ");
+    return chartLabelHasKey(labels, key);
+  });
+  if (keyed.length) return keyed.slice(0, Math.min(limit, 1));
+  return citations.slice(0, limit);
+}
+
 function citationMentionedInText(
   citation: NamedCitation,
   text: string
@@ -59,7 +101,7 @@ export function pickConnectorImageCitations<T extends NamedCitation>(
   if (!citations.length) return [];
   const mentioned = citations.filter((c) => citationMentionedInText(c, answer));
   // Do not fall back to random first citations — that shows the wrong charts.
-  return mentioned.slice(0, limit);
+  return preferChartsMatchingKeyInText(mentioned, answer, limit);
 }
 
 /**
@@ -73,11 +115,16 @@ export function pickConnectorCitationsForChartQuery<T extends NamedCitation>(
   songTitles: string[],
   limit = 4
 ): T[] {
+  const keyText = `${question}\n${answer}`;
   const fromAnswer = pickConnectorImageCitations(citations, answer, limit);
-  if (fromAnswer.length) return fromAnswer;
+  if (fromAnswer.length) {
+    return preferChartsMatchingKeyInText(fromAnswer, keyText, limit);
+  }
 
   const fromQuestion = pickConnectorImageCitations(citations, question, limit);
-  if (fromQuestion.length) return fromQuestion;
+  if (fromQuestion.length) {
+    return preferChartsMatchingKeyInText(fromQuestion, keyText, limit);
+  }
 
   const titles = [
     ...songTitles,
@@ -90,7 +137,11 @@ export function pickConnectorCitationsForChartQuery<T extends NamedCitation>(
       (c) =>
         isLikelyChordChartFile(c.fileName, c.mimeType ?? null) || c.isImage
     );
-    return charts.length === 1 ? charts : [];
+    return preferChartsMatchingKeyInText(
+      charts.length === 1 ? charts : [],
+      keyText,
+      limit
+    );
   }
 
   const matched = citations.filter((c) => {
@@ -117,7 +168,9 @@ export function pickConnectorCitationsForChartQuery<T extends NamedCitation>(
     });
   });
 
-  if (matched.length) return matched.slice(0, limit);
+  if (matched.length) {
+    return preferChartsMatchingKeyInText(matched, keyText, limit);
+  }
 
   // Opaque Trello filenames with a matching card title already filtered upstream.
   const charts = citations.filter(
@@ -126,7 +179,7 @@ export function pickConnectorCitationsForChartQuery<T extends NamedCitation>(
       Boolean(c.cardName?.trim())
   );
   if (charts.length === 1) return charts;
-  return [];
+  return preferChartsMatchingKeyInText(charts, keyText, limit);
 }
 
 function extractTitlesFromQuestion(question: string): string[] {

@@ -106,7 +106,7 @@ import { isImageFileName } from "@/lib/vault/images";
 import {
   connectorFilePreviewPath,
   isConnectorCitationDocumentId,
-  pickConnectorImageCitations,
+  preferChartsMatchingKeyInText,
 } from "@/lib/ontology/connectorCitationIds";
 import { renderPdfThumbnailFromFile, renderPdfThumbnailFromUrl } from "@/lib/vault/pdfThumbnail";
 import { renderGideonText } from "@/components/gideonText";
@@ -265,6 +265,7 @@ function VaultAttachmentCard({
   citationKind,
   sourceId,
   itemId,
+  displayName,
 }: {
   documentId: string;
   fileName: string;
@@ -274,12 +275,17 @@ function VaultAttachmentCard({
   citationKind?: "vault" | "connector";
   sourceId?: string;
   itemId?: string;
+  /** Song/card title for connector charts (shown instead of opaque trello*.jpg). */
+  displayName?: string | null;
 }) {
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [imageFailed, setImageFailed] = useState(false);
   const isImage = kind === "image" || isImageFileName(fileName);
   const isPdf = /\.pdf$/i.test(fileName);
   const pending = isPendingAttachmentId(documentId);
+  const label =
+    (displayName && displayName.trim()) ||
+    fileName;
   const connectorPreview =
     (citationKind === "connector" || isConnectorCitationDocumentId(documentId)) &&
     sourceId &&
@@ -348,53 +354,61 @@ function VaultAttachmentCard({
 
   const badge = fileTypeBadge(fileName);
   const shell = compact
-    ? "inline-flex w-[7.5rem] flex-col overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm"
+    ? "inline-flex w-[8.5rem] flex-col overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm"
     : "block overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm";
   const href = signedUrl ?? (isImage ? previewUrl : null);
   const visualSrc = isImage ? previewUrl ?? signedUrl : pdfThumb;
 
   if (imageFailed && isImage) {
     return (
-      <div className={`${shell} p-2 text-[10px] text-ink-muted`} title={fileName}>
+      <div className={`${shell} p-2 text-[10px] text-ink-muted`} title={label}>
         Couldn&apos;t load preview
       </div>
     );
   }
 
   const thumb = (
-    <div
-      className={`relative bg-stone-50 ${
-        compact ? "h-24 w-full" : "min-h-[8rem] w-full"
-      }`}
-    >
-      {visualSrc ? (
-        <img
-          src={visualSrc}
-          alt={fileName}
-          className={
-            compact
-              ? "h-full w-full object-cover object-top"
-              : "max-h-72 w-full object-contain"
-          }
-          onError={() => setImageFailed(true)}
-        />
-      ) : isImage && (pending || !signedUrl) ? (
-        <div className="flex h-full items-center justify-center">
-          <Loader2 className="h-4 w-4 animate-spin text-ink-muted" />
-        </div>
-      ) : isPdf && !pdfThumb ? (
-        <div className="flex h-full items-center justify-center">
-          <Loader2 className="h-4 w-4 animate-spin text-ink-muted" />
-        </div>
-      ) : (
-        <div className="flex h-full items-center justify-center">
-          <FileText className="h-8 w-8 text-brand" />
-        </div>
-      )}
-      <span className="absolute bottom-1.5 left-1.5 rounded-md bg-white/95 px-1.5 py-0.5 text-[9px] font-semibold text-foreground shadow-sm">
-        {badge}
-      </span>
-    </div>
+    <>
+      <div
+        className={`relative bg-stone-50 ${
+          compact ? "h-24 w-full" : "min-h-[8rem] w-full"
+        }`}
+      >
+        {visualSrc ? (
+          <img
+            src={visualSrc}
+            alt={label}
+            className={
+              compact
+                ? "h-full w-full object-cover object-top"
+                : "max-h-72 w-full object-contain"
+            }
+            onError={() => setImageFailed(true)}
+          />
+        ) : isImage && (pending || !signedUrl) ? (
+          <div className="flex h-full items-center justify-center">
+            <Loader2 className="h-4 w-4 animate-spin text-ink-muted" />
+          </div>
+        ) : isPdf && !pdfThumb ? (
+          <div className="flex h-full items-center justify-center">
+            <Loader2 className="h-4 w-4 animate-spin text-ink-muted" />
+          </div>
+        ) : (
+          <div className="flex h-full items-center justify-center">
+            <FileText className="h-8 w-8 text-brand" />
+          </div>
+        )}
+        <span className="absolute bottom-1.5 left-1.5 rounded-md bg-white/95 px-1.5 py-0.5 text-[9px] font-semibold text-foreground shadow-sm">
+          {badge}
+        </span>
+      </div>
+      <p
+        className="truncate px-1.5 py-1 text-[10px] font-medium leading-tight text-foreground"
+        title={label}
+      >
+        {label}
+      </p>
+    </>
   );
 
   if (href) {
@@ -404,7 +418,7 @@ function VaultAttachmentCard({
         target="_blank"
         rel="noopener noreferrer"
         className={shell}
-        title={fileName}
+        title={label}
       >
         {thumb}
       </a>
@@ -412,7 +426,7 @@ function VaultAttachmentCard({
   }
 
   return (
-    <div className={shell} title={fileName}>
+    <div className={shell} title={label}>
       {thumb}
     </div>
   );
@@ -3014,9 +3028,11 @@ export default function VaultChatPanel({
       ).values(),
     ];
     const vaultImages = imageCitations.filter((c) => c.kind !== "connector");
-    const connectorImages = pickConnectorImageCitations(
+    // Trust server-picked connector citations; prefer the key named in the answer.
+    const connectorImages = preferChartsMatchingKeyInText(
       imageCitations.filter((c) => c.kind === "connector"),
-      m.content ?? ""
+      m.content ?? "",
+      2
     );
     const answerLower = (m.content ?? "").toLowerCase();
     const sourceNamedInAnswer = (fileName: string) => {
@@ -3095,6 +3111,7 @@ export default function VaultChatPanel({
                 key={`att-${c.documentId}`}
                 documentId={c.documentId}
                 fileName={c.fileName}
+                displayName={c.cardName?.trim() || c.fileName}
                 kind={
                   c.isImage || isImageFileName(c.fileName) ? "image" : "document"
                 }

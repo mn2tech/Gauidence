@@ -134,4 +134,31 @@ describe("pickConnectorCitationsForChartQuery", () => {
       ["trello999.jpg"]
     );
   });
+
+  it("prefers the Key C chart when the answer names Key C", () => {
+    const picked = pickConnectorCitationsForChartQuery(
+      [
+        {
+          fileName: "trello636.jpg",
+          cardName: "What a Beautiful Name - C",
+          isImage: true,
+          mimeType: "image/jpeg",
+        },
+        {
+          fileName: "trello114.jpg",
+          cardName: "What a Beautiful Name - Bb",
+          isImage: true,
+          mimeType: "image/jpeg",
+        },
+      ],
+      "Chords and lyrics for What a Beautiful Name",
+      "Here's What a Beautiful Name — Key C from your space.",
+      ["What a Beautiful Name"],
+      4
+    );
+    assert.deepEqual(
+      picked.map((c) => c.fileName),
+      ["trello636.jpg"]
+    );
+  });
 });
