@@ -152,7 +152,7 @@ export async function getOntologyContext(
     const titleHits = entities.filter(
       (e) =>
         entityMatchesSongTitle(e.name, rawTitle) ||
-        entityMatchesSongTitle(e.canonical_name, rawTitle)
+        entityMatchesSongTitle(e.canonical_name ?? "", rawTitle)
     );
     if (titleHits.length) {
       entities = titleHits.slice(0, 12);
@@ -160,7 +160,7 @@ export async function getOntologyContext(
       const fromAll = ranked.filter(
         (e) =>
           entityMatchesSongTitle(e.name, rawTitle) ||
-          entityMatchesSongTitle(e.canonical_name, rawTitle)
+          entityMatchesSongTitle(e.canonical_name ?? "", rawTitle)
       );
       if (fromAll.length) entities = fromAll.slice(0, 12);
     }
