@@ -14,14 +14,40 @@ export function connectorFilePreviewPath(
   return `/api/connections/${sourceId}/items/${itemId}/file`;
 }
 
-type NamedCitation = { fileName: string };
+type NamedCitation = {
+  fileName: string;
+  cardName?: string | null;
+  isImage?: boolean;
+  mimeType?: string | null;
+};
 
 function chartStem(fileName: string): string {
   return fileName
     .replace(/\.[^.]+$/, "")
     .replace(/\s*-\s*[A-G](?:#|b)?(?:m|maj|min|major|minor|5)?\b.*$/i, "")
+    .replace(
+      /\s*[-–—]\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b.*$/i,
+      ""
+    )
     .trim()
     .toLowerCase();
+}
+
+function citationMentionedInText(
+  citation: NamedCitation,
+  text: string
+): boolean {
+  const lower = text.toLowerCase();
+  const stems = [chartStem(citation.fileName)];
+  if (citation.cardName?.trim()) {
+    stems.push(chartStem(citation.cardName));
+  }
+  for (const stem of stems) {
+    if (stem.length < 4) continue;
+    const snippet = stem.slice(0, Math.min(stem.length, 48));
+    if (lower.includes(snippet)) return true;
+  }
+  return false;
 }
 
 /** Prefer the Trello chart named in Gideon's answer — never show unrelated charts. */
@@ -31,15 +57,52 @@ export function pickConnectorImageCitations<T extends NamedCitation>(
   limit = 2
 ): T[] {
   if (!citations.length) return [];
-  const lower = answer.toLowerCase();
-  const mentioned = citations.filter((c) => {
-    const stem = chartStem(c.fileName);
-    if (stem.length < 4) return false;
-    const snippet = stem.slice(0, Math.min(stem.length, 40));
-    return lower.includes(snippet);
-  });
+  const mentioned = citations.filter((c) => citationMentionedInText(c, answer));
   // Do not fall back to random first citations — that shows the wrong charts.
   return mentioned.slice(0, limit);
+}
+
+/**
+ * For chord/lyrics questions: prefer charts named in the answer, else charts
+ * whose Trello card title matches the song named in the question.
+ */
+export function pickConnectorCitationsForChartQuery<T extends NamedCitation>(
+  citations: T[],
+  question: string,
+  answer: string,
+  songTitles: string[],
+  limit = 4
+): T[] {
+  const fromAnswer = pickConnectorImageCitations(citations, answer, limit);
+  if (fromAnswer.length) return fromAnswer;
+
+  if (!songTitles.length) return [];
+
+  const matched = citations.filter((c) => {
+    if (
+      !isLikelyChordChartFile(c.fileName, c.mimeType ?? null) &&
+      !c.isImage
+    ) {
+      return false;
+    }
+    const labels = [c.cardName, c.fileName]
+      .map((v) => (typeof v === "string" ? v.trim() : ""))
+      .filter(Boolean);
+    return songTitles.some((title) => {
+      const t = title.toLowerCase();
+      if (t.length < 3) return false;
+      return labels.some((label) => {
+        const stem = chartStem(label);
+        return (
+          stem.includes(t) ||
+          t.includes(stem) ||
+          citationMentionedInText(c, title)
+        );
+      });
+    });
+  });
+
+  return matched.slice(0, limit);
 }
 
 /** Chord-chart attachments vs syllabus/docs that should not cite for piano help. */

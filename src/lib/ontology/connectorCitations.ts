@@ -37,7 +37,7 @@ export async function resolveConnectorSourceCitations(
   const ids = [...itemIds].slice(0, 8);
   const { data: items } = await supabase
     .from("source_items")
-    .select("id, source_id, name, mime_type, processing_status")
+    .select("id, source_id, name, mime_type, processing_status, metadata")
     .in("id", ids);
 
   if (!items?.length) return [];
@@ -62,6 +62,14 @@ export async function resolveConnectorSourceCitations(
     const fileName = String(item.name ?? "Connected file");
     const mimeType =
       typeof item.mime_type === "string" ? item.mime_type : null;
+    const meta =
+      item.metadata && typeof item.metadata === "object"
+        ? (item.metadata as Record<string, unknown>)
+        : {};
+    const cardName =
+      typeof meta.cardName === "string" && meta.cardName.trim()
+        ? meta.cardName.trim()
+        : null;
     citations.push({
       documentId: connectorCitationDocumentId(item.id as string),
       fileName,
@@ -71,6 +79,7 @@ export async function resolveConnectorSourceCitations(
       sourceType: String(source.source_type ?? ""),
       mimeType,
       isImage: Boolean(mimeType?.startsWith("image/")),
+      cardName,
     });
   }
 

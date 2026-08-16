@@ -16,6 +16,8 @@ export type VaultChatCitation = {
   /** android_storage | trello | … */
   sourceType?: string;
   mimeType?: string | null;
+  /** Trello card title when the file is a chart attachment */
+  cardName?: string | null;
 };
 
 export type VaultChatStreamMessage = {

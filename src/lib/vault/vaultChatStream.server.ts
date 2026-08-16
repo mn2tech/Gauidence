@@ -16,7 +16,11 @@ import {
   dedupeVaultCitations,
 } from "@/lib/vault/indexDocument";
 import { wantsShowPictures, wantsSingleImageFocus } from "@/lib/vault/images";
-import { pickConnectorImageCitations } from "@/lib/ontology/connectorCitationIds";
+import {
+  pickConnectorCitationsForChartQuery,
+} from "@/lib/ontology/connectorCitationIds";
+import { extractChartTitlesFromText } from "@/lib/vault/expandRetrievalQuestion";
+import { titlePhraseForOntologySearch } from "@/lib/ontology/normalize";
 import {
   buildVaultScopePayload,
   chatScopedProfilePayload,
@@ -221,10 +225,17 @@ export function createVaultChatStreamResponse(
           }
         }
         if (args.connectorCitations?.length) {
-          // Only charts the answer actually names — never dump unrelated Trello PDFs.
-          const picked = pickConnectorImageCitations(
+          const songTitles = [
+            ...extractChartTitlesFromText(args.question),
+            ...(titlePhraseForOntologySearch(args.question)
+              ? [titlePhraseForOntologySearch(args.question)!]
+              : []),
+          ];
+          const picked = pickConnectorCitationsForChartQuery(
             args.connectorCitations,
+            args.question,
             answer,
+            songTitles,
             4
           );
           const seen = new Set(selected.map((c) => c.documentId));

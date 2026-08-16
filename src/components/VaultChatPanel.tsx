@@ -236,6 +236,7 @@ type Citation = {
   itemId?: string;
   sourceType?: string;
   mimeType?: string | null;
+  cardName?: string | null;
 };
 
 type VaultMessageAttachment = {
@@ -3585,8 +3586,8 @@ export default function VaultChatPanel({
                   Source:{" "}
                   <span className="font-medium text-foreground">
                     {c.profileName
-                      ? `${c.profileName} · ${c.fileName}`
-                      : c.fileName}
+                      ? `${c.profileName} · ${c.cardName?.trim() || c.fileName}`
+                      : c.cardName?.trim() || c.fileName}
                   </span>
                 </span>
                 <button
