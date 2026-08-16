@@ -84,6 +84,11 @@ describe("extractChartTitlesFromText", () => {
     );
     assert.deepEqual(titles, ["Lord Send Revival"]);
   });
+
+  it("reads a bare chart title with key", () => {
+    const titles = extractChartTitlesFromText("What a Beautiful Name - C");
+    assert.deepEqual(titles, ["What a Beautiful Name"]);
+  });
 });
 
 describe("isPianoOrSongLearnRequest", () => {

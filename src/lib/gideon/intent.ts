@@ -28,7 +28,8 @@ export type GideonRoute = {
   calendarWrite: boolean;
 };
 
-export type ChatTurn = { role: "user" | "assistant"; content: string };
+import type { ChatTurn } from "@/lib/vault/expandRetrievalQuestion";
+import { looksLikeChartTitleQuery } from "@/lib/vault/expandRetrievalQuestion";
 
 export type ClassifyGideonIntentArgs = {
   question: string;
@@ -175,7 +176,8 @@ function isKnowledgeQuestion(q: string): boolean {
     KNOWLEDGE_SOURCE.test(q) ||
     KNOWLEDGE_MUSIC.test(q) ||
     KNOWLEDGE_CONNECTED.test(q) ||
-    KNOWLEDGE_BUSINESS.test(q)
+    KNOWLEDGE_BUSINESS.test(q) ||
+    looksLikeChartTitleQuery(q)
   );
 }
 

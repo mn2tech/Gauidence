@@ -177,6 +177,11 @@ describe("Gideon intent router — follow-ups and tools", () => {
       question: "give me the list of songs",
     });
     assert.equal(shouldSearchGuardianKnowledge(list), true);
+
+    const chartTitle = classifyGideonIntent({
+      question: "What a Beautiful Name - C",
+    });
+    assert.equal(shouldSearchGuardianKnowledge(chartTitle), true);
   });
 
   it("forces knowledge when an attachment is present", () => {

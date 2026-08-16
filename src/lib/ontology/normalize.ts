@@ -195,8 +195,16 @@ export function isSongCatalogQuery(query: string): boolean {
 /** True when the user is asking about analyzed Trello/Device charts or PDFs. */
 export function isConnectedChartQuery(query: string): boolean {
   const q = query.toLowerCase();
-  return /\b(trello|chord charts?|chords?|pdf|jpg|jpeg|png|analyzed|attachment|set\s*lists?)\b/.test(
-    q
+  if (
+    /\b(trello|chord charts?|chords?|pdf|jpg|jpeg|png|analyzed|attachment|set\s*lists?)\b/.test(
+      q
+    )
+  ) {
+    return true;
+  }
+  // "What a Beautiful Name - C" style chart picks
+  return /^.{2,80}?\s[-–—]\s*[a-g](?:#|b)?(?:m|maj|min|major|minor|5)?\s*$/i.test(
+    query.trim()
   );
 }
 

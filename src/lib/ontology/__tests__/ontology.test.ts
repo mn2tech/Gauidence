@@ -116,6 +116,7 @@ describe("isConnectedChartQuery", () => {
     assert.equal(isConnectedChartQuery("What are the chords for Ibadat Karo?"), true);
     assert.equal(isConnectedChartQuery("Can you see the analyzed PDF?"), true);
     assert.equal(isConnectedChartQuery("what is the weather"), false);
+    assert.equal(isConnectedChartQuery("What a Beautiful Name - C"), true);
   });
 });
 

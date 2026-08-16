@@ -15,6 +15,26 @@ const LEARN_THIS_SONG =
 const CHART_FILE_FOLLOWUP =
   /\b(jpe?g|png|pdf|chart\s*(file|image|attachment)|the\s+(file|image|attachment|jpg|jpeg|png|pdf)|attach(ed|ment)?|source\s*(file|preview)?)\b/i;
 
+/** "What a Beautiful Name - C" / "Lord Send Revival - G" as a standalone chart pick. */
+const CHART_TITLE_WITH_KEY =
+  /^.{2,80}?\s[-–—]\s*[A-G](?:#|b)?(?:m|maj|min|major|minor|5)?\s*$/i;
+
+/** True when the message is basically a chart/card title (often with a key). */
+export function looksLikeChartTitleQuery(question: string): boolean {
+  const t = question.trim();
+  if (t.length < 4 || t.length > 100) return false;
+  if (/[?]/.test(t)) return false;
+  if (
+    /\b(what|how|why|when|where|who|please|can you|could you|show me|tell me)\b/i.test(
+      t
+    ) &&
+    !CHART_TITLE_WITH_KEY.test(t)
+  ) {
+    return false;
+  }
+  return CHART_TITLE_WITH_KEY.test(t);
+}
+
 /** Clean a chart filename or card title into a searchable song name. */
 export function cleanChartTitle(raw: string): string {
   let title = raw.trim();
@@ -59,11 +79,19 @@ export function extractChartTitlesFromText(text: string): string[] {
   );
   if (forMatch?.[1]) push(forMatch[1]);
 
+  const trimmed = text.trim();
+  if (looksLikeChartTitleQuery(trimmed)) {
+    push(trimmed);
+  }
+
   return titles;
 }
 
 export function isPianoOrSongLearnRequest(question: string): boolean {
-  return LEARN_THIS_SONG.test(question.trim());
+  return (
+    LEARN_THIS_SONG.test(question.trim()) ||
+    looksLikeChartTitleQuery(question)
+  );
 }
 
 /** Expand a vague follow-up with recent chat turns so retrieval stays on topic. */
