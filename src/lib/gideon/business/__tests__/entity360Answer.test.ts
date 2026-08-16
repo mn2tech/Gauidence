@@ -117,4 +117,53 @@ describe("formatEntity360UserAnswer", () => {
     assert.match(text, /Homepage Redesign Sprint/);
     assert.doesNotMatch(text, /Washington Christian|Ashton Manor|SSVFD/);
   });
+
+  it("ignores mis-typed assessment PROPOSED_TO edges and uses CRM proposals", () => {
+    const entity360: Entity360 = {
+      entity: {
+        id: "1",
+        name: "PROXDOSE",
+        type: "client",
+        aliases: [],
+        description: null,
+        domain: "proxdose.com",
+        confidence: 0.9,
+      },
+      relationships: [
+        {
+          type: "PROPOSED_TO",
+          direction: "incoming",
+          relatedName: "Authenticated Follow-up Review",
+          relatedType: "proposal",
+          relatedId: "x",
+        },
+      ],
+      people: [],
+      proposals: [
+        {
+          id: "p1",
+          title: "Proxdose — Homepage Redesign Sprint",
+          status: "viewed",
+          amountLabel: "$4,500.00",
+          clientName: null,
+          updatedAt: null,
+          sentAt: null,
+        },
+      ],
+      projects: [],
+      contracts: [],
+      assessments: [],
+      commitments: [],
+      risks: [],
+      recentActivity: [],
+      evidence: [],
+      gaps: [],
+    };
+    const text = formatEntity360UserAnswer(entity360);
+    assert.doesNotMatch(text, /Authenticated Follow-up Review/);
+    assert.match(text, /commercial proposal activity/i);
+    assert.match(text, /Homepage Redesign Sprint/);
+    assert.doesNotMatch(text, /PROXDOSE — Proxdose — Homepage/);
+    assert.match(text, /• Proxdose — Homepage Redesign Sprint — \$4,500\.00/);
+  });
 });

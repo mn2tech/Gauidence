@@ -126,6 +126,26 @@ export function formatEntity360ForGideon(entity360: Entity360): string {
   return lines.join("\n");
 }
 
+function isNoisyRelatedName(name: string): boolean {
+  return /\b(follow-?up review|authenticated follow|remediation plan|security assessment|vulnerability assessment|prioritized remediation)\b/i.test(
+    name.trim()
+  );
+}
+
+function formatCommercialLine(
+  entityName: string,
+  proposal: { title: string; clientName: string | null; amountLabel: string | null; status: string }
+): string {
+  const title = proposal.title.trim();
+  const who = (proposal.clientName?.trim() || entityName).trim();
+  const titleAlreadyNamed =
+    title.toLowerCase().includes(who.toLowerCase()) ||
+    title.toLowerCase().includes(entityName.toLowerCase());
+  const head = titleAlreadyNamed ? title : `${who} — ${title}`;
+  const amount = proposal.amountLabel ? ` — ${proposal.amountLabel}` : "";
+  return `• ${head}${amount} (status: ${proposal.status})`;
+}
+
 /**
  * User-facing Entity 360 answer — synthesized briefing, not a numbered fact dump.
  */
@@ -134,17 +154,21 @@ export function formatEntity360UserAnswer(entity360: Entity360): string {
   const parts: string[] = [name, ""];
 
   parts.push("Relationship");
+  const usableRels = entity360.relationships.filter(
+    (r) => !isNoisyRelatedName(r.relatedName)
+  );
   const preferredRel =
-    entity360.relationships.find((r) =>
+    usableRels.find((r) =>
       /^(SERVES|CLIENT_OF|CONTACT_FOR|EMPLOYS|ENGAGES)$/i.test(r.type)
     ) ??
-    entity360.relationships.find(
+    usableRels.find((r) =>
+      /^(HAS_PROJECT|HAS_CONTRACT|WORKS_ON)$/i.test(r.type)
+    ) ??
+    usableRels.find(
       (r) =>
         /^PROPOSED_TO$/i.test(r.type) &&
-        /proposal/i.test(r.relatedType)
-    ) ??
-    entity360.relationships.find((r) =>
-      /^(HAS_PROJECT|HAS_CONTRACT|WORKS_ON)$/i.test(r.type)
+        /proposal/i.test(r.relatedType) &&
+        !isNoisyRelatedName(r.relatedName)
     );
 
   if (preferredRel) {
@@ -165,6 +189,11 @@ export function formatEntity360UserAnswer(entity360: Entity360): string {
         `${name} —[${preferredRel.type}]→ ${preferredRel.relatedName}.`
       );
     }
+  } else if (entity360.proposals.length) {
+    const sample = entity360.proposals[0]?.title ?? "an open proposal";
+    parts.push(
+      `${name} appears in Guardian as a client/prospect with commercial proposal activity (${sample}).`
+    );
   } else if (entity360.entity.type) {
     parts.push(
       `${name} appears in Guardian as a ${entity360.entity.type}${
@@ -192,10 +221,7 @@ export function formatEntity360UserAnswer(entity360: Entity360): string {
   if (entity360.proposals.length) {
     parts.push("Commercial Activity");
     for (const p of entity360.proposals.slice(0, 4)) {
-      const who = p.clientName?.trim() || name;
-      parts.push(
-        `• ${who} — ${p.title}${p.amountLabel ? ` — ${p.amountLabel}` : ""} (status: ${p.status})`
-      );
+      parts.push(formatCommercialLine(name, p));
     }
     parts.push("");
   }

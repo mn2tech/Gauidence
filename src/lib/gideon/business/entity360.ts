@@ -278,6 +278,13 @@ function isAssessmentLike(entity: OntologyEntity): boolean {
   );
 }
 
+/** Work-item / assessment titles wrongly linked via PROPOSED_TO. */
+export function isNoisyBusinessRelatedName(name: string): boolean {
+  return /\b(follow-?up review|authenticated follow|remediation plan|security assessment|vulnerability assessment|prioritized remediation)\b/i.test(
+    name.trim()
+  );
+}
+
 /** Strict proposal↔entity match — never treat empty client names as a match. */
 export function proposalMatchesEntity(
   proposal: {
@@ -357,7 +364,6 @@ export async function buildEntity360(
       relatedId: rel.sourceEntity.id,
     })),
   ].filter((rel) => {
-    // Drop noisy PROPOSED_TO edges to non-proposal nodes (e.g. "Authenticated Follow-up Review").
     if (
       shouldExcludeFromBusinessOntology({
         name: rel.relatedName,
@@ -366,17 +372,11 @@ export async function buildEntity360(
     ) {
       return false;
     }
-    if (/^PROPOSED_TO$/i.test(rel.type) && !/proposal/i.test(rel.relatedType)) {
+    // Assessment / follow-up work items are often mis-typed as "proposal" in ontology.
+    if (isNoisyBusinessRelatedName(rel.relatedName)) {
       return false;
     }
-    if (
-      /\b(follow-?up review|authenticated follow|remediation plan)\b/i.test(
-        rel.relatedName
-      ) &&
-      !/^(client|organization|person|contact|proposal|project|contract)$/i.test(
-        rel.relatedType
-      )
-    ) {
+    if (/^PROPOSED_TO$/i.test(rel.type) && !/proposal/i.test(rel.relatedType)) {
       return false;
     }
     return true;
