@@ -127,6 +127,8 @@ export type WorkspaceContextResult = {
   /** Connected-source files matched via ontology (openable from Ask Gideon). */
   connectorCitations?: VaultChatCitation[];
   businessClaims?: GideonClaim[];
+  /** Prefer as the user-facing answer for Business Pack BI intents. */
+  businessAnswerDraft?: string | null;
 };
 
 /** Fetch retrieval results and formatted context blocks for Gideon. */
@@ -156,14 +158,19 @@ export async function loadWorkspaceContext(
     meta;
 
   const packEngineOn = isGuardianPackEngineEnabled({ email: user.email });
+  const ontologyOn = isGuardianOntologyEnabled();
   const orgSpace = isOrgStyleProfile(activeProfile.profile_type);
+  const businessQuestion =
+    isBusinessIntelligenceQuestion(question) ||
+    isBusinessKnowledgeQuestion(question) ||
+    isBusinessAdvisoryQuestion(question);
+  // Run BI when Pack Engine is on, or when ontology is enabled on an org Space
+  // (so Entity 360 still works if the pack flag is admin-only for Settings UI).
   const businessPlan =
-    packEngineOn &&
     orgSpace &&
     activeProfile.profile_type !== "client" &&
-    (isBusinessIntelligenceQuestion(question) ||
-      isBusinessKnowledgeQuestion(question) ||
-      isBusinessAdvisoryQuestion(question))
+    businessQuestion &&
+    (packEngineOn || ontologyOn)
       ? planBusinessQuery(question)
       : null;
   const runDocumentSearch =
@@ -582,7 +589,10 @@ Active space in the UI: ${activeProfile.display_name}. Document search includes 
   const context: WorkspaceContextData = {
     ...meta,
     blocks: {
-      excerpts: formatted.context.trim() || "(none)",
+      excerpts:
+        businessPlan && !biPlanRequiresDocumentSearch(businessPlan)
+          ? "(none — use BUSINESS INTELLIGENCE; do not invent a raw fact list from documents)"
+          : formatted.context.trim() || "(none)",
       fileInventory: fileInventoryContext,
       attachedDocument: attachedContext.trim() || "(none)",
       dailyLogs: logContext.trim() || "(none)",
@@ -594,8 +604,18 @@ Active space in the UI: ${activeProfile.display_name}. Document search includes 
       workMemory:
         workMemoryContext.trim() ||
         "(none — user has no active work projects)",
-      structuredKnowledge: structuredKnowledgeContext,
-      ontology: ontologyContext,
+      structuredKnowledge:
+        businessPlan && !biPlanRequiresDocumentSearch(businessPlan)
+          ? "(none — use BUSINESS INTELLIGENCE)"
+          : structuredKnowledgeContext,
+      ontology:
+        businessPlan?.intent === "ENTITY_360" ||
+        businessPlan?.intent === "RELATIONSHIP_QUERY" ||
+        businessPlan?.intent === "ADVISORY" ||
+        businessPlan?.intent === "COMMITMENT_ANALYSIS" ||
+        businessPlan?.intent === "EVIDENCE_REQUEST"
+          ? "(none — prefer BUSINESS INTELLIGENCE block over raw ontology dump)"
+          : ontologyContext,
       businessIntelligence:
         businessIntelligenceBundle?.promptBlock?.trim() || "(none)",
     },
@@ -643,9 +663,11 @@ Active space in the UI: ${activeProfile.display_name}. Document search includes 
 
   return {
     context,
-    chunks,
+    chunks:
+      businessPlan && !biPlanRequiresDocumentSearch(businessPlan) ? [] : chunks,
     explicitSpaceName: explicitSpace?.display_name ?? null,
     connectorCitations,
     businessClaims: businessIntelligenceBundle?.claims,
+    businessAnswerDraft: businessIntelligenceBundle?.userAnswerDraft ?? null,
   };
 }

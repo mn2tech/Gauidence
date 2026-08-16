@@ -200,6 +200,8 @@ export type BusinessIntelligenceBundle = {
   priorClaims: GideonClaim[];
   claims: GideonClaim[];
   promptBlock: string;
+  /** Prefer this as the user-facing answer when present (avoids raw LLM dumps). */
+  userAnswerDraft: string | null;
   observability: BusinessBiObservability;
 };
 

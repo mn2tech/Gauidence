@@ -1222,6 +1222,7 @@ export async function POST(request: Request) {
     mimeType?: string | null;
   }[] = [];
   let answer: string | undefined;
+  let pendingClaims: unknown[] = [];
   let attachedFileName: string | undefined;
   let responseVaultScope: ChatMessageRow["vaultScope"] = null;
   let writeProfile = {
@@ -1331,7 +1332,7 @@ export async function POST(request: Request) {
           .reverse()
           .find((row) => row.role === "assistant")?.claims ?? [];
 
-      const { chunks, context: workspaceContext, explicitSpaceName, connectorCitations, businessClaims } =
+      const { chunks, context: workspaceContext, explicitSpaceName, connectorCitations, businessClaims, businessAnswerDraft } =
         await loadWorkspaceContext({
         supabase,
         user,
@@ -1401,6 +1402,14 @@ export async function POST(request: Request) {
             })()
           : null;
 
+      const biAnswer =
+        !inventoryAnswer &&
+        !pianoClarify &&
+        typeof businessAnswerDraft === "string" &&
+        businessAnswerDraft.trim()
+          ? businessAnswerDraft.trim()
+          : null;
+
       if (inventoryAnswer) {
         answer = inventoryAnswer;
         // Song lists are inventory-only — don't attach random chart/PDF previews
@@ -1413,6 +1422,13 @@ export async function POST(request: Request) {
         }
       } else if (pianoClarify) {
         answer = pianoClarify;
+      } else if (biAnswer) {
+        answer = biAnswer;
+        pendingClaims = Array.isArray(businessClaims)
+          ? businessClaims
+          : Array.isArray(workspaceContext.businessClaims)
+            ? workspaceContext.businessClaims
+            : [];
       } else {
         return createVaultChatStreamResponse({
           supabase,
@@ -1450,19 +1466,51 @@ export async function POST(request: Request) {
     }
   }
 
-  const { data: assistantMsg, error: assistantError } = await supabase
-    .from("vault_chat_messages")
-    .insert({
-      chat_id: chatId,
-      user_id: user.id,
-      role: "assistant",
-      content: answer,
-      citations,
-    })
-    .select("id, role, content, citations, created_at")
-    .single();
+  const baseAssistantInsert = {
+    chat_id: chatId,
+    user_id: user.id,
+    role: "assistant" as const,
+    content: answer,
+    citations,
+  };
+  let assistantMsg: {
+    id: string;
+    role: string;
+    content: string;
+    citations: unknown;
+    created_at: string;
+  } | null = null;
+  let assistantError: { message?: string } | null = null;
+  {
+    const first = await supabase
+      .from("vault_chat_messages")
+      .insert({
+        ...baseAssistantInsert,
+        ...(pendingClaims.length ? { claims: pendingClaims } : {}),
+      })
+      .select("id, role, content, citations, created_at")
+      .single();
+    assistantMsg = first.data;
+    assistantError = first.error;
+    if (
+      (!assistantMsg || assistantError) &&
+      /claims|schema cache|could not find/i.test(assistantError?.message ?? "")
+    ) {
+      const retry = await supabase
+        .from("vault_chat_messages")
+        .insert(baseAssistantInsert)
+        .select("id, role, content, citations, created_at")
+        .single();
+      assistantMsg = retry.data;
+      assistantError = retry.error;
+    }
+  }
 
   if (assistantError || !assistantMsg) {
+    console.error(
+      "Vault chat assistant save failed:",
+      assistantError?.message ?? "no row"
+    );
     return NextResponse.json(
       { error: "Answer generated but couldn't be saved." },
       { status: 500 }

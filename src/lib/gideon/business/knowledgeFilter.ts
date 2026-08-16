@@ -54,9 +54,22 @@ const SYSTEM_PROCESS_SIGNALS: Signal[] = [
   },
   {
     category: "SYSTEM_METADATA",
+    weight: 0.9,
+    reason: "legal_disclaimer_template",
+    pattern:
+      /\b(consider reviewing this clause with a qualified professional|materially affects your rights or obligations)\b/i,
+  },
+  {
+    category: "SYSTEM_METADATA",
     weight: 0.85,
     reason: "verify_internal_count",
     pattern: /\bverify the (four|\d+) proposals?\b/i,
+  },
+  {
+    category: "PROCESS_METADATA",
+    weight: 0.85,
+    reason: "needs_verification_deadline_boilerplate",
+    pattern: /\bneeds verification\b/i,
   },
   {
     category: "PROCESS_METADATA",

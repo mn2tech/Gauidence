@@ -55,8 +55,9 @@ describe("business query planner", () => {
     );
     assert.equal(entityPlan.intent, "ENTITY_360");
     assert.ok(entityPlan.requiresOntology);
-    assert.ok(entityPlan.requiresSearch);
+    assert.equal(entityPlan.requiresSearch, false);
     assert.ok(entityPlan.entities.some((e) => /proxdose/i.test(e)));
+    assert.ok(!entityPlan.entities.some((e) => /\.$/.test(e)));
 
     const evidencePlan = planBusinessQuery("Where did you get that?");
     assert.equal(evidencePlan.intent, "EVIDENCE_REQUEST");

@@ -126,6 +126,130 @@ export function formatEntity360ForGideon(entity360: Entity360): string {
   return lines.join("\n");
 }
 
+/**
+ * User-facing Entity 360 answer — synthesized briefing, not a numbered fact dump.
+ */
+export function formatEntity360UserAnswer(entity360: Entity360): string {
+  const name = entity360.entity.name;
+  const parts: string[] = [name, ""];
+
+  parts.push("Relationship");
+  const serveRel = entity360.relationships.find((r) =>
+    /SERVES|CLIENT_OF|PROPOSED_TO/i.test(r.type)
+  );
+  if (serveRel) {
+    if (serveRel.direction === "incoming") {
+      parts.push(
+        `${name} appears in Guardian as related to ${serveRel.relatedName} (${serveRel.type}).`
+      );
+    } else {
+      parts.push(
+        `${name} —[${serveRel.type}]→ ${serveRel.relatedName}.`
+      );
+    }
+  } else if (entity360.entity.type) {
+    parts.push(
+      `${name} appears in Guardian as a ${entity360.entity.type}${
+        entity360.entity.domain ? ` (${entity360.entity.domain})` : ""
+      }.`
+    );
+  }
+  parts.push("");
+
+  if (entity360.assessments.length || entity360.risks.length) {
+    parts.push("Current Work / Assessments");
+    for (const a of entity360.assessments.slice(0, 3)) {
+      parts.push(
+        a.summary
+          ? `Guardian contains ${a.name}: ${a.summary.slice(0, 200)}`
+          : `Guardian contains ${a.name}.`
+      );
+    }
+    for (const r of entity360.risks.slice(0, 3)) {
+      parts.push(`• Risk: ${r.name}${r.summary ? ` — ${r.summary.slice(0, 120)}` : ""}`);
+    }
+    parts.push("");
+  }
+
+  if (entity360.proposals.length) {
+    parts.push("Commercial Activity");
+    for (const p of entity360.proposals.slice(0, 4)) {
+      parts.push(
+        `• ${p.title}${p.amountLabel ? ` — ${p.amountLabel}` : ""} (status: ${p.status})`
+      );
+    }
+    parts.push("");
+  }
+
+  if (entity360.projects.length || entity360.contracts.length) {
+    parts.push("Projects & Contracts");
+    for (const p of entity360.projects.slice(0, 4)) {
+      parts.push(`• Project: ${p.name}${p.status ? ` (${p.status})` : ""}`);
+    }
+    for (const c of entity360.contracts.slice(0, 4)) {
+      parts.push(`• Contract: ${c.name}`);
+    }
+    parts.push("");
+  }
+
+  if (entity360.people.length) {
+    parts.push("People");
+    for (const p of entity360.people.slice(0, 5)) {
+      parts.push(`• ${p.name} (${p.type})`);
+    }
+    parts.push("");
+  }
+
+  if (entity360.commitments.length) {
+    parts.push("Commitments");
+    for (const c of entity360.commitments.slice(0, 6)) {
+      parts.push(
+        `• [${c.status}] ${c.description}${c.dueDate ? ` (due ${c.dueDate})` : ""}`
+      );
+    }
+    parts.push("");
+  }
+
+  const attention: string[] = [];
+  if (entity360.risks.length) {
+    attention.push("Confirm whether critical security remediation was completed.");
+  }
+  if (entity360.proposals.length && !entity360.projects.length) {
+    attention.push(
+      "Determine the current status of open proposals — Guardian does not currently show an active linked project."
+    );
+  }
+  for (const g of entity360.gaps.slice(0, 2)) {
+    attention.push(g);
+  }
+  if (attention.length) {
+    parts.push("Items Requiring Attention");
+    parts.push("Gideon recommendation:");
+    for (const item of attention.slice(0, 4)) {
+      parts.push(`• ${item}`);
+    }
+    parts.push("");
+  }
+
+  if (entity360.evidence.length) {
+    parts.push("Sources");
+    const seen = new Set<string>();
+    for (const ev of entity360.evidence.slice(0, 5)) {
+      const label = ev.documentName ?? ev.text.slice(0, 60);
+      if (seen.has(label)) continue;
+      seen.add(label);
+      parts.push(`• ${label}`);
+    }
+  }
+
+  parts.push("");
+  parts.push(
+    "Known from Guardian: the sections above. Ask a follow-up to drill into proposals, risks, or evidence."
+  );
+
+  return parts.filter((line, i, arr) => !(line === "" && arr[i - 1] === "")).join("\n");
+}
+
 export function formatProposalFollowUpsForGideon(
   candidates: ProposalFollowUpCandidate[]
 ): string {

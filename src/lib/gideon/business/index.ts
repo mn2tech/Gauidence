@@ -34,7 +34,7 @@ export {
   formatEvidenceAnswerFromClaims,
 } from "./claims";
 
-export { BUSINESS_INTELLIGENCE_PROMPT_V11 } from "./formatForGideon";
+export { BUSINESS_INTELLIGENCE_PROMPT_V11, formatEntity360UserAnswer } from "./formatForGideon";
 
 export { rankProposalFollowUps, scoreProposalFollowUp } from "./proposalFollowUp";
 

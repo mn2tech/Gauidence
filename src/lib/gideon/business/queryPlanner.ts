@@ -125,7 +125,9 @@ function flagsFor(intent: BusinessQueryIntent): Omit<
       return {
         requiresOntology: true,
         requiresStructuredData: true,
-        requiresSearch: true,
+        // Ontology evidence + structured proposals are enough; broad search
+        // floods the prompt with raw fact dumps (the failure mode V1.1 fixes).
+        requiresSearch: false,
         requiresEvidence: true,
       };
     case "RELATIONSHIP_QUERY":
@@ -200,7 +202,7 @@ export function extractBusinessEntityMentions(question: string): string[] {
     /\b(?:about|with|for|regarding|re:)\s+([A-Z][A-Za-z0-9.&'-]*(?:\s+[A-Z][A-Za-z0-9.&'-]*){0,3})/
   );
   if (aboutMatch?.[1]) {
-    entities.push(aboutMatch[1].trim());
+    entities.push(aboutMatch[1].replace(/[.,;:!?]+$/g, "").trim());
   }
 
   const domainMatch = q.match(/\b([a-z0-9][a-z0-9-]{1,40}\.(?:com|io|net|org|co))\b/i);
@@ -215,7 +217,7 @@ export function extractBusinessEntityMentions(question: string): string[] {
 
   // Capitalized multi-word or single tokens that aren't stopwords
   for (const m of q.matchAll(/\b([A-Z][A-Za-z0-9.&'-]{1,40}(?:\s+[A-Z][A-Za-z0-9.&'-]{1,40}){0,3})\b/g)) {
-    const name = m[1]?.trim();
+    const name = m[1]?.replace(/[.,;:!?]+$/g, "").trim();
     if (!name) continue;
     const lower = name.toLowerCase();
     if (ENTITY_STOP.has(lower)) continue;

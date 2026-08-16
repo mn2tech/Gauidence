@@ -17,6 +17,7 @@ import {
   formatBusinessIntelligenceBlock,
   formatClaimsForGideon,
   formatEntity360ForGideon,
+  formatEntity360UserAnswer,
   formatProposalFollowUpsForGideon,
 } from "./formatForGideon";
 import {
@@ -82,6 +83,7 @@ export async function loadBusinessIntelligence(
     [];
   let advisory: BusinessIntelligenceBundle["advisory"] = [];
   let claims: GideonClaim[] = [];
+  let userAnswerDraft: string | null = null;
   let ontologyHitCount = 0;
   let structuredHitCount = 0;
   let evidenceSelected = 0;
@@ -100,6 +102,7 @@ export async function loadBusinessIntelligence(
     sections.push("SUGGESTED USER-FACING ANSWER DRAFT:");
     sections.push(evidenceText);
     claims = priorClaims;
+    userAnswerDraft = evidenceText;
     evidenceSelected = priorClaims.reduce(
       (n, c) => n + c.evidence.length,
       0
@@ -123,6 +126,7 @@ export async function loadBusinessIntelligence(
       priorClaims,
       claims,
       promptBlock: formatBusinessIntelligenceBlock({ plan, sections }),
+      userAnswerDraft,
       observability,
     };
   }
@@ -159,7 +163,9 @@ export async function loadBusinessIntelligence(
         claims = mergeClaims(claims, built.claims);
         sections.push("ENTITY 360 (synthesize into a business summary; do not dump raw lists):");
         sections.push(formatEntity360ForGideon(built.entity360));
+        userAnswerDraft = formatEntity360UserAnswer(built.entity360);
       } else {
+        userAnswerDraft = `I could not resolve "${mention}" to a canonical Guardian entity yet. Guardian may still have documents mentioning that name — ask me to search files, or confirm the exact client/organization name.`;
         sections.push(
           `ENTITY 360: I could not resolve "${mention}" to a canonical Guardian entity. Say so clearly and ask a clarifying question.`
         );
@@ -190,6 +196,7 @@ export async function loadBusinessIntelligence(
       ontologyHitCount += result.lines.length;
       sections.push("RELATIONSHIP ANALYSIS (proposals without active project):");
       sections.push(result.lines.join("\n"));
+      userAnswerDraft = result.lines.join("\n");
     } else {
       const mention = plan.entities[0] ?? "client";
       const result = await describeEntityRelationships(args.supabase, {
@@ -201,6 +208,7 @@ export async function loadBusinessIntelligence(
       ontologyHitCount += result.lines.length;
       sections.push("RELATIONSHIP TRAVERSAL:");
       sections.push(result.lines.join("\n"));
+      userAnswerDraft = result.lines.join("\n");
     }
   }
 
@@ -215,6 +223,24 @@ export async function loadBusinessIntelligence(
     proposalFollowUps = ranked.candidates;
     claims = mergeClaims(claims, ranked.claims);
     sections.push(formatProposalFollowUpsForGideon(ranked.candidates));
+    if (plan.intent === "PROPOSAL_ANALYSIS") {
+      if (!ranked.candidates.length) {
+        userAnswerDraft =
+          "Based on available evidence, I could not find open proposals that clearly need follow-up right now.";
+      } else {
+        userAnswerDraft = [
+          "These proposals appear to need follow-up:",
+          "",
+          ...ranked.candidates.slice(0, 8).flatMap((c) => [
+            `${c.clientName} — ${c.title}`,
+            `Amount: ${c.amountLabel ?? "unknown"} · Status: ${c.status}`,
+            `Reason: ${c.reasons.join(" ")}`,
+            `Recommended: ${c.recommendedAction}`,
+            "",
+          ]),
+        ].join("\n");
+      }
+    }
   }
 
   if (plan.intent === "COMMITMENT_ANALYSIS" || plan.intent === "ADVISORY") {
@@ -250,6 +276,10 @@ export async function loadBusinessIntelligence(
     claims = mergeClaims(claims, grouped.claims);
 
     if (plan.intent === "COMMITMENT_ANALYSIS") {
+      const draftLines: string[] = [
+        "Commitments by client (status preserved from Guardian data):",
+        "",
+      ];
       sections.push("COMMITMENTS BY CLIENT (preserve status: PROPOSED vs RECOMMENDED vs AGREED/COMMITTED):");
       if (!grouped.groups.length) {
         sections.push(
@@ -271,6 +301,7 @@ export async function loadBusinessIntelligence(
               : [p.title];
             for (const d of deliverables.slice(0, 4)) {
               sections.push(`• ${client}: [${status}] ${d}`);
+              draftLines.push(`• ${client}: [${status}] ${d}`);
               claims.push({
                 claim: `${client}: ${d} [${status}]`,
                 kind: "KNOWN_FACT",
@@ -287,17 +318,27 @@ export async function loadBusinessIntelligence(
               });
             }
           }
+          draftLines.push(
+            "",
+            "Note: PROPOSED means the proposal is not accepted yet — not an agreed contractual commitment."
+          );
+        } else {
+          draftLines.push(
+            "I could not find stored commitments or proposal deliverables for clients in this Space yet."
+          );
         }
       } else {
         for (const g of grouped.groups) {
           sections.push(`${g.clientName}:`);
+          draftLines.push(`${g.clientName}:`);
           for (const c of g.commitments) {
-            sections.push(
-              `  • [${c.status}] ${c.description}${c.dueDate ? ` (due ${c.dueDate})` : ""}`
-            );
+            const line = `  • [${c.status}] ${c.description}${c.dueDate ? ` (due ${c.dueDate})` : ""}`;
+            sections.push(line);
+            draftLines.push(line);
           }
         }
       }
+      userAnswerDraft = draftLines.join("\n");
     }
   }
 
@@ -345,6 +386,29 @@ export async function loadBusinessIntelligence(
     advisory = built.insights;
     claims = mergeClaims(claims, built.claims);
     sections.push(formatAdvisoryForGideon(built.insights));
+    if (!built.insights.length) {
+      userAnswerDraft =
+        "I could not find ranked focus items from current proposals, commitments, or risks. Guardian may need more business knowledge analyzed first.";
+    } else {
+      userAnswerDraft = [
+        "Here is what I recommend focusing on next:",
+        "",
+        ...built.insights.slice(0, 6).flatMap((insight, i) => [
+          `${i + 1}. ${insight.title}`,
+          `   Why: ${insight.why}`,
+          `   Confidence: ${insight.confidence.toFixed(2)}`,
+          `   Recommended next step: ${insight.recommendedNextStep}`,
+          insight.evidence.length
+            ? `   Evidence: ${insight.evidence.map((e) => e.label ?? e.sourceId).join("; ")}`
+            : "",
+          "",
+        ]),
+        "Known from Guardian: proposal/commitment/risk facts above.",
+        "Gideon recommendation: the priority order and next steps.",
+      ]
+        .filter(Boolean)
+        .join("\n");
+    }
   }
 
   if (plan.intent === "PROJECT_ANALYSIS") {
@@ -377,6 +441,7 @@ export async function loadBusinessIntelligence(
     priorClaims,
     claims,
     promptBlock: formatBusinessIntelligenceBlock({ plan, sections }),
+    userAnswerDraft,
     observability,
   };
 }
