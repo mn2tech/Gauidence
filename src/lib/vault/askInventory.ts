@@ -279,6 +279,7 @@ function parseConnectedChartTitles(inventoryText: string): string[] {
     if (!looksLikeChart) continue;
 
     const title = songTitleFromInventoryLabel(cardName || fileName);
+    if (!looksLikeSongOrChartTitle(title)) continue;
     const key = normalizeSongDedupeKey(title);
     if (!title || !key || seen.has(key)) continue;
     seen.add(key);
@@ -287,9 +288,31 @@ function parseConnectedChartTitles(inventoryText: string): string[] {
   return titles;
 }
 
+/** Drop Trello admin / session cards that are not chord charts. */
+export function looksLikeSongOrChartTitle(title: string): boolean {
+  const t = title.trim();
+  if (t.length < 2) return false;
+  if (
+    /\b(practice\s+session|rehearsal\s+notes?|set\s*list\s+notes?)\b/i.test(t)
+  ) {
+    return false;
+  }
+  if (/\b(bank\s+account|add\s+\w+\s+to\s+bank|todo|to-do|agenda)\b/i.test(t)) {
+    return false;
+  }
+  if (/^[A-Za-z][\w.]*\s*[-–—]\s*Add\b/i.test(t)) return false;
+  if (/^(sep|sept|oct|nov|dec|jan|feb|mar|apr|may|jun|jul|aug)\.?\s+\d/i.test(t) &&
+    /\b(session|practice|meeting)\b/i.test(t)
+  ) {
+    return false;
+  }
+  return true;
+}
+
 function songTitleFromInventoryLabel(label: string): string {
   let title = label.replace(/\.(jpe?g|png|gif|webp|pdf)$/i, "").trim();
   title = title
+    .replace(/^\d+\.\s*/, "")
     .replace(/\s*-\s*[A-G](?:#|b)?(?:m|maj|min|major|minor|5)?(?:\s|$)/i, " ")
     .replace(/\s*-\s*short version\s*$/i, "")
     .replace(

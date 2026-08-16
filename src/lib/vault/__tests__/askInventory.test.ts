@@ -125,6 +125,24 @@ describe("ask vault inventory", () => {
     assert.match(answer!, /Wednesday Practice/);
   });
 
+  it("filters admin and practice-session cards out of song lists", () => {
+    const answer = buildInventoryQuestionAnswer({
+      question: "Song list",
+      spaceDisplayName: "Wednesday Practice",
+      fileInventoryText: `SPACE FILE INVENTORY:
+- chart.jpg · Great is Thy Faithfulness (Trello in this space, analyzed)
+- chart2.jpg · Sep 3rd Practice Session(#4) (Trello in this space, analyzed)
+- chart3.jpg · Mikey - Add Sujay to Bank Account (Trello in this space, analyzed)
+- chart4.jpg · 6. Vesaarina (Singers - Frieda and Joyce, Music-Track) (Trello in this space, analyzed)`,
+    });
+    assert.ok(answer);
+    assert.match(answer!, /Great is Thy Faithfulness/);
+    assert.match(answer!, /Vesaarina/);
+    assert.doesNotMatch(answer!, /Practice Session/);
+    assert.doesNotMatch(answer!, /Bank Account/);
+    assert.doesNotMatch(answer!, /^• 6\./m);
+  });
+
   it("builds a scoped inventory answer about a topic", () => {
     const answer = buildInventoryQuestionAnswer({
       question: "What do I have in my Personal space about Nolan?",
