@@ -13,6 +13,12 @@ import { PROPOSAL_SELECT } from "@/lib/proposals/types";
 import { mapProposalRow } from "@/lib/proposals/server";
 import { shouldExcludeFromBusinessOntology } from "./knowledgeFilter";
 import { proposalTitleWithoutClientPrefix } from "./displayNames";
+import {
+  dedupeRelationshipRows,
+  formatEntityRelationshipsAnswer,
+  isNoisyRelationshipTarget,
+  type RelationshipDisplayRow,
+} from "./relationshipDisplay";
 import type { GideonClaim } from "./types";
 
 export type ClientsWithoutActiveProjectResult = {
@@ -233,13 +239,13 @@ export async function describeEntityRelationships(
     .select(ONTOLOGY_RELATIONSHIP_SELECT)
     .eq("source_entity_id", resolved.entity.id)
     .in("review_status", ONTOLOGY_VISIBLE_REVIEW_STATUSES)
-    .limit(30);
+    .limit(40);
   const { data: incoming } = await supabase
     .from("ontology_relationships")
     .select(ONTOLOGY_RELATIONSHIP_SELECT)
     .eq("target_entity_id", resolved.entity.id)
     .in("review_status", ONTOLOGY_VISIBLE_REVIEW_STATUSES)
-    .limit(30);
+    .limit(40);
 
   const rels = [
     ...((outgoing as OntologyRelationship[] | null) ?? []),
@@ -266,16 +272,12 @@ export async function describeEntityRelationships(
     }
   }
 
-  const lines: string[] = [
-    `Relationships involving ${resolved.entity.name}:`,
-  ];
-  const claims: GideonClaim[] = [];
-
-  for (const rel of rels.slice(0, 15)) {
-    const otherId =
-      rel.source_entity_id === resolved.entity.id
-        ? rel.target_entity_id
-        : rel.source_entity_id;
+  const rawRows: RelationshipDisplayRow[] = [];
+  for (const rel of rels) {
+    const outgoingEdge = rel.source_entity_id === resolved.entity.id;
+    const otherId = outgoingEdge
+      ? rel.target_entity_id
+      : rel.source_entity_id;
     const other = nameMap.get(otherId);
     if (!other) continue;
     if (
@@ -287,36 +289,41 @@ export async function describeEntityRelationships(
     ) {
       continue;
     }
-    const left =
-      rel.source_entity_id === resolved.entity.id
-        ? resolved.entity.name
-        : other.name;
-    const right =
-      rel.source_entity_id === resolved.entity.id
-        ? other.name
-        : resolved.entity.name;
-    const line = `${left} —[${rel.relationship_type}]→ ${right}`;
-    lines.push(`• ${line}`);
-    claims.push({
-      claim: line,
-      kind: "KNOWN_FACT",
+    if (
+      isNoisyRelationshipTarget({
+        name: other.name,
+        entityType: other.entity_type,
+        relationshipType: rel.relationship_type,
+      })
+    ) {
+      continue;
+    }
+    rawRows.push({
+      type: rel.relationship_type,
+      relatedName: other.name,
+      relatedType: other.entity_type,
+      direction: outgoingEdge ? "outgoing" : "incoming",
+      relatedId: other.id,
+      relationshipId: rel.id,
       confidence: rel.confidence != null ? Number(rel.confidence) : 0.7,
-      evidence: [
-        {
-          sourceId: rel.id,
-          sourceType: "ontology_relationship",
-          label: `${rel.relationship_type}`,
-          reference: other.name,
-        },
-      ],
     });
   }
 
-  if (lines.length === 1) {
-    lines.push(
-      "Guardian currently shows no ontology relationships for this entity."
-    );
-  }
+  const rows = dedupeRelationshipRows(rawRows);
+  const lines = formatEntityRelationshipsAnswer(resolved.entity.name, rows);
+  const claims: GideonClaim[] = rows.slice(0, 12).map((row) => ({
+    claim: `${resolved.entity.name} —[${row.type}]→ ${row.relatedName}`,
+    kind: "KNOWN_FACT" as const,
+    confidence: row.confidence,
+    evidence: [
+      {
+        sourceId: row.relationshipId,
+        sourceType: "ontology_relationship",
+        label: row.type,
+        reference: row.relatedName,
+      },
+    ],
+  }));
 
   return { lines, claims };
 }
