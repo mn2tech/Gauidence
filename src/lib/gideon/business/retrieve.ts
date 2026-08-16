@@ -427,13 +427,7 @@ export async function loadBusinessIntelligence(
       proposalFollowUps,
       commitmentDueSoon: dueSoon,
       risks,
-      gaps: [
-        {
-          title: "Missing information",
-          summary:
-            "Prefer stating uncertainty when Guardian lacks confirmation (e.g. remediation completion).",
-        },
-      ],
+      gaps: [],
     });
     advisory = built.insights;
     claims = mergeClaims(claims, built.claims);

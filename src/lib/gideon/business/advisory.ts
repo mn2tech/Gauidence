@@ -5,6 +5,10 @@
 
 import type { ProposalFollowUpCandidate } from "./types";
 import type { AdvisoryInsight, GideonClaim } from "./types";
+import {
+  formatClientProposalLabel,
+  proposalTitleWithoutClientPrefix,
+} from "./displayNames";
 
 export function buildAdvisoryInsights(args: {
   proposalFollowUps: ProposalFollowUpCandidate[];
@@ -29,10 +33,12 @@ export function buildAdvisoryInsights(args: {
     const businessImpact = p.amountLabel ? 0.8 : 0.55;
     const confidence = Math.min(0.95, 0.55 + p.score / 20);
     const priority = urgency * businessImpact * confidence;
+    const cleanTitle = proposalTitleWithoutClientPrefix(p.title, p.clientName);
+    const label = formatClientProposalLabel(p.clientName, p.title);
     insights.push({
       type: "proposal_follow_up",
       entityId: p.proposalId,
-      title: `${p.clientName} — ${p.title}`,
+      title: label,
       summary: p.reasons.join(" "),
       priority,
       urgency,
@@ -43,11 +49,11 @@ export function buildAdvisoryInsights(args: {
         {
           sourceId: p.proposalId,
           sourceType: "proposal",
-          label: p.title,
+          label,
           href: `/proposals/${p.proposalId}`,
         },
       ],
-      recommendedNextStep: p.recommendedAction,
+      recommendedNextStep: `Follow up with ${p.clientName} on "${cleanTitle}".`,
       suggestedActions: [
         { id: "draft_follow_up", label: "Draft Follow-Up" },
         { id: "create_task", label: "Create Task" },

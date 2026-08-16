@@ -5,6 +5,7 @@
 import type { Proposal } from "@/lib/proposals/types";
 import { formatMoney } from "@/lib/proposals/pricing";
 import type { ProposalFollowUpCandidate, GideonClaim } from "./types";
+import { proposalTitleWithoutClientPrefix } from "./displayNames";
 
 export type ProposalFollowUpConfig = {
   staleDays: number;
@@ -116,15 +117,20 @@ export function scoreProposalFollowUp(
 
   if (score < 3) return null;
 
+  const cleanTitle = proposalTitleWithoutClientPrefix(
+    proposal.title,
+    args.clientName
+  );
+
   return {
     proposalId: proposal.id,
-    title: proposal.title,
+    title: cleanTitle,
     clientName: args.clientName,
     amountLabel: formatMoney(proposal.total_cents, proposal.currency),
     status: proposal.status,
     score,
     reasons,
-    recommendedAction: `Follow up with ${args.clientName} on "${proposal.title}".`,
+    recommendedAction: `Follow up with ${args.clientName} on "${cleanTitle}".`,
   };
 }
 

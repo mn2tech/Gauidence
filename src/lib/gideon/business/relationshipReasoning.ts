@@ -12,6 +12,7 @@ import { formatMoney } from "@/lib/proposals/pricing";
 import { PROPOSAL_SELECT } from "@/lib/proposals/types";
 import { mapProposalRow } from "@/lib/proposals/server";
 import { shouldExcludeFromBusinessOntology } from "./knowledgeFilter";
+import { proposalTitleWithoutClientPrefix } from "./displayNames";
 import type { GideonClaim } from "./types";
 
 export type ClientsWithoutActiveProjectResult = {
@@ -19,34 +20,7 @@ export type ClientsWithoutActiveProjectResult = {
   claims: GideonClaim[];
 };
 
-/** Strip a leading "Client — " prefix from proposal titles when grouping by client. */
-export function proposalTitleWithoutClientPrefix(
-  title: string,
-  clientName: string
-): string {
-  const t = title.trim();
-  const c = clientName.trim();
-  if (!c || /^unknown client$/i.test(c)) return t;
-
-  const escaped = c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const exact = t
-    .replace(new RegExp(`^${escaped}\\s*[—\\-:]\\s*`, "i"), "")
-    .trim();
-  if (exact && exact !== t) return exact;
-
-  // AshtonManor vs "Ashton Manor — …"
-  const compact = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
-  const clientKey = compact(c);
-  if (clientKey.length < 3) return t;
-
-  const sep = t.search(/\s*[—\-:]\s*/);
-  if (sep <= 0) return t;
-  const head = t.slice(0, sep).trim();
-  const rest = t.slice(sep).replace(/^\s*[—\-:]\s*/, "").trim();
-  if (rest && compact(head) === clientKey) return rest;
-
-  return t;
-}
+export { proposalTitleWithoutClientPrefix } from "./displayNames";
 
 async function loadClientProfileNames(
   supabase: SupabaseClient,

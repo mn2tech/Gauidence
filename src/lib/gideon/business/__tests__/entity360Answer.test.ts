@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { proposalMatchesEntity } from "../entity360";
 import { formatEntity360UserAnswer } from "../formatForGideon";
-import { proposalTitleWithoutClientPrefix } from "../relationshipReasoning";
+import {
+  formatClientProposalLabel,
+  proposalTitleWithoutClientPrefix,
+} from "../displayNames";
+import { buildAdvisoryInsights } from "../advisory";
 import type { Entity360 } from "../types";
 
 describe("proposalTitleWithoutClientPrefix", () => {
@@ -28,6 +32,46 @@ describe("proposalTitleWithoutClientPrefix", () => {
       ),
       "Guardian Knowledge Base"
     );
+    assert.equal(
+      formatClientProposalLabel(
+        "AshtonManor",
+        "Ashton Manor — Guardian Knowledge Base"
+      ),
+      "AshtonManor — Guardian Knowledge Base"
+    );
+  });
+});
+
+describe("advisory labels", () => {
+  it("does not leak meta gaps or duplicate client names", () => {
+    const { insights } = buildAdvisoryInsights({
+      proposalFollowUps: [
+        {
+          proposalId: "p1",
+          title: "Ashton Manor — Guardian Knowledge Base",
+          clientName: "AshtonManor",
+          amountLabel: "$5,000.00",
+          status: "viewed",
+          score: 9,
+          reasons: ["Proposal status is viewed."],
+          recommendedAction:
+            'Follow up with AshtonManor on "Ashton Manor — Guardian Knowledge Base".',
+        },
+      ],
+      commitmentDueSoon: [],
+      risks: [],
+      gaps: [
+        {
+          title: "Missing information",
+          summary:
+            "Prefer stating uncertainty when Guardian lacks confirmation.",
+        },
+      ],
+    });
+    assert.equal(insights[0]?.title, "AshtonManor — Guardian Knowledge Base");
+    assert.doesNotMatch(insights[0]?.recommendedNextStep ?? "", /Ashton Manor — Guardian/);
+    // Gaps still supported when real, but retrieve no longer injects the meta one.
+    assert.ok(insights.some((i) => i.type === "missing_information"));
   });
 });
 
