@@ -53,9 +53,10 @@ export async function resolveBusinessEntity(
   matchType: "canonical" | "alias" | "domain" | "fuzzy";
   confidence: number;
 } | null> {
-  const mention = args.mention.trim();
+  const mention = args.mention.trim().replace(/[.,;:!?]+$/g, "");
   if (!mention || !args.spaceIds.length) return null;
   const normalized = normalizeEntityName(mention);
+  const safeMention = mention.replace(/[%_,]/g, "").slice(0, 64);
   const domainHint = mention
     .replace(/^https?:\/\//i, "")
     .replace(/\/.*$/, "")
@@ -78,86 +79,191 @@ export async function resolveBusinessEntity(
       confidence: 0.95,
     };
   }
+  if (byCanonical && byCanonical.length > 1) {
+    const preferred = preferBusinessEntity(byCanonical as OntologyEntity[]);
+    if (preferred) {
+      return { entity: preferred, matchType: "canonical", confidence: 0.9 };
+    }
+  }
 
   const { data: aliasRows } = await supabase
     .from("ontology_entity_aliases")
     .select("entity_id")
     .in("profile_id", args.spaceIds)
-    .eq("normalized_alias", normalized)
-    .limit(5);
+    .or(
+      `normalized_alias.eq.${normalized},normalized_alias.ilike.%${normalized}%`
+    )
+    .limit(8);
 
-  if (aliasRows?.length === 1) {
-    const { data: entity } = await supabase
+  if (aliasRows?.length) {
+    const ids = [...new Set(aliasRows.map((a) => String(a.entity_id)))];
+    const { data: aliasEntities } = await supabase
       .from("ontology_entities")
       .select(ONTOLOGY_ENTITY_SELECT)
-      .eq("id", aliasRows[0]!.entity_id)
-      .in("review_status", ONTOLOGY_VISIBLE_REVIEW_STATUSES)
-      .maybeSingle();
-    if (entity) {
-      return {
-        entity: entity as OntologyEntity,
-        matchType: "alias",
-        confidence: 0.9,
-      };
+      .in("id", ids)
+      .in("review_status", ONTOLOGY_VISIBLE_REVIEW_STATUSES);
+    const preferred = preferBusinessEntity(
+      (aliasEntities as OntologyEntity[] | null) ?? []
+    );
+    if (preferred) {
+      return { entity: preferred, matchType: "alias", confidence: 0.88 };
     }
   }
 
-  if (looksLikeDomain || normalized.includes(" ")) {
+  // Name / domain scan across org-like types (including single-token names like Proxdose)
+  {
     const { data: candidates } = await supabase
       .from("ontology_entities")
       .select(ONTOLOGY_ENTITY_SELECT)
       .in("profile_id", args.spaceIds)
       .in("review_status", ONTOLOGY_VISIBLE_REVIEW_STATUSES)
-      .in("entity_type", ["client", "organization"])
-      .limit(80);
+      .in("entity_type", ["client", "organization", "contact", "person"])
+      .or(
+        `name.ilike.%${safeMention}%,canonical_name.ilike.%${normalized}%,description.ilike.%${safeMention}%`
+      )
+      .limit(40);
 
-    const domainNeedle = looksLikeDomain
-      ? domainHint
-      : `${normalized.replace(/\s+/g, "")}.`;
-
-    for (const row of (candidates as OntologyEntity[] | null) ?? []) {
-      const props = row.properties ?? {};
-      const domain = readDomain(props, []);
-      if (domain && (domain === domainHint || domain.startsWith(domainNeedle))) {
-        return { entity: row, matchType: "domain", confidence: 0.85 };
-      }
-      const nameNorm = normalizeEntityName(row.name);
-      if (
-        nameNorm === normalized ||
-        nameNorm.includes(normalized) ||
-        normalized.includes(nameNorm)
-      ) {
-        // Ambiguous multi-match: only accept high-confidence unique-ish names
-        const same = ((candidates as OntologyEntity[]) ?? []).filter((c) => {
-          const n = normalizeEntityName(c.name);
-          return n === nameNorm || n.includes(normalized) || normalized.includes(n);
-        });
-        if (same.length === 1) {
-          return { entity: row, matchType: "fuzzy", confidence: 0.72 };
-        }
+    const ranked = rankNameMatches(
+      (candidates as OntologyEntity[] | null) ?? [],
+      normalized,
+      domainHint,
+      looksLikeDomain
+    );
+    if (ranked[0] && ranked[0].score >= 0.72) {
+      // Ambiguous if second is very close
+      if (!ranked[1] || ranked[0].score - ranked[1].score >= 0.08) {
+        return {
+          entity: ranked[0].entity,
+          matchType: ranked[0].matchType,
+          confidence: ranked[0].score,
+        };
       }
     }
   }
 
-  // Soft ilike fallback — single hit only (reviewable merges stay out of auto path)
-  const { data: soft } = await supabase
-    .from("ontology_entities")
-    .select(ONTOLOGY_ENTITY_SELECT)
-    .in("profile_id", args.spaceIds)
-    .in("review_status", ONTOLOGY_VISIBLE_REVIEW_STATUSES)
-    .in("entity_type", ["client", "organization", "person", "contact"])
-    .or(`name.ilike.%${mention.replace(/[%_]/g, "")}%,canonical_name.ilike.%${normalized}%`)
-    .limit(5);
+  // Broader scan: any entity mentioning the name (assessment titles, docs, etc.)
+  // Prefer promoting an org/client; otherwise use the strongest named hit.
+  {
+    const { data: broad } = await supabase
+      .from("ontology_entities")
+      .select(ONTOLOGY_ENTITY_SELECT)
+      .in("profile_id", args.spaceIds)
+      .in("review_status", ONTOLOGY_VISIBLE_REVIEW_STATUSES)
+      .or(
+        `name.ilike.%${safeMention}%,canonical_name.ilike.%${normalized}%,description.ilike.%${safeMention}%`
+      )
+      .limit(40);
 
-  if (soft?.length === 1) {
-    return {
-      entity: soft[0] as OntologyEntity,
-      matchType: "fuzzy",
-      confidence: 0.65,
-    };
+    const preferred = preferBusinessEntity(
+      (broad as OntologyEntity[] | null) ?? []
+    );
+    if (preferred) {
+      return { entity: preferred, matchType: "fuzzy", confidence: 0.7 };
+    }
+
+    const ranked = rankNameMatches(
+      (broad as OntologyEntity[] | null) ?? [],
+      normalized,
+      domainHint,
+      looksLikeDomain
+    );
+    if (ranked[0] && ranked[0].score >= 0.65) {
+      return {
+        entity: ranked[0].entity,
+        matchType: "fuzzy",
+        confidence: ranked[0].score,
+      };
+    }
   }
 
   return null;
+}
+
+function preferBusinessEntity(
+  entities: OntologyEntity[]
+): OntologyEntity | null {
+  if (!entities.length) return null;
+  const score = (e: OntologyEntity) => {
+    let s = 0;
+    if (e.entity_type === "client") s += 40;
+    else if (e.entity_type === "organization") s += 35;
+    else if (e.entity_type === "contact" || e.entity_type === "person") s += 10;
+    else if (e.entity_type === "document") s += 5;
+    if (!shouldExcludeFromBusinessOntology({
+      name: e.name,
+      description: e.description,
+      entityType: e.entity_type,
+    })) {
+      s += 5;
+    }
+    return s;
+  };
+  const sorted = [...entities].sort((a, b) => score(b) - score(a));
+  return sorted[0] ?? null;
+}
+
+function rankNameMatches(
+  entities: OntologyEntity[],
+  normalized: string,
+  domainHint: string,
+  looksLikeDomain: boolean
+): Array<{
+  entity: OntologyEntity;
+  score: number;
+  matchType: "domain" | "fuzzy";
+}> {
+  const out: Array<{
+    entity: OntologyEntity;
+    score: number;
+    matchType: "domain" | "fuzzy";
+  }> = [];
+
+  for (const row of entities) {
+    if (
+      shouldExcludeFromBusinessOntology({
+        name: row.name,
+        description: row.description,
+        entityType: row.entity_type,
+      })
+    ) {
+      continue;
+    }
+    const nameNorm = normalizeEntityName(row.name);
+    const domain = readDomain(row.properties, []);
+    let score = 0;
+    let matchType: "domain" | "fuzzy" = "fuzzy";
+
+    if (domain && (domain === domainHint || domain.includes(normalized))) {
+      score = 0.9;
+      matchType = "domain";
+    } else if (nameNorm === normalized) {
+      score = 0.95;
+    } else if (nameNorm.startsWith(normalized) || normalized.startsWith(nameNorm)) {
+      score = 0.85;
+    } else if (nameNorm.includes(normalized) || normalized.includes(nameNorm)) {
+      score = 0.78;
+    } else if (
+      (row.description ?? "").toLowerCase().includes(normalized) ||
+      row.name.toLowerCase().includes(normalized)
+    ) {
+      score = 0.68;
+    }
+
+    if (looksLikeDomain && domain === domainHint) {
+      score = Math.max(score, 0.92);
+      matchType = "domain";
+    }
+
+    if (row.entity_type === "client") score += 0.03;
+    if (row.entity_type === "organization") score += 0.02;
+
+    if (score >= 0.65) {
+      out.push({ entity: row, score: Math.min(0.98, score), matchType });
+    }
+  }
+
+  out.sort((a, b) => b.score - a.score);
+  return out;
 }
 
 function isPeopleType(t: string): boolean {
@@ -451,4 +557,191 @@ export async function buildEntity360(
   }
 
   return { entity360, claims };
+}
+
+/**
+ * When no canonical client/org exists yet, summarize ontology + proposal hits
+ * that mention the name — still a briefing, not a raw numbered dump.
+ */
+export async function buildMentionKnowledgeBrief(
+  supabase: SupabaseClient,
+  args: {
+    spaceIds: string[];
+    businessProfileId: string;
+    mention: string;
+    profileNames: Record<string, string>;
+  }
+): Promise<{ answer: string; claims: GideonClaim[] } | null> {
+  const mention = args.mention.trim().replace(/[.,;:!?]+$/g, "");
+  if (!mention || !args.spaceIds.length) return null;
+  const normalized = normalizeEntityName(mention);
+  const safe = mention.replace(/[%_,]/g, "").slice(0, 64);
+
+  const [{ data: entities }, { data: proposalRows }] = await Promise.all([
+    supabase
+      .from("ontology_entities")
+      .select(ONTOLOGY_ENTITY_SELECT)
+      .in("profile_id", args.spaceIds)
+      .in("review_status", ONTOLOGY_VISIBLE_REVIEW_STATUSES)
+      .or(
+        `name.ilike.%${safe}%,canonical_name.ilike.%${normalized}%,description.ilike.%${safe}%`
+      )
+      .limit(30),
+    supabase
+      .from("proposals")
+      .select(PROPOSAL_SELECT)
+      .eq("business_profile_id", args.businessProfileId)
+      .order("updated_at", { ascending: false })
+      .limit(40),
+  ]);
+
+  const kept = ((entities as OntologyEntity[] | null) ?? []).filter(
+    (e) =>
+      !shouldExcludeFromBusinessOntology({
+        name: e.name,
+        description: e.description,
+        entityType: e.entity_type,
+      })
+  );
+
+  const proposals = (proposalRows ?? [])
+    .map((row) => mapProposalRow(row))
+    .filter((p) => {
+      const client =
+        args.profileNames[p.client_profile_id]?.toLowerCase() ?? "";
+      const blob = `${p.title} ${p.summary ?? ""} ${client}`.toLowerCase();
+      return blob.includes(normalized) || client.includes(normalized);
+    });
+
+  if (!kept.length && !proposals.length) return null;
+
+  const assessments = kept.filter(isAssessmentLike).slice(0, 5);
+  const orgs = kept.filter((e) =>
+    ["client", "organization"].includes(e.entity_type)
+  );
+  const people = kept.filter((e) => isPeopleType(e.entity_type)).slice(0, 5);
+  const other = kept
+    .filter(
+      (e) =>
+        !isAssessmentLike(e) &&
+        !["client", "organization", "person", "contact"].includes(e.entity_type)
+    )
+    .slice(0, 6);
+
+  const parts: string[] = [
+    mention.toUpperCase(),
+    "",
+    "Relationship",
+    orgs.length
+      ? `${mention} appears in Guardian ontology as: ${orgs
+          .map((o) => `${o.name} (${o.entity_type})`)
+          .join(", ")}.`
+      : `Guardian does not yet have a dedicated client/organization entity named ${mention}, but related knowledge was found in this Space.`,
+    "",
+  ];
+
+  if (assessments.length) {
+    parts.push("Assessments / Documents");
+    for (const a of assessments) {
+      const desc = (a.description ?? "").trim();
+      // Keep short business prose — not every extracted attribute.
+      const snippet = desc
+        ? desc
+            .split(/[\n.;]/)
+            .map((s) => s.trim())
+            .filter((s) => s.length > 12)
+            .filter(
+              (s) =>
+                !shouldExcludeFromBusinessOntology({
+                  name: s,
+                })
+            )
+            .slice(0, 2)
+            .join(". ")
+        : "";
+      parts.push(
+        snippet
+          ? `• ${a.name} — ${snippet.slice(0, 220)}`
+          : `• ${a.name}`
+      );
+    }
+    parts.push("");
+  }
+
+  if (proposals.length) {
+    parts.push("Commercial Activity");
+    for (const p of proposals.slice(0, 5)) {
+      parts.push(
+        `• ${p.title} — ${formatMoney(p.total_cents, p.currency)} (status: ${p.status})`
+      );
+    }
+    parts.push("");
+  }
+
+  if (people.length) {
+    parts.push("People");
+    for (const p of people) parts.push(`• ${p.name} (${p.entity_type})`);
+    parts.push("");
+  }
+
+  if (other.length) {
+    parts.push("Related knowledge");
+    for (const o of other) {
+      parts.push(`• ${o.name} (${o.entity_type})`);
+    }
+    parts.push("");
+  }
+
+  parts.push("Items Requiring Attention");
+  parts.push("Gideon recommendation:");
+  if (!orgs.length) {
+    parts.push(
+      `• Confirm ${mention} as a canonical client/organization in Ontology so future Entity 360 answers are stronger.`
+    );
+  }
+  if (assessments.length) {
+    parts.push(
+      "• Review whether assessment findings and remediation were completed."
+    );
+  }
+  if (proposals.length) {
+    parts.push("• Confirm status of related proposals and whether a project should be opened.");
+  }
+  parts.push("");
+  parts.push("Sources");
+  for (const a of assessments.slice(0, 4)) parts.push(`• ${a.name}`);
+  for (const p of proposals.slice(0, 3)) parts.push(`• ${p.title} (proposal)`);
+
+  const claims: GideonClaim[] = [];
+  for (const a of assessments.slice(0, 3)) {
+    claims.push({
+      claim: `Guardian contains ${a.name} related to ${mention}.`,
+      kind: "KNOWN_FACT",
+      confidence: 0.7,
+      evidence: [
+        {
+          sourceId: a.id,
+          sourceType: "ontology_entity",
+          label: a.name,
+        },
+      ],
+    });
+  }
+  for (const p of proposals.slice(0, 3)) {
+    claims.push({
+      claim: `${mention} is linked to proposal ${p.title}.`,
+      kind: "KNOWN_FACT",
+      confidence: 0.8,
+      evidence: [
+        {
+          sourceId: p.id,
+          sourceType: "proposal",
+          label: p.title,
+          href: `/proposals/${p.id}`,
+        },
+      ],
+    });
+  }
+
+  return { answer: parts.join("\n"), claims };
 }

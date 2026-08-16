@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { PROPOSAL_SELECT, type Proposal } from "@/lib/proposals/types";
 import { mapProposalRow } from "@/lib/proposals/server";
 import { planBusinessQuery } from "./queryPlanner";
-import { buildEntity360 } from "./entity360";
+import { buildEntity360, buildMentionKnowledgeBrief } from "./entity360";
 import {
   describeEntityRelationships,
   findClientsWithProposalsWithoutActiveProject,
@@ -165,10 +165,31 @@ export async function loadBusinessIntelligence(
         sections.push(formatEntity360ForGideon(built.entity360));
         userAnswerDraft = formatEntity360UserAnswer(built.entity360);
       } else {
-        userAnswerDraft = `I could not resolve "${mention}" to a canonical Guardian entity yet. Guardian may still have documents mentioning that name — ask me to search files, or confirm the exact client/organization name.`;
-        sections.push(
-          `ENTITY 360: I could not resolve "${mention}" to a canonical Guardian entity. Say so clearly and ask a clarifying question.`
-        );
+        const brief = await buildMentionKnowledgeBrief(args.supabase, {
+          spaceIds,
+          businessProfileId: args.businessProfileId,
+          mention,
+          profileNames: args.profileNames,
+        });
+        if (brief) {
+          claims = mergeClaims(claims, brief.claims);
+          ontologyHitCount += brief.claims.length;
+          sections.push(
+            "ENTITY 360 FALLBACK (no canonical entity — briefing from matching ontology/proposals; do not dump raw attributes):"
+          );
+          sections.push(brief.answer);
+          userAnswerDraft = brief.answer;
+        } else {
+          userAnswerDraft = [
+            `I could not find a Guardian entity or matching proposals for "${mention}" in this Space yet.`,
+            "",
+            "Known from Guardian: no canonical client/organization match in the ontology for this Space.",
+            "Gideon recommendation: run Analyze Knowledge on Proxdose documents, or confirm the exact name used in Guardian (for example PROXDOSE / Proxdose LLC / proxdose.com).",
+          ].join("\n");
+          sections.push(
+            `ENTITY 360: no canonical entity and no mention hits for "${mention}".`
+          );
+        }
       }
     } else {
       sections.push(
