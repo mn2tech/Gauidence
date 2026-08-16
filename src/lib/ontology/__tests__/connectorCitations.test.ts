@@ -46,4 +46,19 @@ describe("pickConnectorImageCitations", () => {
     );
     assert.deepEqual(picked, []);
   });
+
+  it("keeps opaque Trello chart ids named in the answer and drops unrelated PDFs", () => {
+    const picked = pickConnectorImageCitations(
+      [
+        { fileName: "trello6283425547712481893.jpg" },
+        { fileName: "Lord, I hope this day is good - D.pdf" },
+        { fileName: "Let's Learn Music.pdf" },
+      ],
+      "Hillsong Young & Free version — Key D (from trello6283425547712481893.jpg):\n- Intro: G D Asus"
+    );
+    assert.deepEqual(
+      picked.map((c) => c.fileName),
+      ["trello6283425547712481893.jpg"]
+    );
+  });
 });

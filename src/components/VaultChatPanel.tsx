@@ -3017,15 +3017,27 @@ export default function VaultChatPanel({
       imageCitations.filter((c) => c.kind === "connector"),
       m.content ?? ""
     );
-    const sourceCitations = uniqueCitations.filter(
-      (c) => !(c.isImage || isImageFileName(c.fileName))
-    );
+    const answerLower = (m.content ?? "").toLowerCase();
+    const sourceNamedInAnswer = (fileName: string) => {
+      const stem = fileName
+        .replace(/\.[^.]+$/, "")
+        .trim()
+        .toLowerCase();
+      if (stem.length < 4) return false;
+      return answerLower.includes(stem.slice(0, Math.min(stem.length, 40)));
+    };
+    // Non-image Sources must also be named in the answer (fixes wrong PDF links
+    // next to a correct Trello chart preview).
+    const sourceCitations = uniqueCitations.filter((c) => {
+      if (c.isImage || isImageFileName(c.fileName)) return false;
+      if (c.kind === "connector") return sourceNamedInAnswer(c.fileName);
+      return sourceNamedInAnswer(c.fileName);
+    });
     const vaultPreviewCitations = [
       ...vaultImages,
       ...connectorImages,
       ...sourceCitations.filter((c) => c.kind !== "connector"),
-    ];
-    const previewCitations = options?.hideCitationPreviews
+    ];    const previewCitations = options?.hideCitationPreviews
       ? []
       : vaultPreviewCitations;
     const linkOnlyCitations = options?.hideCitationPreviews

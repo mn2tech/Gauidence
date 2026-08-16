@@ -476,7 +476,18 @@ export async function loadWorkspaceContext(
           (title) => stem.includes(title) || title.includes(stem.slice(0, 24))
         );
       });
-      if (matched.length) connectorCitations = matched;
+      // Keep opaque Trello filenames (trello123.jpg) for answer-time picking;
+      // drop clearly unrelated named charts/PDFs when we have a song title.
+      if (matched.length) {
+        connectorCitations = matched;
+      } else {
+        connectorCitations = connectorCitations.filter((c) => {
+          const stem = c.fileName.replace(/\.[^.]+$/, "").toLowerCase();
+          if (/^trello\d+/i.test(stem)) return true;
+          if (/\.(jpe?g|png|webp|gif)$/i.test(c.fileName)) return true;
+          return false;
+        });
+      }
     }
   }
 

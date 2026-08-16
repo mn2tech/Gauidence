@@ -16,6 +16,7 @@ import {
   dedupeVaultCitations,
 } from "@/lib/vault/indexDocument";
 import { wantsShowPictures, wantsSingleImageFocus } from "@/lib/vault/images";
+import { pickConnectorImageCitations } from "@/lib/ontology/connectorCitationIds";
 import {
   buildVaultScopePayload,
   chatScopedProfilePayload,
@@ -220,8 +221,14 @@ export function createVaultChatStreamResponse(
           }
         }
         if (args.connectorCitations?.length) {
+          // Only charts the answer actually names — never dump unrelated Trello PDFs.
+          const picked = pickConnectorImageCitations(
+            args.connectorCitations,
+            answer,
+            4
+          );
           const seen = new Set(selected.map((c) => c.documentId));
-          for (const c of args.connectorCitations) {
+          for (const c of picked) {
             if (!c.documentId || seen.has(c.documentId)) continue;
             selected.push(c);
             seen.add(c.documentId);
