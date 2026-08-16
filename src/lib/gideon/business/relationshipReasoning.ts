@@ -27,11 +27,25 @@ export function proposalTitleWithoutClientPrefix(
   const t = title.trim();
   const c = clientName.trim();
   if (!c || /^unknown client$/i.test(c)) return t;
+
   const escaped = c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const stripped = t
+  const exact = t
     .replace(new RegExp(`^${escaped}\\s*[—\\-:]\\s*`, "i"), "")
     .trim();
-  return stripped || t;
+  if (exact && exact !== t) return exact;
+
+  // AshtonManor vs "Ashton Manor — …"
+  const compact = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const clientKey = compact(c);
+  if (clientKey.length < 3) return t;
+
+  const sep = t.search(/\s*[—\-:]\s*/);
+  if (sep <= 0) return t;
+  const head = t.slice(0, sep).trim();
+  const rest = t.slice(sep).replace(/^\s*[—\-:]\s*/, "").trim();
+  if (rest && compact(head) === clientKey) return rest;
+
+  return t;
 }
 
 async function loadClientProfileNames(

@@ -21,6 +21,13 @@ describe("proposalTitleWithoutClientPrefix", () => {
       ),
       "Homepage Redesign Sprint"
     );
+    assert.equal(
+      proposalTitleWithoutClientPrefix(
+        "Ashton Manor — Guardian Knowledge Base",
+        "AshtonManor"
+      ),
+      "Guardian Knowledge Base"
+    );
   });
 });
 
