@@ -18,7 +18,10 @@ export function deriveCommitmentsFromProposal(args: {
   const status: CommitmentStatus =
     args.status === "accepted"
       ? "AGREED"
-      : args.status === "sent" || args.status === "viewed"
+      : args.status === "sent" ||
+          args.status === "viewed" ||
+          args.status === "draft" ||
+          args.status === "changes_requested"
         ? "PROPOSED"
         : args.status === "declined" || args.status === "expired"
           ? "CANCELLED"

@@ -239,6 +239,14 @@ describe("commitments", () => {
       deliverables: [{ title: "Deliver redesigned homepage" }],
     });
     assert.equal(agreed[0]?.status, "AGREED");
+
+    const draft = deriveCommitmentsFromProposal({
+      proposalId: "p1",
+      title: "ai_phone_agent",
+      status: "draft",
+      deliverables: [{ title: "Homepage redesign" }],
+    });
+    assert.equal(draft[0]?.status, "PROPOSED");
   });
 });
 

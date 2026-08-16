@@ -345,17 +345,25 @@ export async function loadBusinessIntelligence(
             const status =
               p.status === "accepted"
                 ? "AGREED"
-                : p.status === "sent" || p.status === "viewed"
+                : p.status === "sent" ||
+                    p.status === "viewed" ||
+                    p.status === "draft" ||
+                    p.status === "changes_requested"
                   ? "PROPOSED"
                   : "UNKNOWN";
             const deliverables = p.deliverables?.length
               ? p.deliverables.map((d) => d.title)
               : [p.title];
+            const proposalLabel = p.title.trim();
             for (const d of deliverables.slice(0, 4)) {
-              sections.push(`• ${client}: [${status}] ${d}`);
-              draftLines.push(`• ${client}: [${status}] ${d}`);
+              const detail =
+                d.trim().toLowerCase() === proposalLabel.toLowerCase()
+                  ? d
+                  : `${d} (from "${proposalLabel}")`;
+              sections.push(`• ${client}: [${status}] ${detail}`);
+              draftLines.push(`• ${client}: [${status}] ${detail}`);
               claims.push({
-                claim: `${client}: ${d} [${status}]`,
+                claim: `${client}: ${detail} [${status}]`,
                 kind: "KNOWN_FACT",
                 confidence: p.status === "accepted" ? 0.85 : 0.6,
                 evidence: [
@@ -372,7 +380,7 @@ export async function loadBusinessIntelligence(
           }
           draftLines.push(
             "",
-            "Note: PROPOSED means the proposal is not accepted yet — not an agreed contractual commitment."
+            "Note: PROPOSED includes draft/sent/viewed proposals — not an agreed contractual commitment until accepted."
           );
         } else {
           draftLines.push(
