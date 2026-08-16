@@ -1,11 +1,11 @@
 import type { OntologyExtractionResult } from "../types";
 
 const TRANSCRIPT_ATTR = "content_transcript";
-const TRANSCRIPT_MAX = 3500;
+const TRANSCRIPT_MAX = 6000;
 
 /**
  * Attach a vision transcript to the document entity so Gideon can answer
- * about chart/sheet contents (chords, labels), not just the file name.
+ * about chart/sheet contents (chords, lyrics, labels), not just the file name.
  */
 export function enrichOntologyWithTranscript(
   extraction: OntologyExtractionResult,

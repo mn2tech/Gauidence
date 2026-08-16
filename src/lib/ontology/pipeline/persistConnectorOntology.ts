@@ -50,10 +50,10 @@ export async function persistConnectorOntologyExtraction(
     createdBy: input.userId,
     confidence: 1,
     description: transcript
-      ? `Connected chart "${input.fileName}".\n\nChart / reference content:\n${transcript.slice(0, 3000)}`
+      ? `Connected chart "${input.fileName}".\n\nChart / reference content:\n${transcript.slice(0, 5500)}`
       : `Connected source file (${input.analysisVersion})`,
     properties: transcript
-      ? { content_transcript: transcript.slice(0, 3500) }
+      ? { content_transcript: transcript.slice(0, 6000) }
       : {},
   });
   if (docEntity.created) stats.entitiesCreated += 1;

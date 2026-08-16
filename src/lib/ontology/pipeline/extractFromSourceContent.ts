@@ -372,10 +372,11 @@ async function extractOntologyMultimodal(args: {
       ...(looksLikeChart
         ? {
             system: `You transcribe music charts, chord sheets, tablature, and practice worksheets for Guardian.
-Copy every readable chord name, key signature, section label, fret/string marking, and instruction exactly.
-Preserve reading order and line breaks. Do not invent chords that are not visible.
+Copy every readable chord name, lyric line, key signature, section label (Verse/Chorus/Bridge/Tag/Intro/Outro), fret/string marking, and performance note exactly.
+Preserve reading order and line breaks. Prefer a chord-over-lyrics layout when both appear on the page (chords on the line above the words they cover).
+Do not invent chords or lyrics that are not visible.
 Output plain text only.`,
-            userHint: `Transcribe this music/reference chart (${args.fileName}) completely. Include all chord names, keys, labels, and notes.`,
+            userHint: `Transcribe this music/reference chart (${args.fileName}) completely. Include all chord names, lyrics, section labels, keys, and notes in reading order.`,
           }
         : {}),
     });

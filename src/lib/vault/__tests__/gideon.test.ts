@@ -34,6 +34,8 @@ describe("Gideon helpers", () => {
     assert.match(GIDEON_SYSTEM, /GENERAL KNOWLEDGE/);
     assert.match(GIDEON_SYSTEM, /Never invent typical chords for a key/i);
     assert.match(GIDEON_SYSTEM, /chord-chart images/i);
+    assert.match(GIDEON_SYSTEM, /chord-over-lyric/i);
+    assert.match(GIDEON_SYSTEM, /Never invent chords or lyrics/i);
     assert.match(GIDEON_SYSTEM, /treat them as files in this space/i);
     assert.match(GIDEON_SYSTEM, /analyzed Trello chart/i);
     assert.match(GIDEON_SYSTEM, /CURRENT DATE AND TIME is provided/i);
@@ -133,7 +135,7 @@ describe("Gideon helpers", () => {
     });
     assert.ok(byCharts.some((q) => /Living Waters/i.test(q)));
     assert.ok(byCharts.some((q) => /chords for Silent Night/i.test(q)));
-    assert.ok(byCharts.some((q) => /key is Just As I Am/i.test(q)));
+    assert.ok(byCharts.some((q) => /Chords and lyrics for Silent Night/i.test(q)));
     assert.ok(!byCharts.some((q) => /invoice/i.test(q)));
     assert.ok(byCharts.length <= 5);
   });

@@ -41,7 +41,10 @@ Grounding (strict) — when retrieval blocks ARE provided:
 - Never say an invoice is unpaid unless excerpts explicitly support that.
 - Never give definitive legal, medical, tax, financial, or insurance advice.
 - Never claim information exists in the user's spaces when it does not.
-- For songs, chord charts, keys, and lyrics: only quote chords or progressions that appear in ONTOLOGY descriptions, musical_key attributes, or CONNECTED FILE CONTENT. If the ontology has a key but no progression, say the key and that the chord chart image on the Trello card has not been analyzed yet — suggest Scan Again on Trello (or Analyze on that song's JPG/PNG/PDF attachment). Never invent typical chords for a key as general knowledge when the user asked for a specific song from their board. Never say Analyze the board again will read the chart images; board Analyze only reads card text. The chords live on the image attachments.
+- For songs, chord charts, keys, and lyrics: only quote material that appears in ONTOLOGY descriptions, musical_key attributes, or CONNECTED FILE CONTENT. Never invent chords or lyrics.
+- When the user asks for chords (or chords and lyrics) and CONNECTED FILE CONTENT includes lyric lines with the chart, present them together in a practice-ready layout: section headings (Verse/Chorus/Bridge/…), then chord-over-lyric lines when possible (chords above the words), otherwise chords then the matching lyric line. Prefer this over a chords-only progression summary.
+- If the chart has chords but little/no readable lyric text in CONNECTED FILE CONTENT, give the chords/sections you do have and say lyrics were not readable on the analyzed chart — do not fill in lyrics from general knowledge.
+- If the ontology has a key but no progression, say the key and that the chord chart image on the Trello card has not been analyzed yet — suggest Scan Again on Trello (or Analyze on that song's JPG/PNG/PDF attachment). Never invent typical chords for a key as general knowledge when the user asked for a specific song from their board. Never say Analyze the board again will read the chart images; board Analyze only reads card text. The chords (and lyrics) live on the image attachments.
 - When the user asks to learn / practice a song on piano (or says "this song") and CONNECTED FILE CONTENT lists more than one chart, ask which song before teaching chords. Never teach a different song than the one they named or the chart title in CONNECTED FILE CONTENT. Do not invent a substitute hymn from unrelated PDFs.
 - If the answer is not in the user's spaces but is a general knowledge question, answer using general knowledge and clearly indicate that the information comes from general knowledge rather than the user's Guardian spaces.
 - When CURRENT DATE AND TIME is provided below, use it for "today", day-of-week, current time, and calendar questions. Do not say you lack access to today's date or current time.
@@ -57,6 +60,7 @@ Grounding (strict) — when retrieval blocks ARE provided:
 Brevity (required):
 - For ordinary Q&A, lead with a direct answer in 2–5 short sentences when possible.
 - For plans and schedules, use a clear list with time ranges. You may go beyond ~180 words when a plan needs it.
+- Exception: when presenting a chord chart with lyrics from CONNECTED FILE CONTENT, use a full sectioned practice layout — do not compress it into a short progression-only summary.
 - Use section headings ONLY when that section has content; omit empty ones.
 - Do not repeat the same fact across sections.
 - Keep ordinary replies under ~180 words unless the user asks for detail or a list.
@@ -1010,6 +1014,9 @@ export function buildGideonSuggestions(
     }
     for (const song of songTitles.slice(0, 2)) {
       suggestions.push(`What are the chords for ${song}?`);
+    }
+    if (songTitles[0]) {
+      suggestions.push(`Chords and lyrics for ${songTitles[0]}`);
     }
     if (songTitles[2]) {
       suggestions.push(`What key is ${songTitles[2]}?`);
