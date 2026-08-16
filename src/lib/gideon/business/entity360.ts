@@ -278,6 +278,42 @@ function isAssessmentLike(entity: OntologyEntity): boolean {
   );
 }
 
+/** Strict proposal↔entity match — never treat empty client names as a match. */
+export function proposalMatchesEntity(
+  proposal: {
+    title: string;
+    summary: string | null;
+    client_profile_id: string;
+  },
+  args: {
+    mentionKeys: Set<string>;
+    profileNames: Record<string, string>;
+    entityName: string;
+  }
+): boolean {
+  const clientRaw = args.profileNames[proposal.client_profile_id]?.trim() ?? "";
+  const clientKey = normalizeEntityName(clientRaw);
+  if (clientKey.length >= 3) {
+    for (const key of args.mentionKeys) {
+      if (clientKey === key || clientKey.includes(key) || key.includes(clientKey)) {
+        return true;
+      }
+    }
+  }
+
+  const titleKey = normalizeEntityName(
+    `${proposal.title} ${proposal.summary ?? ""}`
+  );
+  for (const key of args.mentionKeys) {
+    if (key.length >= 3 && titleKey.includes(key)) return true;
+  }
+
+  const entityKey = normalizeEntityName(args.entityName);
+  if (entityKey.length >= 3 && titleKey.includes(entityKey)) return true;
+
+  return false;
+}
+
 /**
  * Build a prioritized Entity 360 summary for Gideon (not a raw ontology dump).
  */
@@ -321,10 +357,29 @@ export async function buildEntity360(
       relatedId: rel.sourceEntity.id,
     })),
   ].filter((rel) => {
-    return !shouldExcludeFromBusinessOntology({
-      name: rel.relatedName,
-      entityType: rel.relatedType,
-    });
+    // Drop noisy PROPOSED_TO edges to non-proposal nodes (e.g. "Authenticated Follow-up Review").
+    if (
+      shouldExcludeFromBusinessOntology({
+        name: rel.relatedName,
+        entityType: rel.relatedType,
+      })
+    ) {
+      return false;
+    }
+    if (/^PROPOSED_TO$/i.test(rel.type) && !/proposal/i.test(rel.relatedType)) {
+      return false;
+    }
+    if (
+      /\b(follow-?up review|authenticated follow|remediation plan)\b/i.test(
+        rel.relatedName
+      ) &&
+      !/^(client|organization|person|contact|proposal|project|contract)$/i.test(
+        rel.relatedType
+      )
+    ) {
+      return false;
+    }
+    return true;
   });
 
   const people = graph.connectedEntities
@@ -389,8 +444,13 @@ export async function buildEntity360(
 
   const risks = graph.connectedEntities
     .filter((e) => {
+      if (isAssessmentLike(e)) return false;
+      if (isPeopleType(e.entity_type)) return false;
+      if (["proposal", "project", "contract", "client", "organization"].includes(e.entity_type)) {
+        return false;
+      }
       const blob = `${e.name} ${e.description ?? ""}`.toLowerCase();
-      return /\b(risk|finding|vulnerability|unsupported|remediation)\b/.test(
+      return /\b(risk|finding|vulnerability|unsupported php|security finding)\b/.test(
         blob
       );
     })
@@ -411,6 +471,12 @@ export async function buildEntity360(
     }));
 
   const clientNameKey = normalizeEntityName(resolved.entity.name);
+  const mentionKeys = new Set(
+    [clientNameKey, ...aliases.map((a) => normalizeEntityName(a))].filter(
+      (k) => k.length >= 3
+    )
+  );
+
   const { data: proposalRows } = await supabase
     .from("proposals")
     .select(PROPOSAL_SELECT)
@@ -420,15 +486,13 @@ export async function buildEntity360(
 
   const proposals = (proposalRows ?? [])
     .map((row) => mapProposalRow(row))
-    .filter((p) => {
-      const clientLabel =
-        args.profileNames[p.client_profile_id]?.toLowerCase() ?? "";
-      return (
-        normalizeEntityName(clientLabel).includes(clientNameKey) ||
-        clientNameKey.includes(normalizeEntityName(clientLabel)) ||
-        clientLabel.includes(resolved.entity.name.toLowerCase())
-      );
-    })
+    .filter((p) =>
+      proposalMatchesEntity(p, {
+        mentionKeys,
+        profileNames: args.profileNames,
+        entityName: resolved.entity.name,
+      })
+    )
     .slice(0, 8)
     .map((p) => ({
       id: p.id,
@@ -606,12 +670,15 @@ export async function buildMentionKnowledgeBrief(
 
   const proposals = (proposalRows ?? [])
     .map((row) => mapProposalRow(row))
-    .filter((p) => {
-      const client =
-        args.profileNames[p.client_profile_id]?.toLowerCase() ?? "";
-      const blob = `${p.title} ${p.summary ?? ""} ${client}`.toLowerCase();
-      return blob.includes(normalized) || client.includes(normalized);
-    });
+    .filter((p) =>
+      proposalMatchesEntity(p, {
+        mentionKeys: new Set(
+          [normalized].filter((k) => k.length >= 3)
+        ),
+        profileNames: args.profileNames,
+        entityName: mention,
+      })
+    );
 
   if (!kept.length && !proposals.length) return null;
 

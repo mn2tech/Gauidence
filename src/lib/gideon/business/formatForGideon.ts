@@ -134,17 +134,35 @@ export function formatEntity360UserAnswer(entity360: Entity360): string {
   const parts: string[] = [name, ""];
 
   parts.push("Relationship");
-  const serveRel = entity360.relationships.find((r) =>
-    /SERVES|CLIENT_OF|PROPOSED_TO/i.test(r.type)
-  );
-  if (serveRel) {
-    if (serveRel.direction === "incoming") {
+  const preferredRel =
+    entity360.relationships.find((r) =>
+      /^(SERVES|CLIENT_OF|CONTACT_FOR|EMPLOYS|ENGAGES)$/i.test(r.type)
+    ) ??
+    entity360.relationships.find(
+      (r) =>
+        /^PROPOSED_TO$/i.test(r.type) &&
+        /proposal/i.test(r.relatedType)
+    ) ??
+    entity360.relationships.find((r) =>
+      /^(HAS_PROJECT|HAS_CONTRACT|WORKS_ON)$/i.test(r.type)
+    );
+
+  if (preferredRel) {
+    if (/^SERVES$/i.test(preferredRel.type) && preferredRel.direction === "incoming") {
       parts.push(
-        `${name} appears in Guardian as related to ${serveRel.relatedName} (${serveRel.type}).`
+        `${name} appears in Guardian as a client/prospect related to ${preferredRel.relatedName}.`
+      );
+    } else if (/^PROPOSED_TO$/i.test(preferredRel.type)) {
+      parts.push(
+        `Guardian links proposal activity involving ${name} (${preferredRel.relatedName}).`
+      );
+    } else if (preferredRel.direction === "incoming") {
+      parts.push(
+        `${preferredRel.relatedName} —[${preferredRel.type}]→ ${name}.`
       );
     } else {
       parts.push(
-        `${name} —[${serveRel.type}]→ ${serveRel.relatedName}.`
+        `${name} —[${preferredRel.type}]→ ${preferredRel.relatedName}.`
       );
     }
   } else if (entity360.entity.type) {
@@ -174,8 +192,9 @@ export function formatEntity360UserAnswer(entity360: Entity360): string {
   if (entity360.proposals.length) {
     parts.push("Commercial Activity");
     for (const p of entity360.proposals.slice(0, 4)) {
+      const who = p.clientName?.trim() || name;
       parts.push(
-        `• ${p.title}${p.amountLabel ? ` — ${p.amountLabel}` : ""} (status: ${p.status})`
+        `• ${who} — ${p.title}${p.amountLabel ? ` — ${p.amountLabel}` : ""} (status: ${p.status})`
       );
     }
     parts.push("");
