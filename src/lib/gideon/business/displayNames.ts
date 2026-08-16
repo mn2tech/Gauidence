@@ -40,3 +40,35 @@ export function formatClientProposalLabel(
   const cleanTitle = proposalTitleWithoutClientPrefix(title, client);
   return `${client} — ${cleanTitle}`;
 }
+
+const HOMEPAGE_SPRINT_DELIVERABLE =
+  /\b(homepage redesign|trust\s*&\s*conversion|launch\s*&\s*documentation)\b/i;
+
+/**
+ * Prefer proposal title when stored deliverables clearly belong to another template
+ * (e.g. homepage sprint lines on an ai_phone_agent proposal).
+ */
+export function commitmentItemsForProposal(args: {
+  clientName: string;
+  title: string;
+  deliverables: Array<{ title: string }>;
+}): string[] {
+  const cleanTitle = proposalTitleWithoutClientPrefix(args.title, args.clientName);
+  const titles = args.deliverables
+    .map((d) => d.title.trim())
+    .filter(Boolean);
+
+  if (!titles.length) return [cleanTitle];
+
+  const titleSuggestsPhone = /\b(ai[_ ]?phone|phone agent|voice agent)\b/i.test(
+    cleanTitle
+  );
+  const homepageHits = titles.filter((t) =>
+    HOMEPAGE_SPRINT_DELIVERABLE.test(t)
+  ).length;
+  if (titleSuggestsPhone && homepageHits >= 2) {
+    return [cleanTitle];
+  }
+
+  return titles;
+}

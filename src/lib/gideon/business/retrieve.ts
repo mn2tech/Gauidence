@@ -30,6 +30,10 @@ import {
   logBusinessIntelligenceTrace,
 } from "./observability";
 import { shouldExcludeFromBusinessOntology } from "./knowledgeFilter";
+import {
+  commitmentItemsForProposal,
+  proposalTitleWithoutClientPrefix,
+} from "./displayNames";
 import type {
   BusinessIntelligenceBundle,
   BusinessQueryPlan,
@@ -351,10 +355,15 @@ export async function loadBusinessIntelligence(
                     p.status === "changes_requested"
                   ? "PROPOSED"
                   : "UNKNOWN";
-            const deliverables = p.deliverables?.length
-              ? p.deliverables.map((d) => d.title)
-              : [p.title];
-            const proposalLabel = p.title.trim();
+            const proposalLabel = proposalTitleWithoutClientPrefix(
+              p.title,
+              client
+            );
+            const deliverables = commitmentItemsForProposal({
+              clientName: client,
+              title: p.title,
+              deliverables: p.deliverables ?? [],
+            });
             for (const d of deliverables.slice(0, 4)) {
               const detail =
                 d.trim().toLowerCase() === proposalLabel.toLowerCase()

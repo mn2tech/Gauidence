@@ -5,6 +5,7 @@ import { formatEntity360UserAnswer } from "../formatForGideon";
 import {
   formatClientProposalLabel,
   proposalTitleWithoutClientPrefix,
+  commitmentItemsForProposal,
 } from "../displayNames";
 import { buildAdvisoryInsights } from "../advisory";
 import type { Entity360 } from "../types";
@@ -38,6 +39,34 @@ describe("proposalTitleWithoutClientPrefix", () => {
         "Ashton Manor — Guardian Knowledge Base"
       ),
       "AshtonManor — Guardian Knowledge Base"
+    );
+  });
+});
+
+describe("commitmentItemsForProposal", () => {
+  it("drops homepage template deliverables on phone-agent proposals", () => {
+    assert.deepEqual(
+      commitmentItemsForProposal({
+        clientName: "Washington Christian Academy",
+        title: "Washington Christian Academy — ai_phone_agent",
+        deliverables: [
+          { title: "Homepage redesign" },
+          { title: "Trust & conversion upgrades" },
+          { title: "Launch & documentation" },
+        ],
+      }),
+      ["ai_phone_agent"]
+    );
+    assert.deepEqual(
+      commitmentItemsForProposal({
+        clientName: "Proxdose",
+        title: "Proxdose — Homepage Redesign Sprint",
+        deliverables: [
+          { title: "Homepage redesign" },
+          { title: "Trust & conversion upgrades" },
+        ],
+      }),
+      ["Homepage redesign", "Trust & conversion upgrades"]
     );
   });
 });
