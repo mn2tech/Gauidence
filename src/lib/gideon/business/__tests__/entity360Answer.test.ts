@@ -2,7 +2,27 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { proposalMatchesEntity } from "../entity360";
 import { formatEntity360UserAnswer } from "../formatForGideon";
+import { proposalTitleWithoutClientPrefix } from "../relationshipReasoning";
 import type { Entity360 } from "../types";
+
+describe("proposalTitleWithoutClientPrefix", () => {
+  it("strips a leading client name from proposal titles", () => {
+    assert.equal(
+      proposalTitleWithoutClientPrefix(
+        "Washington Christian Academy — ai_phone_agent",
+        "Washington Christian Academy"
+      ),
+      "ai_phone_agent"
+    );
+    assert.equal(
+      proposalTitleWithoutClientPrefix(
+        "Homepage Redesign Sprint",
+        "Proxdose"
+      ),
+      "Homepage Redesign Sprint"
+    );
+  });
+});
 
 describe("proposalMatchesEntity", () => {
   it("does not match every proposal when client name is missing", () => {

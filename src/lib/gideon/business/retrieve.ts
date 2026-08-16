@@ -61,6 +61,31 @@ export type LoadBusinessIntelligenceArgs = {
   plan?: BusinessQueryPlan;
 };
 
+async function enrichProfileNamesForProposals(
+  supabase: SupabaseClient,
+  proposals: Proposal[],
+  known: Record<string, string>
+): Promise<Record<string, string>> {
+  const names: Record<string, string> = { ...known };
+  const missing = [
+    ...new Set(
+      proposals
+        .map((p) => p.client_profile_id)
+        .filter((id) => id && !names[id]?.trim())
+    ),
+  ];
+  if (!missing.length) return names;
+  const { data } = await supabase
+    .from("guardian_profiles")
+    .select("id, display_name")
+    .in("id", missing);
+  for (const row of data ?? []) {
+    const display = String(row.display_name ?? "").trim();
+    if (display) names[String(row.id)] = display;
+  }
+  return names;
+}
+
 /**
  * Intent-dependent Business Intelligence retrieval.
  * Does not run every subsystem for every question.
@@ -74,6 +99,7 @@ export async function loadBusinessIntelligence(
     args.businessProfileId
   );
   const priorClaims = parseClaimsJson(args.priorClaims);
+  let profileNames = { ...args.profileNames };
 
   const sections: string[] = [];
   let entity360 = null as BusinessIntelligenceBundle["entity360"];
@@ -142,6 +168,11 @@ export async function loadBusinessIntelligence(
       .limit(40);
     proposals = (proposalRows ?? []).map((row) => mapProposalRow(row));
     structuredHitCount += proposals.length;
+    profileNames = await enrichProfileNamesForProposals(
+      args.supabase,
+      proposals,
+      profileNames
+    );
   }
 
   if (plan.intent === "ENTITY_360") {
@@ -151,7 +182,7 @@ export async function loadBusinessIntelligence(
         spaceIds,
         businessProfileId: args.businessProfileId,
         mention,
-        profileNames: args.profileNames,
+        profileNames,
       });
       if (built) {
         entity360 = built.entity360;
@@ -169,7 +200,7 @@ export async function loadBusinessIntelligence(
           spaceIds,
           businessProfileId: args.businessProfileId,
           mention,
-          profileNames: args.profileNames,
+          profileNames,
         });
         if (brief) {
           claims = mergeClaims(claims, brief.claims);
@@ -209,7 +240,7 @@ export async function loadBusinessIntelligence(
         {
           spaceIds,
           businessProfileId: args.businessProfileId,
-          profileNames: args.profileNames,
+          profileNames,
         }
       );
       relationshipAnswers.push(...result.lines);
@@ -239,7 +270,7 @@ export async function loadBusinessIntelligence(
     plan.intent === "BUSINESS_STATUS"
   ) {
     const ranked = rankProposalFollowUps(proposals, {
-      profileNames: args.profileNames,
+      profileNames,
     });
     proposalFollowUps = ranked.candidates;
     claims = mergeClaims(claims, ranked.claims);
@@ -310,7 +341,7 @@ export async function loadBusinessIntelligence(
           sections.push("", "PROPOSAL DELIVERABLES (status from proposal only):");
           for (const p of proposals.slice(0, 10)) {
             const client =
-              args.profileNames[p.client_profile_id]?.trim() || "Client";
+              profileNames[p.client_profile_id]?.trim() || "Client";
             const status =
               p.status === "accepted"
                 ? "AGREED"

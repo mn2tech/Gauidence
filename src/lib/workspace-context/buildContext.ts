@@ -442,7 +442,13 @@ export async function loadWorkspaceContext(
           supabase,
           businessProfileId: activeProfile.id,
           question: retrievalQuestion,
-          profileNames,
+          // Include all accessible Spaces so proposal client_profile_id lookups resolve.
+          profileNames: {
+            ...profileNames,
+            ...Object.fromEntries(
+              meta.accessibleProfiles.map((p) => [p.id, p.display_name])
+            ),
+          },
           priorClaims: args.priorClaims,
           plan: businessPlan,
         }).catch((err) => {

@@ -19,6 +19,44 @@ export type ClientsWithoutActiveProjectResult = {
   claims: GideonClaim[];
 };
 
+/** Strip a leading "Client — " prefix from proposal titles when grouping by client. */
+export function proposalTitleWithoutClientPrefix(
+  title: string,
+  clientName: string
+): string {
+  const t = title.trim();
+  const c = clientName.trim();
+  if (!c || /^unknown client$/i.test(c)) return t;
+  const escaped = c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const stripped = t
+    .replace(new RegExp(`^${escaped}\\s*[—\\-:]\\s*`, "i"), "")
+    .trim();
+  return stripped || t;
+}
+
+async function loadClientProfileNames(
+  supabase: SupabaseClient,
+  clientIds: string[],
+  known: Record<string, string>
+): Promise<Record<string, string>> {
+  const names: Record<string, string> = { ...known };
+  const missing = [
+    ...new Set(clientIds.filter((id) => id && !names[id]?.trim())),
+  ];
+  if (!missing.length) return names;
+
+  const { data } = await supabase
+    .from("guardian_profiles")
+    .select("id, display_name")
+    .in("id", missing);
+  for (const row of data ?? []) {
+    const id = String(row.id);
+    const display = String(row.display_name ?? "").trim();
+    if (display) names[id] = display;
+  }
+  return names;
+}
+
 /**
  * Clients that have proposals but no active ontology project.
  * Ontology-first; structured proposals fill commercial detail.
@@ -67,6 +105,12 @@ export async function findClientsWithProposalsWithoutActiveProject(
   const relationships = (projectRels as OntologyRelationship[] | null) ?? [];
   const proposals = (proposalRows ?? []).map((row) => mapProposalRow(row));
 
+  const profileNames = await loadClientProfileNames(
+    supabase,
+    proposals.map((p) => p.client_profile_id),
+    args.profileNames
+  );
+
   const projectEntityIds = new Set<string>();
   const { data: projects } = await supabase
     .from("ontology_entities")
@@ -88,52 +132,56 @@ export async function findClientsWithProposalsWithoutActiveProject(
 
   const clientsWithActiveProject = new Set<string>();
   for (const rel of relationships) {
-    if (rel.relationship_type === "HAS_PROJECT") {
-      if (projectEntityIds.has(rel.target_entity_id)) {
-        clientsWithActiveProject.add(rel.source_entity_id);
-      }
-    }
-    if (rel.relationship_type === "WORKS_ON") {
-      if (projectEntityIds.has(rel.target_entity_id)) {
-        clientsWithActiveProject.add(rel.source_entity_id);
-      }
+    if (
+      (rel.relationship_type === "HAS_PROJECT" ||
+        rel.relationship_type === "WORKS_ON") &&
+      projectEntityIds.has(rel.target_entity_id)
+    ) {
+      clientsWithActiveProject.add(rel.source_entity_id);
     }
   }
 
   const lines: string[] = [];
   const claims: GideonClaim[] = [];
 
-  // Prefer structured proposals grouped by client space name
+  // Group by client profile id so missing names don't collapse everyone into one bucket.
   const byClient = new Map<
     string,
-    Array<{ id: string; title: string; amount: string; status: string }>
+    {
+      name: string;
+      props: Array<{ id: string; title: string; amount: string; status: string }>;
+    }
   >();
   for (const p of proposals) {
     if (p.status === "accepted" && p.work_project_id) continue;
+    const clientId = p.client_profile_id || `unknown:${p.id}`;
     const clientName =
-      args.profileNames[p.client_profile_id]?.trim() || "Unknown client";
-    const list = byClient.get(clientName) ?? [];
-    list.push({
+      profileNames[p.client_profile_id]?.trim() || "Unknown client";
+    const entry = byClient.get(clientId) ?? { name: clientName, props: [] };
+    entry.name = clientName;
+    entry.props.push({
       id: p.id,
-      title: p.title,
+      title: proposalTitleWithoutClientPrefix(p.title, clientName),
       amount: formatMoney(p.total_cents, p.currency),
       status: p.status,
     });
-    byClient.set(clientName, list);
+    byClient.set(clientId, entry);
   }
 
   // Drop clients that clearly have an ontology active project with matching name
-  for (const [clientName, props] of byClient) {
+  for (const [clientId, { name: clientName, props }] of byClient) {
     const matchedEntity = entities.find(
       (e) => e.name.toLowerCase() === clientName.toLowerCase()
     );
     if (matchedEntity && clientsWithActiveProject.has(matchedEntity.id)) {
-      byClient.delete(clientName);
+      byClient.delete(clientId);
       continue;
     }
     const block = [
       clientName,
-      ...props.slice(0, 3).map((p) => `  ${p.title} — ${p.amount} (${p.status})`),
+      ...props
+        .slice(0, 3)
+        .map((p) => `  ${p.title} — ${p.amount} (${p.status})`),
     ].join("\n");
     lines.push(block);
     for (const p of props.slice(0, 2)) {
@@ -159,8 +207,9 @@ export async function findClientsWithProposalsWithoutActiveProject(
       "Based on available evidence, I could not find clients that have proposals without an active project."
     );
   } else {
+    const n = byClient.size;
     lines.unshift(
-      `${byClient.size} client${byClient.size === 1 ? "" : "s"} appear to have proposals without an active project:`
+      `${n} client${n === 1 ? "" : "s"} appear${n === 1 ? "s" : ""} to have proposals without an active project:`
     );
   }
 
