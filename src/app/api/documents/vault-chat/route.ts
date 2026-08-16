@@ -1090,13 +1090,25 @@ export async function POST(request: Request) {
     );
   }
 
-  const { data: priorRows } = await supabase
-    .from("vault_chat_messages")
-    .select("id, role, content, citations, claims, created_at")
-    .eq("chat_id", chatId)
-    .order("created_at", { ascending: true });
+  let priorMessages: ChatMessageRow[] = [];
+  {
+    const withClaims = await supabase
+      .from("vault_chat_messages")
+      .select("id, role, content, citations, claims, created_at")
+      .eq("chat_id", chatId)
+      .order("created_at", { ascending: true });
+    if (withClaims.error && /claims|schema cache|could not find/i.test(withClaims.error.message)) {
+      const withoutClaims = await supabase
+        .from("vault_chat_messages")
+        .select("id, role, content, citations, created_at")
+        .eq("chat_id", chatId)
+        .order("created_at", { ascending: true });
+      priorMessages = (withoutClaims.data ?? []) as ChatMessageRow[];
+    } else {
+      priorMessages = (withClaims.data ?? []) as ChatMessageRow[];
+    }
+  }
 
-  let priorMessages = priorRows ?? [];
   let userMsg: ChatMessageRow | null = null;
 
   if (regenerateAssistantId) {

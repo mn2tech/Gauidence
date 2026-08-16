@@ -247,21 +247,62 @@ export function createVaultChatStreamResponse(
           },
         });
 
-        const { data: assistantMsg, error: assistantError } =
-          await args.supabase
+        const claimsPayload = Array.isArray(args.claims) ? args.claims : [];
+        const baseInsert = {
+          chat_id: args.chatId,
+          user_id: args.userId,
+          role: "assistant" as const,
+          content: answer,
+          citations,
+        };
+
+        let assistantMsg: {
+          id: string;
+          role: string;
+          content: string;
+          citations: unknown;
+          created_at: string;
+        } | null = null;
+        let assistantError: { message?: string; code?: string } | null = null;
+
+        {
+          const first = await args.supabase
             .from("vault_chat_messages")
             .insert({
-              chat_id: args.chatId,
-              user_id: args.userId,
-              role: "assistant",
-              content: answer,
-              citations,
-              claims: Array.isArray(args.claims) ? args.claims : [],
+              ...baseInsert,
+              ...(claimsPayload.length ? { claims: claimsPayload } : {}),
             })
             .select("id, role, content, citations, created_at")
             .single();
+          assistantMsg = first.data;
+          assistantError = first.error;
+
+          // Migration 0083 adds claims — retry without it if the column is missing.
+          const missingClaimsCol =
+            Boolean(assistantError) &&
+            /claims|schema cache|could not find/i.test(
+              assistantError?.message ?? ""
+            );
+          if ((!assistantMsg || assistantError) && missingClaimsCol) {
+            console.warn(
+              "vault_chat_messages.claims unavailable; saving without claims:",
+              assistantError?.message
+            );
+            const retry = await args.supabase
+              .from("vault_chat_messages")
+              .insert(baseInsert)
+              .select("id, role, content, citations, created_at")
+              .single();
+            assistantMsg = retry.data;
+            assistantError = retry.error;
+          }
+        }
 
         if (assistantError || !assistantMsg) {
+          console.error(
+            "Vault chat assistant save failed:",
+            assistantError?.message ?? "no row"
+          );
           write({
             type: "error",
             error: "Answer generated but couldn't be saved.",
