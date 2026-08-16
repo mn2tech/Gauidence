@@ -1177,7 +1177,7 @@ export async function POST(request: Request) {
       content: String(m.content).slice(0, 1200),
     }));
   const isFirstExchange =
-    !regenerateAssistantId && (priorRows ?? []).length === 0;
+    !regenerateAssistantId && priorMessages.length === 0;
 
   if (!isNewChat && history.length === 0 && !regenerateAssistantId) {
     await supabase
