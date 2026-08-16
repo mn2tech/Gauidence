@@ -60,9 +60,8 @@ export function commitmentItemsForProposal(args: {
 
   if (!titles.length) return [cleanTitle];
 
-  const titleSuggestsPhone = /\b(ai[_ ]?phone|phone agent|voice agent)\b/i.test(
-    cleanTitle
-  );
+  const titleSuggestsPhone =
+    /ai[_-]?phone|phone[_ -]?agent|voice[_ -]?agent/i.test(cleanTitle);
   const homepageHits = titles.filter((t) =>
     HOMEPAGE_SPRINT_DELIVERABLE.test(t)
   ).length;
