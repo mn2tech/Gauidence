@@ -565,7 +565,7 @@ function rankConnectedFileContent(
       if (
         titlePhrase &&
         !entityMatchesSongTitle(entity.name, titlePhrase) &&
-        !entityMatchesSongTitle(entity.canonical_name, titlePhrase)
+        !entityMatchesSongTitle(entity.canonical_name ?? "", titlePhrase)
       ) {
         return null;
       }
