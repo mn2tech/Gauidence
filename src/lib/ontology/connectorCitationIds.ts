@@ -63,8 +63,8 @@ export function pickConnectorImageCitations<T extends NamedCitation>(
 }
 
 /**
- * For chord/lyrics questions: prefer charts named in the answer, else charts
- * whose Trello card title matches the song named in the question.
+ * For chord/lyrics questions: prefer charts named in the answer, else in the
+ * question, else charts whose Trello card title matches the song named.
  */
 export function pickConnectorCitationsForChartQuery<T extends NamedCitation>(
   citations: T[],
@@ -76,7 +76,22 @@ export function pickConnectorCitationsForChartQuery<T extends NamedCitation>(
   const fromAnswer = pickConnectorImageCitations(citations, answer, limit);
   if (fromAnswer.length) return fromAnswer;
 
-  if (!songTitles.length) return [];
+  const fromQuestion = pickConnectorImageCitations(citations, question, limit);
+  if (fromQuestion.length) return fromQuestion;
+
+  const titles = [
+    ...songTitles,
+    ...extractTitlesFromQuestion(question),
+  ].filter(Boolean);
+
+  if (!titles.length) {
+    // Ontology already scoped citations to this turn — if only one chart remains, attach it.
+    const charts = citations.filter(
+      (c) =>
+        isLikelyChordChartFile(c.fileName, c.mimeType ?? null) || c.isImage
+    );
+    return charts.length === 1 ? charts : [];
+  }
 
   const matched = citations.filter((c) => {
     if (
@@ -88,8 +103,8 @@ export function pickConnectorCitationsForChartQuery<T extends NamedCitation>(
     const labels = [c.cardName, c.fileName]
       .map((v) => (typeof v === "string" ? v.trim() : ""))
       .filter(Boolean);
-    return songTitles.some((title) => {
-      const t = title.toLowerCase();
+    return titles.some((title) => {
+      const t = title.toLowerCase().trim();
       if (t.length < 3) return false;
       return labels.some((label) => {
         const stem = chartStem(label);
@@ -102,7 +117,23 @@ export function pickConnectorCitationsForChartQuery<T extends NamedCitation>(
     });
   });
 
-  return matched.slice(0, limit);
+  if (matched.length) return matched.slice(0, limit);
+
+  // Opaque Trello filenames with a matching card title already filtered upstream.
+  const charts = citations.filter(
+    (c) =>
+      (isLikelyChordChartFile(c.fileName, c.mimeType ?? null) || c.isImage) &&
+      Boolean(c.cardName?.trim())
+  );
+  if (charts.length === 1) return charts;
+  return [];
+}
+
+function extractTitlesFromQuestion(question: string): string[] {
+  const forMatch = question.match(
+    /\b(?:chords?(?:\s+and\s+lyrics)?|lyrics|key|learn|practice|play)\s+(?:for|to)\s+(.+?)(?:\?|$)/i
+  );
+  return forMatch?.[1] ? [forMatch[1].trim()] : [];
 }
 
 /** Chord-chart attachments vs syllabus/docs that should not cite for piano help. */

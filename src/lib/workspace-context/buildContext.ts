@@ -56,7 +56,9 @@ import {
 } from "@/lib/vault/expandRetrievalQuestion";
 import {
   filterCitationsToChordCharts,
+  isLikelyChordChartFile,
 } from "@/lib/ontology/connectorCitationIds";
+import { entityMatchesSongTitle } from "@/lib/ontology/pipeline/chartTranscript";
 import { wantsReminderAgent } from "@/lib/reminders/propose";
 import { wantsDailyLogCapture } from "@/lib/logs/propose";
 import { wantsWorkMemoryUpdate } from "@/lib/work-memory/propose";
@@ -473,9 +475,19 @@ export async function loadWorkspaceContext(
     if (namedCharts.length) {
       const lowered = namedCharts.map((t) => t.toLowerCase());
       const matched = connectorCitations.filter((c) => {
-        const stem = c.fileName.replace(/\.[^.]+$/, "").toLowerCase();
-        return lowered.some(
-          (title) => stem.includes(title) || title.includes(stem.slice(0, 24))
+        const labels = [c.fileName, c.cardName]
+          .map((v) => (typeof v === "string" ? v.trim() : ""))
+          .filter(Boolean);
+        return lowered.some((title) =>
+          labels.some((label) => {
+            const stem = label.replace(/\.[^.]+$/, "").toLowerCase();
+            return (
+              stem.includes(title) ||
+              title.includes(stem.slice(0, 24)) ||
+              entityMatchesSongTitle(label, title) ||
+              entityMatchesSongTitle(title, label)
+            );
+          })
         );
       });
       // Keep opaque Trello filenames (trello123.jpg) for answer-time picking;
@@ -486,6 +498,7 @@ export async function loadWorkspaceContext(
         connectorCitations = connectorCitations.filter((c) => {
           const stem = c.fileName.replace(/\.[^.]+$/, "").toLowerCase();
           if (/^trello\d+/i.test(stem)) return true;
+          if (isLikelyChordChartFile(c.fileName, c.mimeType ?? null)) return true;
           if (/\.(jpe?g|png|webp|gif)$/i.test(c.fileName)) return true;
           return false;
         });

@@ -111,21 +111,38 @@ export function tokenizeForOntologySearch(query: string): string[] {
 }
 
 /**
- * Remaining title-like phrase after dropping question words.
+ * Remaining title-like phrase after dropping question scaffolding.
  * "What are the chords for Just As I Am?" → "just as i am"
+ * "Chords and lyrics for What a Beautiful Name" → "what a beautiful name"
+ * (Do not strip every "what"/"a" — those are part of some song titles.)
  */
 export function titlePhraseForOntologySearch(query: string): string | null {
-  const stripped = query
+  let q = query
     .toLowerCase()
     .replace(/[?!.,'"()]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const forMatch = q.match(
+    /\b(?:chords?(?:\s+and\s+lyrics)?|lyrics|words|key|learn|practice|play)\s+(?:for|to)\s+(.+)$/i
+  );
+  if (forMatch?.[1]) {
+    const title = forMatch[1].replace(/\s+/g, " ").trim();
+    if (title.length >= 4) return title.slice(0, 80);
+  }
+
+  q = q
+    .replace(/^(hey|hi|hello|gideon)\s+/i, "")
+    .replace(/^(please\s+)?(can you|could you|would you)\s+/i, "")
+    .replace(/^(what(?:'s|s)?|whats|which)\s+(are|is)\s+(the\s+)?/i, "")
     .replace(
-      /\b(what|whats|which|are|is|the|a|an|and|with|chords?|charts?|lyrics?|words?|for|key|pdf|jpe?g|png|analyzed|show|me|can|you|see|please|tell|about|song|hymn|from|trello|want|learn|piano|keyboard|help|practice|play|teach|this|that|on|side|by|version)\b/g,
+      /\b(chords?|charts?|lyrics?|words?|for|of|key|pdf|jpe?g|png|analyzed|show|me|please|tell|about|song|hymn|from|trello|want|learn|piano|keyboard|help|practice|play|teach|this|that|on|side|by|version|and|with|are|is|the)\b/g,
       " "
     )
     .replace(/\s+/g, " ")
     .trim();
-  if (stripped.length < 4) return null;
-  return stripped.slice(0, 80);
+  if (q.length < 4) return null;
+  return q.slice(0, 80);
 }
 
 /** Lightweight plural → singular for ontology search tokens. */

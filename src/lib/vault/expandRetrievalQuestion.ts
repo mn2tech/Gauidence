@@ -12,6 +12,9 @@ const SHORT_DEICTIC =
 const LEARN_THIS_SONG =
   /\b((learn|practice|play|teach)\b.{0,40}\b(this |that |the )?(song|chart|hymn)|help me .{0,20}(piano|keyboard|song)|(piano|keyboard).{0,30}(learn|practice|help))\b/i;
 
+const CHART_FILE_FOLLOWUP =
+  /\b(jpe?g|png|pdf|chart\s*(file|image|attachment)|the\s+(file|image|attachment|jpg|jpeg|png|pdf)|attach(ed|ment)?|source\s*(file|preview)?)\b/i;
+
 /** Clean a chart filename or card title into a searchable song name. */
 export function cleanChartTitle(raw: string): string {
   let title = raw.trim();
@@ -81,6 +84,7 @@ export function expandRetrievalQuestion(
     DEICTIC_FOLLOWUP.test(q) ||
     SHORT_DEICTIC.test(q) ||
     isPianoOrSongLearnRequest(q) ||
+    CHART_FILE_FOLLOWUP.test(q) ||
     (q.length < 48 && /\b(it|that|this|those|them|the same)\b/i.test(q));
 
   if (!needsHistory || history.length === 0) return q;
@@ -91,7 +95,10 @@ export function expandRetrievalQuestion(
     .join("\n");
 
   const namedInHistory = extractChartTitlesFromText(recent);
-  if (namedInHistory.length && isPianoOrSongLearnRequest(q)) {
+  if (
+    namedInHistory.length &&
+    (isPianoOrSongLearnRequest(q) || CHART_FILE_FOLLOWUP.test(q))
+  ) {
     return `${q}\n\nSongs recently discussed (ask which one if unclear): ${namedInHistory.slice(0, 12).join("; ")}\n\nContext from this conversation:\n${recent}`;
   }
 

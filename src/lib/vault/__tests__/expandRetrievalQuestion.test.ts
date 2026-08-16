@@ -52,6 +52,21 @@ describe("expandRetrievalQuestion", () => {
     assert.match(expanded, /Asha Meri/);
     assert.match(expanded, /Songs recently discussed/);
   });
+
+  it("keeps recent song context for JPG/PDF follow-ups", () => {
+    const expanded = expandRetrievalQuestion("what about jpg or pdf", [
+      {
+        role: "user",
+        content: "Chords and lyrics for What a Beautiful Name",
+      },
+      {
+        role: "assistant",
+        content: "Here are the chords for What a Beautiful Name.",
+      },
+    ]);
+    assert.match(expanded, /What a Beautiful Name/);
+    assert.match(expanded, /Songs recently discussed/);
+  });
 });
 
 describe("extractChartTitlesFromText", () => {

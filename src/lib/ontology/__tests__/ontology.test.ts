@@ -96,6 +96,19 @@ describe("titlePhraseForOntologySearch", () => {
       "lord send revival"
     );
   });
+
+  it("keeps What/A inside song titles like What a Beautiful Name", () => {
+    assert.equal(
+      titlePhraseForOntologySearch(
+        "Chords and lyrics for What a Beautiful Name"
+      ),
+      "what a beautiful name"
+    );
+    assert.equal(
+      titlePhraseForOntologySearch("What a Beautiful Name chords"),
+      "what a beautiful name"
+    );
+  });
 });
 
 describe("isConnectedChartQuery", () => {

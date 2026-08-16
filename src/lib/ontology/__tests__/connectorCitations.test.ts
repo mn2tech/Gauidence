@@ -113,4 +113,25 @@ describe("pickConnectorCitationsForChartQuery", () => {
       ["trello6283425547712481893.jpg"]
     );
   });
+
+  it("matches What a Beautiful Name from the question even when answer hedges", () => {
+    const picked = pickConnectorCitationsForChartQuery(
+      [
+        {
+          fileName: "trello999.jpg",
+          cardName: "What a Beautiful Name - Bb",
+          isImage: true,
+          mimeType: "image/jpeg",
+        },
+      ],
+      "Chords and lyrics for What a Beautiful Name",
+      "From what's available right now, I don't have a file inventory showing a separate JPG.",
+      ["what a beautiful name"],
+      4
+    );
+    assert.deepEqual(
+      picked.map((c) => c.fileName),
+      ["trello999.jpg"]
+    );
+  });
 });
