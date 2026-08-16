@@ -1,4 +1,5 @@
 import type { OntologyExtractionResult } from "../types";
+import { sanitizeChartTranscript } from "./chartTranscript";
 
 const TRANSCRIPT_ATTR = "content_transcript";
 const TRANSCRIPT_MAX = 6000;
@@ -12,7 +13,7 @@ export function enrichOntologyWithTranscript(
   transcript: string,
   fileName: string
 ): OntologyExtractionResult {
-  const summary = transcript.trim().slice(0, TRANSCRIPT_MAX);
+  const summary = sanitizeChartTranscript(transcript).slice(0, TRANSCRIPT_MAX);
   if (summary.length < 12) return extraction;
 
   const entities = extraction.entities.map((e) => ({ ...e }));

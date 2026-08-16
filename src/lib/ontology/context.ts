@@ -10,6 +10,7 @@ import {
   ONTOLOGY_RELATIONSHIP_SELECT,
   ONTOLOGY_VISIBLE_REVIEW_STATUSES,
 } from "./types";
+import { entityMatchesSongTitle } from "./pipeline/chartTranscript";
 
 /**
  * Load ontology context for Gideon (1-hop + optional 2-hop paths).
@@ -139,11 +140,31 @@ export async function getOntologyContext(
   }
 
   const ranked = rankEntitiesByQueryTokens([...byId.values()], searchTerms);
-  const entities = listInvoices
+  let entities = listInvoices
     ? preferInvoicesFirst(ranked).slice(0, 20)
     : listSongs || listCharts
       ? preferSongCatalogFirst(ranked).slice(0, 40)
       : ranked.slice(0, 5);
+
+  // Single-song chord/lyrics lookup: keep only entities that match the title.
+  const rawTitle = titlePhraseForOntologySearch(trimmed);
+  if (rawTitle && (listCharts || /\b(chords?|lyrics)\b/i.test(trimmed)) && !listSongs) {
+    const titleHits = entities.filter(
+      (e) =>
+        entityMatchesSongTitle(e.name, rawTitle) ||
+        entityMatchesSongTitle(e.canonical_name, rawTitle)
+    );
+    if (titleHits.length) {
+      entities = titleHits.slice(0, 12);
+    } else {
+      const fromAll = ranked.filter(
+        (e) =>
+          entityMatchesSongTitle(e.name, rawTitle) ||
+          entityMatchesSongTitle(e.canonical_name, rawTitle)
+      );
+      if (fromAll.length) entities = fromAll.slice(0, 12);
+    }
+  }
   if (!entities.length) return empty;
 
   // Relationships/evidence stay space-scoped for the matched entity's profile when possible.
@@ -386,7 +407,7 @@ function rankEntitiesByQueryTokens(
     if (tokenHits >= 2) hits += 4;
     const props = entity.properties ?? {};
     if (
-      tokens.some((t) => t === "chord" || t === "lyric" || t === "key") &&
+      tokens.some((t) => t === "chord" || t === "key") &&
       (typeof props.musical_key === "string" ||
         /\bkey\s+[A-G]/i.test(entity.description ?? ""))
     ) {

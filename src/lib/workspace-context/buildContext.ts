@@ -324,7 +324,9 @@ export async function loadWorkspaceContext(
           userId: user.id,
         })
           .then(async (ontology) => {
-            const text = formatOntologyForGideon(ontology);
+            const text = formatOntologyForGideon(ontology, {
+              query: retrievalQuestion,
+            });
             const citations = await resolveConnectorSourceCitations(
               supabase,
               ontology,

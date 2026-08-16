@@ -91,6 +91,10 @@ describe("titlePhraseForOntologySearch", () => {
       titlePhraseForOntologySearch("What are the chords for Just As I Am?"),
       "just as i am"
     );
+    assert.equal(
+      titlePhraseForOntologySearch("Chords and lyrics for Lord Send Revival"),
+      "lord send revival"
+    );
   });
 });
 

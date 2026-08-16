@@ -62,6 +62,13 @@ describe("extractChartTitlesFromText", () => {
     assert.ok(titles.some((t) => /Asha Meri/i.test(t)));
     assert.ok(titles.some((t) => /Athyunatha/i.test(t)));
   });
+
+  it("reads titles from chords-and-lyrics phrasing", () => {
+    const titles = extractChartTitlesFromText(
+      "Chords and lyrics for Lord Send Revival"
+    );
+    assert.deepEqual(titles, ["Lord Send Revival"]);
+  });
 });
 
 describe("isPianoOrSongLearnRequest", () => {

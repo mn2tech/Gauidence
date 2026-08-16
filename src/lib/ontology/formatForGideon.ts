@@ -1,12 +1,20 @@
 import type { OntologyContext, OntologyEntity } from "./types";
 import { readContentTranscript } from "./pipeline/enrichWithTranscript";
+import {
+  entityMatchesSongTitle,
+  sanitizeChartTranscript,
+} from "./pipeline/chartTranscript";
 import { shouldExcludeFromBusinessOntology } from "@/lib/gideon/business/knowledgeFilter";
+import { titlePhraseForOntologySearch } from "./normalize";
 
 /**
  * Compact one-hop ontology block for Gideon's system prompt.
  * Returns "(none)" when empty so the prompt section stays stable.
  */
-export function formatOntologyForGideon(ctx: OntologyContext): string {
+export function formatOntologyForGideon(
+  ctx: OntologyContext,
+  options?: { query?: string }
+): string {
   if (
     ctx.matchedEntities.length === 0 &&
     ctx.relationships.length === 0 &&
@@ -75,9 +83,12 @@ export function formatOntologyForGideon(ctx: OntologyContext): string {
       );
     }
 
-    const contentBlocks = rankConnectedFileContent(entities);
+    const titlePhrase = options?.query
+      ? titlePhraseForOntologySearch(options.query)
+      : null;
+    const contentBlocks = rankConnectedFileContent(entities, titlePhrase);
     if (contentBlocks.length) {
-      blocks.push("", ...contentBlocks.slice(0, 6));
+      blocks.push("", ...contentBlocks.slice(0, 4));
     }
   }
 
@@ -545,21 +556,32 @@ function rankEntitiesForPrompt(entities: OntologyEntity[]): OntologyEntity[] {
   return [...entities].sort((a, b) => score(b) - score(a));
 }
 
-function rankConnectedFileContent(entities: OntologyEntity[]): string[] {
+function rankConnectedFileContent(
+  entities: OntologyEntity[],
+  titlePhrase?: string | null
+): string[] {
   const scored = entities
     .map((entity) => {
-      const transcript =
+      if (
+        titlePhrase &&
+        !entityMatchesSongTitle(entity.name, titlePhrase) &&
+        !entityMatchesSongTitle(entity.canonical_name, titlePhrase)
+      ) {
+        return null;
+      }
+      const raw =
         readContentTranscript(entity.properties) ??
         (/\b(chart \/ reference content|card notes|verse|chorus)\b/i.test(
           entity.description ?? ""
         )
           ? (entity.description ?? "").trim()
           : "");
+      const transcript = sanitizeChartTranscript(raw);
       if (!transcript || transcript.length < 12) return null;
       if (/^connected source file\b/i.test(transcript)) return null;
       return {
         len: transcript.length,
-        block: `CONNECTED FILE CONTENT (${entity.name}):\n${transcript.slice(0, 3000)}`,
+        block: `CONNECTED FILE CONTENT (${entity.name}):\n${transcript.slice(0, 4500)}`,
       };
     })
     .filter((b): b is { len: number; block: string } => Boolean(b));

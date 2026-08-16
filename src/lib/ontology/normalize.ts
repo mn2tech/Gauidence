@@ -67,6 +67,17 @@ const ONTOLOGY_QUERY_STOPWORDS = new Set([
   "files",
   "document",
   "documents",
+  "chord",
+  "chords",
+  "lyric",
+  "lyrics",
+  "chart",
+  "charts",
+  "song",
+  "songs",
+  "hymn",
+  "hymns",
+  "words",
 ]);
 
 /**
@@ -108,7 +119,7 @@ export function titlePhraseForOntologySearch(query: string): string | null {
     .toLowerCase()
     .replace(/[?!.,'"()]/g, " ")
     .replace(
-      /\b(what|whats|which|are|is|the|a|an|chords?|charts?|for|key|pdf|jpe?g|png|analyzed|show|me|can|you|see|please|tell|about|song|hymn|from|trello|want|learn|piano|keyboard|help|practice|play|teach|this|that|on)\b/g,
+      /\b(what|whats|which|are|is|the|a|an|and|with|chords?|charts?|lyrics?|words?|for|key|pdf|jpe?g|png|analyzed|show|me|can|you|see|please|tell|about|song|hymn|from|trello|want|learn|piano|keyboard|help|practice|play|teach|this|that|on|side|by|version)\b/g,
       " "
     )
     .replace(/\s+/g, " ")

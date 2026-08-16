@@ -52,7 +52,7 @@ export function extractChartTitlesFromText(text: string): string[] {
     push(match[1]!);
   }
   const forMatch = text.match(
-    /\b(?:chords?|key|learn|practice|play)\s+(?:for|to)\s+(.+?)(?:\?|$)/i
+    /\b(?:chords?(?:\s+and\s+lyrics)?|lyrics|key|learn|practice|play)\s+(?:for|to)\s+(.+?)(?:\?|$)/i
   );
   if (forMatch?.[1]) push(forMatch[1]);
 
