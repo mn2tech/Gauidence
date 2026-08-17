@@ -87,8 +87,11 @@ import { collaboratorDisplayName } from "@/lib/profiles/collaboratorDisplay";
 import { isGuardianPackEngineEnabled } from "@/lib/features/packs";
 import {
   businessPackSkillPromptNote,
+  dentalPackSkillPromptNote,
   isBusinessAdvisoryQuestion,
   isBusinessKnowledgeQuestion,
+  isDentalAdvisoryQuestion,
+  isDentalKnowledgeQuestion,
 } from "@/lib/packs/gideon";
 import {
   biPlanRequiresDocumentSearch,
@@ -282,17 +285,30 @@ export async function loadWorkspaceContext(
     (Boolean(businessPlan?.requiresStructuredData) ||
       /\b(proposal|proposals|quote|estimate)\b/i.test(retrievalQuestion));
 
-  const packSkillsNote = businessPackSkillPromptNote({
-    packEngineEnabled: packEngineOn,
-    isOrgSpace: orgSpace,
-    includeSkill:
-      intent === "knowledge_search" ||
-      intent === "combined" ||
-      Boolean(businessPlan) ||
-      (intent === "chief_of_staff" &&
-        (isBusinessAdvisoryQuestion(retrievalQuestion) ||
-          isBusinessKnowledgeQuestion(retrievalQuestion))),
-  });
+  const packSkillsNote = [
+    businessPackSkillPromptNote({
+      packEngineEnabled: packEngineOn,
+      isOrgSpace: orgSpace,
+      includeSkill:
+        intent === "knowledge_search" ||
+        intent === "combined" ||
+        Boolean(businessPlan) ||
+        (intent === "chief_of_staff" &&
+          (isBusinessAdvisoryQuestion(retrievalQuestion) ||
+            isBusinessKnowledgeQuestion(retrievalQuestion))),
+    }),
+    dentalPackSkillPromptNote({
+      packEngineEnabled: packEngineOn,
+      isOrgSpace: orgSpace,
+      includeSkill:
+        isDentalKnowledgeQuestion(retrievalQuestion) ||
+        isDentalAdvisoryQuestion(retrievalQuestion) ||
+        (intent === "knowledge_search" &&
+          isDentalKnowledgeQuestion(retrievalQuestion)),
+    }),
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 
   const loadOntologyContext =
     load.documents &&

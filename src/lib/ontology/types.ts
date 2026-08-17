@@ -27,6 +27,16 @@ export const ONTOLOGY_ENTITY_TYPES = [
   "movie",
   "product",
   "date",
+  // Guardian Dental Pack #002
+  "patient",
+  "provider",
+  "appointment",
+  "treatment_plan",
+  "treatment",
+  "claim",
+  "payer",
+  "referral",
+  "lab_case",
 ] as const;
 
 export type OntologyEntityType = (typeof ONTOLOGY_ENTITY_TYPES)[number];
@@ -74,6 +84,19 @@ export const ONTOLOGY_RELATIONSHIP_TYPES = [
   "OWNED_BY",
   "CREATED_BY",
   "EVIDENCED_BY",
+  // Guardian Dental Pack #002
+  "TREATS",
+  "HAS_APPOINTMENT",
+  "SCHEDULED_WITH",
+  "HAS_TREATMENT_PLAN",
+  "INCLUDES_TREATMENT",
+  "PERFORMED_AT",
+  "CLAIM_FOR",
+  "INSURED_BY",
+  "SUBMITTED_TO",
+  "REFERRED_TO",
+  "REFERRED_BY",
+  "LAB_CASE_FOR",
 ] as const;
 
 export type OntologyRelationshipType =
@@ -125,6 +148,22 @@ export const ONTOLOGY_RELATIONSHIP_ALIASES: Record<string, OntologyRelationshipT
   ASSIGNED: "ASSIGNED_TO",
   TASK_FOR: "TASK_RELATES_TO",
   TASK_ON: "TASK_RELATES_TO",
+  // Dental
+  TREATING: "TREATS",
+  TREATED_BY: "TREATS",
+  HAS_VISIT: "HAS_APPOINTMENT",
+  APPOINTMENT_WITH: "SCHEDULED_WITH",
+  SCHEDULED_FOR: "HAS_APPOINTMENT",
+  PLAN_FOR: "HAS_TREATMENT_PLAN",
+  INCLUDES_PROCEDURE: "INCLUDES_TREATMENT",
+  PROCEDURE_AT: "PERFORMED_AT",
+  CLAIM_ON: "CLAIM_FOR",
+  INSURANCE_WITH: "INSURED_BY",
+  COVERED_BY: "INSURED_BY",
+  CLAIM_TO: "SUBMITTED_TO",
+  REFERRAL_TO: "REFERRED_TO",
+  REFERRAL_FROM: "REFERRED_BY",
+  LAB_FOR: "LAB_CASE_FOR",
 };
 
 export function normalizeRelationshipType(

@@ -199,3 +199,6 @@ export type DashboardCardData = {
 
 export const GUARDIAN_BUSINESS_PACK_SLUG = "guardian-business";
 export const GUARDIAN_BUSINESS_PACK_VERSION = "1.1.0";
+
+export const GUARDIAN_DENTAL_PACK_SLUG = "guardian-dental";
+export const GUARDIAN_DENTAL_PACK_VERSION = "1.0.0";

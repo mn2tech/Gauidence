@@ -296,7 +296,12 @@ export function isFuzzyMatchAllowed(entityType: string): boolean {
     entityType === "proposal" ||
     entityType === "opportunity" ||
     entityType === "restaurant" ||
-    entityType === "place"
+    entityType === "place" ||
+    entityType === "patient" ||
+    entityType === "provider" ||
+    entityType === "payer" ||
+    entityType === "treatment_plan" ||
+    entityType === "claim"
   );
 }
 

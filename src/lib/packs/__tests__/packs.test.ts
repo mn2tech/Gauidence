@@ -4,13 +4,19 @@ import { findReusableSpaceId } from "../spaces";
 import {
   isBusinessAdvisoryQuestion,
   isBusinessKnowledgeQuestion,
+  isDentalKnowledgeQuestion,
+  isDentalAdvisoryQuestion,
   formatPackSkillsForPrompt,
   buildBusinessQuickActions,
+  buildDentalQuickActions,
   businessPackSkillPromptNote,
+  dentalPackSkillPromptNote,
 } from "../gideon";
 import {
   GUARDIAN_BUSINESS_PACK_SLUG,
   GUARDIAN_BUSINESS_PACK_VERSION,
+  GUARDIAN_DENTAL_PACK_SLUG,
+  GUARDIAN_DENTAL_PACK_VERSION,
 } from "../types";
 import {
   getGuardianPackEngineFlag,
@@ -70,6 +76,11 @@ describe("pack constants", () => {
     assert.equal(GUARDIAN_BUSINESS_PACK_SLUG, "guardian-business");
     assert.equal(GUARDIAN_BUSINESS_PACK_VERSION, "1.1.0");
   });
+
+  it("seeds Guardian Dental as pack #002 v1.0.0", () => {
+    assert.equal(GUARDIAN_DENTAL_PACK_SLUG, "guardian-dental");
+    assert.equal(GUARDIAN_DENTAL_PACK_VERSION, "1.0.0");
+  });
 });
 
 describe("business ontology types", () => {
@@ -85,6 +96,14 @@ describe("business ontology types", () => {
     assert.equal(isFuzzyMatchAllowed("client"), true);
     assert.equal(isFuzzyMatchAllowed("proposal"), true);
     assert.equal(isFuzzyMatchAllowed("person"), false);
+  });
+
+  it("normalizes dental relationship aliases and fuzzy types", () => {
+    assert.equal(normalizeRelationshipType("TREATS"), "TREATS");
+    assert.equal(normalizeRelationshipType("INSURANCE_WITH"), "INSURED_BY");
+    assert.equal(normalizeRelationshipType("CLAIM_ON"), "CLAIM_FOR");
+    assert.equal(isFuzzyMatchAllowed("patient"), true);
+    assert.equal(isFuzzyMatchAllowed("claim"), true);
   });
 
   it("normalizes entity names for resolution", () => {
@@ -157,6 +176,43 @@ describe("gideon business pack routing", () => {
   it("exposes business quick actions", () => {
     const actions = buildBusinessQuickActions();
     assert.ok(actions.some((a) => /follow-up|focus on next|proposals/i.test(a.prompt)));
+  });
+});
+
+describe("gideon dental pack routing", () => {
+  it("detects dental knowledge and advisory questions", () => {
+    assert.equal(
+      isDentalKnowledgeQuestion("Which patients have upcoming appointments?"),
+      true
+    );
+    assert.equal(
+      isDentalKnowledgeQuestion("What insurance claims need follow-up?"),
+      true
+    );
+    assert.equal(isDentalKnowledgeQuestion("Hello there"), false);
+    assert.equal(
+      isDentalAdvisoryQuestion("What should I follow up on today?"),
+      true
+    );
+  });
+
+  it("routes dental patient questions to knowledge search", () => {
+    const route = classifyGideonIntent({
+      question: "Which patients have upcoming appointments?",
+    });
+    assert.equal(route.capabilities.guardianKnowledge, true);
+  });
+
+  it("builds dental skill notes and quick actions", () => {
+    const note = dentalPackSkillPromptNote({
+      packEngineEnabled: true,
+      isOrgSpace: true,
+      includeSkill: true,
+    });
+    assert.match(note, /DENTAL PRACTICE OPS/);
+    assert.ok(
+      buildDentalQuickActions().some((a) => /claims|appointments|treatment/i.test(a.prompt))
+    );
   });
 });
 

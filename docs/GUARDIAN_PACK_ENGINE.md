@@ -224,6 +224,27 @@ Goal: define **Guardian Dental** (Pack #002) primarily via definitions, not a re
 4. **Do not** create a separate app, database, or document store.
 5. Optional: pack-specific extraction hints via `pack_rules.definition` jsonb.
 
+### Seeded Pack #002 — Guardian Dental
+
+Migration: `supabase/migrations/0084_guardian_dental_pack.sql`
+
+| Field | Value |
+|-------|-------|
+| Name | Guardian Dental |
+| Slug | `guardian-dental` |
+| Version | `1.0.0` |
+| Pack number | 2 |
+
+**Entity types:** organization (practice), person, patient, provider, contact, appointment, treatment_plan, treatment, claim, payer, referral, lab_case, invoice, contract, policy, task, document.
+
+**Relationships:** EMPLOYS, SERVES, TREATS, HAS_APPOINTMENT, SCHEDULED_WITH, HAS_TREATMENT_PLAN, INCLUDES_TREATMENT, PERFORMED_AT, CLAIM_FOR, INSURED_BY, SUBMITTED_TO, REFERRED_TO, REFERRED_BY, LAB_CASE_FOR, CONTACT_FOR, HAS_INVOICE, ASSIGNED_TO, TASK_RELATES_TO, APPLIES_TO.
+
+**Recommended Spaces:** Patients, Clinical, Scheduling, Insurance & Claims, Billing (+ optional Providers, Compliance).
+
+**Gideon skill:** Dental Practice Ops (`dental_practice_ops`) — operational answers only; no definitive medical/clinical advice.
+
+**Dashboard:** patients, appointments, treatment plans, claims, providers, lab cases, tasks, follow-ups, recent knowledge, ontology health.
+
 Example sketch:
 
 ```sql
@@ -243,6 +264,15 @@ on conflict (slug) do update set name = excluded.name, updated_at = now();
 6. Gideon answers relationship / proposal / commitment / evidence / advisory acceptance questions with correct strategies  
 7. System/process metadata is not presented as client facts  
 
+### Dental Pack #002 checklist
+
+1. Settings → Packs shows Guardian Dental  
+2. Install on a practice Space with Patients / Clinical / Scheduling / Insurance / Billing  
+3. Analyze existing knowledge (explicit)  
+4. Ontology Explorer can store patient / appointment / claim entities  
+5. Gideon answers dental starter questions with Dental Practice Ops framing  
+6. Dashboard cards load from catalog (not Business defaults)  
+
 ## Tests
 
 ```bash
@@ -250,4 +280,4 @@ npx tsx --require ./scripts/stub-server-only.cjs --test src/lib/packs/__tests__/
 npx tsx --require ./scripts/stub-server-only.cjs --test src/lib/gideon/business/__tests__/businessIntelligence.test.ts
 ```
 
-Covered: feature flag, Space reuse, relationship normalization, Gideon routing for business / advisory questions, skill prompt formatting, query planner intents, knowledge filter, proposal follow-up scoring, claims/evidence, advisory ranking, commitment status distinction.
+Covered: feature flag, Space reuse, relationship normalization, Gideon routing for business / dental / advisory questions, skill prompt formatting, query planner intents, knowledge filter, proposal follow-up scoring, claims/evidence, advisory ranking, commitment status distinction.

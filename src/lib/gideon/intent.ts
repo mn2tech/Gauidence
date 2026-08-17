@@ -71,6 +71,10 @@ const KNOWLEDGE_FIND =
 const KNOWLEDGE_BUSINESS =
   /\b((what|which|our|my|the) clients?\b|clients? (are|do|we|we'?re)|working with|everything we know about|what proposals?\b|proposals? (are|have|outstanding|need)|what contracts?\b|contracts? (expire|expiring|outstanding)|what projects?\b|projects? (associated|for|with)|who (is|are) working on|what did we promise|what commitments?\b|commitments? (have|did|to)|business relationships?|what relationships?\b|relationships? (do we|with)|show me everything we know|where did you get)\b/i;
 
+/** Dental Pack practice operations questions. */
+const KNOWLEDGE_DENTAL =
+  /\b((what|which|our|my|the) patients?\b|patients? (have|with|need|are)|upcoming appointments?|insurance claims?|claims? (need|pending|denied|follow)|treatment plans?|lab cases?|who is treating|dental (practice|clinic|office)|hygienist|dentist|payer|referrals?)\b/i;
+
 const BUSINESS_ADVISORY =
   /\b(what should i (follow up|focus|do|prioritize)|what needs (my )?attention|which proposals? have not|follow[- ]?up on|focus on next)\b/i;
 
@@ -177,6 +181,7 @@ function isKnowledgeQuestion(q: string): boolean {
     KNOWLEDGE_MUSIC.test(q) ||
     KNOWLEDGE_CONNECTED.test(q) ||
     KNOWLEDGE_BUSINESS.test(q) ||
+    KNOWLEDGE_DENTAL.test(q) ||
     looksLikeChartTitleQuery(q)
   );
 }

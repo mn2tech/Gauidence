@@ -267,4 +267,4 @@ Acceptance questions (with seeded Proxdose / Onyx / proposals data):
 - Persist `business_insights` on a schedule; notify owners
 - Execute suggested actions with human approval
 - Draft follow-up emails / create tasks / reminders
-- Then industry Pack #002 (Guardian Dental)
+- Then industry Pack #002 (Guardian Dental) — see `docs/GUARDIAN_PACK_ENGINE.md` and migration `0084_guardian_dental_pack.sql`

@@ -1,8 +1,12 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getInstalledPack } from "./catalog";
+import {
+  GUARDIAN_BUSINESS_PACK_SLUG,
+  GUARDIAN_DENTAL_PACK_SLUG,
+} from "./types";
 import type { PackDashboardCard, DashboardCardData } from "./types";
+import { getInstalledPack } from "./catalog";
 
 export type { DashboardCardData };
 
@@ -166,8 +170,100 @@ function ensureBusinessCardDefs(
   return ordered;
 }
 
+/** Default Dental Pack cards when catalog config is thin. */
+function ensureDentalCardDefs(
+  cardsDef: PackDashboardCard[]
+): PackDashboardCard[] {
+  const byKey = new Map(cardsDef.map((c) => [c.key, c]));
+  const defaults: PackDashboardCard[] = [
+    {
+      key: "follow_ups",
+      title: "Needs follow-up",
+      source: "follow_ups",
+      empty: "Nothing urgent in tasks or claims right now.",
+    },
+    {
+      key: "patients",
+      title: "Patients",
+      entityTypes: ["patient"],
+      empty: "Analyze clinical and patient docs to discover patients.",
+    },
+    {
+      key: "appointments",
+      title: "Appointments",
+      entityTypes: ["appointment"],
+      empty: "Analyze scheduling materials to discover appointments.",
+    },
+    {
+      key: "treatment_plans",
+      title: "Treatment plans",
+      entityTypes: ["treatment_plan"],
+      empty: "Analyze clinical docs to discover treatment plans.",
+    },
+    {
+      key: "claims",
+      title: "Insurance claims",
+      entityTypes: ["claim"],
+      empty: "Analyze insurance docs to track claims.",
+    },
+    {
+      key: "providers",
+      title: "Providers",
+      entityTypes: ["provider"],
+      empty: "Analyze team materials to discover providers.",
+    },
+    {
+      key: "lab_cases",
+      title: "Lab cases",
+      entityTypes: ["lab_case"],
+      empty: "No lab cases discovered yet.",
+    },
+    {
+      key: "tasks",
+      title: "Tasks",
+      entityTypes: ["task"],
+      empty: "No tasks discovered yet.",
+    },
+    {
+      key: "recent_knowledge",
+      title: "Recent Knowledge",
+      source: "recent_evidence",
+      empty: "Analyze existing knowledge to populate this feed.",
+    },
+    {
+      key: "ontology_health",
+      title: "Ontology Health",
+      source: "ontology_stats",
+      empty: "Install and analyze to build your dental ontology.",
+    },
+  ];
+
+  const ordered: PackDashboardCard[] = [];
+  for (const def of defaults) {
+    ordered.push(byKey.get(def.key) ?? def);
+    byKey.delete(def.key);
+  }
+  for (const leftover of byKey.values()) {
+    ordered.push(leftover);
+  }
+  return ordered;
+}
+
+function ensurePackCardDefs(
+  packSlug: string,
+  cardsDef: PackDashboardCard[]
+): PackDashboardCard[] {
+  if (packSlug === GUARDIAN_BUSINESS_PACK_SLUG) {
+    return ensureBusinessCardDefs(cardsDef);
+  }
+  if (packSlug === GUARDIAN_DENTAL_PACK_SLUG) {
+    return ensureDentalCardDefs(cardsDef);
+  }
+  return cardsDef;
+}
+
 /**
- * Build Business Pack dashboard cards from real ontology/proposal data.
+ * Build Pack dashboard cards from real ontology/proposal data.
  * Never fabricates metrics — empty states when counts are zero.
  */
 export async function buildPackDashboard(
@@ -190,7 +286,8 @@ export async function buildPackDashboard(
   if (!installed) return null;
 
   const spaceIds = await resolvePackSpaceIds(supabase, profileId);
-  const cardsDef = ensureBusinessCardDefs(
+  const cardsDef = ensurePackCardDefs(
+    packSlug,
     installed.definition.dashboard?.cards ?? []
   );
   const cards: DashboardCardData[] = [];
@@ -209,24 +306,48 @@ export async function buildPackDashboard(
         now.getTime() - STALE_PROPOSAL_DAYS * 24 * 60 * 60 * 1000
       ).toISOString();
 
-      const [{ data: staleProposals }, { data: tasks }] = await Promise.all([
-        supabase
-          .from("proposals")
-          .select("id, title, status, updated_at")
-          .eq("business_profile_id", profileId)
-          .in("status", ["sent", "viewed", "changes_requested"])
-          .lt("updated_at", staleBefore)
-          .order("updated_at", { ascending: true })
-          .limit(8),
-        supabase
-          .from("ontology_entities")
-          .select("id, name, profile_id, updated_at")
-          .in("profile_id", spaceIds)
-          .eq("entity_type", "task")
-          .neq("review_status", "rejected")
-          .order("updated_at", { ascending: false })
-          .limit(5),
-      ]);
+      const isDental = packSlug === GUARDIAN_DENTAL_PACK_SLUG;
+      const [{ data: staleProposals }, { data: tasks }, { data: claims }] =
+        await Promise.all([
+          isDental
+            ? Promise.resolve({ data: [] as Array<{
+                id: string;
+                title: string | null;
+                status: string | null;
+                updated_at: string;
+              }> })
+            : supabase
+                .from("proposals")
+                .select("id, title, status, updated_at")
+                .eq("business_profile_id", profileId)
+                .in("status", ["sent", "viewed", "changes_requested"])
+                .lt("updated_at", staleBefore)
+                .order("updated_at", { ascending: true })
+                .limit(8),
+          supabase
+            .from("ontology_entities")
+            .select("id, name, profile_id, updated_at")
+            .in("profile_id", spaceIds)
+            .eq("entity_type", "task")
+            .neq("review_status", "rejected")
+            .order("updated_at", { ascending: false })
+            .limit(5),
+          isDental
+            ? supabase
+                .from("ontology_entities")
+                .select("id, name, profile_id, updated_at")
+                .in("profile_id", spaceIds)
+                .eq("entity_type", "claim")
+                .neq("review_status", "rejected")
+                .order("updated_at", { ascending: false })
+                .limit(5)
+            : Promise.resolve({ data: [] as Array<{
+                id: string;
+                name: string;
+                profile_id: string;
+                updated_at: string;
+              }> }),
+        ]);
 
       const items: DashboardCardData["items"] = [];
       for (const p of staleProposals ?? []) {
@@ -236,6 +357,14 @@ export async function buildPackDashboard(
           label: String(p.title ?? "Proposal"),
           meta: `${p.status} · ${age}d since update`,
           href: `/proposals/${p.id}`,
+        });
+      }
+      for (const c of claims ?? []) {
+        items.push({
+          id: `claim:${c.id}`,
+          label: String(c.name),
+          meta: "insurance claim",
+          href: `${ontologyHref}&entityId=${c.id}`,
         });
       }
       for (const t of tasks ?? []) {
@@ -259,11 +388,15 @@ export async function buildPackDashboard(
             tone: items.length > 0 ? "attention" : "neutral",
             detail:
               items.length > 0
-                ? `Open proposals idle ${STALE_PROPOSAL_DAYS}+ days, plus ontology tasks`
+                ? isDental
+                  ? "Insurance claims and ontology tasks needing attention"
+                  : `Open proposals idle ${STALE_PROPOSAL_DAYS}+ days, plus ontology tasks`
                 : undefined,
           },
           profileId,
-          "What should I follow up on?"
+          isDental
+            ? "What should I follow up on today?"
+            : "What should I follow up on?"
         )
       );
       continue;
@@ -405,7 +538,7 @@ export async function buildPackDashboard(
         detail:
           entityCount === 0
             ? card.empty
-            : `${entityCount} entities across this business and child Spaces`,
+            : `${entityCount} entities across this Space and child Spaces`,
         askHref: ontologyHref,
         askQuestion: "Open ontology explorer",
       });
@@ -419,6 +552,11 @@ export async function buildPackDashboard(
         .in("profile_id", spaceIds)
         .order("created_at", { ascending: false })
         .limit(6);
+
+      const recentAsk =
+        packSlug === GUARDIAN_DENTAL_PACK_SLUG
+          ? "What recent knowledge did we learn about this practice?"
+          : "What recent knowledge did we learn about this business?";
 
       cards.push(
         withAsk(
@@ -438,7 +576,7 @@ export async function buildPackDashboard(
             empty: card.empty,
           },
           profileId,
-          "What recent knowledge did we learn about this business?"
+          recentAsk
         )
       );
       continue;
@@ -467,14 +605,20 @@ export async function buildPackDashboard(
         return score(String(a.entity_type)) - score(String(b.entity_type));
       });
 
-      if (card.key === "clients") {
+      if (card.key === "clients" || card.key === "patients") {
         summaryClients = count ?? ranked.length;
       }
 
       const askByKey: Record<string, string> = {
         clients: "What clients are we currently working with?",
+        patients: "Which patients have upcoming appointments?",
         contracts: "What contracts do we have?",
         active_projects: "What projects are associated with this business?",
+        appointments: "What appointments are scheduled this week?",
+        treatment_plans: "Which treatment plans are incomplete?",
+        claims: "What insurance claims need follow-up?",
+        providers: "Who are our providers?",
+        lab_cases: "What lab cases are outstanding?",
         tasks: "What tasks need attention?",
       };
 
