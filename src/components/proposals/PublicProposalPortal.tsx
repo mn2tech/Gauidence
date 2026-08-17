@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { CheckCircle2, Loader2, MessageSquare, XCircle } from "lucide-react";
+import DownloadProposalButton from "@/components/proposals/DownloadProposalButton";
 import ProposalStatusBadge from "@/components/proposals/ProposalStatusBadge";
 import type { ProposalWithMeta } from "@/lib/proposals/types";
 import { formatMoney } from "@/lib/proposals/pricing";
@@ -105,7 +106,13 @@ export default function PublicProposalPortal({ token }: { token: string }) {
             Prepared for {proposal.client_name ?? "you"}
           </p>
         </div>
-        <ProposalStatusBadge status={proposal.status} />
+        <div className="flex flex-wrap items-center gap-2">
+          <ProposalStatusBadge status={proposal.status} />
+          <DownloadProposalButton
+            portalToken={token}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-stone-600 px-3 py-2 text-xs font-semibold text-stone-100 hover:bg-stone-800"
+          />
+        </div>
       </div>
 
       {proposal.summary ? (

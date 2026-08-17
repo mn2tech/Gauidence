@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import ClientProposalsScreen from "@/components/proposals/ClientProposalsScreen";
+import DownloadProposalButton from "@/components/proposals/DownloadProposalButton";
 import ProposalStatusBadge from "@/components/proposals/ProposalStatusBadge";
 import ShareProposalButton from "@/components/proposals/ShareProposalButton";
 import {
@@ -765,6 +766,12 @@ export default function ProposalsScreen() {
                 Apply latest template
               </button>
             ) : null}
+            {selected ? (
+              <DownloadProposalButton
+                proposalId={selected.id}
+                className="inline-flex items-center gap-2 rounded-xl border border-stone-300 px-4 py-2.5 text-sm font-semibold hover:bg-stone-50"
+              />
+            ) : null}
             {selected && canShareProposal(selected.status) ? (
               <ShareProposalButton
                 proposalId={selected.id}
@@ -933,14 +940,7 @@ export default function ProposalsScreen() {
                       >
                         Edit
                       </Link>
-                      <a
-                        href={`/api/proposals/${proposal.id}/export`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="rounded-xl border border-stone-300 px-3 py-2 text-xs font-semibold hover:bg-stone-50"
-                      >
-                        Export PDF
-                      </a>
+                      <DownloadProposalButton proposalId={proposal.id} />
                       {proposal.status === "draft" ||
                       proposal.status === "changes_requested" ? (
                         <button

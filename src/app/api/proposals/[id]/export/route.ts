@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { generateProposalHtml } from "@/lib/proposals/export";
+import {
+  generateProposalHtml,
+  proposalExportHeaders,
+} from "@/lib/proposals/export";
 import {
   isProposalAuthed,
   requireProposalUser,
@@ -10,7 +13,7 @@ export const runtime = "nodejs";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-/** Export a proposal as printable HTML (PDF via browser print). */
+/** Download a proposal as printable HTML. */
 export async function GET(_request: Request, context: RouteContext) {
   const auth = await requireProposalUser();
   if (!isProposalAuthed(auth)) return auth;
@@ -33,9 +36,6 @@ export async function GET(_request: Request, context: RouteContext) {
   });
 
   return new NextResponse(html, {
-    headers: {
-      "Content-Type": "text/html; charset=utf-8",
-      "Content-Disposition": `inline; filename="${proposal.title.replace(/[^\w.-]+/g, "_")}.html"`,
-    },
+    headers: proposalExportHeaders(proposal.title),
   });
 }

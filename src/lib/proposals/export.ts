@@ -85,6 +85,22 @@ export type ProposalExportData = {
   clientName: string;
 };
 
+export function proposalExportFilename(title: string): string {
+  const base = title
+    .replace(/[^\w.-]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 80);
+  return `${base || "proposal"}.html`;
+}
+
+export function proposalExportHeaders(title: string): Record<string, string> {
+  const filename = proposalExportFilename(title);
+  return {
+    "Content-Type": "text/html; charset=utf-8",
+    "Content-Disposition": `attachment; filename="${filename}"`,
+  };
+}
+
 export function generateProposalHtml(data: ProposalExportData): string {
   const { proposal, businessName, clientName } = data;
   const currency = proposal.currency || "USD";

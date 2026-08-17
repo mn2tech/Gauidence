@@ -11,6 +11,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useActiveProfile } from "@/components/ProfileProvider";
+import DownloadProposalButton from "@/components/proposals/DownloadProposalButton";
 import ProposalStatusBadge from "@/components/proposals/ProposalStatusBadge";
 import ShareProposalButton from "@/components/proposals/ShareProposalButton";
 import { clientBusinessLabel } from "@/lib/client-requests/helpers";
@@ -329,6 +330,7 @@ export default function ClientProposalsScreen() {
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <ProposalStatusBadge status={proposal.status} />
+                <DownloadProposalButton proposalId={proposal.id} />
                 {canShareProposal(proposal.status) ? (
                   <ShareProposalButton
                     proposalId={proposal.id}
@@ -450,13 +452,12 @@ export default function ClientProposalsScreen() {
       ) : (
         <div className="space-y-3">
           {proposals.map((proposal) => (
-            <Link
-              key={proposal.id}
-              href={`${PROPOSALS_PATH}?id=${proposal.id}`}
-              className={`${cardClass} block transition hover:border-brand/40`}
-            >
+            <div key={proposal.id} className={cardClass}>
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
+                <Link
+                  href={`${PROPOSALS_PATH}?id=${proposal.id}`}
+                  className="min-w-0 flex-1 transition hover:text-brand"
+                >
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="font-semibold">{proposal.title}</h3>
                     <ProposalStatusBadge status={proposal.status} />
@@ -466,10 +467,18 @@ export default function ClientProposalsScreen() {
                     {formatMoney(proposal.total_cents, proposal.currency)} ·{" "}
                     {formatWhen(proposal.sent_at ?? proposal.updated_at)}
                   </p>
+                </Link>
+                <div className="flex flex-wrap items-center gap-2">
+                  <DownloadProposalButton proposalId={proposal.id} />
+                  <Link
+                    href={`${PROPOSALS_PATH}?id=${proposal.id}`}
+                    className="text-xs font-semibold text-brand"
+                  >
+                    View →
+                  </Link>
                 </div>
-                <span className="text-xs font-semibold text-brand">View →</span>
               </div>
-            </Link>
+            </div>
           ))}
         </div>
       )}
