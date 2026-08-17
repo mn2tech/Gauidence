@@ -1,4 +1,5 @@
 import type { OntologyExtractionResult } from "../types";
+import { extractYouTubeUrls } from "./youtubeUrls";
 
 export type TrelloParsedSong = {
   list: string;
@@ -8,6 +9,7 @@ export type TrelloParsedSong = {
   practicedOn: string | null;
   notes: string;
   attachments: string[];
+  youtubeUrls: string[];
 };
 
 /** Pull the CARD INDEX block from formatted Trello board text. */
@@ -75,14 +77,17 @@ export function parseTrelloBoardSongs(sourceText: string): TrelloParsedSong[] {
     seen.add(key);
     const meta = parseMusicCardTitle(name);
     const detail = details.get(key);
+    const notes = detail?.notes ?? "";
+    const attachments = detail?.attachments ?? [];
     songs.push({
       list,
       name,
       songTitle: meta.songTitle,
       key: meta.key,
       practicedOn: meta.practicedOn,
-      notes: detail?.notes ?? "",
-      attachments: detail?.attachments ?? [],
+      notes,
+      attachments,
+      youtubeUrls: extractYouTubeUrls([notes, ...attachments].join("\n")),
     });
   }
 
@@ -152,6 +157,16 @@ export function mergeTrelloAttachmentOntoSong(
       ? `Chord chart PDF: ${args.fileName}\n${transcript}`
       : `Chord chart PDF: ${args.fileName}`,
     attachments: [args.fileName],
+    youtubeUrls: extractYouTubeUrls(
+      [
+        transcript,
+        ...extraction.entities.map((e) => e.description ?? ""),
+        ...extraction.entities.map((e) => {
+          const t = e.attributes?.content_transcript;
+          return typeof t === "string" ? t : "";
+        }),
+      ].join("\n")
+    ),
   };
 
   const merged = mergeTrelloSongEntities(extraction, [song]);
@@ -216,10 +231,14 @@ function songToEntity(
   const attachmentLine = song.attachments.length
     ? `Attachments: ${song.attachments.join("; ")}`
     : "";
+  const youtubeLine = song.youtubeUrls.length
+    ? `YouTube: ${song.youtubeUrls.join(" | ")}`
+    : "";
   const description = [
     header,
     notes ? `Card notes:\n${notes}` : "",
     attachmentLine,
+    youtubeLine,
   ]
     .filter(Boolean)
     .join("\n\n")
@@ -235,6 +254,10 @@ function songToEntity(
   if (song.key) attributes.musical_key = song.key;
   if (song.practicedOn) attributes.practiced_on = song.practicedOn;
   if (notes.length >= 8) attributes.content_transcript = notes.slice(0, 3500);
+  if (song.youtubeUrls[0]) attributes.youtube_url = song.youtubeUrls[0];
+  if (song.youtubeUrls.length > 1) {
+    attributes.youtube_urls = song.youtubeUrls.slice(0, 5);
+  }
 
   return {
     type: "document",

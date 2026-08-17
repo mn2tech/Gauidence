@@ -1332,7 +1332,7 @@ export async function POST(request: Request) {
           .reverse()
           .find((row) => row.role === "assistant")?.claims ?? [];
 
-      const { chunks, context: workspaceContext, explicitSpaceName, connectorCitations, businessClaims, businessAnswerDraft } =
+      const { chunks, context: workspaceContext, explicitSpaceName, connectorCitations, youtubeUrls, businessClaims, businessAnswerDraft } =
         await loadWorkspaceContext({
         supabase,
         user,
@@ -1456,6 +1456,7 @@ export async function POST(request: Request) {
           explicitSpaceName,
           ontologyBlock: workspaceContext.blocks.ontology,
           connectorCitations,
+          youtubeUrls,
           claims: businessClaims ?? workspaceContext.businessClaims ?? [],
         });
       }

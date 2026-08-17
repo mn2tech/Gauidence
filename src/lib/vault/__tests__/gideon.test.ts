@@ -40,6 +40,7 @@ describe("Gideon helpers", () => {
     assert.match(GIDEON_SYSTEM, /analyzed Trello chart/i);
     assert.match(GIDEON_SYSTEM, /Never say you lack a JPG\/PDF/i);
     assert.match(GIDEON_SYSTEM, /including a key suffix/i);
+    assert.match(GIDEON_SYSTEM, /YOUTUBE:/i);
     assert.match(GIDEON_SYSTEM, /CURRENT DATE AND TIME is provided/i);
     assert.equal(
       GIDEON_BRAND_LINE,

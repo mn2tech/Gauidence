@@ -19,6 +19,7 @@ import { wantsShowPictures, wantsSingleImageFocus } from "@/lib/vault/images";
 import {
   pickConnectorCitationsForChartQuery,
 } from "@/lib/ontology/connectorCitationIds";
+import { ensureYouTubeLinksInAnswer, extractYouTubeUrls } from "@/lib/ontology/pipeline/youtubeUrls";
 import { extractChartTitlesFromText } from "@/lib/vault/expandRetrievalQuestion";
 import { titlePhraseForOntologySearch } from "@/lib/ontology/normalize";
 import {
@@ -89,6 +90,8 @@ export type VaultChatStreamArgs = {
   ontologyBlock?: string | null;
   /** Connected-source files from ontology — always attach as openable citations. */
   connectorCitations?: VaultChatStreamMessage["citations"];
+  /** YouTube links from matched song cards — ensure they appear in the answer. */
+  youtubeUrls?: string[];
   /** Business Pack claim/evidence payload to persist with the assistant message. */
   claims?: unknown;
 };
@@ -194,6 +197,15 @@ export function createVaultChatStreamResponse(
               chunks: args.chunks,
               explicitSpaceName: args.explicitSpaceName,
             });
+        }
+
+        if (args.youtubeUrls?.length) {
+          answer = ensureYouTubeLinksInAnswer(answer, args.youtubeUrls);
+        } else if (args.ontologyBlock) {
+          answer = ensureYouTubeLinksInAnswer(
+            answer,
+            extractYouTubeUrls(args.ontologyBlock)
+          );
         }
 
         let selected = selectCitationsForAnswer(answer, args.chunks);

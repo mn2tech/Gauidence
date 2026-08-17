@@ -4,6 +4,10 @@ import {
   entityMatchesSongTitle,
   sanitizeChartTranscript,
 } from "./pipeline/chartTranscript";
+import {
+  extractYouTubeUrls,
+  youTubeUrlsFromEntity,
+} from "./pipeline/youtubeUrls";
 import { shouldExcludeFromBusinessOntology } from "@/lib/gideon/business/knowledgeFilter";
 import { titlePhraseForOntologySearch } from "./normalize";
 
@@ -150,8 +154,10 @@ function formatEntityAttributes(
   if (facts.invoiceDate) parts.push(`invoice_date:${facts.invoiceDate}`);
   const musicalKey = readStringAttr(properties, "musical_key", "key");
   const practicedOn = readStringAttr(properties, "practiced_on");
+  const youtubeUrl = readStringAttr(properties, "youtube_url");
   if (musicalKey) parts.push(`musical_key:${musicalKey}`);
   if (practicedOn) parts.push(`practiced_on:${practicedOn}`);
+  if (youtubeUrl) parts.push(`youtube:${youtubeUrl}`);
   if (!parts.length) return "";
   return ` | ${parts.join("; ")}`;
 }
@@ -577,16 +583,74 @@ function rankConnectedFileContent(
           ? (entity.description ?? "").trim()
           : "");
       const transcript = sanitizeChartTranscript(raw);
-      if (!transcript || transcript.length < 12) return null;
-      if (/^connected source file\b/i.test(transcript)) return null;
+      const youtubeUrls = youTubeUrlsFromEntity(entity);
+      if ((!transcript || transcript.length < 12) && !youtubeUrls.length) {
+        return null;
+      }
+      if (transcript && /^connected source file\b/i.test(transcript)) {
+        return null;
+      }
+      const ytLine = youtubeUrls.length
+        ? `YOUTUBE: ${youtubeUrls.join(" | ")}\n`
+        : "";
+      const body = transcript?.length >= 12 ? transcript.slice(0, 4500) : "";
       return {
-        len: transcript.length,
-        block: `CONNECTED FILE CONTENT (${entity.name}):\n${transcript.slice(0, 4500)}`,
+        len: (transcript?.length ?? 0) + youtubeUrls.length * 100,
+        block: `CONNECTED FILE CONTENT (${entity.name}):\n${ytLine}${body}`.trim(),
       };
     })
     .filter((b): b is { len: number; block: string } => Boolean(b));
   scored.sort((a, b) => b.len - a.len);
   return scored.map((s) => s.block);
+}
+
+/** YouTube links for the songs/charts matched in this ontology turn. */
+export function collectYouTubeUrlsFromOntology(
+  ctx: OntologyContext,
+  query?: string | null
+): string[] {
+  const titlePhrase = query ? titlePhraseForOntologySearch(query) : null;
+  const found: string[] = [];
+  const seen = new Set<string>();
+  for (const entity of ctx.matchedEntities) {
+    if (
+      titlePhrase &&
+      !entityMatchesSongTitle(entity.name, titlePhrase) &&
+      !entityMatchesSongTitle(entity.canonical_name ?? "", titlePhrase)
+    ) {
+      continue;
+    }
+    for (const url of youTubeUrlsFromEntity(entity)) {
+      const key = url.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      found.push(url);
+    }
+  }
+  if (!found.length && ctx.matchedEntities.length) {
+    for (const entity of ctx.matchedEntities) {
+      for (const url of youTubeUrlsFromEntity(entity)) {
+        const key = url.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        found.push(url);
+      }
+    }
+  }
+  // Also mine the formatted evidence/descriptions already in context via entity text.
+  if (!found.length) {
+    for (const entity of ctx.matchedEntities) {
+      for (const url of extractYouTubeUrls(
+        `${entity.description ?? ""}\n${String(entity.properties?.content_transcript ?? "")}`
+      )) {
+        const key = url.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        found.push(url);
+      }
+    }
+  }
+  return found.slice(0, 5);
 }
 
 function isGenericInvoiceOrg(entity: OntologyEntity): boolean {

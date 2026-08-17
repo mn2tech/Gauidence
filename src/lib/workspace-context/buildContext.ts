@@ -19,7 +19,10 @@ import { isGuardianOntologyEnabled } from "@/lib/features/ontology";
 import { retrieveStructuredKnowledge } from "@/lib/knowledge/v2/retrieve";
 import { formatKnowledgeForGideon } from "@/lib/knowledge/v2/formatForGideon";
 import { getOntologyContext } from "@/lib/ontology/context";
-import { formatOntologyForGideon } from "@/lib/ontology/formatForGideon";
+import {
+  collectYouTubeUrlsFromOntology,
+  formatOntologyForGideon,
+} from "@/lib/ontology/formatForGideon";
 import { resolveConnectorSourceCitations } from "@/lib/ontology/connectorCitations";
 import type { VaultChatCitation } from "@/lib/vault/vaultChatStream";
 import {
@@ -128,6 +131,8 @@ export type WorkspaceContextResult = {
   explicitSpaceName?: string | null;
   /** Connected-source files matched via ontology (openable from Ask Gideon). */
   connectorCitations?: VaultChatCitation[];
+  /** YouTube links from matched song/chart ontology entities. */
+  youtubeUrls?: string[];
   businessClaims?: GideonClaim[];
   /** Prefer as the user-facing answer for Business Pack BI intents. */
   businessAnswerDraft?: string | null;
@@ -334,7 +339,11 @@ export async function loadWorkspaceContext(
               ontology,
               user.id
             );
-            return { text, citations };
+            const youtubeUrls = collectYouTubeUrlsFromOntology(
+              ontology,
+              retrievalQuestion
+            );
+            return { text, citations, youtubeUrls };
           })
           .catch((err) => {
             console.warn(
@@ -344,11 +353,13 @@ export async function loadWorkspaceContext(
             return {
               text: "(none)",
               citations: [] as VaultChatCitation[],
+              youtubeUrls: [] as string[],
             };
           })
       : Promise.resolve({
           text: "(none)",
           citations: [] as VaultChatCitation[],
+          youtubeUrls: [] as string[],
         }),
     load.logs
       ? retrieveRelevantDailyLogs(supabase, {
@@ -699,6 +710,7 @@ Active space in the UI: ${activeProfile.display_name}. Document search includes 
       businessPlan && !biPlanRequiresDocumentSearch(businessPlan) ? [] : chunks,
     explicitSpaceName: explicitSpace?.display_name ?? null,
     connectorCitations,
+    youtubeUrls: ontologyBundle.youtubeUrls ?? [],
     businessClaims: businessIntelligenceBundle?.claims,
     businessAnswerDraft: businessIntelligenceBundle?.userAnswerDraft ?? null,
   };

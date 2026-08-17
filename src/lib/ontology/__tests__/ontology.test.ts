@@ -838,6 +838,28 @@ Card details:
     assert.match(String(song!.attributes?.content_transcript ?? ""), /Chorus: Eb F Gm/);
   });
 
+  it("stores YouTube links from card notes on the song entity", () => {
+    const text = `Trello board: Living Waters
+CARD INDEX (1 items):
+* [Songs] What a Beautiful Name - C
+Card details:
+- [Songs] What a Beautiful Name - C
+  https://youtu.be/nQWFzMvCfLE
+  attachment (file): Listen — https://www.youtube.com/watch?v=nQWFzMvCfLE
+`;
+    const songs = parseTrelloBoardSongs(text);
+    assert.equal(songs[0]?.youtubeUrls[0], "https://www.youtube.com/watch?v=nQWFzMvCfLE");
+    const merged = mergeTrelloSongEntities(
+      { entities: [], relationships: [], events: [] },
+      songs
+    );
+    assert.equal(
+      merged.entities[0]?.attributes?.youtube_url,
+      "https://www.youtube.com/watch?v=nQWFzMvCfLE"
+    );
+    assert.match(merged.entities[0]?.description ?? "", /YouTube:/);
+  });
+
   it("folds PDF transcript onto the Trello card/song entity", () => {
     const merged = mergeTrelloAttachmentOntoSong(
       {

@@ -108,6 +108,7 @@ import {
   isConnectorCitationDocumentId,
   preferChartsMatchingKeyInText,
 } from "@/lib/ontology/connectorCitationIds";
+import { extractYouTubeUrls } from "@/lib/ontology/pipeline/youtubeUrls";
 import { renderPdfThumbnailFromFile, renderPdfThumbnailFromUrl } from "@/lib/vault/pdfThumbnail";
 import { renderGideonText } from "@/components/gideonText";
 import { clipboardImageToFile } from "@/lib/vault/clipboardImage";
@@ -3034,6 +3035,7 @@ export default function VaultChatPanel({
       m.content ?? "",
       2
     );
+    const youtubeLinks = extractYouTubeUrls(m.content ?? "");
     const answerLower = (m.content ?? "").toLowerCase();
     const sourceNamedInAnswer = (fileName: string) => {
       const stem = fileName
@@ -3104,7 +3106,7 @@ export default function VaultChatPanel({
 
     return (
       <div className="min-w-0 flex-1 space-y-2">
-        {previewCitations.length > 0 ? (
+        {previewCitations.length > 0 || youtubeLinks.length > 0 ? (
           <div className="flex flex-wrap gap-2">
             {previewCitations.map((c) => (
               <VaultAttachmentCard
@@ -3119,6 +3121,23 @@ export default function VaultChatPanel({
                 sourceId={c.sourceId}
                 itemId={c.itemId}
               />
+            ))}
+            {youtubeLinks.map((url) => (
+              <a
+                key={url}
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex max-w-[11rem] flex-col items-start justify-center gap-1 rounded-xl border border-stone-200 bg-white px-3 py-2 text-left shadow-sm transition hover:bg-stone-50"
+                title={url}
+              >
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-muted">
+                  YouTube
+                </span>
+                <span className="text-xs font-semibold text-brand">
+                  Watch on YouTube
+                </span>
+              </a>
             ))}
           </div>
         ) : null}
