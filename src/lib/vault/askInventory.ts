@@ -1,3 +1,7 @@
+import {
+  isLikelyChordChartFile,
+  isNonChordChartNoise,
+} from "@/lib/ontology/connectorCitationIds";
 import { isImageFileName, isImageMimeType } from "@/lib/vault/images";
 
 export const ASK_VAULT_NAME_PREVIEW = 6;
@@ -365,6 +369,15 @@ function parseConnectedChartEntries(inventoryText: string): ConnectedChartEntry[
       /\.(jpe?g|png|gif|webp|pdf)$/i.test(fileName) ||
       Boolean(cardName && !/\.txt$/i.test(cardName));
     if (!looksLikeChart) continue;
+    if (
+      /\.pdf$/i.test(fileName) &&
+      !isLikelyChordChartFile(fileName, "application/pdf")
+    ) {
+      continue;
+    }
+    if (isNonChordChartNoise(fileName) || isNonChordChartNoise(cardName)) {
+      continue;
+    }
 
     const title = songTitleFromInventoryLabel(cardName || fileName);
     if (!looksLikeSongOrChartTitle(title)) continue;
@@ -381,6 +394,7 @@ function parseConnectedChartEntries(inventoryText: string): ConnectedChartEntry[
 export function looksLikeSongOrChartTitle(title: string): boolean {
   const t = title.trim();
   if (t.length < 2) return false;
+  if (isNonChordChartNoise(t)) return false;
   if (
     /\b(practice\s+session|rehearsal\s+notes?|set\s*list\s+notes?)\b/i.test(t)
   ) {
@@ -457,6 +471,13 @@ export function summarizeConnectedPracticeItems(
       !isJpg &&
       !isPng &&
       (isImageFileName(name) || isImageMimeType(mime));
+
+    if (isNonChordChartNoise(name) || (cardName && isNonChordChartNoise(cardName))) {
+      continue;
+    }
+    if (isPdf && !isLikelyChordChartFile(name, mime ?? "application/pdf")) {
+      continue;
+    }
 
     if (isJpg || isPng || isPdf || isOtherImage || kind === "attachment") {
       if (isJpg) jpgCount += 1;

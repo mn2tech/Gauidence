@@ -265,4 +265,17 @@ describe("connected practice stats", () => {
     assert.match(answer!, /PDF charts/);
     assert.match(answer!, /Just As I Am/);
   });
+
+  it("omits finger charts and lyrics-only PDFs from PDF chord lists", () => {
+    const answer = buildInventoryQuestionAnswer({
+      question: "List the PDF chord charts in this space",
+      spaceDisplayName: "Wednesday Practice",
+      fileInventoryText: `SPACE FILE INVENTORY:
+- Come+Lord+Jesus+(Even+So+Come)+-+SongSelect+Chart+in+Bb+(1).pdf · Even So Come (Trello in this space, analyzed)
+- McGill_Music_Sax_School_Finger_Chart.pdf · SAX - Finger chart (Trello in this space, analyzed)
+- Shoonya se leke toone mujhe - Telugu lyrics.pdf · Shoonya se leke toone mujhe (Trello in this space, analyzed)`,
+    });
+    assert.match(answer!, /Even So Come/);
+    assert.doesNotMatch(answer!, /Finger chart|SAX|Shoonya|Telugu lyrics/i);
+  });
 });

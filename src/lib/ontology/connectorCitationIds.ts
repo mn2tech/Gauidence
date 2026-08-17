@@ -189,6 +189,34 @@ function extractTitlesFromQuestion(question: string): string[] {
   return forMatch?.[1] ? [forMatch[1].trim()] : [];
 }
 
+/** Non-song attachments that should not count as chord charts. */
+export function isNonChordChartNoise(nameOrTitle: string): boolean {
+  const t = nameOrTitle.trim();
+  if (!t) return false;
+  if (
+    /\b(syllabus|invoice|receipt|proposal|handbook|policy|contract|worksheet)\b/i.test(
+      t
+    )
+  ) {
+    return true;
+  }
+  if (/\b(kfc|junior)\b/i.test(t)) return true;
+  // Instrument method / fingering references (not worship charts).
+  // Underscored Trello names (e.g. School_Finger_Chart) have no \b before Finger.
+  if (
+    /finger[\s_-]*charts?|fingerings?|sax[\s_-]+school|method[\s_-]+book|scale[\s_-]+chart/i.test(
+      t
+    )
+  ) {
+    return true;
+  }
+  // Lyrics-only sheets without chart/chord markers.
+  if (/\blyrics?\b/i.test(t) && !/\b(chord|chart|songselect)\b/i.test(t)) {
+    return true;
+  }
+  return false;
+}
+
 /** Chord-chart attachments vs syllabus/docs that should not cite for piano help. */
 export function isLikelyChordChartFile(
   fileName: string,
@@ -196,13 +224,11 @@ export function isLikelyChordChartFile(
 ): boolean {
   const name = fileName.trim();
   if (!name) return false;
-  if (/\b(syllabus|invoice|receipt|proposal|handbook|policy|contract)\b/i.test(name)) {
-    return false;
-  }
+  if (isNonChordChartNoise(name)) return false;
   if (/\.(jpe?g|png|webp|gif)$/i.test(name)) return true;
   if (mimeType?.startsWith("image/")) return true;
   if (/\.pdf$/i.test(name) || mimeType === "application/pdf") {
-    return !/\b(kfc|junior|syllabus|worksheet)\b/i.test(name);
+    return true;
   }
   return false;
 }

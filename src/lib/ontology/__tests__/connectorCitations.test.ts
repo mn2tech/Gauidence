@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   connectorCitationDocumentId,
   isConnectorCitationDocumentId,
+  isLikelyChordChartFile,
   pickConnectorCitationsForChartQuery,
   pickConnectorImageCitations,
 } from "../connectorCitationIds.ts";
@@ -159,6 +160,32 @@ describe("pickConnectorCitationsForChartQuery", () => {
     assert.deepEqual(
       picked.map((c) => c.fileName),
       ["trello636.jpg"]
+    );
+  });
+});
+
+describe("isLikelyChordChartFile", () => {
+  it("keeps SongSelect charts and drops finger/lyrics-only PDFs", () => {
+    assert.equal(
+      isLikelyChordChartFile(
+        "Come+Lord+Jesus+(Even+So+Come)+-+SongSelect+Chart+in+Bb+(1).pdf",
+        "application/pdf"
+      ),
+      true
+    );
+    assert.equal(
+      isLikelyChordChartFile(
+        "McGill_Music_Sax_School_Finger_Chart.pdf",
+        "application/pdf"
+      ),
+      false
+    );
+    assert.equal(
+      isLikelyChordChartFile(
+        "Shoonya se leke toone mujhe - Telugu lyrics.pdf",
+        "application/pdf"
+      ),
+      false
     );
   });
 });
