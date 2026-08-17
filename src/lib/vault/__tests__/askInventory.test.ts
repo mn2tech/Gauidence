@@ -4,6 +4,7 @@ import {
   buildAskVaultInventory,
   buildInventoryQuestionAnswer,
   chartFileTypeListFilter,
+  displayNameWithMimeExtension,
   formatBoundConnectedFilesForGideon,
   formatConnectedPracticeStatsLine,
   formatVaultFileListForGideon,
@@ -237,5 +238,31 @@ describe("connected practice stats", () => {
     assert.match(answer!, /What a Beautiful Name/);
     assert.match(answer!, /Lord Send Revival/);
     assert.doesNotMatch(answer!, /Silent Night/);
+  });
+
+  it("lists PDFs when opaque Trello names get a mime extension", () => {
+    assert.equal(
+      displayNameWithMimeExtension("trello999", "application/pdf"),
+      "trello999.pdf"
+    );
+    const inventory = formatBoundConnectedFilesForGideon(
+      [
+        {
+          name: "trello999",
+          cardName: "Just As I Am - Bb",
+          sourceType: "trello",
+          processingStatus: "analyzed",
+          mimeType: "application/pdf",
+        },
+      ],
+      ["Wednesday Practice"]
+    );
+    const answer = buildInventoryQuestionAnswer({
+      question: "List the PDF chord charts in this space",
+      spaceDisplayName: "Wednesday Practice",
+      fileInventoryText: inventory,
+    });
+    assert.match(answer!, /PDF charts/);
+    assert.match(answer!, /Just As I Am/);
   });
 });

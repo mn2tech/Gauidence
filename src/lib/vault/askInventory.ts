@@ -125,7 +125,24 @@ export type BoundConnectedFileRow = {
   cardName?: string | null;
   sourceType: string;
   processingStatus: string;
+  mimeType?: string | null;
 };
+
+/** Ensure opaque Trello ids get a real extension from mime (for JPG/PDF lists). */
+export function displayNameWithMimeExtension(
+  name: string,
+  mimeType?: string | null
+): string {
+  const trimmed = name.trim() || "file";
+  if (/\.[a-z0-9]{2,5}$/i.test(trimmed)) return trimmed;
+  const mime = (mimeType ?? "").toLowerCase();
+  if (mime === "application/pdf" || mime.includes("pdf")) return `${trimmed}.pdf`;
+  if (mime === "image/png") return `${trimmed}.png`;
+  if (mime === "image/jpeg" || mime === "image/jpg") return `${trimmed}.jpg`;
+  if (mime === "image/webp") return `${trimmed}.webp`;
+  if (mime === "image/gif") return `${trimmed}.gif`;
+  return trimmed;
+}
 
 /**
  * Trello / Device Storage files bound to the active space.
@@ -142,13 +159,17 @@ export function formatBoundConnectedFilesForGideon(
     `SPACE FILE INVENTORY (Trello / connected files in ${spaceLabel} — treat these as files in this space, not only on the connection):`,
   ];
   for (const file of files) {
+    const displayName = displayNameWithMimeExtension(
+      file.name,
+      file.mimeType
+    );
     const card =
       typeof file.cardName === "string" && file.cardName.trim()
         ? ` · ${file.cardName.trim()}`
         : "";
     const kind = file.sourceType === "trello" ? "Trello" : "Device Storage";
     lines.push(
-      `- ${file.name}${card} (${kind} in this space, ${file.processingStatus})`
+      `- ${displayName}${card} (${kind} in this space, ${file.processingStatus})`
     );
   }
   return lines.join("\n");

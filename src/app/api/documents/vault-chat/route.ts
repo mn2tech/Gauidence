@@ -9,7 +9,7 @@ import {
 import { generateVaultChatTitle } from "@/lib/chat/generateVaultChatTitle";
 import { shouldGenerateVaultChatTitle } from "@/lib/chat/vaultChatTitle";
 import { isVaultEmbeddingConfigured } from "@/lib/vault/embeddings";
-import { buildAskVaultInventory, buildInventoryQuestionAnswer, wantsVaultFileInventory, wantsSongOrChartList } from "@/lib/vault/askInventory";
+import { buildAskVaultInventory, buildInventoryQuestionAnswer, wantsVaultFileInventory, wantsSongOrChartList, chartFileTypeListFilter } from "@/lib/vault/askInventory";
 import {
   extractChartTitlesFromText,
   isPianoOrSongLearnRequest,
@@ -1416,12 +1416,12 @@ export async function POST(request: Request) {
 
       if (inventoryAnswer) {
         answer = inventoryAnswer;
-        // Song lists are inventory-only — don't attach random chart/PDF previews
-        // from ontology search that happened to run in the same turn.
-        if (
-          !wantsSongOrChartList(question) &&
-          connectorCitations?.length
-        ) {
+        // Roster answers (songs / JPG / PNG / PDF lists) are inventory-only —
+        // don't attach random ontology chart previews from the same turn.
+        const isChartRoster =
+          wantsSongOrChartList(question) ||
+          chartFileTypeListFilter(question) != null;
+        if (!isChartRoster && connectorCitations?.length) {
           citations = connectorCitations;
         }
       } else if (pianoClarify) {

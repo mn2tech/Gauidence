@@ -7,6 +7,7 @@ import {
   formatBoundConnectedFilesForGideon,
   wantsVaultFileInventory,
   wantsSongOrChartList,
+  chartFileTypeListFilter,
   RECENT_VAULT_FILE_PREVIEW,
   summarizeConnectedPracticeItems,
   formatConnectedPracticeStatsLine,
@@ -212,7 +213,9 @@ export async function loadVaultFileInventoryContext(
         searchProfileIds,
         profileNames,
         {
-          songList: wantsSongOrChartList(question),
+          songList:
+            wantsSongOrChartList(question) ||
+            chartFileTypeListFilter(question) != null,
         }
       )
     : "";
@@ -321,6 +324,7 @@ async function loadBoundConnectedFilesForGideon(
           typeof meta.cardName === "string" ? meta.cardName : null,
         sourceType: String(src?.source_type ?? ""),
         processingStatus: String(item.processing_status ?? "analyzed"),
+        mimeType: typeof item.mime_type === "string" ? item.mime_type : null,
       };
     });
   if (!files.length) return "";
