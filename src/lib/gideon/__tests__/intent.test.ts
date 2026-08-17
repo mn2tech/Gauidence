@@ -167,6 +167,11 @@ describe("Gideon intent router — follow-ups and tools", () => {
     });
     assert.equal(shouldSearchGuardianKnowledge(pdf), true);
 
+    const openPdf = classifyGideonIntent({
+      question: "open this pdf",
+    });
+    assert.equal(shouldSearchGuardianKnowledge(openPdf), true);
+
     const songs = classifyGideonIntent({
       question: "What songs are on The Living Waters?",
     });

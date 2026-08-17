@@ -11,8 +11,10 @@ import { shouldGenerateVaultChatTitle } from "@/lib/chat/vaultChatTitle";
 import { isVaultEmbeddingConfigured } from "@/lib/vault/embeddings";
 import { buildAskVaultInventory, buildInventoryQuestionAnswer, wantsVaultFileInventory, wantsSongOrChartList, chartFileTypeListFilter } from "@/lib/vault/askInventory";
 import {
+  buildOpenChartAttachmentAnswer,
   extractChartTitlesFromText,
   isPianoOrSongLearnRequest,
+  wantsOpenChartAttachment,
 } from "@/lib/vault/expandRetrievalQuestion";
 import { loadConnectedSuggestionContext } from "@/lib/vault/loadInventory";
 import { enqueueMissingVaultIndexing } from "@/lib/vault/ensureIndexed";
@@ -1323,7 +1325,8 @@ export async function POST(request: Request) {
         forceKnowledge:
           wantsVaultFileInventory(question) ||
           wantsTranscription(question) ||
-          wantsShowPictures(question),
+          wantsShowPictures(question) ||
+          wantsOpenChartAttachment(question),
       });
       const loadFlags = resolveGideonLoad(gideonRoute);
       const calendarNote = await loadCalendarPromptNote({
@@ -1380,8 +1383,18 @@ export async function POST(request: Request) {
             })
           : null;
 
+      const openChartAnswer =
+        !inventoryAnswer
+          ? buildOpenChartAttachmentAnswer({
+              question,
+              history,
+              citations: connectorCitations ?? [],
+            })
+          : null;
+
       const pianoClarify =
         !inventoryAnswer &&
+        !openChartAnswer &&
         isPianoOrSongLearnRequest(question) &&
         extractChartTitlesFromText(question).length === 0
           ? (() => {
@@ -1408,6 +1421,7 @@ export async function POST(request: Request) {
 
       const biAnswer =
         !inventoryAnswer &&
+        !openChartAnswer &&
         !pianoClarify &&
         typeof businessAnswerDraft === "string" &&
         businessAnswerDraft.trim()
@@ -1424,6 +1438,9 @@ export async function POST(request: Request) {
         if (!isChartRoster && connectorCitations?.length) {
           citations = connectorCitations;
         }
+      } else if (openChartAnswer) {
+        answer = openChartAnswer.answer;
+        citations = openChartAnswer.citations;
       } else if (pianoClarify) {
         answer = pianoClarify;
       } else if (biAnswer) {

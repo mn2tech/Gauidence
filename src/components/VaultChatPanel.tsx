@@ -3118,26 +3118,58 @@ export default function VaultChatPanel({
     );
     const youtubeLinks = extractYouTubeUrls(m.content ?? "");
     const answerLower = (m.content ?? "").toLowerCase();
-    const sourceNamedInAnswer = (fileName: string) => {
-      const stem = fileName
-        .replace(/\.[^.]+$/, "")
-        .trim()
-        .toLowerCase();
-      if (stem.length < 4) return false;
-      return answerLower.includes(stem.slice(0, Math.min(stem.length, 40)));
+    const sourceNamedInAnswer = (c: Citation) => {
+      const labels = [c.cardName, c.fileName]
+        .map((v) => (typeof v === "string" ? v.trim() : ""))
+        .filter(Boolean);
+      return labels.some((label) => {
+        const stem = label
+          .replace(/\.[^.]+$/, "")
+          .trim()
+          .toLowerCase();
+        if (stem.length < 4) return false;
+        const needle = stem.slice(0, Math.min(stem.length, 40));
+        if (answerLower.includes(needle)) return true;
+        // Song title without opaque Trello/SongSelect filename noise
+        const short = stem
+          .split(/[+(]/)
+          .map((p) => p.trim())
+          .find((p) => p.length >= 4 && !/^(trello|come|lord)\d*$/i.test(p));
+        return short ? answerLower.includes(short.slice(0, 40)) : false;
+      });
     };
-    // Non-image Sources must also be named in the answer (fixes wrong PDF links
-    // next to a correct Trello chart preview).
+    // Connector PDFs: same trust as connector images (server already picked).
+    const connectorPdfs = preferChartsMatchingKeyInText(
+      uniqueCitations.filter(
+        (c) =>
+          c.kind === "connector" &&
+          !c.isImage &&
+          !isImageFileName(c.fileName) &&
+          (/\.pdf$/i.test(c.fileName) ||
+            Boolean(c.mimeType?.includes("pdf")))
+      ),
+      m.content ?? "",
+      2
+    );
+    // Non-image vault Sources must also be named in the answer.
     const sourceCitations = uniqueCitations.filter((c) => {
       if (c.isImage || isImageFileName(c.fileName)) return false;
-      if (c.kind === "connector") return sourceNamedInAnswer(c.fileName);
-      return sourceNamedInAnswer(c.fileName);
+      if (c.kind === "connector") {
+        // Shown as preview cards above; keep link-only for non-PDF docs.
+        if (/\.pdf$/i.test(c.fileName) || c.mimeType?.includes("pdf")) {
+          return false;
+        }
+        return sourceNamedInAnswer(c);
+      }
+      return sourceNamedInAnswer(c);
     });
     const vaultPreviewCitations = [
       ...vaultImages,
       ...connectorImages,
+      ...connectorPdfs,
       ...sourceCitations.filter((c) => c.kind !== "connector"),
-    ];    const previewCitations = options?.hideCitationPreviews
+    ];
+    const previewCitations = options?.hideCitationPreviews
       ? []
       : vaultPreviewCitations;
     const linkOnlyCitations = options?.hideCitationPreviews

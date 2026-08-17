@@ -5,6 +5,8 @@ import {
   wantsFullDailyLogQuote,
   extractChartTitlesFromText,
   isPianoOrSongLearnRequest,
+  wantsOpenChartAttachment,
+  buildOpenChartAttachmentAnswer,
 } from "../expandRetrievalQuestion.ts";
 
 describe("expandRetrievalQuestion", () => {
@@ -89,6 +91,14 @@ describe("extractChartTitlesFromText", () => {
     const titles = extractChartTitlesFromText("What a Beautiful Name - C");
     assert.deepEqual(titles, ["What a Beautiful Name"]);
   });
+
+  it("reads song title from PDF roster bullets", () => {
+    const titles = extractChartTitlesFromText(
+      `PDF charts in your Wednesday Practice space (1):
+• Even So Come (Come+Lord+Jesus+(Even+So+Come)+-+SongSelect+Chart+in+Bb+(1).pdf)`
+    );
+    assert.ok(titles.some((t) => /^Even So Come$/i.test(t)));
+  });
 });
 
 describe("isPianoOrSongLearnRequest", () => {
@@ -98,6 +108,42 @@ describe("isPianoOrSongLearnRequest", () => {
       true
     );
     assert.equal(isPianoOrSongLearnRequest("what invoices are due"), false);
+  });
+});
+
+describe("wantsOpenChartAttachment", () => {
+  it("detects open/show PDF follow-ups", () => {
+    assert.equal(wantsOpenChartAttachment("open this pdf"), true);
+    assert.equal(wantsOpenChartAttachment("Show the chart"), true);
+    assert.equal(wantsOpenChartAttachment("List the PDF chord charts"), false);
+  });
+
+  it("builds an answer that names the PDF Source", () => {
+    const result = buildOpenChartAttachmentAnswer({
+      question: "open this pdf",
+      history: [
+        {
+          role: "assistant",
+          content: `PDF charts in your Wednesday Practice space (1):
+• Even So Come (Come+Lord+Jesus+(Even+So+Come)+-+SongSelect+Chart+in+Bb+(1).pdf)`,
+        },
+      ],
+      citations: [
+        {
+          documentId: "connector:1",
+          fileName:
+            "Come+Lord+Jesus+(Even+So+Come)+-+SongSelect+Chart+in+Bb+(1).pdf",
+          cardName: "Even So Come",
+          kind: "connector",
+          mimeType: "application/pdf",
+        },
+      ],
+    });
+    assert.ok(result);
+    assert.match(result!.answer, /Even So Come/);
+    assert.match(result!.answer, /Source preview/i);
+    assert.match(result!.answer, /SongSelect/);
+    assert.equal(result!.citations.length, 1);
   });
 });
 

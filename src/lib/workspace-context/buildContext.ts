@@ -55,6 +55,7 @@ import {
   wantsFullDailyLogQuote,
   isPianoOrSongLearnRequest,
   extractChartTitlesFromText,
+  wantsOpenChartAttachment,
   type ChatTurn,
 } from "@/lib/vault/expandRetrievalQuestion";
 import {
@@ -481,7 +482,7 @@ export async function loadWorkspaceContext(
   const ontologyContext = ontologyBundle.text;
   const namedCharts = extractChartTitlesFromText(retrievalQuestion);
   let connectorCitations = ontologyBundle.citations;
-  if (isPianoOrSongLearnRequest(question) || namedCharts.length > 0) {
+  if (isPianoOrSongLearnRequest(question) || namedCharts.length > 0 || wantsOpenChartAttachment(question)) {
     connectorCitations = filterCitationsToChordCharts(connectorCitations);
     if (namedCharts.length) {
       const lowered = namedCharts.map((t) => t.toLowerCase());

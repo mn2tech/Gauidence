@@ -53,7 +53,7 @@ const KNOWLEDGE_MUSIC =
   /\b(chords?|chord charts?|set\s*lists?|hymns?|lyrics|what key|which key|key of|trello|songs?(?:\s+list)?|list of songs|song titles?|living\s+waters|what songs|songs (?:are |on |in )|piano|keyboard|learn (this |that )?(song|chart|hymn)|practice (this |that )?(song|chart))\b/i;
 
 const KNOWLEDGE_CONNECTED =
-  /\b(analyzed (pdf|file|chart|attachment|jpg|jpeg|png)|the (pdf|jpg|jpeg|png)|connected (file|trello|source)|trello (board|pdf|chart|attachment))\b/i;
+  /\b(analyzed (pdf|file|chart|attachment|jpg|jpeg|png)|the (pdf|jpg|jpeg|png)|this (pdf|jpg|jpeg|png|chart)|open (this |that |the )?(pdf|jpg|jpeg|png|chart)|connected (file|trello|source)|trello (board|pdf|chart|attachment))\b/i;
 
 const KNOWLEDGE_SAY =
   /\bwhat does (the |my |our |this )?.{0,80}\b(say|mention|cover|require)\b/i;
