@@ -172,6 +172,17 @@ describe("Gideon intent router — follow-ups and tools", () => {
     });
     assert.equal(shouldSearchGuardianKnowledge(openPdf), true);
 
+    const officeHours = classifyGideonIntent({
+      question: "What are the office hours for Lagos Dental Centre?",
+    });
+    assert.equal(officeHours.intent, "knowledge_search");
+    assert.equal(shouldSearchGuardianKnowledge(officeHours), true);
+
+    const services = classifyGideonIntent({
+      question: "What services does Lagos Dental Centre offer?",
+    });
+    assert.equal(shouldSearchGuardianKnowledge(services), true);
+
     const songs = classifyGideonIntent({
       question: "What songs are on The Living Waters?",
     });

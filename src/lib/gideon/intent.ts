@@ -73,7 +73,11 @@ const KNOWLEDGE_BUSINESS =
 
 /** Dental Pack practice operations questions. */
 const KNOWLEDGE_DENTAL =
-  /\b((what|which|our|my|the) patients?\b|patients? (have|with|need|are)|upcoming appointments?|insurance claims?|claims? (need|pending|denied|follow)|treatment plans?|lab cases?|who is treating|dental (practice|clinic|office)|hygienist|dentist|payer|referrals?)\b/i;
+  /\b((what|which|our|my|the) patients?\b|patients? (have|with|need|are)|upcoming appointments?|insurance claims?|claims? (need|pending|denied|follow)|treatment plans?|lab cases?|who is treating|dental (practice|clinic|office|centre|center)|hygienist|dentist|payer|referrals?|office hours|hours of operation|(what|which) services?\b|membership plan|zen suite|practice profile)\b/i;
+
+/** Practice / org operational facts that live in uploaded profiles (any industry). */
+const KNOWLEDGE_PRACTICE_FACTS =
+  /\b(office hours|hours of operation|when .{0,30}\bopen\b|what (are|is) (the )?(office )?hours|where (is|are) .{0,40}\b(located|address)\b|what services? (does|do|are)|membership plan|contact (info|information|details)|phone number for)\b/i;
 
 const BUSINESS_ADVISORY =
   /\b(what should i (follow up|focus|do|prioritize)|what needs (my )?attention|which proposals? have not|follow[- ]?up on|focus on next)\b/i;
@@ -182,6 +186,7 @@ function isKnowledgeQuestion(q: string): boolean {
     KNOWLEDGE_CONNECTED.test(q) ||
     KNOWLEDGE_BUSINESS.test(q) ||
     KNOWLEDGE_DENTAL.test(q) ||
+    KNOWLEDGE_PRACTICE_FACTS.test(q) ||
     looksLikeChartTitleQuery(q)
   );
 }

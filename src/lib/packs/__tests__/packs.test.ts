@@ -189,6 +189,10 @@ describe("gideon dental pack routing", () => {
       isDentalKnowledgeQuestion("What insurance claims need follow-up?"),
       true
     );
+    assert.equal(
+      isDentalKnowledgeQuestion("What are the office hours for Lagos Dental Centre?"),
+      true
+    );
     assert.equal(isDentalKnowledgeQuestion("Hello there"), false);
     assert.equal(
       isDentalAdvisoryQuestion("What should I follow up on today?"),

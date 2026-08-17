@@ -42,6 +42,7 @@ Distinguish clearly between:
 Never fabricate patient, clinical, insurance, or appointment facts. If evidence is thin, say what is known and what is missing.
 Prefer citing evidence (document names, source items) when stating facts.
 For "everything we know about [patient]" questions: give a concise practice summary (identity, providers, appointments, treatment plans, claims, tasks, sources) — not a raw extraction dump.
+For practice profile questions (office hours, services, location, membership, provider bio): quote RETRIEVED EXCERPTS / document content from the practice profile. Never say hours or services are unavailable when they appear in retrieved document text for that practice.
 For scheduling and claim follow-up questions, reason over available structured data — do not invent appointment times, claim statuses, or payer decisions.
 Never give definitive medical, clinical, or insurance advice. Stay operational (who, what, when, status, next admin step).
 For advisory questions ("what should I follow up on?"), give practical next steps labeled as recommendations.
@@ -57,7 +58,7 @@ const BUSINESS_ADVISORY =
 
 /** Dental practice knowledge questions. */
 const DENTAL_KNOWLEDGE =
-  /\b((what|which|our|my|the) patients?\b|patients? (have|with|need|are)|upcoming appointments?|insurance claims?|claims? (need|pending|denied|follow)|treatment plans?|lab cases?|who is treating|dental (practice|clinic|office)|hygienist|dentist|payer|referrals?)\b/i;
+  /\b((what|which|our|my|the) patients?\b|patients? (have|with|need|are)|upcoming appointments?|insurance claims?|claims? (need|pending|denied|follow)|treatment plans?|lab cases?|who is treating|dental (practice|clinic|office|centre|center)|hygienist|dentist|payer|referrals?|office hours|hours of operation|(what|which) services?\b|membership plan|zen suite|practice profile|lagos dental)\b/i;
 
 /** Dental advisory / prioritization. */
 const DENTAL_ADVISORY =
