@@ -40,6 +40,10 @@ export const ANALYZE_SUPPORTED_MIME = new Set([
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "application/vnd.ms-excel",
   "application/excel",
+  "application/vnd.google-apps.document",
+  "application/vnd.google-apps.spreadsheet",
+  "application/vnd.google-apps.presentation",
+  "application/vnd.google-apps.drawing",
 ]);
 
 export function isAnalyzeSupportedMime(

@@ -28,7 +28,14 @@ export default async function BrowseConnectionFilesPage({ params }: Props) {
   const folderName =
     source.sourceType === "trello"
       ? String(source.settings?.username ?? source.displayName ?? "Trello")
-      : String(source.settings?.folderName ?? "Folder");
+      : source.sourceType === "google_drive"
+        ? String(
+            source.settings?.folderName ??
+              source.settings?.email ??
+              source.displayName ??
+              "Google Drive"
+          )
+        : String(source.settings?.folderName ?? "Folder");
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -47,7 +54,12 @@ export default async function BrowseConnectionFilesPage({ params }: Props) {
             Browse Files
           </h1>
           <p className="mt-2 text-sm text-ink-muted">
-            Device Storage · {folderName} · metadata only
+            {source.sourceType === "trello"
+              ? "Trello"
+              : source.sourceType === "google_drive"
+                ? "Google Drive"
+                : "Device Storage"}{" "}
+            · {folderName} · metadata only
           </p>
           <div className="mt-8">
             <BrowseSourceFiles sourceId={id} />

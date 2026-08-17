@@ -25,7 +25,13 @@ export function classifyFileType(
   if (PDF_EXT.has(ext) || mimeType === "application/pdf") {
     return "PDF";
   }
-  if (DOC_EXT.has(ext) || mimeType?.includes("word") || mimeType?.includes("msword")) {
+  if (
+    DOC_EXT.has(ext) ||
+    mimeType?.includes("word") ||
+    mimeType?.includes("msword") ||
+    mimeType === "application/vnd.google-apps.document" ||
+    mimeType === "application/vnd.google-apps.presentation"
+  ) {
     return "Documents";
   }
   if (

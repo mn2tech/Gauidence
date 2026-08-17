@@ -1598,6 +1598,7 @@ export default function VaultChatPanel({
     ) {
       const isTrelloFile =
         citation.sourceType === "trello" ||
+        citation.sourceType === "google_drive" ||
         Boolean(citation.mimeType?.includes("pdf")) ||
         /\.(pdf|jpe?g|png|gif|webp)$/i.test(citation.fileName);
       const detailPath = `/settings/connections/${citation.sourceId}/files/${citation.itemId}`;

@@ -67,6 +67,10 @@ export async function PATCH(req: Request, ctx: Ctx) {
     profileId?: string | null;
     trelloBoardId?: string | null;
     trelloBoardName?: string | null;
+    googleDriveFolderId?: string | null;
+    googleDriveFolderName?: string | null;
+    googleDriveDriveId?: string | null;
+    googleDriveFolderKind?: string | null;
   };
   try {
     body = await req.json();
@@ -98,6 +102,36 @@ export async function PATCH(req: Request, ctx: Ctx) {
         ...(withSecrets?.settings ?? existing.settings),
         boardId: boardId || null,
         boardName: String(body.trelloBoardName ?? "").trim() || null,
+      };
+    }
+    if (body.googleDriveFolderId !== undefined) {
+      if (existing.sourceType !== "google_drive") {
+        return NextResponse.json(
+          { error: "Only Google Drive connections can save a folder." },
+          { status: 400 }
+        );
+      }
+      const withSecrets = await getConnectedSourceWithSecrets(
+        supabase,
+        user.id,
+        id
+      );
+      const folderId = String(body.googleDriveFolderId ?? "").trim() || "root";
+      const kindRaw = String(body.googleDriveFolderKind ?? "").trim();
+      const folderKind =
+        kindRaw === "shared_drive" || kindRaw === "folder" || kindRaw === "my_drive"
+          ? kindRaw
+          : folderId === "root"
+            ? "my_drive"
+            : "folder";
+      settings = {
+        ...(withSecrets?.settings ?? existing.settings),
+        folderId,
+        folderName:
+          String(body.googleDriveFolderName ?? "").trim() ||
+          (folderId === "root" ? "My Drive" : null),
+        driveId: String(body.googleDriveDriveId ?? "").trim() || null,
+        folderKind,
       };
     }
 
@@ -145,6 +179,20 @@ export async function DELETE(_req: Request, ctx: Ctx) {
           username: existing.settings.username ?? null,
           fullName: existing.settings.fullName ?? null,
           memberId: existing.settings.memberId ?? null,
+        },
+      });
+      return NextResponse.json({ source });
+    }
+    if (existing.sourceType === "google_drive") {
+      const source = await updateConnectedSource(supabase, user.id, id, {
+        status: "disconnected",
+        settings: {
+          email: existing.settings.email ?? null,
+          accountName: existing.settings.accountName ?? null,
+          folderId: existing.settings.folderId ?? null,
+          folderName: existing.settings.folderName ?? null,
+          driveId: existing.settings.driveId ?? null,
+          folderKind: existing.settings.folderKind ?? null,
         },
       });
       return NextResponse.json({ source });

@@ -35,28 +35,50 @@ export function mapConnectedSource(row: ConnectedSourceRow): ConnectedSource {
   };
 }
 
-/** Public mapping — never send Trello apiKey/token to the browser. */
+/** Public mapping — never send Trello or Google Drive secrets to the browser. */
 export function mapConnectedSourceForClient(
   row: ConnectedSourceRow
 ): ConnectedSource {
   const source = mapConnectedSource(row);
-  if (source.sourceType !== "trello") return source;
-  const {
-    apiKey: _k,
-    token: _t,
-    secret: _s,
-    ...safe
-  } = source.settings;
-  return {
-    ...source,
-    settings: {
-      ...safe,
-      hasCredentials: Boolean(
-        String(row.settings?.apiKey ?? "").trim() &&
-          String(row.settings?.token ?? "").trim()
-      ),
-    },
-  };
+  if (source.sourceType === "trello") {
+    const {
+      apiKey: _k,
+      token: _t,
+      secret: _s,
+      ...safe
+    } = source.settings;
+    return {
+      ...source,
+      settings: {
+        ...safe,
+        hasCredentials: Boolean(
+          String(row.settings?.apiKey ?? "").trim() &&
+            String(row.settings?.token ?? "").trim()
+        ),
+      },
+    };
+  }
+  if (source.sourceType === "google_drive") {
+    const {
+      accessToken: _a,
+      refreshToken: _r,
+      tokenType: _tt,
+      scope: _sc,
+      expiresAt: _e,
+      ...safe
+    } = source.settings;
+    return {
+      ...source,
+      settings: {
+        ...safe,
+        hasCredentials: Boolean(
+          String(row.settings?.refreshToken ?? "").trim() ||
+            String(row.settings?.accessToken ?? "").trim()
+        ),
+      },
+    };
+  }
+  return source;
 }
 
 export async function listConnectedSources(
@@ -91,7 +113,7 @@ export async function getConnectedSource(
   return data ? mapConnectedSourceForClient(data as ConnectedSourceRow) : null;
 }
 
-/** Internal: includes secrets for server-side Trello API calls. */
+/** Internal: includes secrets for server-side Trello / Google Drive API calls. */
 export async function getConnectedSourceWithSecrets(
   supabase: SupabaseClient,
   userId: string,

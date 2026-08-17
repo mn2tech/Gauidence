@@ -171,7 +171,12 @@ export function formatBoundConnectedFilesForGideon(
       typeof file.cardName === "string" && file.cardName.trim()
         ? ` · ${file.cardName.trim()}`
         : "";
-    const kind = file.sourceType === "trello" ? "Trello" : "Device Storage";
+    const kind =
+      file.sourceType === "trello"
+        ? "Trello"
+        : file.sourceType === "google_drive"
+          ? "Google Drive"
+          : "Device Storage";
     lines.push(
       `- ${displayName}${card} (${kind} in this space, ${file.processingStatus})`
     );

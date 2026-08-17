@@ -13,6 +13,14 @@ describe("file type classification", () => {
     assert.equal(classifyFileType("a.pdf"), "PDF");
     assert.equal(classifyFileType("a.docx"), "Documents");
     assert.equal(classifyFileType("a.xlsx"), "Spreadsheets");
+    assert.equal(
+      classifyFileType("Budget", "application/vnd.google-apps.document"),
+      "Documents"
+    );
+    assert.equal(
+      classifyFileType("Budget", "application/vnd.google-apps.spreadsheet"),
+      "Spreadsheets"
+    );
     assert.equal(classifyFileType("notes.txt"), "Text");
     assert.equal(classifyFileType("readme.md"), "Text");
     assert.equal(classifyFileType("export.json"), "Text");

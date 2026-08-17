@@ -127,7 +127,11 @@ export async function discoverPackSourceItems(
       name: String(row.name ?? "Item"),
       sourceId,
       sourceType,
-      remote: sourceType === "trello" || metadata.provider === "trello",
+      remote:
+        sourceType === "trello" ||
+        sourceType === "google_drive" ||
+        metadata.provider === "trello" ||
+        metadata.provider === "google_drive",
       processingStatus: String(row.processing_status ?? "discovered"),
       mimeType: (row.mime_type as string | null) ?? null,
       sourceUri: String(row.source_uri ?? ""),
@@ -156,7 +160,11 @@ export async function discoverPackSourceItems(
         const t = sourceTypeById.get(m.sourceId);
         if (t) {
           m.sourceType = t;
-          m.remote = t === "trello" || m.metadata.provider === "trello";
+          m.remote =
+            t === "trello" ||
+            t === "google_drive" ||
+            m.metadata.provider === "trello" ||
+            m.metadata.provider === "google_drive";
         }
       }
     }

@@ -1,7 +1,10 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { ConnectorError } from "../types";
-import { mapConnectedSource } from "../services/connectedSources";
+import {
+  mapConnectedSource,
+  mapConnectedSourceForClient,
+} from "../services/connectedSources";
 
 describe("connection mapping and errors", () => {
   it("maps connected_sources rows to ConnectedSource", () => {
@@ -22,6 +25,34 @@ describe("connection mapping and errors", () => {
     assert.equal(source.sourceType, "android_storage");
     assert.equal(source.settings.folderName, "Downloads");
     assert.match(source.sourceUri ?? "", /content:\/\//);
+  });
+
+  it("redacts Google Drive OAuth tokens for the client", () => {
+    const source = mapConnectedSourceForClient({
+      id: "11111111-1111-1111-1111-111111111111",
+      user_id: "22222222-2222-2222-2222-222222222222",
+      profile_id: "33333333-3333-3333-3333-333333333333",
+      source_type: "google_drive",
+      display_name: "Google Drive (a@b.com)",
+      source_uri: "https://drive.google.com/drive/my-drive",
+      status: "connected",
+      settings: {
+        accessToken: "secret-access",
+        refreshToken: "secret-refresh",
+        expiresAt: "2026-08-17T00:00:00.000Z",
+        email: "a@b.com",
+        folderName: "Invoices",
+      },
+      last_scan_at: null,
+      created_at: "2026-08-17T00:00:00.000Z",
+      updated_at: "2026-08-17T00:00:00.000Z",
+    });
+    assert.equal(source.sourceType, "google_drive");
+    assert.equal(source.settings.email, "a@b.com");
+    assert.equal(source.settings.folderName, "Invoices");
+    assert.equal(source.settings.hasCredentials, true);
+    assert.equal(source.settings.accessToken, undefined);
+    assert.equal(source.settings.refreshToken, undefined);
   });
 
   it("preserves cancelled picker as ConnectorError cancelled", () => {

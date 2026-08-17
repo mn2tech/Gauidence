@@ -205,6 +205,7 @@ export default function BrowseSourceFiles({ sourceId }: Props) {
       let access: BatchReadAccess = {};
       const needsLocalAccess =
         sourceType !== "trello" &&
+        sourceType !== "google_drive" &&
         queue.some((item) => !isRemoteAnalyzeItem(item));
       if (needsLocalAccess) {
         try {
@@ -247,7 +248,10 @@ export default function BrowseSourceFiles({ sourceId }: Props) {
           force:
             item.processingStatus === "analyzed" ||
             item.processingStatus === "analysis_failed",
-          remote: sourceType === "trello" || isRemoteAnalyzeItem(item),
+          remote:
+            sourceType === "trello" ||
+            sourceType === "google_drive" ||
+            isRemoteAnalyzeItem(item),
           readOptions: {
             directoryHandle: access.directoryHandle,
             fileIndex: access.fileIndex,

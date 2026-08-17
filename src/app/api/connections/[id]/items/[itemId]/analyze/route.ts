@@ -99,9 +99,9 @@ export async function POST(req: Request, ctx: Ctx) {
           user.id,
           sourceId
         );
-        if (!source || source.sourceType !== "trello") {
+        if (!source || (source.sourceType !== "trello" && source.sourceType !== "google_drive")) {
           return NextResponse.json(
-            { error: "fetchFromSource is only supported for Trello." },
+            { error: "fetchFromSource is only supported for Trello and Google Drive." },
             { status: 400 }
           );
         }
@@ -109,12 +109,28 @@ export async function POST(req: Request, ctx: Ctx) {
         if (!item) {
           return NextResponse.json({ error: "Item not found." }, { status: 404 });
         }
-        const loaded = await loadTrelloItemAnalysisContent(source, item);
+        const loaded =
+          source.sourceType === "google_drive"
+            ? await (async () => {
+                const { googleDriveAccessTokenForSource } = await import(
+                  "@/lib/connectors/googleDrive/access"
+                );
+                const { loadGoogleDriveItemAnalysisContent } = await import(
+                  "@/lib/connectors/googleDrive/scan"
+                );
+                const accessToken = await googleDriveAccessTokenForSource(
+                  supabase,
+                  user.id,
+                  source
+                );
+                return loadGoogleDriveItemAnalysisContent(accessToken, item);
+              })()
+            : await loadTrelloItemAnalysisContent(source, item);
         if (loaded.bytes.byteLength > MAX_BYTES) {
           return NextResponse.json(
             {
               error:
-                "This Trello file is too large to analyze right now (15 MB limit).",
+                "This file is too large to analyze right now (15 MB limit).",
             },
             { status: 413 }
           );
@@ -124,7 +140,7 @@ export async function POST(req: Request, ctx: Ctx) {
         bytes = loaded.bytes;
         text = loaded.text;
         contentHash = body.contentHash?.trim() || (await sha256Hex(bytes));
-        // Bound Trello space (e.g. Wednesday Practice) wins over active space.
+        // Bound connector space wins over active space.
         profileId = source.profileId ?? body.profileId ?? null;
         force = Boolean(body.force);
       } else {

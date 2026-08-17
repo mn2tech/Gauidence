@@ -3,7 +3,10 @@ import { createClient } from "@/lib/supabase/server";
 import { getConnectedSourceWithSecrets } from "@/lib/connectors/services/connectedSources";
 import { getSourceItem } from "@/lib/connectors/services/sourceItems";
 import { loadTrelloItemAnalysisContent } from "@/lib/connectors/trello/scan";
+import { loadGoogleDriveItemAnalysisContent } from "@/lib/connectors/googleDrive/scan";
+import { googleDriveAccessTokenForSource } from "@/lib/connectors/googleDrive/access";
 import { guessMimeFromName } from "@/lib/connectors/content/types";
+import { isRemoteSourceType } from "@/lib/connectors/remote";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -14,7 +17,7 @@ const MAX_BYTES = 15 * 1024 * 1024;
 
 /**
  * Stream file bytes for in-app preview (Content-Disposition: inline).
- * Remote connectors (Trello attachments) are fetched server-side.
+ * Remote connectors (Trello / Google Drive) are fetched server-side.
  * Device Storage files stay on-device — clients should read locally.
  */
 export async function GET(_req: Request, ctx: Ctx) {
@@ -44,7 +47,7 @@ export async function GET(_req: Request, ctx: Ctx) {
     return NextResponse.json({ error: "File not found." }, { status: 404 });
   }
 
-  if (source.sourceType !== "trello") {
+  if (!isRemoteSourceType(source.sourceType)) {
     return NextResponse.json(
       {
         error:
@@ -55,16 +58,28 @@ export async function GET(_req: Request, ctx: Ctx) {
     );
   }
 
-  const kind = String(item.metadata?.kind ?? "");
-  if (kind !== "attachment") {
-    return NextResponse.json(
-      { error: "Preview is only available for Trello file attachments." },
-      { status: 400 }
-    );
+  if (source.sourceType === "trello") {
+    const kind = String(item.metadata?.kind ?? "");
+    if (kind !== "attachment") {
+      return NextResponse.json(
+        { error: "Preview is only available for Trello file attachments." },
+        { status: 400 }
+      );
+    }
   }
 
   try {
-    const loaded = await loadTrelloItemAnalysisContent(source, item);
+    const loaded =
+      source.sourceType === "google_drive"
+        ? await (async () => {
+            const accessToken = await googleDriveAccessTokenForSource(
+              supabase,
+              user.id,
+              source
+            );
+            return loadGoogleDriveItemAnalysisContent(accessToken, item);
+          })()
+        : await loadTrelloItemAnalysisContent(source, item);
     if (loaded.bytes.byteLength > MAX_BYTES) {
       return NextResponse.json(
         { error: "This file is too large to preview (15 MB limit)." },

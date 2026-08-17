@@ -106,9 +106,11 @@ export async function analyzeSourceItem(
     );
   }
 
-  // Trello must land in the bound space so Ask Gideon in that space can see it.
+  // Bound connectors (Trello, Google Drive) must land in the chosen space.
   let profileId =
-    (source.source_type === "trello" ? source.profile_id : null) ||
+    (source.source_type === "trello" || source.source_type === "google_drive"
+      ? source.profile_id
+      : null) ||
     args.profileId ||
     source.profile_id ||
     null;

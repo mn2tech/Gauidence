@@ -1,6 +1,7 @@
 "use client";
 
 import { ConnectorError, type SourceItem } from "@/lib/connectors/types";
+import { isRemoteSourceItem } from "@/lib/connectors/remote";
 import {
   hashSourceBytes,
   readSourceItemContent,
@@ -61,13 +62,9 @@ export function isItemNeedsAnalyze(
   );
 }
 
-function isTrelloRemoteItem(item: SourceItem): boolean {
-  return item.metadata?.provider === "trello";
-}
-
 /** True when Analyze can fetch content server-side (no local folder picker). */
 export function isRemoteAnalyzeItem(item: SourceItem): boolean {
-  return isTrelloRemoteItem(item);
+  return isRemoteSourceItem(item);
 }
 
 async function markAnalysisFailed(
@@ -91,7 +88,7 @@ async function markAnalysisFailed(
 
 /**
  * Read bytes + POST analyze for one connected source item.
- * Trello boards/PDFs are fetched server-side (no local file picker).
+ * Trello boards/PDFs and Google Drive files are fetched server-side (no local file picker).
  */
 export async function analyzeSourceItemClient(args: {
   sourceId: string;
@@ -99,7 +96,7 @@ export async function analyzeSourceItemClient(args: {
   force?: boolean;
   profileId?: string | null;
   readOptions?: ReadSourceOptions;
-  /** Force server-side fetch (whole Trello connection). */
+  /** Force server-side fetch (Trello / Google Drive). */
   remote?: boolean;
   /** When true, already-analyzed items may skip if content hash is unchanged. */
   allowUnchangedSkip?: boolean;
@@ -111,7 +108,7 @@ export async function analyzeSourceItemClient(args: {
       item.processingStatus === "analysis_failed" ||
       (!allowUnchangedSkip && item.processingStatus === "analyzed");
 
-    if (remote || isTrelloRemoteItem(item)) {
+    if (remote || isRemoteAnalyzeItem(item)) {
       const res = await fetch(
         `/api/connections/${sourceId}/items/${item.id}/analyze`,
         {

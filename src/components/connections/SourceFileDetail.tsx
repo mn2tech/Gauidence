@@ -131,7 +131,8 @@ export default function SourceFileDetail({ sourceId, itemId }: Props) {
   const isPdf =
     Boolean(item?.mimeType?.includes("pdf")) ||
     Boolean(item?.name?.toLowerCase().endsWith(".pdf"));
-  const isTrelloRemote = source?.sourceType === "trello";
+  const isRemotePreview =
+    source?.sourceType === "trello" || source?.sourceType === "google_drive";
 
   const loadPdfPreview = useCallback(async () => {
     if (!item?.id || !isPdf) return;
@@ -139,7 +140,7 @@ export default function SourceFileDetail({ sourceId, itemId }: Props) {
     setPreviewLoading(true);
     setPreviewError(null);
     try {
-      if (isTrelloRemote) {
+      if (isRemotePreview) {
         // Stream inline from Guardian API (Trello → Guardian → browser).
         setPreviewUrl((prev) => {
           if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
@@ -176,14 +177,14 @@ export default function SourceFileDetail({ sourceId, itemId }: Props) {
     } finally {
       setPreviewLoading(false);
     }
-  }, [isPdf, isTrelloRemote, item, sourceId]);
+  }, [isPdf, isRemotePreview, item, sourceId]);
 
   // Trello PDFs can load immediately via the file API.
   useEffect(() => {
     if (
       !item ||
       !isPdf ||
-      !isTrelloRemote ||
+      !isRemotePreview ||
       previewUrl ||
       previewLoading ||
       previewAttempted
@@ -194,7 +195,7 @@ export default function SourceFileDetail({ sourceId, itemId }: Props) {
   }, [
     item,
     isPdf,
-    isTrelloRemote,
+    isRemotePreview,
     previewUrl,
     previewLoading,
     previewAttempted,
@@ -210,7 +211,7 @@ export default function SourceFileDetail({ sourceId, itemId }: Props) {
         sourceId,
         item,
         profileId: active?.id,
-        remote: isTrelloRemote,
+        remote: isRemotePreview,
         force: true,
       });
       if (!result.ok) {
@@ -246,7 +247,7 @@ export default function SourceFileDetail({ sourceId, itemId }: Props) {
     } finally {
       setAnalyzing(false);
     }
-  }, [item, load, sourceId, active?.id, isTrelloRemote]);
+  }, [item, load, sourceId, active?.id, isRemotePreview]);
 
   const setReview = useCallback(
     async (
@@ -340,9 +341,11 @@ export default function SourceFileDetail({ sourceId, itemId }: Props) {
   const sourceLabel =
     source?.sourceType === "trello"
       ? "Trello"
-      : source?.sourceType === "guardian"
-        ? "Guardian"
-        : "Device Storage";
+      : source?.sourceType === "google_drive"
+        ? "Google Drive"
+        : source?.sourceType === "guardian"
+          ? "Guardian"
+          : "Device Storage";
 
   return (
     <div className="space-y-6">
@@ -413,11 +416,13 @@ export default function SourceFileDetail({ sourceId, itemId }: Props) {
             </button>
           ) : null}
           <p className="text-xs text-ink-muted">
-            {isTrelloRemote
-              ? String(item.metadata?.kind ?? "") === "attachment"
-                ? "Guardian fetches this attachment from Trello to analyze and preview. The file is not copied into Guardian vault storage."
-                : "Guardian reads this Trello board’s cards and attachments metadata to build knowledge. Nothing is copied into Guardian vault storage."
-              : "Guardian reads this file temporarily to extract knowledge. The original stays on your device — nothing is copied into Guardian storage. If folder access expired, your browser will ask you to pick this one file again."}
+            {source?.sourceType === "google_drive"
+              ? "Guardian fetches this file from Google Drive to analyze and preview. The file is not copied into Guardian vault storage."
+              : isRemotePreview
+                ? String(item.metadata?.kind ?? "") === "attachment"
+                  ? "Guardian fetches this attachment from Trello to analyze and preview. The file is not copied into Guardian vault storage."
+                  : "Guardian reads this Trello board’s cards and attachments metadata to build knowledge. Nothing is copied into Guardian vault storage."
+                : "Guardian reads this file temporarily to extract knowledge. The original stays on your device — nothing is copied into Guardian storage. If folder access expired, your browser will ask you to pick this one file again."}
           </p>
           {!supported ? (
             <p className="text-xs text-amber-800">
@@ -461,8 +466,8 @@ export default function SourceFileDetail({ sourceId, itemId }: Props) {
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Loading…
                   </span>
-                ) : isTrelloRemote ? (
-                  "Load via API"
+                ) : isRemotePreview ? (
+                  "Load from connection"
                 ) : (
                   "Open from device"
                 )}
@@ -482,9 +487,11 @@ export default function SourceFileDetail({ sourceId, itemId }: Props) {
             />
           ) : !previewLoading && !previewError ? (
             <p className="mt-3 text-sm text-ink-muted">
-              {isTrelloRemote
-                ? "Fetch this PDF through Guardian’s file API to display it here."
-                : "Read the PDF from your connected folder to display it here."}
+              {source?.sourceType === "google_drive"
+                ? "Fetch this PDF from Google Drive to display it here."
+                : isRemotePreview
+                  ? "Fetch this PDF through Guardian’s file API to display it here."
+                  : "Read the PDF from your connected folder to display it here."}
             </p>
           ) : null}
         </section>

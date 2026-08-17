@@ -9,7 +9,11 @@ export type ConnectedSourceStatus =
   | "error"
   | "permission_revoked";
 
-export type ConnectedSourceType = "android_storage" | "guardian" | "trello";
+export type ConnectedSourceType =
+  | "android_storage"
+  | "guardian"
+  | "trello"
+  | "google_drive";
 
 export type SourceItemProcessingStatus =
   | "discovered"

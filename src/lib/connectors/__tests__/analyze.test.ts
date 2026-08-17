@@ -32,6 +32,13 @@ describe("connector analyze support", () => {
       true
     );
     assert.equal(isAnalyzeSupportedMime(undefined, "report.xls"), true);
+    assert.equal(
+      isAnalyzeSupportedMime(
+        "application/vnd.google-apps.document",
+        "Q3 Plan"
+      ),
+      true
+    );
     assert.equal(isAnalyzeSupportedMime("application/zip", "a.zip"), false);
   });
 
@@ -115,6 +122,17 @@ describe("connector analyze support", () => {
         sourceUri: "https://trello.com/b/x",
         processingStatus: "discovered",
         metadata: { provider: "trello", kind: "board" },
+      }),
+      true
+    );
+    assert.equal(
+      isRemoteAnalyzeItem({
+        sourceId: "s1",
+        externalId: "f1",
+        name: "chart.pdf",
+        sourceUri: "https://drive.google.com/file/d/x",
+        processingStatus: "discovered",
+        metadata: { provider: "google_drive", kind: "file" },
       }),
       true
     );

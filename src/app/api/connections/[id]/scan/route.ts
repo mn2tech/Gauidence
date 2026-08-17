@@ -12,6 +12,9 @@ import {
   itemBelongsToTrelloBoard,
   trelloSelectedBoardId,
 } from "@/lib/connectors/trello/selectedBoard";
+import { scanGoogleDriveSource } from "@/lib/connectors/googleDrive/scan";
+import { googleDriveAccessTokenForSource } from "@/lib/connectors/googleDrive/access";
+import { GoogleDriveApiError } from "@/lib/connectors/googleDrive/client";
 import { rehomeSourceItemsOntologyToSpace } from "@/lib/ontology/pipeline/persistConnectorOntology";
 
 export const runtime = "nodejs";
@@ -45,6 +48,56 @@ export async function POST(req: Request, ctx: Ctx) {
       { error: "This connection is disconnected. Reconnect to scan." },
       { status: 400 }
     );
+  }
+
+  if (sourcePublic.sourceType === "google_drive") {
+    const source = await getConnectedSourceWithSecrets(supabase, user.id, id);
+    if (!source) {
+      return NextResponse.json({ error: "Connection not found." }, { status: 404 });
+    }
+    try {
+      const accessToken = await googleDriveAccessTokenForSource(
+        supabase,
+        user.id,
+        source
+      );
+      const items = await scanGoogleDriveSource(source, accessToken);
+      const summary = await upsertScanResults(supabase, id, items);
+      if (source.profileId) {
+        const { data: analyzed } = await supabase
+          .from("source_items")
+          .select("id")
+          .eq("source_id", id)
+          .eq("processing_status", "analyzed")
+          .limit(500);
+        await rehomeSourceItemsOntologyToSpace(supabase, {
+          sourceItemIds: (analyzed ?? []).map((row) => row.id as string),
+          profileId: source.profileId,
+        });
+      }
+      return NextResponse.json({ summary });
+    } catch (err) {
+      if (
+        err instanceof GoogleDriveApiError &&
+        (err.status === 401 || err.status === 403)
+      ) {
+        await supabase
+          .from("connected_sources")
+          .update({ status: "permission_revoked" })
+          .eq("id", id)
+          .eq("user_id", user.id);
+        return NextResponse.json(
+          {
+            error: "permission_revoked",
+            message: "Google Drive access was revoked. Reconnect to continue.",
+          },
+          { status: 403 }
+        );
+      }
+      const message =
+        err instanceof Error ? err.message : "Couldn't scan Google Drive.";
+      return NextResponse.json({ error: message }, { status: 500 });
+    }
   }
 
   // Trello: always scan server-side with stored credentials.
