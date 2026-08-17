@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import {
-  generateProposalHtml,
-  proposalExportHeaders,
-} from "@/lib/proposals/export";
+import { proposalExportHeaders } from "@/lib/proposals/export";
+import { generateProposalPdf } from "@/lib/proposals/exportPdf";
 import { hashProposalPortalToken } from "@/lib/proposals/portal";
 import { enrichProposals, recordProposalEvent } from "@/lib/proposals/server";
 import { PROPOSAL_SELECT } from "@/lib/proposals/types";
@@ -13,7 +11,7 @@ export const runtime = "nodejs";
 
 type RouteContext = { params: Promise<{ token: string }> };
 
-/** Download a shared proposal as printable HTML. */
+/** Download a shared proposal as a PDF. */
 export async function GET(_request: Request, context: RouteContext) {
   const { token } = await context.params;
   const admin = createAdminClient();
@@ -57,13 +55,13 @@ export async function GET(_request: Request, context: RouteContext) {
     actorUserId,
   });
 
-  const html = generateProposalHtml({
+  const pdf = await generateProposalPdf({
     proposal,
     businessName: proposal.business_name ?? "Business",
     clientName: proposal.client_name ?? "Client",
   });
 
-  return new NextResponse(html, {
+  return new NextResponse(new Uint8Array(pdf), {
     headers: proposalExportHeaders(proposal.title),
   });
 }

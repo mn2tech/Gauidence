@@ -15,14 +15,14 @@ export default function DownloadProposalButton({
   portalToken,
   className = "inline-flex items-center gap-1.5 rounded-xl border border-stone-300 px-3 py-2 text-xs font-semibold hover:bg-stone-50",
   iconClassName = "h-3.5 w-3.5",
-  label = "Download",
+  label = "Download PDF",
 }: Props) {
   const href = portalToken
     ? `/api/proposal-portal/${encodeURIComponent(portalToken)}/export`
     : `/api/proposals/${proposalId}/export`;
 
   return (
-    <a href={href} download className={className} title="Download proposal">
+    <a href={href} download className={className} title="Download PDF">
       <Download className={iconClassName} />
       {label}
     </a>

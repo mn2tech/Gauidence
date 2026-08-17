@@ -90,13 +90,13 @@ export function proposalExportFilename(title: string): string {
     .replace(/[^\w.-]+/g, "_")
     .replace(/^_+|_+$/g, "")
     .slice(0, 80);
-  return `${base || "proposal"}.html`;
+  return `${base || "proposal"}.pdf`;
 }
 
 export function proposalExportHeaders(title: string): Record<string, string> {
   const filename = proposalExportFilename(title);
   return {
-    "Content-Type": "text/html; charset=utf-8",
+    "Content-Type": "application/pdf",
     "Content-Disposition": `attachment; filename="${filename}"`,
   };
 }

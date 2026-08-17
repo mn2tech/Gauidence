@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
-import {
-  generateProposalHtml,
-  proposalExportHeaders,
-} from "@/lib/proposals/export";
+import { proposalExportHeaders } from "@/lib/proposals/export";
+import { generateProposalPdf } from "@/lib/proposals/exportPdf";
 import {
   isProposalAuthed,
   requireProposalUser,
@@ -13,7 +11,7 @@ export const runtime = "nodejs";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-/** Download a proposal as printable HTML. */
+/** Download a proposal as a PDF. */
 export async function GET(_request: Request, context: RouteContext) {
   const auth = await requireProposalUser();
   if (!isProposalAuthed(auth)) return auth;
@@ -23,7 +21,7 @@ export async function GET(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Proposal not found." }, { status: 404 });
   }
 
-  const html = generateProposalHtml({
+  const pdf = await generateProposalPdf({
     proposal,
     businessName: proposal.business_name ?? "Business",
     clientName: proposal.client_name ?? "Client",
@@ -35,7 +33,7 @@ export async function GET(_request: Request, context: RouteContext) {
     actorUserId: auth.user.id,
   });
 
-  return new NextResponse(html, {
+  return new NextResponse(new Uint8Array(pdf), {
     headers: proposalExportHeaders(proposal.title),
   });
 }
