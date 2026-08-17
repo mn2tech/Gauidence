@@ -22,7 +22,7 @@ Recommendation / Action (labeled)
 
 > Gideon should reason over Guardian knowledge, not merely repeat Guardian knowledge.
 
-This builds on Pack Engine V1 (`docs/GUARDIAN_PACK_ENGINE.md`). It does **not** rebuild the Pack Engine and does **not** start Pack #002 (Guardian Dental).
+This builds on Pack Engine V1 (`docs/GUARDIAN_PACK_ENGINE.md`). It does **not** rebuild the Pack Engine. Guardian Dental (Pack #002) is seeded separately in `0084_guardian_dental_pack.sql`.
 
 ---
 
