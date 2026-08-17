@@ -3171,11 +3171,12 @@ export default function VaultChatPanel({
           c.fileName.toLowerCase() === n ||
           c.fileName.toLowerCase().includes(n.replace(/\.[^.]+$/, ""))
       );
+    // Preview cards only for images + connector chart PDFs. Vault docs (JSON,
+    // notes, etc.) stay as Source links — no file thumbnail above the answer.
     const vaultPreviewCitations = [
       ...vaultImages,
       ...connectorImages,
       ...connectorPdfs,
-      ...sourceCitations.filter((c) => c.kind !== "connector"),
     ].filter(matchesExplicit);
     const previewCitations = options?.hideCitationPreviews
       ? []
