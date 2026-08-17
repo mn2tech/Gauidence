@@ -273,6 +273,8 @@ on conflict (slug) do update set name = excluded.name, updated_at = now();
 5. Gideon answers dental starter questions with Dental Practice Ops framing  
 6. Dashboard cards load from catalog (not Business defaults)  
 
+**No clinical data yet?** Use the public (non-PHI) Lagos Dental Centre fixture — see [`docs/demos/GUARDIAN_DENTAL_DEMO.md`](demos/GUARDIAN_DENTAL_DEMO.md).
+
 ## Tests
 
 ```bash
