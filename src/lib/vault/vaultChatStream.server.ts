@@ -20,8 +20,11 @@ import {
   pickConnectorCitationsForChartQuery,
 } from "@/lib/ontology/connectorCitationIds";
 import { ensureYouTubeLinksInAnswer, extractYouTubeUrls } from "@/lib/ontology/pipeline/youtubeUrls";
-import { extractChartTitlesFromText } from "@/lib/vault/expandRetrievalQuestion";
-import { titlePhraseForOntologySearch } from "@/lib/ontology/normalize";
+import { extractChartTitlesFromText, isPianoOrSongLearnRequest } from "@/lib/vault/expandRetrievalQuestion";
+import {
+  isConnectedChartQuery,
+  titlePhraseForOntologySearch,
+} from "@/lib/ontology/normalize";
 import {
   buildVaultScopePayload,
   chatScopedProfilePayload,
@@ -241,24 +244,32 @@ export function createVaultChatStreamResponse(
           }
         }
         if (args.connectorCitations?.length) {
-          const songTitles = [
-            ...extractChartTitlesFromText(args.question),
-            ...(titlePhraseForOntologySearch(args.question)
-              ? [titlePhraseForOntologySearch(args.question)!]
-              : []),
-          ];
-          const picked = pickConnectorCitationsForChartQuery(
-            args.connectorCitations,
-            args.question,
-            answer,
-            songTitles,
-            4
-          );
-          const seen = new Set(selected.map((c) => c.documentId));
-          for (const c of picked) {
-            if (!c.documentId || seen.has(c.documentId)) continue;
-            selected.push(c);
-            seen.add(c.documentId);
+          // Chord/chart connector previews only for music/chart turns — never on
+          // practice-profile questions (avoids random Trello PDFs next to JSON).
+          const chartTurn =
+            isConnectedChartQuery(args.question) ||
+            isPianoOrSongLearnRequest(args.question) ||
+            extractChartTitlesFromText(args.question).length > 0;
+          if (chartTurn) {
+            const songTitles = [
+              ...extractChartTitlesFromText(args.question),
+              ...(titlePhraseForOntologySearch(args.question)
+                ? [titlePhraseForOntologySearch(args.question)!]
+                : []),
+            ];
+            const picked = pickConnectorCitationsForChartQuery(
+              args.connectorCitations,
+              args.question,
+              answer,
+              songTitles,
+              4
+            );
+            const seen = new Set(selected.map((c) => c.documentId));
+            for (const c of picked) {
+              if (!c.documentId || seen.has(c.documentId)) continue;
+              selected.push(c);
+              seen.add(c.documentId);
+            }
           }
         }
         const citations = markImageCitations(dedupeVaultCitations(selected));

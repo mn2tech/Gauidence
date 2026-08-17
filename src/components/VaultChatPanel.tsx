@@ -103,7 +103,10 @@ import {
   type GideonFocusBlock,
 } from "@/lib/gideon/focusBlock";
 import { isImageFileName } from "@/lib/vault/images";
-import { citationNamedInText } from "@/lib/vault/retrieve";
+import {
+  citationNamedInText,
+  extractExplicitSourceFileNames,
+} from "@/lib/vault/retrieve";
 import {
   connectorFilePreviewPath,
   isConnectorCitationDocumentId,
@@ -3125,13 +3128,14 @@ export default function VaultChatPanel({
     const vaultImages = imageCitations
       .filter((c) => c.kind !== "connector")
       .filter((c) => sourceNamedInAnswer(c));
-    // Trust server-picked connector citations; prefer the key named in the answer.
+    // Trust server-picked connector citations only when the answer names them.
+    // preferChartsMatchingKeyInText alone can return the first 2 unnamed PDFs.
     const connectorImages = preferChartsMatchingKeyInText(
       imageCitations.filter((c) => c.kind === "connector"),
       answerText,
       2
-    );
-    // Connector PDFs: same trust as connector images (server already picked).
+    ).filter((c) => sourceNamedInAnswer(c));
+    // Connector PDFs: same — must be named in the answer.
     const connectorPdfs = preferChartsMatchingKeyInText(
       uniqueCitations.filter(
         (c) =>
@@ -3143,7 +3147,7 @@ export default function VaultChatPanel({
       ),
       answerText,
       2
-    );
+    ).filter((c) => sourceNamedInAnswer(c));
     // Non-image vault Sources must also be named in the answer.
     const sourceCitations = uniqueCitations.filter((c) => {
       if (c.isImage || isImageFileName(c.fileName)) return false;
@@ -3156,12 +3160,23 @@ export default function VaultChatPanel({
       }
       return sourceNamedInAnswer(c);
     });
+    // Prefer files listed on Source: lines when present.
+    const explicitSourceNames = extractExplicitSourceFileNames(answerText).map(
+      (n) => n.toLowerCase()
+    );
+    const matchesExplicit = (c: Citation) =>
+      explicitSourceNames.length === 0 ||
+      explicitSourceNames.some(
+        (n) =>
+          c.fileName.toLowerCase() === n ||
+          c.fileName.toLowerCase().includes(n.replace(/\.[^.]+$/, ""))
+      );
     const vaultPreviewCitations = [
       ...vaultImages,
       ...connectorImages,
       ...connectorPdfs,
       ...sourceCitations.filter((c) => c.kind !== "connector"),
-    ];
+    ].filter(matchesExplicit);
     const previewCitations = options?.hideCitationPreviews
       ? []
       : vaultPreviewCitations;

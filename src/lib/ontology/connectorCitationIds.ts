@@ -63,7 +63,11 @@ export function preferChartsMatchingKeyInText<T extends NamedCitation>(
   if (!citations.length) return [];
   if (citations.length === 1) return citations.slice(0, limit);
   const key = extractMusicalKeyFromText(text);
-  if (!key) return citations.slice(0, limit);
+  if (!key) {
+    // No key to prefer — keep only citations already named in the text.
+    const named = citations.filter((c) => citationMentionedInText(c, text));
+    return (named.length ? named : []).slice(0, limit);
+  }
   const keyed = citations.filter((c) => {
     const labels = [c.cardName, c.fileName]
       .map((v) => (typeof v === "string" ? v.trim() : ""))
@@ -72,7 +76,8 @@ export function preferChartsMatchingKeyInText<T extends NamedCitation>(
     return chartLabelHasKey(labels, key);
   });
   if (keyed.length) return keyed.slice(0, Math.min(limit, 1));
-  return citations.slice(0, limit);
+  const named = citations.filter((c) => citationMentionedInText(c, text));
+  return (named.length ? named : []).slice(0, limit);
 }
 
 function citationMentionedInText(

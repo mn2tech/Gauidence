@@ -9,6 +9,7 @@ import {
   formatRetrievalContext,
   selectCitationsForAnswer,
   dedupeVaultCitations,
+  citationNamedInText,
 } from "../../vault/retrieve.ts";
 
 describe("vault RAG chunking", () => {
@@ -182,7 +183,7 @@ describe("vault retrieval formatting", () => {
     const cited = selectCitationsForAnswer(
       `Lagos Dental Centre office hours:
 • Tuesday: 10 AM – 7 PM
-Source: lagos-dental-centre-practice-profile.json`,
+Source: Lagos Dental Centre - lagos-dental-centre-practice-profile.json`,
       chunks,
       "What are the office hours for Lagos Dental Centre?"
     );
@@ -190,6 +191,20 @@ Source: lagos-dental-centre-practice-profile.json`,
     assert.equal(
       cited[0]?.fileName,
       "lagos-dental-centre-practice-profile.json"
+    );
+  });
+
+  it("does not treat the Space name as naming every file in that Space", () => {
+    assert.equal(
+      citationNamedInText(
+        {
+          fileName: "Noble uncle First Anniversary.pdf",
+          profileName: "Lagos Dental Centre",
+          cardName: "Lagos Dental Centre",
+        },
+        "Lagos Dental Centre office hours are Tue–Thu. Source: lagos-dental-centre-practice-profile.json"
+      ),
+      false
     );
   });
 

@@ -117,9 +117,12 @@ export function citationNamedInText(
   const hay = text.toLowerCase();
   if (!hay.trim()) return false;
 
+  const profile = citation.profileName?.trim().toLowerCase() ?? "";
   const labels = [citation.cardName, citation.fileName]
     .map((v) => (typeof v === "string" ? v.trim() : ""))
-    .filter(Boolean);
+    .filter(Boolean)
+    // Space/practice name alone must not count as naming every file in that Space.
+    .filter((label) => label.toLowerCase() !== profile);
 
   for (const label of labels) {
     const name = label.toLowerCase();
@@ -144,29 +147,36 @@ export function citationNamedInText(
     }
   }
 
-  const vault = citation.profileName?.trim().toLowerCase() ?? "";
-  if (vault.length >= 4 && hay.includes(vault)) {
-    for (const label of labels) {
-      const base = label
-        .toLowerCase()
-        .replace(/\.[^.]+$/, "")
-        .trim();
-      // Vault name alone is not enough — still need a strong file stem.
-      if (base.length >= 12 && hay.includes(base)) return true;
-      const tokens = base
-        .split(/[\s_+.\-]+/)
-        .map((t) => t.trim())
-        .filter((t) => t.length >= 5);
-      if (
-        tokens.length >= 2 &&
-        tokens.filter((t) => hay.includes(t)).length >= 2
-      ) {
-        return true;
-      }
-    }
+  // Explicit "Source: filename" lines — match file stem tokens only (not Space name).
+  const fileBase = citation.fileName
+    .toLowerCase()
+    .replace(/\.[^.]+$/, "")
+    .trim();
+  if (fileBase.length >= 10 && hay.includes(fileBase)) return true;
+  const fileTokens = fileBase
+    .split(/[\s_+.\-]+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length >= 5);
+  if (fileTokens.length >= 2) {
+    const hitCount = fileTokens.filter((t) => hay.includes(t)).length;
+    if (hitCount >= 2) return true;
   }
 
   return false;
+}
+
+/** Filenames explicitly listed after Source: in the answer. */
+export function extractExplicitSourceFileNames(answer: string): string[] {
+  const names: string[] = [];
+  for (const match of answer.matchAll(
+    /source\s*:\s*(?:[^\n—\-]*?[—\-]\s*)?([^\n]+?\.(?:pdf|json|csv|jpe?g|png|webp|gif|txt|docx?))/gi
+  )) {
+    const raw = match[1]?.trim();
+    if (!raw) continue;
+    const base = raw.split(/[/\\]/).pop()?.trim();
+    if (base) names.push(base);
+  }
+  return names;
 }
 
 /**
@@ -245,6 +255,26 @@ export function selectCitationsForAnswer(
   if (matched.length === 0) return [];
 
   matched.sort((a, b) => b.score - a.score || b.similarity - a.similarity);
+
+  const explicit = extractExplicitSourceFileNames(answer).map((n) =>
+    n.toLowerCase()
+  );
+  if (explicit.length) {
+    const explicitHits = matched.filter((m) =>
+      explicit.some(
+        (n) =>
+          m.fileName.toLowerCase() === n ||
+          m.fileName.toLowerCase().includes(n.replace(/\.[^.]+$/, ""))
+      )
+    );
+    if (explicitHits.length) {
+      return explicitHits.slice(0, 2).map(({ documentId, fileName, profileName }) => ({
+        documentId,
+        fileName,
+        ...(profileName ? { profileName } : {}),
+      }));
+    }
+  }
 
   // If the answer clearly names one primary file, drop weaker extras.
   const top = matched[0]!;
