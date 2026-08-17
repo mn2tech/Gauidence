@@ -309,6 +309,125 @@ export function looksLikeSongOrChartTitle(title: string): boolean {
   return true;
 }
 
+export type ConnectedPracticeItemInput = {
+  name?: string | null;
+  mime_type?: string | null;
+  metadata?: Record<string, unknown> | null;
+};
+
+export type ConnectedPracticeStats = {
+  songCount: number;
+  jpgCount: number;
+  pngCount: number;
+  pdfCount: number;
+  chartCount: number;
+  analyzedItemCount: number;
+  songTitles: string[];
+};
+
+/**
+ * Count songs and chart file types from analyzed Trello/device items
+ * for Ask Gideon welcome stats.
+ */
+export function summarizeConnectedPracticeItems(
+  items: ConnectedPracticeItemInput[]
+): ConnectedPracticeStats {
+  let jpgCount = 0;
+  let pngCount = 0;
+  let pdfCount = 0;
+  let chartCount = 0;
+  const songKeys = new Set<string>();
+  const songTitles: string[] = [];
+
+  for (const item of items) {
+    const name = String(item.name ?? "").trim();
+    const mime = typeof item.mime_type === "string" ? item.mime_type : null;
+    const meta =
+      item.metadata && typeof item.metadata === "object" ? item.metadata : {};
+    const kind = String(meta.kind ?? "");
+    const cardName =
+      typeof meta.cardName === "string" && meta.cardName.trim()
+        ? meta.cardName.trim()
+        : null;
+
+    // Board text dumps are not chart files.
+    if (/\.txt$/i.test(name) || kind === "board" || /^pasted\b/i.test(name)) {
+      continue;
+    }
+
+    const isJpg =
+      /\.jpe?g$/i.test(name) ||
+      mime === "image/jpeg" ||
+      mime === "image/jpg";
+    const isPng = /\.png$/i.test(name) || mime === "image/png";
+    const isPdf =
+      /\.pdf$/i.test(name) ||
+      mime === "application/pdf" ||
+      Boolean(mime?.includes("pdf"));
+    const isOtherImage =
+      !isJpg &&
+      !isPng &&
+      (isImageFileName(name) || isImageMimeType(mime));
+
+    if (isJpg || isPng || isPdf || isOtherImage || kind === "attachment") {
+      if (isJpg) jpgCount += 1;
+      else if (isPng) pngCount += 1;
+      else if (isPdf) pdfCount += 1;
+      if (isJpg || isPng || isPdf || isOtherImage) chartCount += 1;
+    } else {
+      continue;
+    }
+
+    const title = songTitleFromInventoryLabel(cardName || name);
+    if (!looksLikeSongOrChartTitle(title)) continue;
+    const key = title.toLowerCase().replace(/\s+/g, " ").trim();
+    if (!key || songKeys.has(key)) continue;
+    songKeys.add(key);
+    if (songTitles.length < 8) songTitles.push(title);
+  }
+
+  return {
+    songCount: songKeys.size,
+    jpgCount,
+    pngCount,
+    pdfCount,
+    chartCount,
+    analyzedItemCount: items.length,
+    songTitles,
+  };
+}
+
+/** Compact welcome line: "42 songs · 38 JPGs · 4 PDFs". */
+export function formatConnectedPracticeStatsLine(
+  stats: ConnectedPracticeStats,
+  boardName?: string | null
+): string | null {
+  const bits: string[] = [];
+  if (stats.songCount > 0) {
+    bits.push(
+      `${stats.songCount} song${stats.songCount === 1 ? "" : "s"}`
+    );
+  }
+  if (stats.jpgCount > 0) {
+    bits.push(`${stats.jpgCount} JPG${stats.jpgCount === 1 ? "" : "s"}`);
+  }
+  if (stats.pngCount > 0) {
+    bits.push(`${stats.pngCount} PNG${stats.pngCount === 1 ? "" : "s"}`);
+  }
+  if (stats.pdfCount > 0) {
+    bits.push(`${stats.pdfCount} PDF${stats.pdfCount === 1 ? "" : "s"}`);
+  }
+  if (!bits.length && stats.chartCount > 0) {
+    bits.push(
+      `${stats.chartCount} chart${stats.chartCount === 1 ? "" : "s"}`
+    );
+  }
+  if (!bits.length) return null;
+  const summary = bits.join(" · ");
+  const board = boardName?.trim();
+  return board ? `${board}: ${summary}` : summary;
+}
+
 function songTitleFromInventoryLabel(label: string): string {
   let title = label.replace(/\.(jpe?g|png|gif|webp|pdf)$/i, "").trim();
   title = title

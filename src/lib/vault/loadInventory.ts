@@ -8,7 +8,10 @@ import {
   wantsVaultFileInventory,
   wantsSongOrChartList,
   RECENT_VAULT_FILE_PREVIEW,
+  summarizeConnectedPracticeItems,
+  formatConnectedPracticeStatsLine,
   type VaultFileInventoryRow,
+  type ConnectedPracticeStats,
 } from "./askInventory";
 import {
   getCachedProfileFileCounts,
@@ -26,6 +29,8 @@ export type ConnectedSuggestionContext = {
   songTitles: string[];
   boardName: string | null;
   hasConnectedCharts: boolean;
+  practiceStats: ConnectedPracticeStats | null;
+  practiceStatsLine: string | null;
 };
 
 /** Analyzed Trello/device charts bound to a space — for Ask Gideon chips. */
@@ -39,6 +44,8 @@ export async function loadConnectedSuggestionContext(
     songTitles: [],
     boardName: null,
     hasConnectedCharts: false,
+    practiceStats: null,
+    practiceStatsLine: null,
   };
 
   const { data: sources } = await supabase
@@ -72,7 +79,7 @@ export async function loadConnectedSuggestionContext(
     .in("source_id", sourceIds)
     .eq("processing_status", "analyzed")
     .order("updated_at", { ascending: false })
-    .limit(80);
+    .limit(250);
   if (!items?.length) return empty;
 
   const onSelectedBoard = items.filter((item) => {
@@ -95,24 +102,16 @@ export async function loadConnectedSuggestionContext(
   });
   if (!onSelectedBoard.length) return empty;
 
-  const songTitles: string[] = [];
-  const seen = new Set<string>();
-  for (const item of onSelectedBoard) {
-    const meta =
-      item.metadata && typeof item.metadata === "object"
-        ? (item.metadata as Record<string, unknown>)
-        : {};
-    const title = chartSuggestionTitle({
+  const practiceStats = summarizeConnectedPracticeItems(
+    onSelectedBoard.map((item) => ({
       name: typeof item.name === "string" ? item.name : null,
-      cardName: typeof meta.cardName === "string" ? meta.cardName : null,
-    });
-    if (!title) continue;
-    const key = title.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    songTitles.push(title);
-    if (songTitles.length >= 4) break;
-  }
+      mime_type: typeof item.mime_type === "string" ? item.mime_type : null,
+      metadata:
+        item.metadata && typeof item.metadata === "object"
+          ? (item.metadata as Record<string, unknown>)
+          : null,
+    }))
+  );
 
   let boardName: string | null = null;
   for (const source of relevant) {
@@ -127,11 +126,39 @@ export async function loadConnectedSuggestionContext(
     }
   }
 
+  // Prefer chip titles from the stats helper; fall back to chartSuggestionTitle.
+  const songTitles =
+    practiceStats.songTitles.length > 0
+      ? practiceStats.songTitles.slice(0, 4)
+      : (() => {
+          const titles: string[] = [];
+          const seen = new Set<string>();
+          for (const item of onSelectedBoard) {
+            const meta =
+              item.metadata && typeof item.metadata === "object"
+                ? (item.metadata as Record<string, unknown>)
+                : {};
+            const title = chartSuggestionTitle({
+              name: typeof item.name === "string" ? item.name : null,
+              cardName: typeof meta.cardName === "string" ? meta.cardName : null,
+            });
+            if (!title) continue;
+            const key = title.toLowerCase();
+            if (seen.has(key)) continue;
+            seen.add(key);
+            titles.push(title);
+            if (titles.length >= 4) break;
+          }
+          return titles;
+        })();
+
   return {
-    chartCount: onSelectedBoard.length,
+    chartCount: practiceStats.chartCount || onSelectedBoard.length,
     songTitles,
     boardName,
-    hasConnectedCharts: onSelectedBoard.length > 0,
+    hasConnectedCharts: practiceStats.chartCount > 0 || onSelectedBoard.length > 0,
+    practiceStats,
+    practiceStatsLine: formatConnectedPracticeStatsLine(practiceStats, boardName),
   };
 }
 

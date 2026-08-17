@@ -4,7 +4,9 @@ import {
   buildAskVaultInventory,
   buildInventoryQuestionAnswer,
   formatBoundConnectedFilesForGideon,
+  formatConnectedPracticeStatsLine,
   formatVaultFileListForGideon,
+  summarizeConnectedPracticeItems,
   wantsVaultFileInventory,
 } from "../askInventory.ts";
 
@@ -165,5 +167,45 @@ Documents (2): Nolan report.pdf, homework.pdf
 Photos (1): summer.jpg`,
     });
     assert.match(answer!, /Nolan report\.pdf/);
+  });
+});
+
+describe("connected practice stats", () => {
+  it("counts songs, JPGs, and PDFs from Trello chart items", () => {
+    const stats = summarizeConnectedPracticeItems([
+      {
+        name: "board.txt",
+        mime_type: "text/plain",
+        metadata: { kind: "board" },
+      },
+      {
+        name: "trello1.jpg",
+        mime_type: "image/jpeg",
+        metadata: { kind: "attachment", cardName: "What a Beautiful Name - C" },
+      },
+      {
+        name: "trello2.jpg",
+        mime_type: "image/jpeg",
+        metadata: { kind: "attachment", cardName: "What a Beautiful Name - Bb" },
+      },
+      {
+        name: "trello3.jpg",
+        mime_type: "image/jpeg",
+        metadata: { kind: "attachment", cardName: "Lord Send Revival - G" },
+      },
+      {
+        name: "chart.pdf",
+        mime_type: "application/pdf",
+        metadata: { kind: "attachment", cardName: "Silent Night - C" },
+      },
+    ]);
+    assert.equal(stats.jpgCount, 3);
+    assert.equal(stats.pdfCount, 1);
+    assert.equal(stats.chartCount, 4);
+    assert.equal(stats.songCount, 3);
+    assert.match(
+      formatConnectedPracticeStatsLine(stats, "Living Waters")!,
+      /Living Waters: 3 songs · 3 JPGs · 1 PDF/
+    );
   });
 });

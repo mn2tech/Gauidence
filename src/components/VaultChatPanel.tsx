@@ -489,6 +489,17 @@ type Meta = {
   suggestions: string[];
   quickActions?: GideonQuickAction[];
   connectedItemCount?: number;
+  practiceStats?: {
+    songCount: number;
+    jpgCount: number;
+    pngCount: number;
+    pdfCount: number;
+    chartCount: number;
+    analyzedItemCount: number;
+    songTitles: string[];
+  } | null;
+  practiceStatsLine?: string | null;
+  musicPractice?: boolean;
   profileId?: string;
   profileName?: string;
   askContextLabel?: string;
@@ -3684,15 +3695,29 @@ export default function VaultChatPanel({
   ).slice(0, 4);
 
   const countBits: string[] = [];
+  if (meta?.practiceStatsLine) {
+    countBits.push(meta.practiceStatsLine);
+  }
   if (docCount > 0) {
-    countBits.push(`${docCount} document${docCount === 1 ? "" : "s"}`);
+    countBits.push(
+      meta?.practiceStatsLine
+        ? `${docCount} uploaded doc${docCount === 1 ? "" : "s"}`
+        : `${docCount} document${docCount === 1 ? "" : "s"}`
+    );
   }
   if (photoCount > 0) {
-    countBits.push(`${photoCount} photo${photoCount === 1 ? "" : "s"}`);
+    countBits.push(
+      meta?.practiceStatsLine
+        ? `${photoCount} uploaded photo${photoCount === 1 ? "" : "s"}`
+        : `${photoCount} photo${photoCount === 1 ? "" : "s"}`
+    );
   }
   if (logCount > 0) {
     countBits.push(`${logCount} Daily Log${logCount === 1 ? "" : "s"}`);
   }
+
+  const practiceStats = meta?.practiceStats ?? null;
+  const showPracticeStats = Boolean(meta?.practiceStatsLine);
 
   const templateBadge =
     meta?.guidance?.badge ?? meta?.templateBadge ?? null;
@@ -3734,6 +3759,37 @@ export default function VaultChatPanel({
               <p className="text-sm leading-relaxed text-ink-muted">
                 {GIDEON_RETURNING_PROMPT}
               </p>
+              {showPracticeStats ? (
+                <div className="rounded-xl border border-stone-200 bg-stone-50/80 px-3 py-2.5">
+                  <p className="text-xs font-semibold text-foreground">
+                    {meta?.practiceStatsLine}
+                  </p>
+                  {practiceStats ? (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {practiceStats.songCount > 0 ? (
+                        <span className="rounded-full border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-medium text-foreground">
+                          {practiceStats.songCount} songs
+                        </span>
+                      ) : null}
+                      {practiceStats.jpgCount > 0 ? (
+                        <span className="rounded-full border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-medium text-foreground">
+                          {practiceStats.jpgCount} JPGs
+                        </span>
+                      ) : null}
+                      {practiceStats.pngCount > 0 ? (
+                        <span className="rounded-full border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-medium text-foreground">
+                          {practiceStats.pngCount} PNGs
+                        </span>
+                      ) : null}
+                      {practiceStats.pdfCount > 0 ? (
+                        <span className="rounded-full border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-medium text-foreground">
+                          {practiceStats.pdfCount} PDFs
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
               <p className="text-[11px] font-medium text-ink-muted">
                 {GIDEON_CHIEF_OF_STAFF_TAGLINE}
               </p>
@@ -3830,10 +3886,13 @@ export default function VaultChatPanel({
             </>
           )}
 
-          {!showMinimalWelcome && !emptyVault && countBits.length > 0 ? (
+          {!showPracticeStats &&
+          !showMinimalWelcome &&
+          !emptyVault &&
+          countBits.length > 0 ? (
             <details className="rounded-xl border border-stone-200 bg-stone-50/80 px-3 py-2.5">
               <summary className="cursor-pointer text-xs font-semibold text-foreground">
-                In this vault: {countBits.join(" · ")}
+                In this space: {countBits.join(" · ")}
               </summary>
               <div className="mt-2 space-y-2 border-t border-stone-200 pt-2">
                 {docCount > 0 ? (
@@ -3877,6 +3936,60 @@ export default function VaultChatPanel({
                     Open {VAULT_NAV_LABEL}
                   </Link>{" "}
                   to see everything.
+                </p>
+              </div>
+            </details>
+          ) : null}
+
+          {showPracticeStats && !(showMinimalWelcome && !emptyVault) ? (
+            <details
+              open
+              className="rounded-xl border border-stone-200 bg-stone-50/80 px-3 py-2.5"
+            >
+              <summary className="cursor-pointer text-xs font-semibold text-foreground">
+                {meta?.practiceStatsLine}
+              </summary>
+              <div className="mt-2 space-y-2 border-t border-stone-200 pt-2">
+                {practiceStats ? (
+                  <div className="flex flex-wrap gap-2">
+                    {practiceStats.songCount > 0 ? (
+                      <span className="rounded-full border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-medium text-foreground">
+                        {practiceStats.songCount} songs
+                      </span>
+                    ) : null}
+                    {practiceStats.jpgCount > 0 ? (
+                      <span className="rounded-full border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-medium text-foreground">
+                        {practiceStats.jpgCount} JPGs
+                      </span>
+                    ) : null}
+                    {practiceStats.pngCount > 0 ? (
+                      <span className="rounded-full border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-medium text-foreground">
+                        {practiceStats.pngCount} PNGs
+                      </span>
+                    ) : null}
+                    {practiceStats.pdfCount > 0 ? (
+                      <span className="rounded-full border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-medium text-foreground">
+                        {practiceStats.pdfCount} PDFs
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
+                {practiceStats && practiceStats.songTitles.length > 0 ? (
+                  <div>
+                    <p className="text-[11px] font-medium text-ink-muted">
+                      Songs
+                    </p>
+                    <NameList
+                      names={practiceStats.songTitles}
+                      more={Math.max(
+                        0,
+                        practiceStats.songCount - practiceStats.songTitles.length
+                      )}
+                    />
+                  </div>
+                ) : null}
+                <p className="text-[11px] text-ink-muted">
+                  Ask for chords, lyrics, or a song list anytime.
                 </p>
               </div>
             </details>
