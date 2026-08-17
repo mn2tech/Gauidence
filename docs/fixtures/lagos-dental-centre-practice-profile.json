@@ -1,0 +1,107 @@
+{
+  "title": "Lagos Dental Centre — Public Practice Profile (non-PHI)",
+  "source": "https://www.lagosdentalcentre.com/",
+  "note": "Demo fixture for Guardian Dental Pack #002. Contains no patient PHI.",
+  "organization": {
+    "name": "Lagos Dental Centre",
+    "type": "dental practice",
+    "entity_type": "organization",
+    "tagline": "Olney's dental home for care without compromise",
+    "positioning": "Empathetic care. Clinical excellence. A practice made for you.",
+    "address": "3333 Olney Sandy Spring Rd, Ste 201, Olney, MD 20832",
+    "phone": "(301) 969-2290",
+    "email": "hello@lagosdentalcentre.com",
+    "website": "https://www.lagosdentalcentre.com/",
+    "service_area": [
+      "Olney",
+      "Sandy Spring",
+      "Leisure World",
+      "Layhill",
+      "Brookeville",
+      "Ashton"
+    ]
+  },
+  "provider": {
+    "name": "Dr. Innocent Nwanya, DDS",
+    "entity_type": "provider",
+    "role": "Dentist / clinical provider; founder of Lagos Dental Centre",
+    "background": [
+      "BDS with distinctions, University of Maiduguri",
+      "Volunteer care with the Nigerian Red Cross for displaced communities",
+      "DDS, NYU College of Dentistry",
+      "Member, American Academy of Implant Dentistry",
+      "Member, International Congress of Oral Implantologists",
+      "Ongoing advanced training at the Kois Center"
+    ],
+    "philosophy": "Evidence-based diagnoses, quality materials, implant and comprehensive care, and a lasting patient relationship — patients are never rushed.",
+    "relationships": [
+      {
+        "type": "EMPLOYS",
+        "source": "Lagos Dental Centre",
+        "target": "Dr. Innocent Nwanya, DDS",
+        "evidence": "Dr. Nwanya is the dentist behind Lagos Dental Centre and founder of the practice."
+      }
+    ]
+  },
+  "hours": [
+    { "day": "Tuesday", "hours": "10 AM - 7 PM", "note": "evening hours" },
+    { "day": "Wednesday", "hours": "9 AM - 5 PM" },
+    { "day": "Thursday", "hours": "8 AM - 5 PM" }
+  ],
+  "services": [
+    "Preventive dentistry",
+    "Tooth restoration",
+    "Clear aligners",
+    "Cosmetic dentistry",
+    "Crowns and bridges",
+    "Dental implants (placed and restored in-house; single tooth through full-arch)",
+    "Dentures",
+    "Emergency dentistry (same-day priority for patients in pain)",
+    "Extractions / extracted teeth care",
+    "Sedation"
+  ],
+  "highlighted_offerings": [
+    {
+      "name": "Dental implants",
+      "description": "Permanent, natural-feeling replacement for missing teeth; planning through long-term maintenance handled in-house."
+    },
+    {
+      "name": "Emergency dentistry",
+      "description": "Same-day appointments prioritized for patients in pain; call the office to be assessed quickly."
+    },
+    {
+      "name": "Clear aligners",
+      "description": "Aligner therapy with attention to bite and overall oral health, not only tooth position."
+    },
+    {
+      "name": "Zen Suite",
+      "description": "A calm operatory designed for patients with dental anxiety and neurodivergent needs."
+    }
+  ],
+  "technology_and_differentiators": [
+    "CBCT imaging for implant planning and complex decisions",
+    "Kois Center–trained dentist",
+    "Time and explanation; fewer unnecessary outside referrals",
+    "Evening hours open until 7 PM on Tuesdays"
+  ],
+  "membership_plan": {
+    "name": "Lagos Dental Centre Membership Plan",
+    "summary": "One annual fee covering cleanings, exams, and x-rays, plus 15% off eligible treatment."
+  },
+  "guardian_demo_notes": {
+    "known_facts": [
+      "The organization is Lagos Dental Centre (dental practice in Olney, MD).",
+      "The primary provider is Dr. Innocent Nwanya, DDS.",
+      "The practice serves the Olney / Sandy Spring area (no named patients in this file).",
+      "Services, hours, contact, and membership are practice operations facts — not clinical chart data."
+    ],
+    "not_included": [
+      "patient names",
+      "chart numbers",
+      "appointments",
+      "treatment plans",
+      "insurance claims",
+      "PHI"
+    ]
+  }
+}

@@ -2,7 +2,10 @@
 
 > **Source:** Public website content from [lagosdentalcentre.com](https://www.lagosdentalcentre.com/)  
 > **Use:** Demo fixture for Guardian Dental Pack #002. Contains **no patient PHI**.  
-> **How to use:** Upload this file into a Dental Pack Space (e.g. Clinical or the parent practice Space), then run **Analyze existing knowledge**.
+> **How to use:** Space uploads do **not** accept `.md`. Upload the JSON twin  
+> [`lagos-dental-centre-practice-profile.json`](./lagos-dental-centre-practice-profile.json)  
+> into a Dental Pack Space (e.g. Clinical or the parent practice Space), then run **Analyze existing knowledge**.  
+> Or use **Paste text** and paste the body of this document.
 
 ---
 
