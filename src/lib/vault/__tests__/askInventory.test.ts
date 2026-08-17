@@ -3,9 +3,11 @@ import assert from "node:assert/strict";
 import {
   buildAskVaultInventory,
   buildInventoryQuestionAnswer,
+  chartFileTypeListFilter,
   formatBoundConnectedFilesForGideon,
   formatConnectedPracticeStatsLine,
   formatVaultFileListForGideon,
+  practiceStatsListPrompt,
   summarizeConnectedPracticeItems,
   wantsVaultFileInventory,
 } from "../askInventory.ts";
@@ -207,5 +209,33 @@ describe("connected practice stats", () => {
       formatConnectedPracticeStatsLine(stats, "Living Waters")!,
       /Living Waters: 3 songs · 3 JPGs · 1 PDF/
     );
+  });
+
+  it("builds list prompts for practice-stat chips", () => {
+    assert.equal(
+      practiceStatsListPrompt("songs", "Living Waters"),
+      "What songs are on Living Waters?"
+    );
+    assert.equal(
+      practiceStatsListPrompt("jpg"),
+      "List the JPG chord charts in this space"
+    );
+    assert.equal(chartFileTypeListFilter("List the JPG chord charts in this space"), "jpg");
+    assert.equal(chartFileTypeListFilter("List the PDF chord charts in this space"), "pdf");
+  });
+
+  it("lists JPG charts from inventory text", () => {
+    const answer = buildInventoryQuestionAnswer({
+      question: "List the JPG chord charts in this space",
+      spaceDisplayName: "Wednesday Practice",
+      fileInventoryText: `SPACE FILE INVENTORY (Trello / connected files in Wednesday Practice — treat these as files in this space, not only on the connection):
+- trello1.jpg · What a Beautiful Name - C (Trello in this space, analyzed)
+- chart.pdf · Silent Night - C (Trello in this space, analyzed)
+- trello2.jpg · Lord Send Revival - G (Trello in this space, analyzed)`,
+    });
+    assert.match(answer!, /JPG charts/);
+    assert.match(answer!, /What a Beautiful Name/);
+    assert.match(answer!, /Lord Send Revival/);
+    assert.doesNotMatch(answer!, /Silent Night/);
   });
 });

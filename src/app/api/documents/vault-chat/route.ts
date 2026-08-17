@@ -668,6 +668,7 @@ export async function GET(request: Request) {
         connectedItemCount: connectedHints.chartCount,
         practiceStats: connectedHints.practiceStats,
         practiceStatsLine: connectedHints.practiceStatsLine,
+        boardName: connectedHints.boardName,
         musicPractice,
         guidance,
         profileId: active.id,

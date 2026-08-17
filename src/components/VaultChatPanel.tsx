@@ -192,6 +192,7 @@ import {
   formatAssistantMessageSpeechText,
 } from "@/lib/vault/assistantMessageText";
 import { documentsHref, VAULT_NAV_LABEL } from "@/lib/routes";
+import { practiceStatsListPrompt } from "@/lib/vault/askInventory";
 import type { WorkProject } from "@/lib/work-memory/types";
 import OnboardingProgressChip from "@/components/OnboardingProgressChip";
 import FirstWinCard from "@/components/FirstWinCard";
@@ -499,6 +500,7 @@ type Meta = {
     songTitles: string[];
   } | null;
   practiceStatsLine?: string | null;
+  boardName?: string | null;
   musicPractice?: boolean;
   profileId?: string;
   profileName?: string;
@@ -538,6 +540,74 @@ function NameList({
       {names.join(" · ")}
       {more > 0 ? ` · +${more} more` : ""}
     </p>
+  );
+}
+
+function PracticeStatsChips({
+  stats,
+  boardName,
+  disabled,
+  onAsk,
+}: {
+  stats: {
+    songCount: number;
+    jpgCount: number;
+    pngCount: number;
+    pdfCount: number;
+  };
+  boardName?: string | null;
+  disabled?: boolean;
+  onAsk: (prompt: string) => void;
+}) {
+  const chipClass =
+    "rounded-full border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-medium text-foreground transition hover:border-brand hover:bg-brand-light/40 disabled:opacity-50";
+  return (
+    <div className="mt-2 flex flex-wrap gap-2">
+      {stats.songCount > 0 ? (
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => onAsk(practiceStatsListPrompt("songs", boardName))}
+          className={chipClass}
+          title="Show song list"
+        >
+          {stats.songCount} songs
+        </button>
+      ) : null}
+      {stats.jpgCount > 0 ? (
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => onAsk(practiceStatsListPrompt("jpg", boardName))}
+          className={chipClass}
+          title="List JPG charts"
+        >
+          {stats.jpgCount} JPGs
+        </button>
+      ) : null}
+      {stats.pngCount > 0 ? (
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => onAsk(practiceStatsListPrompt("png", boardName))}
+          className={chipClass}
+          title="List PNG charts"
+        >
+          {stats.pngCount} PNGs
+        </button>
+      ) : null}
+      {stats.pdfCount > 0 ? (
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => onAsk(practiceStatsListPrompt("pdf", boardName))}
+          className={chipClass}
+          title="List PDF charts"
+        >
+          {stats.pdfCount} PDFs
+        </button>
+      ) : null}
+    </div>
   );
 }
 
@@ -3761,33 +3831,30 @@ export default function VaultChatPanel({
               </p>
               {showPracticeStats ? (
                 <div className="rounded-xl border border-stone-200 bg-stone-50/80 px-3 py-2.5">
-                  <p className="text-xs font-semibold text-foreground">
+                  <button
+                    type="button"
+                    disabled={sending || loadingHistory}
+                    onClick={() =>
+                      void sendQuestion(
+                        practiceStatsListPrompt("songs", meta?.boardName)
+                      )
+                    }
+                    className="text-left text-xs font-semibold text-foreground transition hover:text-brand disabled:opacity-50"
+                    title="Show song list"
+                  >
                     {meta?.practiceStatsLine}
-                  </p>
+                  </button>
                   {practiceStats ? (
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {practiceStats.songCount > 0 ? (
-                        <span className="rounded-full border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-medium text-foreground">
-                          {practiceStats.songCount} songs
-                        </span>
-                      ) : null}
-                      {practiceStats.jpgCount > 0 ? (
-                        <span className="rounded-full border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-medium text-foreground">
-                          {practiceStats.jpgCount} JPGs
-                        </span>
-                      ) : null}
-                      {practiceStats.pngCount > 0 ? (
-                        <span className="rounded-full border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-medium text-foreground">
-                          {practiceStats.pngCount} PNGs
-                        </span>
-                      ) : null}
-                      {practiceStats.pdfCount > 0 ? (
-                        <span className="rounded-full border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-medium text-foreground">
-                          {practiceStats.pdfCount} PDFs
-                        </span>
-                      ) : null}
-                    </div>
+                    <PracticeStatsChips
+                      stats={practiceStats}
+                      boardName={meta?.boardName}
+                      disabled={sending || loadingHistory}
+                      onAsk={(prompt) => void sendQuestion(prompt)}
+                    />
                   ) : null}
+                  <p className="mt-1.5 text-[10px] text-ink-muted">
+                    Tap a count to open the list
+                  </p>
                 </div>
               ) : null}
               <p className="text-[11px] font-medium text-ink-muted">
@@ -3951,28 +4018,12 @@ export default function VaultChatPanel({
               </summary>
               <div className="mt-2 space-y-2 border-t border-stone-200 pt-2">
                 {practiceStats ? (
-                  <div className="flex flex-wrap gap-2">
-                    {practiceStats.songCount > 0 ? (
-                      <span className="rounded-full border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-medium text-foreground">
-                        {practiceStats.songCount} songs
-                      </span>
-                    ) : null}
-                    {practiceStats.jpgCount > 0 ? (
-                      <span className="rounded-full border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-medium text-foreground">
-                        {practiceStats.jpgCount} JPGs
-                      </span>
-                    ) : null}
-                    {practiceStats.pngCount > 0 ? (
-                      <span className="rounded-full border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-medium text-foreground">
-                        {practiceStats.pngCount} PNGs
-                      </span>
-                    ) : null}
-                    {practiceStats.pdfCount > 0 ? (
-                      <span className="rounded-full border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-medium text-foreground">
-                        {practiceStats.pdfCount} PDFs
-                      </span>
-                    ) : null}
-                  </div>
+                  <PracticeStatsChips
+                    stats={practiceStats}
+                    boardName={meta?.boardName}
+                    disabled={sending || loadingHistory}
+                    onAsk={(prompt) => void sendQuestion(prompt)}
+                  />
                 ) : null}
                 {practiceStats && practiceStats.songTitles.length > 0 ? (
                   <div>
@@ -3989,7 +4040,7 @@ export default function VaultChatPanel({
                   </div>
                 ) : null}
                 <p className="text-[11px] text-ink-muted">
-                  Ask for chords, lyrics, or a song list anytime.
+                  Tap a count to open the list — or ask for chords anytime.
                 </p>
               </div>
             </details>

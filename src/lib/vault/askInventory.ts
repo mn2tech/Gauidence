@@ -9,6 +9,11 @@ const INVENTORY_QUESTION_PATTERN =
 const SONG_LIST_QUESTION_PATTERN =
   /\b((?:list|show|give(?:\s+me)?)\s+(?:(?:me|us)\s+)?(?:the\s+)?(?:list\s+of\s+)?songs?|what songs|songs (?:are |on |in )|song list|song titles?|which songs)\b/i;
 
+const CHART_FILE_TYPE_LIST_PATTERN =
+  /\b((?:list|show|give(?:\s+me)?|what|which|how many)\b.{0,40}\b(jpe?gs?|pngs?|pdfs?)\b|\b(jpe?gs?|pngs?|pdfs?)\b.{0,40}\b(charts?|chord|files?|attachments?|in this space))\b/i;
+
+export type ChartFileTypeFilter = "jpg" | "png" | "pdf";
+
 /** True when the user wants a song/chart roster (not chords for one song). */
 export function wantsSongOrChartList(question: string): boolean {
   const q = question.trim();
@@ -18,10 +23,47 @@ export function wantsSongOrChartList(question: string): boolean {
   return SONG_LIST_QUESTION_PATTERN.test(q);
 }
 
+/** JPG / PNG / PDF chart roster questions from practice-stat chips. */
+export function chartFileTypeListFilter(
+  question: string
+): ChartFileTypeFilter | null {
+  const q = question.trim().toLowerCase();
+  if (!CHART_FILE_TYPE_LIST_PATTERN.test(q) && !/\b(jpe?gs?|pngs?|pdfs?)\b/.test(q)) {
+    return null;
+  }
+  if (!/\b(list|show|give|what|which|how many|charts?|chord|files?|space)\b/i.test(q)) {
+    return null;
+  }
+  if (/\bpdfs?\b/.test(q)) return "pdf";
+  if (/\bpngs?\b/.test(q)) return "png";
+  if (/\bjpe?gs?\b/.test(q)) return "jpg";
+  return null;
+}
+
 /** True when the user is asking to list, count, browse, or compare vault files. */
 export function wantsVaultFileInventory(question: string): boolean {
   const q = question.trim();
-  return INVENTORY_QUESTION_PATTERN.test(q) || wantsSongOrChartList(q);
+  return (
+    INVENTORY_QUESTION_PATTERN.test(q) ||
+    wantsSongOrChartList(q) ||
+    chartFileTypeListFilter(q) != null
+  );
+}
+
+/** Prompts for welcome practice-stat chips. */
+export function practiceStatsListPrompt(
+  kind: "songs" | ChartFileTypeFilter,
+  boardName?: string | null
+): string {
+  const board = boardName?.trim();
+  if (kind === "songs") {
+    return board
+      ? `What songs are on ${board}?`
+      : "What songs and chord charts are in this space?";
+  }
+  if (kind === "jpg") return "List the JPG chord charts in this space";
+  if (kind === "png") return "List the PNG chord charts in this space";
+  return "List the PDF chord charts in this space";
 }
 
 export type AskVaultFileRow = {
@@ -261,6 +303,31 @@ function parseInventoryFileNames(inventoryText: string): {
 function parseConnectedChartTitles(inventoryText: string): string[] {
   const titles: string[] = [];
   const seen = new Set<string>();
+  for (const entry of parseConnectedChartEntries(inventoryText)) {
+    const key = normalizeSongDedupeKey(entry.title);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    titles.push(entry.title);
+  }
+  return titles;
+}
+
+type ConnectedChartEntry = {
+  title: string;
+  fileName: string;
+  kind: ChartFileTypeFilter | "other";
+};
+
+function chartKindFromFileName(fileName: string): ChartFileTypeFilter | "other" {
+  if (/\.jpe?g$/i.test(fileName)) return "jpg";
+  if (/\.png$/i.test(fileName)) return "png";
+  if (/\.pdf$/i.test(fileName)) return "pdf";
+  return "other";
+}
+
+function parseConnectedChartEntries(inventoryText: string): ConnectedChartEntry[] {
+  const entries: ConnectedChartEntry[] = [];
+  const seen = new Set<string>();
   for (const line of inventoryText.split(/\n/)) {
     const connected = line.match(
       /^-\s+(.+?)(?:\s+·\s+(.+?))?\s+\((?:Trello|Device Storage)\b/i
@@ -280,12 +347,13 @@ function parseConnectedChartTitles(inventoryText: string): string[] {
 
     const title = songTitleFromInventoryLabel(cardName || fileName);
     if (!looksLikeSongOrChartTitle(title)) continue;
-    const key = normalizeSongDedupeKey(title);
-    if (!title || !key || seen.has(key)) continue;
+    const kind = chartKindFromFileName(fileName);
+    const key = `${normalizeSongDedupeKey(title)}|${kind}|${fileName.toLowerCase()}`;
+    if (!title || seen.has(key)) continue;
     seen.add(key);
-    titles.push(title);
+    entries.push({ title, fileName, kind });
   }
-  return titles;
+  return entries;
 }
 
 /** Drop Trello admin / session cards that are not chord charts. */
@@ -480,6 +548,7 @@ export function buildInventoryQuestionAnswer(args: {
     logsText !== "(none)" &&
     topicMentionedInText(logsText, topic!);
   const songList = wantsSongOrChartList(args.question);
+  const fileTypeFilter = chartFileTypeListFilter(args.question);
 
   if (args.fileInventoryText.startsWith("(no documents")) {
     if (logsRelevant) {
@@ -505,6 +574,28 @@ export function buildInventoryQuestionAnswer(args: {
         ? ` (+${titles.length - cap} more — ask for the next page)`
         : "";
     return `Songs/charts in your ${space} space (${titles.length}):\n${shown.map((t) => `• ${t}`).join("\n")}${more}`;
+  }
+
+  if (fileTypeFilter) {
+    const entries = parseConnectedChartEntries(args.fileInventoryText).filter(
+      (e) => e.kind === fileTypeFilter
+    );
+    const label =
+      fileTypeFilter === "jpg"
+        ? "JPG"
+        : fileTypeFilter === "png"
+          ? "PNG"
+          : "PDF";
+    if (entries.length === 0) {
+      return `I don't see ${label} chord charts in your ${space} space yet.`;
+    }
+    const cap = 40;
+    const shown = entries.slice(0, cap);
+    const more =
+      entries.length > cap ? ` (+${entries.length - cap} more)` : "";
+    return `${label} charts in your ${space} space (${entries.length}):\n${shown
+      .map((e) => `• ${e.title} (${e.fileName})`)
+      .join("\n")}${more}`;
   }
 
   if (topic) {
