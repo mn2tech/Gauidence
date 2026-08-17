@@ -158,6 +158,41 @@ describe("vault retrieval formatting", () => {
     assert.equal(noneNamed.length, 0);
   });
 
+  it("drops unrelated vault files when the answer names one practice profile", () => {
+    const chunks = [
+      {
+        id: "1",
+        document_id: "doc-json",
+        file_name: "lagos-dental-centre-practice-profile.json",
+        content: "Tuesday 10 AM - 7 PM",
+        chunk_index: 0,
+        similarity: 0.82,
+        profile_name: "Lagos Dental Centre",
+      },
+      {
+        id: "2",
+        document_id: "doc-party",
+        file_name: "Noble uncle First Anniversary.pdf",
+        content: "party invite",
+        chunk_index: 0,
+        similarity: 0.71,
+        profile_name: "Lagos Dental Centre",
+      },
+    ];
+    const cited = selectCitationsForAnswer(
+      `Lagos Dental Centre office hours:
+• Tuesday: 10 AM – 7 PM
+Source: lagos-dental-centre-practice-profile.json`,
+      chunks,
+      "What are the office hours for Lagos Dental Centre?"
+    );
+    assert.equal(cited.length, 1);
+    assert.equal(
+      cited[0]?.fileName,
+      "lagos-dental-centre-practice-profile.json"
+    );
+  });
+
   it("dedupeVaultCitations keeps one entry per file name", () => {
     const deduped = dedupeVaultCitations([
       {

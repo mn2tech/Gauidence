@@ -103,6 +103,7 @@ import {
   type GideonFocusBlock,
 } from "@/lib/gideon/focusBlock";
 import { isImageFileName } from "@/lib/vault/images";
+import { citationNamedInText } from "@/lib/vault/retrieve";
 import {
   connectorFilePreviewPath,
   isConnectorCitationDocumentId,
@@ -3109,35 +3110,27 @@ export default function VaultChatPanel({
           .map((c) => [c.fileName.trim().toLowerCase(), c])
       ).values(),
     ];
-    const vaultImages = imageCitations.filter((c) => c.kind !== "connector");
+    const youtubeLinks = extractYouTubeUrls(m.content ?? "");
+    const answerText = m.content ?? "";
+    const sourceNamedInAnswer = (c: Citation) =>
+      citationNamedInText(
+        {
+          fileName: c.fileName,
+          profileName: c.profileName,
+          cardName: c.cardName,
+        },
+        answerText
+      );
+    // Vault images/PDFs only when the answer names them (no stray party invites).
+    const vaultImages = imageCitations
+      .filter((c) => c.kind !== "connector")
+      .filter((c) => sourceNamedInAnswer(c));
     // Trust server-picked connector citations; prefer the key named in the answer.
     const connectorImages = preferChartsMatchingKeyInText(
       imageCitations.filter((c) => c.kind === "connector"),
-      m.content ?? "",
+      answerText,
       2
     );
-    const youtubeLinks = extractYouTubeUrls(m.content ?? "");
-    const answerLower = (m.content ?? "").toLowerCase();
-    const sourceNamedInAnswer = (c: Citation) => {
-      const labels = [c.cardName, c.fileName]
-        .map((v) => (typeof v === "string" ? v.trim() : ""))
-        .filter(Boolean);
-      return labels.some((label) => {
-        const stem = label
-          .replace(/\.[^.]+$/, "")
-          .trim()
-          .toLowerCase();
-        if (stem.length < 4) return false;
-        const needle = stem.slice(0, Math.min(stem.length, 40));
-        if (answerLower.includes(needle)) return true;
-        // Song title without opaque Trello/SongSelect filename noise
-        const short = stem
-          .split(/[+(]/)
-          .map((p) => p.trim())
-          .find((p) => p.length >= 4 && !/^(trello|come|lord)\d*$/i.test(p));
-        return short ? answerLower.includes(short.slice(0, 40)) : false;
-      });
-    };
     // Connector PDFs: same trust as connector images (server already picked).
     const connectorPdfs = preferChartsMatchingKeyInText(
       uniqueCitations.filter(
@@ -3148,7 +3141,7 @@ export default function VaultChatPanel({
           (/\.pdf$/i.test(c.fileName) ||
             Boolean(c.mimeType?.includes("pdf")))
       ),
-      m.content ?? "",
+      answerText,
       2
     );
     // Non-image vault Sources must also be named in the answer.

@@ -102,7 +102,72 @@ export type VaultCitation = {
   itemId?: string;
   sourceType?: string;
   mimeType?: string | null;
+  cardName?: string | null;
 };
+
+/** True when the answer (or question) clearly names this citation's file/card. */
+export function citationNamedInText(
+  citation: {
+    fileName: string;
+    profileName?: string | null;
+    cardName?: string | null;
+  },
+  text: string
+): boolean {
+  const hay = text.toLowerCase();
+  if (!hay.trim()) return false;
+
+  const labels = [citation.cardName, citation.fileName]
+    .map((v) => (typeof v === "string" ? v.trim() : ""))
+    .filter(Boolean);
+
+  for (const label of labels) {
+    const name = label.toLowerCase();
+    const base = name.replace(/\.[^.]+$/, "").trim();
+    if (name.length >= 4 && hay.includes(name)) return true;
+    // Require a long stem so short accidental substrings don't match.
+    if (base.length >= 10 && hay.includes(base)) return true;
+    if (base.length >= 6 && base.length < 10) {
+      const escaped = base.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      if (new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, "i").test(hay)) {
+        return true;
+      }
+    }
+    // Distinctive multi-token stems (e.g. lagos-dental-centre-practice-profile)
+    const tokens = base
+      .split(/[\s_+.\-]+/)
+      .map((t) => t.trim())
+      .filter((t) => t.length >= 5);
+    if (tokens.length >= 2) {
+      const hitCount = tokens.filter((t) => hay.includes(t)).length;
+      if (hitCount >= 2) return true;
+    }
+  }
+
+  const vault = citation.profileName?.trim().toLowerCase() ?? "";
+  if (vault.length >= 4 && hay.includes(vault)) {
+    for (const label of labels) {
+      const base = label
+        .toLowerCase()
+        .replace(/\.[^.]+$/, "")
+        .trim();
+      // Vault name alone is not enough — still need a strong file stem.
+      if (base.length >= 12 && hay.includes(base)) return true;
+      const tokens = base
+        .split(/[\s_+.\-]+/)
+        .map((t) => t.trim())
+        .filter((t) => t.length >= 5);
+      if (
+        tokens.length >= 2 &&
+        tokens.filter((t) => hay.includes(t)).length >= 2
+      ) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
 
 /**
  * Only attach sources that the answer actually names, and that appear in
@@ -110,13 +175,18 @@ export type VaultCitation = {
  */
 export function selectCitationsForAnswer(
   answer: string,
-  chunks: RetrievedChunk[]
+  chunks: RetrievedChunk[],
+  question?: string
 ): VaultCitation[] {
   if (!answer.trim() || chunks.length === 0) return [];
 
   const byDoc = new Map<
     string,
-    { fileName: string; similarity: number; profileName?: string }
+    {
+      fileName: string;
+      similarity: number;
+      profileName?: string;
+    }
   >();
   for (const c of chunks) {
     const prev = byDoc.get(c.document_id);
@@ -130,36 +200,62 @@ export function selectCitationsForAnswer(
   }
 
   const answerLower = answer.toLowerCase();
+  const questionLower = (question ?? "").toLowerCase();
   const matched: {
     documentId: string;
     fileName: string;
     similarity: number;
     profileName?: string;
+    score: number;
   }[] = [];
 
   for (const [documentId, meta] of byDoc) {
     const { fileName, similarity, profileName } = meta;
-    const name = fileName.toLowerCase();
-    const base = name.replace(/\.[^.]+$/, "");
-    const vault = profileName?.trim().toLowerCase() ?? "";
-    const labeled = vault ? `${vault} · ${name}` : name;
+    if (!citationNamedInText({ fileName, profileName }, answer)) continue;
+
+    let score = similarity + 2;
     if (
-      answerLower.includes(name) ||
-      answerLower.includes(labeled) ||
-      (vault && answerLower.includes(vault) && answerLower.includes(base))
+      questionLower &&
+      citationNamedInText({ fileName, profileName }, questionLower)
     ) {
-      matched.push({ documentId, fileName, similarity, profileName });
-      continue;
+      score += 3;
+    } else if (questionLower) {
+      const base = fileName.toLowerCase().replace(/\.[^.]+$/, "");
+      const qTokens = questionLower
+        .split(/[^a-z0-9]+/)
+        .filter((t) => t.length >= 5);
+      const overlap = qTokens.filter((t) => base.includes(t)).length;
+      score += Math.min(overlap, 3);
     }
-    if (base.length >= 6 && answerLower.includes(base)) {
-      matched.push({ documentId, fileName, similarity, profileName });
+    if (
+      /source\s*:/i.test(answerLower) &&
+      answerLower.includes(fileName.toLowerCase())
+    ) {
+      score += 2;
     }
+    matched.push({
+      documentId,
+      fileName,
+      similarity,
+      profileName,
+      score,
+    });
   }
 
   if (matched.length === 0) return [];
 
-  matched.sort((a, b) => b.similarity - a.similarity);
-  return matched.map(({ documentId, fileName, profileName }) => ({
+  matched.sort((a, b) => b.score - a.score || b.similarity - a.similarity);
+
+  // If the answer clearly names one primary file, drop weaker extras.
+  const top = matched[0]!;
+  const tight = matched.filter(
+    (m) =>
+      m.documentId === top.documentId ||
+      answerLower.includes(m.fileName.toLowerCase()) ||
+      m.score >= top.score - 0.35
+  );
+
+  return tight.slice(0, 2).map(({ documentId, fileName, profileName }) => ({
     documentId,
     fileName,
     ...(profileName ? { profileName } : {}),

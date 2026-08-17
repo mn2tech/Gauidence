@@ -208,7 +208,11 @@ export function createVaultChatStreamResponse(
           );
         }
 
-        let selected = selectCitationsForAnswer(answer, args.chunks);
+        let selected = selectCitationsForAnswer(
+          answer,
+          args.chunks,
+          args.question
+        );
         if (args.attachedDoc) {
           const attachedCitation = {
             documentId: args.attachedDoc.documentId,
