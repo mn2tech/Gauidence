@@ -11,6 +11,7 @@ import {
   collectActionSystemNotes,
   collectThinkingSteps,
 } from "../runner.ts";
+import { resolveOrgWorkspaceId } from "../orgProfile.ts";
 import type { ActionContext } from "../types.ts";
 
 const baseCtx = (question: string): ActionContext => ({
@@ -70,5 +71,30 @@ describe("Guardian Action Engine", () => {
       "Searching workspace",
       "Ranking relevance",
     ]);
+  });
+
+  it("resolves business workspace ids for org tools", () => {
+    assert.equal(
+      resolveOrgWorkspaceId({
+        id: "biz",
+        profile_type: "business",
+      }),
+      "biz"
+    );
+    assert.equal(
+      resolveOrgWorkspaceId({
+        id: "emp",
+        profile_type: "employee",
+        parent_profile_id: "biz",
+      }),
+      "biz"
+    );
+    assert.equal(
+      resolveOrgWorkspaceId({
+        id: "fam",
+        profile_type: "family",
+      }),
+      null
+    );
   });
 });

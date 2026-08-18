@@ -1,6 +1,8 @@
 import { registerAction, getAction } from "./registry";
 import { registerCoreActions } from "./actions/core";
 import { payrollClockAction } from "./actions/payrollClock";
+import { leadsAction } from "./actions/leads";
+import { recruitAction } from "./actions/recruit";
 import {
   uploadDocumentAction,
   saveDocumentAction,
@@ -23,6 +25,8 @@ export function registerAllActions(): void {
   registerDailyLogActions();
   registerSpaceCreateActions();
   if (!getAction("payroll_clock")) registerAction(payrollClockAction);
+  if (!getAction("leads")) registerAction(leadsAction);
+  if (!getAction("recruit")) registerAction(recruitAction);
   if (!getAction("upload_document")) registerAction(uploadDocumentAction);
   if (!getAction("save_document")) registerAction(saveDocumentAction);
   allRegistered = true;
