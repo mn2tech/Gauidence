@@ -2,6 +2,8 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   findTrelloBoundProfile,
+  isMusicPracticeChatContext,
+  looksLikeMusicPracticeSpace,
   TRELLO_PREFERRED_SPACE_NAME,
 } from "../trello/boundSpace.ts";
 
@@ -34,6 +36,31 @@ describe("findTrelloBoundProfile", () => {
     assert.equal(
       findTrelloBoundProfile(profiles, profiles[1])?.id,
       "2"
+    );
+  });
+});
+
+describe("music practice chat context", () => {
+  it("does not treat a business space as music practice", () => {
+    assert.equal(looksLikeMusicPracticeSpace("NM2TECH - Next Move"), false);
+    assert.equal(
+      isMusicPracticeChatContext({
+        spaceName: "NM2TECH - Next Move",
+        boardName: null,
+        hasConnectedCharts: false,
+      }),
+      false
+    );
+  });
+
+  it("treats Living Waters charts as music practice even on a business space", () => {
+    assert.equal(
+      isMusicPracticeChatContext({
+        spaceName: "NM2TECH - Next Move",
+        boardName: "The Living Waters",
+        hasConnectedCharts: true,
+      }),
+      true
     );
   });
 });

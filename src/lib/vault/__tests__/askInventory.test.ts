@@ -148,6 +148,20 @@ describe("ask vault inventory", () => {
     assert.doesNotMatch(answer!, /^• 6\./m);
   });
 
+  it("does not list business reports as songs", () => {
+    const answer = buildInventoryQuestionAnswer({
+      question: "What songs and chord charts are in this space?",
+      spaceDisplayName: "NM2TECH - Next Move",
+      fileInventoryText: `SPACE FILE INVENTORY:
+- WMOI OCTOBER 2021 FINANCIAL HELP REPORT.pdf · WMOI OCTOBER 2021 FINANCIAL HELP REPORT (Trello in this space, analyzed)
+- logo.png (Device Storage in this space, analyzed)
+- Silent Night Holy Night - C.jpg · Silent Night Holy Night (Trello in this space, analyzed)`,
+    });
+    assert.ok(answer);
+    assert.match(answer!, /Silent Night Holy Night/);
+    assert.doesNotMatch(answer!, /FINANCIAL HELP REPORT|logo\.png|WMOI/i);
+  });
+
   it("builds a scoped inventory answer about a topic", () => {
     const answer = buildInventoryQuestionAnswer({
       question: "What do I have in my Personal space about Nolan?",
@@ -210,6 +224,36 @@ describe("connected practice stats", () => {
       formatConnectedPracticeStatsLine(stats, "Living Waters")!,
       /Living Waters: 3 songs · 3 JPGs · 1 PDF/
     );
+  });
+
+  it("does not count business documents as songs or charts", () => {
+    const stats = summarizeConnectedPracticeItems([
+      {
+        name: "WMOI OCTOBER 2021 FINANCIAL HELP REPORT.pdf",
+        mime_type: "application/pdf",
+        metadata: {
+          kind: "attachment",
+          cardName: "WMOI OCTOBER 2021 FINANCIAL HELP REPORT",
+        },
+      },
+      {
+        name: "q3-budget.xlsx",
+        mime_type:
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        metadata: { kind: "attachment", cardName: "Q3 Budget" },
+      },
+      {
+        name: "logo.png",
+        mime_type: "image/png",
+        metadata: { kind: "attachment" },
+      },
+    ]);
+    assert.equal(stats.songCount, 0);
+    assert.equal(stats.jpgCount, 0);
+    assert.equal(stats.pngCount, 0);
+    assert.equal(stats.pdfCount, 0);
+    assert.equal(stats.chartCount, 0);
+    assert.equal(formatConnectedPracticeStatsLine(stats), null);
   });
 
   it("builds list prompts for practice-stat chips", () => {

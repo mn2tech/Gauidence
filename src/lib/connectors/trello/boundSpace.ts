@@ -11,6 +11,19 @@ export function looksLikeMusicPracticeSpace(name?: string | null): boolean {
   return SOFT_MATCH.test(name.trim());
 }
 
+/** True when Ask Gideon should use music/practice chips, stats, and song prompts. */
+export function isMusicPracticeChatContext(opts: {
+  spaceName?: string | null;
+  boardName?: string | null;
+  hasConnectedCharts?: boolean;
+}): boolean {
+  return (
+    looksLikeMusicPracticeSpace(opts.spaceName) ||
+    looksLikeMusicPracticeSpace(opts.boardName) ||
+    Boolean(opts.hasConnectedCharts)
+  );
+}
+
 /**
  * Pick which Guardian space Trello ontology should write into.
  * Exact preferred name → soft music/practice match → active → first space.

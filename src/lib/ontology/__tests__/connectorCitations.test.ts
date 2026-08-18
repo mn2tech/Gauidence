@@ -187,5 +187,20 @@ describe("isLikelyChordChartFile", () => {
       ),
       false
     );
+    assert.equal(
+      isLikelyChordChartFile(
+        "WMOI OCTOBER 2021 FINANCIAL HELP REPORT.pdf",
+        "application/pdf"
+      ),
+      false
+    );
+    assert.equal(
+      isLikelyChordChartFile("Just As I Am - Bb.pdf", "application/pdf"),
+      true
+    );
+    assert.equal(
+      isLikelyChordChartFile("trello999.pdf", "application/pdf"),
+      true
+    );
   });
 });

@@ -148,6 +148,20 @@ describe("Gideon helpers", () => {
     assert.ok(byCharts.length <= 5);
   });
 
+  it("does not suggest chords for business files on a business space", () => {
+    const biz = buildGideonSuggestions(
+      [{ documentType: "other", fileName: "notes.pdf" }],
+      "business",
+      {
+        spaceName: "NM2TECH - Next Move",
+        songTitles: ["WMOI OCTOBER 2021 FINANCIAL HELP REPORT"],
+        hasConnectedCharts: false,
+      }
+    );
+    assert.ok(biz.some((q) => /employees|clients|attention/i.test(q)));
+    assert.ok(!biz.some((q) => /songs?|chord|practice/i.test(q)));
+  });
+
   it("does not invent invoice chips for business spaces without invoices", () => {
     const biz = buildGideonSuggestions(
       [{ documentType: "other", fileName: "notes.pdf" }],

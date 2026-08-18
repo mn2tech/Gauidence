@@ -205,6 +205,16 @@ export function isNonChordChartNoise(nameOrTitle: string): boolean {
   ) {
     return true;
   }
+  if (
+    /\b(financial|statement|minutes|budget|payroll|audit|presentation|spreadsheet|letterhead|memo|roadmap|onboarding|kickoff)\b/i.test(
+      t
+    )
+  ) {
+    return true;
+  }
+  if (/\breports?\b|\b(1099|w-?2)\b|\btax\b/i.test(t)) {
+    return true;
+  }
   if (/\b(kfc|junior)\b/i.test(t)) return true;
   // Instrument method / fingering references (not worship charts).
   // Underscored Trello names (e.g. School_Finger_Chart) have no \b before Finger.
@@ -222,6 +232,24 @@ export function isNonChordChartNoise(nameOrTitle: string): boolean {
   return false;
 }
 
+/** Opaque Trello attachment names (e.g. trello636.jpg) have no song signal in the file name. */
+export function isOpaqueTrelloFileName(name: string): boolean {
+  const stem = name.replace(/\.[^.]+$/, "").trim();
+  return /^trello\d+$/i.test(stem);
+}
+
+/** Title/file looks like a chord chart (SongSelect, explicit chords, or a key suffix). */
+export function hasChordChartSignal(label: string): boolean {
+  const t = label.replace(/\.(jpe?g|png|gif|webp|pdf)$/i, "").trim();
+  if (!t) return false;
+  if (/\b(songselect|chord\s*charts?|chords?)\b/i.test(t)) return true;
+  if (/[-–—]\s*[A-G](?:#|b)?(?:m|maj|min|major|minor|5)?(?:\s|$)/i.test(t)) {
+    return true;
+  }
+  if (/\bin\s+[A-G](?:#|b)?m?\b/i.test(t)) return true;
+  return false;
+}
+
 /** Chord-chart attachments vs syllabus/docs that should not cite for piano help. */
 export function isLikelyChordChartFile(
   fileName: string,
@@ -233,7 +261,7 @@ export function isLikelyChordChartFile(
   if (/\.(jpe?g|png|webp|gif)$/i.test(name)) return true;
   if (mimeType?.startsWith("image/")) return true;
   if (/\.pdf$/i.test(name) || mimeType === "application/pdf") {
-    return true;
+    return isOpaqueTrelloFileName(name) || hasChordChartSignal(name);
   }
   return false;
 }

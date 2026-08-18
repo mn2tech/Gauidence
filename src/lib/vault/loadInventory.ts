@@ -11,6 +11,7 @@ import {
   RECENT_VAULT_FILE_PREVIEW,
   summarizeConnectedPracticeItems,
   formatConnectedPracticeStatsLine,
+  looksLikeSongOrChartTitle,
   type VaultFileInventoryRow,
   type ConnectedPracticeStats,
 } from "./askInventory";
@@ -154,10 +155,10 @@ export async function loadConnectedSuggestionContext(
         })();
 
   return {
-    chartCount: practiceStats.chartCount || onSelectedBoard.length,
-    songTitles,
+    chartCount: practiceStats.chartCount,
+    songTitles: songTitles.filter((title) => looksLikeSongOrChartTitle(title)),
     boardName,
-    hasConnectedCharts: practiceStats.chartCount > 0 || onSelectedBoard.length > 0,
+    hasConnectedCharts: practiceStats.chartCount > 0,
     practiceStats,
     practiceStatsLine: formatConnectedPracticeStatsLine(practiceStats, boardName),
   };

@@ -9,7 +9,10 @@ import {
   GUARDIAN_TIME_ZONE,
 } from "@/lib/timezone";
 import type { SearchScopeMode } from "@/lib/workspace-context/searchScope";
-import { looksLikeMusicPracticeSpace } from "@/lib/connectors/trello/boundSpace";
+import {
+  isMusicPracticeChatContext,
+  looksLikeMusicPracticeSpace,
+} from "@/lib/connectors/trello/boundSpace";
 
 export const GIDEON_BRAND_LINE =
   "Guardian watches. Gideon explains. You decide.";
@@ -984,10 +987,11 @@ export function buildGideonSuggestions(
         .filter((t) => t.length >= 2)
     ),
   ].slice(0, 4);
-  const musicSpace =
-    looksLikeMusicPracticeSpace(context.spaceName) ||
-    Boolean(context.hasConnectedCharts) ||
-    songTitles.length > 0;
+  const musicSpace = isMusicPracticeChatContext({
+    spaceName: context.spaceName,
+    boardName: context.boardName,
+    hasConnectedCharts: context.hasConnectedCharts,
+  });
 
   if (docs.length === 0 && !musicSpace) return [];
 

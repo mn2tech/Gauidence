@@ -31,7 +31,7 @@ import {
   wantsTranscription,
   type VaultDocHint,
 } from "@/lib/vault/gideon";
-import { looksLikeMusicPracticeSpace } from "@/lib/connectors/trello/boundSpace";
+import { isMusicPracticeChatContext } from "@/lib/connectors/trello/boundSpace";
 import { buildGideonQuickActions } from "@/lib/gideon/chiefOfStaff";
 import { loadAttachedVaultDocument } from "@/lib/vault/attachedDocument";
 import {
@@ -565,9 +565,11 @@ export async function GET(request: Request) {
     let suggestions: string[] = [];
     let guidance = null;
     const profileKind = suggestionKindFrom(active.profile_type);
-    const musicPractice =
-      looksLikeMusicPracticeSpace(active.display_name) ||
-      connectedHints.hasConnectedCharts;
+    const musicPractice = isMusicPracticeChatContext({
+      spaceName: active.display_name,
+      boardName: connectedHints.boardName,
+      hasConnectedCharts: connectedHints.hasConnectedCharts,
+    });
     const quickActions = buildGideonQuickActions({ musicPractice });
 
     if (docCount > 0 || connectedHints.hasConnectedCharts) {
@@ -594,9 +596,9 @@ export async function GET(request: Request) {
       }
       suggestions = buildGideonSuggestions(hints, profileKind, {
         spaceName: active.display_name,
-        boardName: connectedHints.boardName,
-        songTitles: connectedHints.songTitles,
-        hasConnectedCharts: connectedHints.hasConnectedCharts,
+        boardName: musicPractice ? connectedHints.boardName : null,
+        songTitles: musicPractice ? connectedHints.songTitles : [],
+        hasConnectedCharts: musicPractice && connectedHints.hasConnectedCharts,
       });
     } else if (logCount > 0) {
       suggestions = buildGideonLogSuggestions(profileKind);
@@ -683,8 +685,10 @@ export async function GET(request: Request) {
         suggestions,
         quickActions,
         connectedItemCount: connectedHints.chartCount,
-        practiceStats: connectedHints.practiceStats,
-        practiceStatsLine: connectedHints.practiceStatsLine,
+        practiceStats: musicPractice ? connectedHints.practiceStats : null,
+        practiceStatsLine: musicPractice
+          ? connectedHints.practiceStatsLine
+          : null,
         boardName: connectedHints.boardName,
         musicPractice,
         guidance,

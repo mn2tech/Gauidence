@@ -1,6 +1,8 @@
 import {
+  hasChordChartSignal,
   isLikelyChordChartFile,
   isNonChordChartNoise,
+  isOpaqueTrelloFileName,
 } from "@/lib/ontology/connectorCitationIds";
 import { isImageFileName, isImageMimeType } from "@/lib/vault/images";
 
@@ -370,22 +372,13 @@ function parseConnectedChartEntries(inventoryText: string): ConnectedChartEntry[
     if (cardName && (/^\.txt$/i.test(cardName) || /^pasted\b/i.test(cardName))) {
       continue;
     }
-    const looksLikeChart =
-      /\.(jpe?g|png|gif|webp|pdf)$/i.test(fileName) ||
-      Boolean(cardName && !/\.txt$/i.test(cardName));
-    if (!looksLikeChart) continue;
     if (
-      /\.pdf$/i.test(fileName) &&
-      !isLikelyChordChartFile(fileName, "application/pdf")
+      !isConnectedPracticeChartItem(fileName, null, cardName || null)
     ) {
-      continue;
-    }
-    if (isNonChordChartNoise(fileName) || isNonChordChartNoise(cardName)) {
       continue;
     }
 
     const title = songTitleFromInventoryLabel(cardName || fileName);
-    if (!looksLikeSongOrChartTitle(title)) continue;
     const kind = chartKindFromFileName(fileName);
     const key = `${normalizeSongDedupeKey(title)}|${kind}|${fileName.toLowerCase()}`;
     if (!title || seen.has(key)) continue;
@@ -399,6 +392,7 @@ function parseConnectedChartEntries(inventoryText: string): ConnectedChartEntry[
 export function looksLikeSongOrChartTitle(title: string): boolean {
   const t = title.trim();
   if (t.length < 2) return false;
+  if (isOpaqueTrelloFileName(t)) return false;
   if (isNonChordChartNoise(t)) return false;
   if (
     /\b(practice\s+session|rehearsal\s+notes?|set\s*list\s+notes?)\b/i.test(t)
@@ -415,6 +409,30 @@ export function looksLikeSongOrChartTitle(title: string): boolean {
     return false;
   }
   return true;
+}
+
+function isConnectedPracticeChartItem(
+  name: string,
+  mime: string | null,
+  cardName: string | null
+): boolean {
+  if (isNonChordChartNoise(name) || (cardName && isNonChordChartNoise(cardName))) {
+    return false;
+  }
+  const title = songTitleFromInventoryLabel(cardName || name);
+  if (!looksLikeSongOrChartTitle(title)) return false;
+
+  const combined = [name, cardName, title].filter(Boolean).join(" ");
+  if (hasChordChartSignal(combined)) return true;
+  if (cardName && looksLikeSongOrChartTitle(cardName)) return true;
+  if (isOpaqueTrelloFileName(name) && cardName) return true;
+
+  const isPdf =
+    /\.pdf$/i.test(name) ||
+    mime === "application/pdf" ||
+    Boolean(mime?.includes("pdf"));
+  if (isPdf) return isLikelyChordChartFile(name, mime ?? "application/pdf");
+  return false;
 }
 
 export type ConnectedPracticeItemInput = {
@@ -477,24 +495,19 @@ export function summarizeConnectedPracticeItems(
       !isPng &&
       (isImageFileName(name) || isImageMimeType(mime));
 
-    if (isNonChordChartNoise(name) || (cardName && isNonChordChartNoise(cardName))) {
+    if (!(isJpg || isPng || isPdf || isOtherImage || kind === "attachment")) {
       continue;
     }
-    if (isPdf && !isLikelyChordChartFile(name, mime ?? "application/pdf")) {
+    if (!isConnectedPracticeChartItem(name, mime, cardName)) {
       continue;
     }
 
-    if (isJpg || isPng || isPdf || isOtherImage || kind === "attachment") {
-      if (isJpg) jpgCount += 1;
-      else if (isPng) pngCount += 1;
-      else if (isPdf) pdfCount += 1;
-      if (isJpg || isPng || isPdf || isOtherImage) chartCount += 1;
-    } else {
-      continue;
-    }
+    if (isJpg) jpgCount += 1;
+    else if (isPng) pngCount += 1;
+    else if (isPdf) pdfCount += 1;
+    if (isJpg || isPng || isPdf || isOtherImage) chartCount += 1;
 
     const title = songTitleFromInventoryLabel(cardName || name);
-    if (!looksLikeSongOrChartTitle(title)) continue;
     const key = title.toLowerCase().replace(/\s+/g, " ").trim();
     if (!key || songKeys.has(key)) continue;
     songKeys.add(key);
