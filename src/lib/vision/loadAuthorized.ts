@@ -51,7 +51,7 @@ export async function loadAuthorizedVisionImage(
     .select("source_text, vision_summary, vision_transcription, summary")
     .eq("document_id", doc.id)
     .maybeSingle();
-  const extracted =
+  const extracted = (
     extractedQuery.error && /vision_|schema cache/i.test(extractedQuery.error.message)
       ? (
           await supabase
@@ -60,7 +60,13 @@ export async function loadAuthorizedVisionImage(
             .eq("document_id", doc.id)
             .maybeSingle()
         ).data
-      : extractedQuery.data;
+      : extractedQuery.data
+  ) as {
+    source_text?: string | null;
+    summary?: string | null;
+    vision_summary?: string | null;
+    vision_transcription?: string | null;
+  } | null;
 
   return {
     documentId: doc.id,
