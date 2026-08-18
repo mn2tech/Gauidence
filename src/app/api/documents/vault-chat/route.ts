@@ -1167,7 +1167,7 @@ export async function POST(request: Request) {
       );
     }
     question = String(userRow.content);
-    userMsg = hydrateVaultChatMessage({
+    userMsg = hydrateVaultChatMessage<ChatMessageRow>({
       id: userRow.id,
       role: "user",
       content: question,

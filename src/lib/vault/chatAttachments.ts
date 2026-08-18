@@ -12,7 +12,7 @@ export type ChatMessageAttachment = {
 
 export type HydratableChatMessage = {
   id: string;
-  role: "user" | "assistant" | string;
+  role: "user" | "assistant";
   content: string;
   citations?: VaultChatCitation[] | null;
   attachment?: ChatMessageAttachment | null;
