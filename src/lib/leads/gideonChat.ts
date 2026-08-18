@@ -6,14 +6,24 @@ import { findPotentialDuplicates } from "@/lib/leads/duplicates";
 import {
   getBusinessLeadById,
   listBusinessLeads,
+  loadLeadDetail,
   recordLeadActivity,
 } from "@/lib/leads/server";
-import { LEAD_SELECT, LEAD_STATUS_LABELS, leadDisplayName } from "@/lib/leads/types";
 import {
+  LEAD_SELECT,
+  LEAD_STATUS_LABELS,
+  leadDisplayName,
+  leadTypeOf,
+} from "@/lib/leads/types";
+import {
+  formatFederalPartners,
   formatLeadDetail,
   formatLeadFollowUps,
   formatLeadLine,
   formatLeadPipeline,
+  formatMatchLeads,
+  formatStaleLeads,
+  formatTodaysActions,
   parseLeadsGideonQuery,
   wantsLeadsQuery,
   type LeadsGideonIntent,
@@ -266,9 +276,42 @@ export async function answerLeadsGideonQuery(
         intent: "lookup",
       };
     }
+    const detail = await loadLeadDetail(supabase, lead.id).catch(() => null);
     return {
-      message: formatLeadDetail(lead),
+      message: formatLeadDetail(detail ?? lead, detail?.activities ?? []),
       intent: "lookup",
+      href,
+    };
+  }
+
+  if (parsed.intent === "today") {
+    return {
+      message: formatTodaysActions(leads),
+      intent: "today",
+      href,
+    };
+  }
+
+  if (parsed.intent === "federal") {
+    return {
+      message: formatFederalPartners(leads, parsed.uncontacted),
+      intent: "federal",
+      href,
+    };
+  }
+
+  if (parsed.intent === "match") {
+    return {
+      message: formatMatchLeads(leads, parsed.matchTerm),
+      intent: "match",
+      href,
+    };
+  }
+
+  if (parsed.intent === "stale") {
+    return {
+      message: formatStaleLeads(leads),
+      intent: "stale",
       href,
     };
   }
@@ -281,8 +324,11 @@ export async function answerLeadsGideonQuery(
     };
   }
 
+  const pipelineLeads = parsed.leadType
+    ? leads.filter((l) => leadTypeOf(l) === parsed.leadType)
+    : leads;
   return {
-    message: formatLeadPipeline(leads, parsed.status),
+    message: formatLeadPipeline(pipelineLeads, parsed.status),
     intent: parsed.intent === "unknown" ? "pipeline" : parsed.intent,
     href,
   };

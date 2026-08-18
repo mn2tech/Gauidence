@@ -12,7 +12,7 @@ import {
   isChatLlmConfigured,
 } from "@/lib/analysis/chatProvider";
 import { assertBillingQuota } from "@/lib/billing/quota";
-import { getBusinessLeadById, recordLeadActivity } from "@/lib/leads/server";
+import { getBusinessLeadById, loadLeadActivities, recordLeadActivity } from "@/lib/leads/server";
 import type { BusinessLead } from "@/lib/leads/types";
 import { LEAD_SELECT } from "@/lib/leads/types";
 import type { LeadOpportunityBrief } from "@/lib/leads/opportunity";
@@ -141,6 +141,17 @@ export async function runLeadOutreachDraft(
     (business?.display_name as string) ||
     undefined;
 
+  const activities = await loadLeadActivities(supabase, args.leadId).catch(
+    () => []
+  );
+  const recentHistory = activities
+    .slice(0, 8)
+    .map((a) => {
+      const when = (a.occurred_at ?? a.created_at).slice(0, 10);
+      return `- ${when}: ${a.description ?? a.activity_type}`;
+    })
+    .join("\n");
+
   const userPrompt = buildLeadOutreachUserPrompt({
     companyName: lead.company_name,
     contactName: lead.contact_name,
@@ -150,10 +161,15 @@ export async function runLeadOutreachDraft(
     primaryNeed: brief?.primaryNeed ?? lead.opportunity_summary,
     recommendedService: brief?.recommendedService ?? lead.recommended_service,
     conversationAngle: brief?.conversationAngle ?? lead.conversation_angle,
-    reasoning: brief?.reasoning,
+    reasoning: brief?.reasoning ?? lead.match_explanation,
     suggestedOpening: brief?.suggestedOpening,
     senderName: args.senderName,
     businessName,
+    leadType: lead.lead_type,
+    matchExplanation: lead.match_explanation,
+    recommendedApproach: lead.recommended_approach,
+    capabilities: lead.primary_capabilities,
+    recentHistory: recentHistory || null,
   });
 
   const client = isAnthropicConfigured() ? createLlmClient() : null;

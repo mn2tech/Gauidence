@@ -1,4 +1,12 @@
-import { LEAD_STATUSES, type LeadStatus } from "@/lib/leads/types";
+import {
+  LEAD_ACTIVITY_TYPES,
+  LEAD_STATUSES,
+  LEAD_TYPES,
+  SMALL_BUSINESS_STATUSES,
+  type LeadActivityType,
+  type LeadStatus,
+  type LeadType,
+} from "@/lib/leads/types";
 
 export function parseUuid(value: unknown): string | null {
   if (typeof value !== "string" || !value.trim()) return null;
@@ -38,4 +46,94 @@ export function parseCompanyOrContact(
   const contact = parseOptionalText(contactName);
   if (!company && !contact) return null;
   return { companyName: company, contactName: contact };
+}
+
+export function parseLeadType(value: unknown): LeadType | null {
+  if (typeof value !== "string" || !value.trim()) return null;
+  const normalized = value.trim().toLowerCase().replace(/-/g, "_");
+  if (normalized === "federal" || normalized === "federal_partner") {
+    return "federal_partner";
+  }
+  return LEAD_TYPES.includes(normalized as LeadType)
+    ? (normalized as LeadType)
+    : null;
+}
+
+export function parseLeadActivityType(value: unknown): LeadActivityType | null {
+  if (typeof value !== "string" || !value.trim()) return null;
+  const normalized = value.trim().toLowerCase().replace(/-/g, "_");
+  return LEAD_ACTIVITY_TYPES.includes(normalized as LeadActivityType)
+    ? (normalized as LeadActivityType)
+    : null;
+}
+
+export function parseSmallBusinessStatus(value: unknown): string | null {
+  const text = parseOptionalText(value);
+  if (!text) return null;
+  const match = SMALL_BUSINESS_STATUSES.find(
+    (s) => s.toLowerCase() === text.toLowerCase()
+  );
+  return match ?? text;
+}
+
+export function parseOptionalDate(value: unknown): string | null {
+  const text = parseOptionalText(value);
+  if (!text) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+  const d = new Date(text);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 10);
+}
+
+export function parseOptionalScore(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n)) return null;
+  return Math.max(0, Math.min(100, Math.round(n)));
+}
+
+export function parseLeadProfileFields(
+  body: Record<string, unknown>
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  const textFields: Array<[string, string[]]> = [
+    ["linkedin_url", ["linkedinUrl", "linkedin_url", "linkedin"]],
+    ["relationship_owner", ["relationshipOwner", "relationship_owner", "owner"]],
+    ["uei", ["uei"]],
+    ["cage_code", ["cageCode", "cage_code"]],
+    ["naics_codes", ["naicsCodes", "naics_codes", "naics"]],
+    ["primary_capabilities", ["primaryCapabilities", "primary_capabilities"]],
+    [
+      "federal_agencies_served",
+      ["federalAgenciesServed", "federal_agencies_served", "agencies"],
+    ],
+    ["contract_vehicles", ["contractVehicles", "contract_vehicles"]],
+    ["known_contracts", ["knownContracts", "known_contracts"]],
+    ["current_opportunities", ["currentOpportunities", "current_opportunities"]],
+    ["past_performance_areas", ["pastPerformanceAreas", "past_performance_areas"]],
+    ["technology_areas", ["technologyAreas", "technology_areas"]],
+    ["market_agency", ["marketAgency", "market_agency", "agency"]],
+    ["match_explanation", ["matchExplanation", "match_explanation"]],
+    ["recommended_approach", ["recommendedApproach", "recommended_approach"]],
+    ["next_action", ["nextAction", "next_action"]],
+  ];
+  for (const [column, keys] of textFields) {
+    for (const key of keys) {
+      if (body[key] !== undefined) {
+        out[column] = parseOptionalText(body[key]);
+        break;
+      }
+    }
+  }
+  if (body.smallBusinessStatus !== undefined || body.small_business_status !== undefined) {
+    out.small_business_status = parseSmallBusinessStatus(
+      body.smallBusinessStatus ?? body.small_business_status
+    );
+  }
+  if (body.nextActionDate !== undefined || body.next_action_date !== undefined) {
+    out.next_action_date = parseOptionalDate(
+      body.nextActionDate ?? body.next_action_date
+    );
+  }
+  return out;
 }

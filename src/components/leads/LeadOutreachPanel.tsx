@@ -1,12 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, Copy, Loader2, Mail } from "lucide-react";
 import type { LeadOutreachDraft } from "@/lib/leads/outreach";
 import type { BusinessLead } from "@/lib/leads/types";
 
 const buttonSecondary =
   "inline-flex items-center gap-2 rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm font-medium transition hover:bg-stone-50 disabled:opacity-50";
+const buttonPrimary =
+  "inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark disabled:opacity-50";
+const inputClass =
+  "w-full rounded-xl border border-border-subtle px-3 py-2.5 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/25";
 
 function readOutreachDraft(lead: BusinessLead): LeadOutreachDraft | null {
   const raw = lead.opportunity_brief;
@@ -29,6 +33,7 @@ type Props = {
   drafting: boolean;
   error: string | null;
   onDraft: () => void;
+  onApproved?: () => Promise<void> | void;
 };
 
 export default function LeadOutreachPanel({
@@ -36,83 +41,111 @@ export default function LeadOutreachPanel({
   drafting,
   error,
   onDraft,
+  onApproved,
 }: Props) {
-  const draft = readOutreachDraft(lead);
-  const [copied, setCopied] = useState<"subject" | "body" | "all" | null>(null);
+  const saved = readOutreachDraft(lead);
+  const [subject, setSubject] = useState(saved?.subject ?? "");
+  const [body, setBody] = useState(saved?.body ?? "");
+  const [approved, setApproved] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  async function copyText(text: string, which: "subject" | "body" | "all") {
+  useEffect(() => {
+    if (!saved) return;
+    setSubject(saved.subject);
+    setBody(saved.body);
+    setApproved(false);
+  }, [saved?.createdAt, saved?.subject, saved?.body]);
+
+  const draft = saved
+    ? { ...saved, subject: subject || saved.subject, body: body || saved.body }
+    : null;
+
+  async function copyAll() {
+    if (!draft) return;
     try {
-      await navigator.clipboard.writeText(text);
-      setCopied(which);
-      setTimeout(() => setCopied(null), 2000);
+      await navigator.clipboard.writeText(
+        `Subject: ${draft.subject}\n\n${draft.body}`
+      );
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     } catch {
       // ignore
     }
+  }
+
+  async function handleApprove() {
+    setApproved(true);
+    await onApproved?.();
   }
 
   return (
     <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
       <div className="flex items-center gap-2">
         <Mail className="h-5 w-5 text-brand" />
-        <h2 className="font-semibold">Outreach</h2>
+        <h2 className="font-semibold">Prepare Outreach</h2>
       </div>
       <p className="mt-2 text-sm text-ink-muted">
-        Gideon drafts a short personal email. Review and copy it — nothing is
-        sent automatically in V1.
+        Prepare → Review → Edit → Approve → Send. Guardian does not send email
+        in Phase 1. Copy the approved message into your inbox.
       </p>
 
       {draft ? (
         <div className="mt-4 space-y-4">
-          <div>
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-sm font-medium">Subject</p>
-              <button
-                type="button"
-                onClick={() => void copyText(draft.subject, "subject")}
-                className="text-xs font-medium text-brand hover:underline"
-              >
-                {copied === "subject" ? (
-                  <span className="inline-flex items-center gap-1">
-                    <Check className="h-3 w-3" /> Copied
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1">
-                    <Copy className="h-3 w-3" /> Copy
-                  </span>
-                )}
-              </button>
-            </div>
-            <p className="mt-1 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm">
-              {draft.subject}
+          {approved ? (
+            <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+              Approved. Copy and send from your email — nothing is sent from
+              Guardian.
             </p>
+          ) : (
+            <p className="text-xs text-ink-muted">Review and edit before you copy.</p>
+          )}
+          <div>
+            <label className="text-sm font-medium">Subject</label>
+            <input
+              value={subject}
+              onChange={(e) => {
+                setSubject(e.target.value);
+                setApproved(false);
+              }}
+              className={`mt-1 ${inputClass}`}
+            />
           </div>
           <div>
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-sm font-medium">Email</p>
-              <button
-                type="button"
-                onClick={() =>
-                  void copyText(
-                    `Subject: ${draft.subject}\n\n${draft.body}`,
-                    "all"
-                  )
-                }
-                className="text-xs font-medium text-brand hover:underline"
-              >
-                {copied === "all" ? (
-                  <span className="inline-flex items-center gap-1">
-                    <Check className="h-3 w-3" /> Copied
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1">
-                    <Copy className="h-3 w-3" /> Copy all
-                  </span>
-                )}
-              </button>
-            </div>
-            <pre className="mt-1 whitespace-pre-wrap rounded-xl border border-stone-200 bg-stone-50 px-3 py-3 text-sm font-sans text-ink-muted">
-              {draft.body}
-            </pre>
+            <label className="text-sm font-medium">Message</label>
+            <textarea
+              value={body}
+              onChange={(e) => {
+                setBody(e.target.value);
+                setApproved(false);
+              }}
+              rows={8}
+              className={`mt-1 ${inputClass}`}
+            />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => void handleApprove()}
+              className={buttonPrimary}
+            >
+              Approve
+            </button>
+            <button
+              type="button"
+              disabled={!approved}
+              onClick={() => void copyAll()}
+              className={buttonSecondary}
+            >
+              {copied ? (
+                <>
+                  <Check className="h-4 w-4" /> Copied
+                </>
+              ) : (
+                <>
+                  <Copy className="h-4 w-4" /> Copy to send
+                </>
+              )}
+            </button>
           </div>
         </div>
       ) : null}
@@ -130,7 +163,7 @@ export default function LeadOutreachPanel({
         ) : (
           <Mail className="h-4 w-4" />
         )}
-        {draft ? "Regenerate draft" : "Draft Outreach"}
+        {draft ? "Regenerate draft" : "Prepare Outreach"}
       </button>
     </div>
   );

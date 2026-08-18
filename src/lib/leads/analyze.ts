@@ -198,7 +198,9 @@ export async function runLeadOpportunityAnalysis(
   }
 
   const newStatus =
-    lead.status === "new" ? "researched" : lead.status;
+    lead.status === "new" || lead.status === "identified"
+      ? "research"
+      : lead.status;
 
   const { data: updated, error: updateError } = await supabase
     .from("business_leads")
@@ -208,6 +210,8 @@ export async function runLeadOpportunityAnalysis(
       opportunity_summary: brief.primaryNeed || null,
       conversation_angle: brief.conversationAngle || null,
       next_action: brief.nextBestAction || null,
+      match_explanation: brief.matchExplanation || brief.reasoning || null,
+      recommended_approach: brief.recommendedApproach || brief.suggestedOpening || null,
       opportunity_brief: brief,
       status: newStatus,
       last_activity_at: new Date().toISOString(),
@@ -232,7 +236,7 @@ export async function runLeadOpportunityAnalysis(
       await recordLeadActivity(supabase, {
         leadId: args.leadId,
         activityType: "status_changed",
-        description: "Status changed to researched",
+        description: `Status changed to ${newStatus.replace(/_/g, " ")}`,
         actorUserId: args.userId,
         metadata: { from: lead.status, to: newStatus },
       });

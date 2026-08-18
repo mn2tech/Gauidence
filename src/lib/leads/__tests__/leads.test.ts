@@ -4,12 +4,15 @@ import {
   parseCompanyOrContact,
   parseLeadSearchQuery,
   parseLeadStatus,
+  parseLeadType,
   parseOptionalText,
   parseUuid,
 } from "../validators";
 import {
+  applyLeadListFilters,
   computeLeadSummary,
   leadDisplayName,
+  todaysActionLeads,
   type BusinessLead,
 } from "../types";
 import { findDuplicateReasons } from "../duplicates";
@@ -31,7 +34,15 @@ describe("leads validators", () => {
   it("parseLeadStatus normalizes status", () => {
     assert.equal(parseLeadStatus("follow-up"), "follow_up");
     assert.equal(parseLeadStatus("New"), "new");
+    assert.equal(parseLeadStatus("identified"), "identified");
     assert.equal(parseLeadStatus("invalid"), null);
+  });
+
+  it("parseLeadType accepts commercial and federal", () => {
+    assert.equal(parseLeadType("commercial"), "commercial");
+    assert.equal(parseLeadType("federal"), "federal_partner");
+    assert.equal(parseLeadType("federal_partner"), "federal_partner");
+    assert.equal(parseLeadType("nope"), null);
   });
 
   it("parseCompanyOrContact requires at least one name", () => {
@@ -115,6 +126,43 @@ describe("leads types", () => {
     assert.equal(s.interested, 1);
     assert.equal(s.proposal, 1);
     assert.equal(s.won, 1);
+    assert.equal(s.commercial, 6);
+    assert.equal(s.federal, 0);
+  });
+
+  it("todaysActionLeads and federal filters", () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const due = baseLead({
+      id: "due",
+      company_name: "Due Co",
+      next_action: "Call Ken",
+      next_action_date: today,
+    });
+    const partner = baseLead({
+      id: "fp",
+      lead_type: "federal_partner",
+      company_name: "Prime LLC",
+      status: "qualified",
+      next_action: "Capability meeting",
+      next_action_date: "2099-01-01",
+      market_agency: "Treasury",
+      naics_codes: "541511",
+      small_business_status: "SDVOSB",
+      primary_capabilities: "data engineering",
+      lead_score: 80,
+      current_opportunities: "DHS modernization",
+    });
+    assert.equal(todaysActionLeads([due, partner]).length, 1);
+    const filtered = applyLeadListFilters([due, partner], {
+      agency: "treasury",
+      naics: "5415",
+      sbStatus: "sdvosb",
+      capability: "data",
+      minMatch: 70,
+      hasOpportunity: true,
+    });
+    assert.equal(filtered.length, 1);
+    assert.equal(filtered[0]?.id, "fp");
   });
 });
 

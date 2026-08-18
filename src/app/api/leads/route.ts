@@ -6,12 +6,14 @@ import {
   resolveBusinessProfile,
 } from "@/lib/leads/auth";
 import { findPotentialDuplicates } from "@/lib/leads/duplicates";
-import { recordLeadActivity, listBusinessLeads } from "@/lib/leads/server";
-import { LEAD_SELECT } from "@/lib/leads/types";
+import { recordLeadActivity, listBusinessLeads, upsertPrimaryContactFromLead } from "@/lib/leads/server";
+import { LEAD_SELECT, defaultStatusForLeadType, type BusinessLead } from "@/lib/leads/types";
 import {
   parseCompanyOrContact,
+  parseLeadProfileFields,
   parseLeadSearchQuery,
   parseLeadStatus,
+  parseLeadType,
   parseOptionalText,
   parseUuid,
 } from "@/lib/leads/validators";
@@ -30,6 +32,8 @@ export async function GET(request: Request) {
     url.searchParams.get("profileId");
   const status = parseLeadStatus(url.searchParams.get("status") ?? "");
   const search = parseLeadSearchQuery(url.searchParams.get("q"));
+  const leadType = parseLeadType(url.searchParams.get("leadType") ?? url.searchParams.get("type") ?? "");
+  const needsFollowUp = url.searchParams.get("followUp") === "1";
 
   const business = await resolveBusinessProfile(
     supabase,
@@ -47,6 +51,8 @@ export async function GET(request: Request) {
     const leads = await listBusinessLeads(supabase, business.id, {
       status,
       search,
+      leadType,
+      needsFollowUp,
     });
     return NextResponse.json({ leads });
   } catch {
@@ -102,9 +108,11 @@ export async function POST(request: Request) {
     );
   }
 
-  const status = parseLeadStatus(body.status) ?? "new";
+  const leadType = parseLeadType(body.leadType ?? body.lead_type) ?? "commercial";
+  const status = parseLeadStatus(body.status) ?? defaultStatusForLeadType(leadType);
   const forceCreate = body.forceCreate === true;
   const documentId = parseUuid(body.documentId ?? body.document_id);
+  const profileFields = parseLeadProfileFields(body);
 
   const candidate = {
     email: parseOptionalText(body.email),
@@ -132,6 +140,7 @@ export async function POST(request: Request) {
     .from("business_leads")
     .insert({
       business_profile_id: business.id,
+      lead_type: leadType,
       company_name: names.companyName,
       contact_name: names.contactName,
       job_title: parseOptionalText(body.jobTitle ?? body.job_title),
@@ -148,6 +157,7 @@ export async function POST(request: Request) {
       document_id: documentId,
       created_by: user.id,
       last_activity_at: new Date().toISOString(),
+      ...profileFields,
     })
     .select(LEAD_SELECT)
     .single();
@@ -163,9 +173,13 @@ export async function POST(request: Request) {
     await recordLeadActivity(supabase, {
       leadId: String(data.id),
       activityType: "created",
-      description: "Lead created",
+      description:
+        leadType === "federal_partner"
+          ? "Federal partner created"
+          : "Lead created",
       actorUserId: user.id,
     });
+    await upsertPrimaryContactFromLead(supabase, data as BusinessLead, user.id);
   } catch {
     // Lead was created; activity logging is non-critical for V1.
   }

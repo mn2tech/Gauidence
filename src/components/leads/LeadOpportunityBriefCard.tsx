@@ -37,6 +37,12 @@ function parseBriefFromLead(lead: BusinessLead): LeadOpportunityBrief | null {
         ? b.leadScore
         : (lead.lead_score ?? 0),
     nextBestAction: String(b.nextBestAction ?? lead.next_action ?? ""),
+    matchExplanation: String(
+      b.matchExplanation ?? lead.match_explanation ?? ""
+    ),
+    recommendedApproach: String(
+      b.recommendedApproach ?? lead.recommended_approach ?? ""
+    ),
     analyzedAt: b.analyzedAt ? String(b.analyzedAt) : undefined,
   };
 }
@@ -78,19 +84,23 @@ export default function LeadOpportunityBriefCard({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-center gap-2">
           <Sparkles className="h-5 w-5 text-brand" />
-          <h2 className="font-semibold">AI Opportunity Brief</h2>
+          <h2 className="font-semibold">
+            {lead.lead_type === "federal_partner"
+              ? "NM2TECH partner match"
+              : "AI Opportunity Brief"}
+          </h2>
         </div>
         {lead.lead_score != null ? (
           <p className="text-sm font-semibold text-brand">
-            Lead score: {lead.lead_score} / 100
+            NM2TECH match: {lead.lead_score} / 100
           </p>
         ) : null}
       </div>
 
       {!hasBrief ? (
         <p className="mt-3 text-sm text-ink-muted">
-          Let Gideon research this company, identify a potential opportunity, and
-          suggest what to do next.
+          Let Gideon research this company. Facts from the website stay
+          labeled observed; recommendations stay labeled inferred.
         </p>
       ) : (
         <div className="mt-4 space-y-4 text-sm">
@@ -105,10 +115,21 @@ export default function LeadOpportunityBriefCard({
             </p>
           </div>
 
-          {brief?.reasoning ? (
+          {(brief?.reasoning || lead.match_explanation) ? (
             <div>
-              <p className="font-medium">Why</p>
-              <p className="mt-1 text-ink-muted">{brief.reasoning}</p>
+              <p className="font-medium">Why this partner matches NM2TECH</p>
+              <p className="mt-1 text-ink-muted">
+                {lead.match_explanation || brief?.reasoning}
+              </p>
+            </div>
+          ) : null}
+
+          {(brief?.recommendedApproach || lead.recommended_approach) ? (
+            <div>
+              <p className="font-medium">Recommended NM2TECH approach</p>
+              <p className="mt-1 text-ink-muted">
+                {lead.recommended_approach || brief?.recommendedApproach}
+              </p>
             </div>
           ) : null}
 
@@ -176,7 +197,7 @@ export default function LeadOpportunityBriefCard({
           ) : (
             <Sparkles className="h-4 w-4" />
           )}
-          {hasBrief ? "Refresh opportunity" : "Find Opportunity"}
+          {hasBrief ? "Refresh research" : "Research Company"}
         </button>
 
         {lead.proposal_id ? (

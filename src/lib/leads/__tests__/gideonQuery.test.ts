@@ -98,12 +98,34 @@ describe("leads Gideon query", () => {
     );
   });
 
+  it("parses today's actions, federal, stale, and match questions", () => {
+    assert.equal(
+      parseLeadsGideonQuery("Which leads should I contact today?").intent,
+      "today"
+    );
+    const federal = parseLeadsGideonQuery(
+      "Show federal partners I haven't contacted."
+    );
+    assert.equal(federal.intent, "federal");
+    assert.equal(federal.uncontacted, true);
+    assert.equal(
+      parseLeadsGideonQuery("Which relationships are becoming stale?").intent,
+      "stale"
+    );
+    const match = parseLeadsGideonQuery(
+      "Which partners match our AI capabilities?"
+    );
+    assert.equal(match.intent, "match");
+    assert.equal(match.matchTerm, "ai");
+  });
+
   it("formats a pipeline summary", () => {
     const text = formatLeadPipeline([
       lead(),
       lead({ id: "2", status: "won", company_name: "Won Co" }),
     ]);
     assert.match(text, /Leads pipeline: 2/);
+    assert.match(text, /Commercial/);
     assert.match(text, /Acme/);
     assert.match(text, /\/leads/);
   });

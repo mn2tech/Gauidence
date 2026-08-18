@@ -2,9 +2,15 @@
 
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
-import { LEAD_SOURCES } from "@/lib/leads/types";
+import {
+  LEAD_SOURCES,
+  LEAD_TYPE_LABELS,
+  SMALL_BUSINESS_STATUSES,
+  type LeadType,
+} from "@/lib/leads/types";
 
 export type LeadFormValues = {
+  leadType: LeadType;
   companyName: string;
   contactName: string;
   jobTitle: string;
@@ -15,9 +21,24 @@ export type LeadFormValues = {
   customSource: string;
   sourceDetail: string;
   notes: string;
+  linkedinUrl: string;
+  relationshipOwner: string;
+  smallBusinessStatus: string;
+  uei: string;
+  cageCode: string;
+  naicsCodes: string;
+  primaryCapabilities: string;
+  federalAgenciesServed: string;
+  contractVehicles: string;
+  knownContracts: string;
+  currentOpportunities: string;
+  pastPerformanceAreas: string;
+  technologyAreas: string;
+  marketAgency: string;
 };
 
 const EMPTY_VALUES: LeadFormValues = {
+  leadType: "commercial",
   companyName: "",
   contactName: "",
   jobTitle: "",
@@ -28,6 +49,20 @@ const EMPTY_VALUES: LeadFormValues = {
   customSource: "",
   sourceDetail: "",
   notes: "",
+  linkedinUrl: "",
+  relationshipOwner: "",
+  smallBusinessStatus: "",
+  uei: "",
+  cageCode: "",
+  naicsCodes: "",
+  primaryCapabilities: "",
+  federalAgenciesServed: "",
+  contractVehicles: "",
+  knownContracts: "",
+  currentOpportunities: "",
+  pastPerformanceAreas: "",
+  technologyAreas: "",
+  marketAgency: "",
 };
 
 const inputClass =
@@ -56,12 +91,14 @@ export default function LeadForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showDetails, setShowDetails] = useState(
-    !quick || Boolean(
-      initialValues?.jobTitle ||
-        initialValues?.email ||
-        initialValues?.phone ||
-        initialValues?.website
-    )
+    !quick ||
+      initialValues?.leadType === "federal_partner" ||
+      Boolean(
+        initialValues?.jobTitle ||
+          initialValues?.email ||
+          initialValues?.phone ||
+          initialValues?.website
+      )
   );
 
   function setField<K extends keyof LeadFormValues>(key: K, value: LeadFormValues[K]) {
@@ -98,6 +135,21 @@ export default function LeadForm({
       ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className="text-sm font-medium">Lead type</label>
+          <select
+            value={values.leadType}
+            onChange={(e) => {
+              const next = e.target.value as LeadType;
+              setField("leadType", next);
+              if (next === "federal_partner") setShowDetails(true);
+            }}
+            className={`mt-1 ${inputClass}`}
+          >
+            <option value="commercial">{LEAD_TYPE_LABELS.commercial}</option>
+            <option value="federal_partner">{LEAD_TYPE_LABELS.federal_partner}</option>
+          </select>
+        </div>
         <div>
           <label className="text-sm font-medium">Company name</label>
           <input
@@ -243,6 +295,139 @@ export default function LeadForm({
           className={`mt-1 ${inputClass}`}
         />
       </div>
+
+      {values.leadType === "federal_partner" ? (
+        <div className="space-y-4 rounded-xl border border-stone-200 bg-stone-50 p-4">
+          <p className="text-sm font-semibold">Federal partner profile</p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="text-sm font-medium">Market / Agency</label>
+              <input
+                value={values.marketAgency}
+                onChange={(e) => setField("marketAgency", e.target.value)}
+                placeholder="Treasury, DHS"
+                className={`mt-1 ${inputClass}`}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Relationship owner</label>
+              <input
+                value={values.relationshipOwner}
+                onChange={(e) => setField("relationshipOwner", e.target.value)}
+                placeholder="Ken"
+                className={`mt-1 ${inputClass}`}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Small business status</label>
+              <select
+                value={values.smallBusinessStatus}
+                onChange={(e) => setField("smallBusinessStatus", e.target.value)}
+                className={`mt-1 ${inputClass}`}
+              >
+                <option value="">Unknown</option>
+                {SMALL_BUSINESS_STATUSES.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-sm font-medium">LinkedIn</label>
+              <input
+                value={values.linkedinUrl}
+                onChange={(e) => setField("linkedinUrl", e.target.value)}
+                placeholder="https://linkedin.com/company/…"
+                className={`mt-1 ${inputClass}`}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">UEI</label>
+              <input
+                value={values.uei}
+                onChange={(e) => setField("uei", e.target.value)}
+                className={`mt-1 ${inputClass}`}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">CAGE code</label>
+              <input
+                value={values.cageCode}
+                onChange={(e) => setField("cageCode", e.target.value)}
+                className={`mt-1 ${inputClass}`}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="text-sm font-medium">NAICS codes</label>
+              <input
+                value={values.naicsCodes}
+                onChange={(e) => setField("naicsCodes", e.target.value)}
+                placeholder="541511, 541512"
+                className={`mt-1 ${inputClass}`}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="text-sm font-medium">Primary capabilities</label>
+              <textarea
+                value={values.primaryCapabilities}
+                onChange={(e) => setField("primaryCapabilities", e.target.value)}
+                rows={2}
+                className={`mt-1 ${inputClass}`}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="text-sm font-medium">Federal agencies served</label>
+              <input
+                value={values.federalAgenciesServed}
+                onChange={(e) => setField("federalAgenciesServed", e.target.value)}
+                className={`mt-1 ${inputClass}`}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Contract vehicles</label>
+              <input
+                value={values.contractVehicles}
+                onChange={(e) => setField("contractVehicles", e.target.value)}
+                placeholder="Only if verified"
+                className={`mt-1 ${inputClass}`}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Known contracts</label>
+              <input
+                value={values.knownContracts}
+                onChange={(e) => setField("knownContracts", e.target.value)}
+                placeholder="Only if verified"
+                className={`mt-1 ${inputClass}`}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="text-sm font-medium">Current opportunities</label>
+              <input
+                value={values.currentOpportunities}
+                onChange={(e) => setField("currentOpportunities", e.target.value)}
+                className={`mt-1 ${inputClass}`}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Past performance areas</label>
+              <input
+                value={values.pastPerformanceAreas}
+                onChange={(e) => setField("pastPerformanceAreas", e.target.value)}
+                className={`mt-1 ${inputClass}`}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Technology areas</label>
+              <input
+                value={values.technologyAreas}
+                onChange={(e) => setField("technologyAreas", e.target.value)}
+                placeholder="Data, cloud, AI…"
+                className={`mt-1 ${inputClass}`}
+              />
+            </div>
+          </div>
+        </div>
+      ) : null}
         </>
       ) : null}
 

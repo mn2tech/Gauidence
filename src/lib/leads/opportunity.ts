@@ -11,6 +11,8 @@ export const LEAD_OPPORTUNITY_SCHEMA = {
     "suggestedOpening",
     "leadScore",
     "nextBestAction",
+    "matchExplanation",
+    "recommendedApproach",
   ],
   properties: {
     companySummary: { type: "string" },
@@ -34,6 +36,8 @@ export const LEAD_OPPORTUNITY_SCHEMA = {
     suggestedOpening: { type: "string" },
     leadScore: { type: "number" },
     nextBestAction: { type: "string" },
+    matchExplanation: { type: "string" },
+    recommendedApproach: { type: "string" },
   },
 } as const;
 
@@ -55,6 +59,8 @@ export type LeadOpportunityBrief = {
   suggestedOpening: string;
   leadScore: number;
   nextBestAction: string;
+  matchExplanation?: string;
+  recommendedApproach?: string;
   analyzedAt?: string;
 };
 
@@ -178,6 +184,17 @@ export function parseLeadOpportunityBrief(
       "next_best_action",
       "nextAction",
       "next_action"
+    ),
+    matchExplanation: pickString(
+      parsed,
+      "matchExplanation",
+      "match_explanation",
+      "whyThisPartner"
+    ),
+    recommendedApproach: pickString(
+      parsed,
+      "recommendedApproach",
+      "recommended_approach"
     ),
     analyzedAt: new Date().toISOString(),
   };

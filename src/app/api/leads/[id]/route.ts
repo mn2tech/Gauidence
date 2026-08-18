@@ -12,7 +12,9 @@ import {
 import { LEAD_SELECT } from "@/lib/leads/types";
 import {
   parseCompanyOrContact,
+  parseLeadProfileFields,
   parseLeadStatus,
+  parseLeadType,
   parseOptionalText,
 } from "@/lib/leads/validators";
 import { requireOwnedGuardianProfile } from "@/lib/profiles/server";
@@ -102,6 +104,11 @@ export async function PATCH(request: Request, context: RouteContext) {
     );
   }
   if (body.notes !== undefined) updates.notes = parseOptionalText(body.notes);
+
+  const leadType = parseLeadType(body.leadType ?? body.lead_type);
+  if (leadType) updates.lead_type = leadType;
+
+  Object.assign(updates, parseLeadProfileFields(body));
 
   const newStatus = parseLeadStatus(body.status);
   if (newStatus) updates.status = newStatus;

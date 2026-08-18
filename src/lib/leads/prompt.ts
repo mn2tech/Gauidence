@@ -19,27 +19,31 @@ Return strict JSON only (no markdown fences):
   "conversationAngle": string,
   "suggestedOpening": string,
   "leadScore": number,
-  "nextBestAction": string
+  "nextBestAction": string,
+  "matchExplanation": string,
+  "recommendedApproach": string
 }
 
 Scoring (leadScore 0–100 integer):
-- Service fit to catalog
-- Evidence of a real problem
-- Contact data quality
-- Business relevance
-- Relationship / context from notes
-- Likelihood of an actionable opportunity
+- For commercial: service fit, evidence of a real problem, contact quality, likelihood of an actionable sale
+- For federal partners: NM2TECH teaming/subcontracting fit — AI/data/cloud/federal IT staffing overlap — without claiming unverified certifications or contracts
 
 Evidence kinds:
 - "observed" — directly supported by lead fields, notes, or website fetch data provided
 - "inferred" — reasonable hypothesis; state uncertainty in detail
 - "unknown" — cannot assess; frame as a question to explore
 
+NM2TECH capabilities to consider (do not invent that the lead has these):
+AI / Generative AI, Data Engineering, Data Architecture, SAS / SAS Viya, Cloud modernization, Azure, AWS, PostgreSQL, ETL / ELT, Machine Learning, AI agents, Knowledge management, Application development, Federal IT staffing, Data governance.
+
 Rules:
-- Never invent facts. If no website data was provided, do not claim website issues as observed.
+- Never invent facts, certifications, UEI/CAGE, contract vehicles, or past performance.
+- If no website data was provided, do not claim website issues as observed.
 - recommendedService should align with the SERVICE CATALOG when possible.
+- matchExplanation: 1–3 sentences on why this company may (or may not) be a fit. Label inference clearly.
+- recommendedApproach: one concrete relationship move (e.g. "Request a 20-minute capability discussion as a data/AI subcontracting partner").
 - suggestedOpening: under 60 words, personal, specific — no generic marketing language.
-- nextBestAction: one concrete step (e.g. "Send a personalized introduction email").
+- nextBestAction: one concrete step.
 - Max 5 items in potentialNeeds.`;
 
 export function buildLeadOpportunityUserPrompt(args: {
@@ -69,7 +73,23 @@ export function buildLeadOpportunityUserPrompt(args: {
     lead.phone ? `Phone: ${lead.phone}` : null,
     lead.website ? `Website: ${lead.website}` : null,
     lead.source ? `Source: ${lead.source}` : null,
-    lead.source_detail ? `Where we met: ${lead.source_detail}` : null,
+    `Type: ${lead.lead_type === "federal_partner" ? "Federal Partner" : "Commercial"}`,
+    lead.market_agency ? `Market / agency: ${lead.market_agency}` : null,
+    lead.small_business_status
+      ? `Small business status: ${lead.small_business_status}`
+      : null,
+    lead.uei ? `UEI: ${lead.uei}` : null,
+    lead.cage_code ? `CAGE: ${lead.cage_code}` : null,
+    lead.naics_codes ? `NAICS: ${lead.naics_codes}` : null,
+    lead.primary_capabilities
+      ? `Stated capabilities: ${lead.primary_capabilities}`
+      : null,
+    lead.federal_agencies_served
+      ? `Agencies served: ${lead.federal_agencies_served}`
+      : null,
+    lead.contract_vehicles
+      ? `Contract vehicles (claimed): ${lead.contract_vehicles}`
+      : null,
     lead.notes ? `Notes: ${lead.notes}` : null,
     "",
     args.serviceCatalog ? `PROPOSAL SERVICE CATALOG:\n${args.serviceCatalog}` : null,
@@ -105,6 +125,11 @@ export function buildLeadOpportunityUserPrompt(args: {
     parts.push("", "WEBSITE: not provided on lead.");
   }
 
-  parts.push("", "Identify the best opportunity and what to do next.");
+  parts.push(
+    "",
+    lead.lead_type === "federal_partner"
+      ? "Evaluate this company as a potential federal teaming/subcontracting partner for NM2TECH. Distinguish verified facts from inference. Do not invent contracts or certifications."
+      : "Identify the best commercial opportunity and what to do next."
+  );
   return parts.filter(Boolean).join("\n");
 }
