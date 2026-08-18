@@ -10,6 +10,7 @@ import {
   Loader2,
   Plus,
   Search,
+  Trash2,
   UserPlus,
 } from "lucide-react";
 import { useActiveProfile } from "@/components/ProfileProvider";
@@ -48,7 +49,7 @@ import {
   type LeadType,
   type LeadWithActivities,
 } from "@/lib/leads/types";
-import { isOrgStyleProfile } from "@/lib/profiles/types";
+import { isOrgStyleProfile, isProfileOwner } from "@/lib/profiles/types";
 import { LEADS_PATH, PROPOSALS_PATH } from "@/lib/routes";
 
 const cardClass = "rounded-2xl border border-stone-200 bg-white p-5 shadow-sm";
@@ -133,6 +134,7 @@ export default function LeadsScreen() {
     isOrgStyleProfile(active.profile_type) &&
     active.profile_type !== "client";
   const businessProfileId = isBusiness ? active?.id ?? null : null;
+  const canDeleteLeads = isBusiness && active != null && isProfileOwner(active);
 
   const [leads, setLeads] = useState<BusinessLead[]>([]);
   const [selectedLead, setSelectedLead] = useState<LeadWithActivities | null>(null);
@@ -172,6 +174,7 @@ export default function LeadsScreen() {
   const [pendingCreatePayload, setPendingCreatePayload] = useState<
     Record<string, unknown> | null
   >(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const summary = useMemo(() => computeLeadSummary(leads), [leads]);
   const todayBreakdown = useMemo(() => todaysActionBreakdown(leads), [leads]);
@@ -525,6 +528,38 @@ export default function LeadsScreen() {
     await loadDetail(selectedId);
   }
 
+  async function handleDeleteLead(lead: BusinessLead) {
+    const name = leadDisplayName(lead);
+    const confirmed = window.confirm(
+      `Delete "${name}"? Contacts and activity for this company will be removed. This can't be undone.`
+    );
+    if (!confirmed) return;
+
+    setDeletingId(lead.id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/leads/${lead.id}`, { method: "DELETE" });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          typeof body.error === "string"
+            ? body.error
+            : "Couldn't delete lead."
+        );
+      }
+      setLeads((prev) => prev.filter((item) => item.id !== lead.id));
+      if (selectedId === lead.id) {
+        setSelectedLead(null);
+        setEditing(false);
+        router.push(LEADS_PATH);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't delete lead.");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   function recommendNextAction() {
     if (!selectedLead) return;
     const type = leadTypeOf(selectedLead);
@@ -614,6 +649,8 @@ export default function LeadsScreen() {
           All leads
         </Link>
 
+        {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
+
         {detailLoading && !lead ? (
           <p className="mt-6 text-sm text-ink-muted">Loading lead…</p>
         ) : lead ? (
@@ -656,6 +693,21 @@ export default function LeadsScreen() {
                       >
                         Edit
                       </button>
+                      {canDeleteLeads ? (
+                        <button
+                          type="button"
+                          disabled={deletingId === lead.id}
+                          onClick={() => void handleDeleteLead(lead)}
+                          className="inline-flex items-center gap-1.5 text-sm font-medium text-rose-700 hover:underline disabled:opacity-50"
+                        >
+                          {deletingId === lead.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-3.5 w-3.5" />
+                          )}
+                          Delete
+                        </button>
+                      ) : null}
                     </div>
                   </div>
 
@@ -1156,6 +1208,9 @@ export default function LeadsScreen() {
                 <th className="px-4 py-3 font-medium">Last contact</th>
                 <th className="px-4 py-3 font-medium">Next action</th>
                 <th className="px-4 py-3 font-medium">Owner</th>
+                {canDeleteLeads ? (
+                  <th className="px-4 py-3 font-medium">Actions</th>
+                ) : null}
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-100">
@@ -1195,6 +1250,23 @@ export default function LeadsScreen() {
                   <td className="px-4 py-3 text-ink-muted">
                     {lead.relationship_owner ?? "—"}
                   </td>
+                  {canDeleteLeads ? (
+                    <td className="px-4 py-3">
+                      <button
+                        type="button"
+                        disabled={deletingId === lead.id}
+                        onClick={() => void handleDeleteLead(lead)}
+                        className="inline-flex items-center gap-1 text-sm font-medium text-rose-700 hover:underline disabled:opacity-50"
+                      >
+                        {deletingId === lead.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-3.5 w-3.5" />
+                        )}
+                        Delete
+                      </button>
+                    </td>
+                  ) : null}
                 </tr>
               ))}
             </tbody>
