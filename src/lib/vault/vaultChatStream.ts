@@ -25,6 +25,20 @@ export type VaultChatStreamMessage = {
   role: "user" | "assistant";
   content: string;
   citations?: VaultChatCitation[];
+  attachment?: {
+    documentId: string;
+    fileName: string;
+    kind: "image" | "document";
+    mimeType?: string | null;
+    previewUrl?: string | null;
+  } | null;
+  attachments?: Array<{
+    documentId: string;
+    fileName: string;
+    kind: "image" | "document";
+    mimeType?: string | null;
+    previewUrl?: string | null;
+  }>;
   vaultScope?: {
     profileId: string;
     profileName: string;

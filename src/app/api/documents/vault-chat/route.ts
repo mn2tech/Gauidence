@@ -34,6 +34,11 @@ import {
 import { looksLikeMusicPracticeSpace } from "@/lib/connectors/trello/boundSpace";
 import { buildGideonQuickActions } from "@/lib/gideon/chiefOfStaff";
 import { loadAttachedVaultDocument } from "@/lib/vault/attachedDocument";
+import {
+  citationFromDocument,
+  hydrateVaultChatMessage,
+  hydrateVaultChatMessages,
+} from "@/lib/vault/chatAttachments";
 import { wantsShowPictures } from "@/lib/vault/images";
 import {
   resolveGideonImageAttachmentId,
@@ -511,7 +516,9 @@ export async function GET(request: Request) {
       chats: threadChats,
       chatId: chat.id,
       title: chat.title,
-      messages: (messages ?? []) as ChatMessageRow[],
+      messages: hydrateVaultChatMessages(
+        (messages ?? []) as ChatMessageRow[]
+      ),
       meta: {
         profileId: chatProfile.id,
         profileName: chatProfile.display_name,
@@ -1156,14 +1163,14 @@ export async function POST(request: Request) {
       );
     }
     question = String(userRow.content);
-    userMsg = {
+    userMsg = hydrateVaultChatMessage({
       id: userRow.id,
       role: "user",
       content: question,
       citations:
         (userRow.citations as ChatMessageRow["citations"] | null) ?? [],
       created_at: userRow.created_at,
-    };
+    });
     priorMessages = priorMessages.filter(
       (row) => row.id !== regenerateAssistantId
     );
@@ -1202,6 +1209,30 @@ export async function POST(request: Request) {
       .eq("profile_id", active.id);
   }
 
+  const requestedAttachmentId =
+    typeof attachmentDocumentIdRaw === "string"
+      ? attachmentDocumentIdRaw.trim()
+      : "";
+
+  let persistCitations: NonNullable<ChatMessageRow["citations"]> = [];
+  if (requestedAttachmentId && !regenerateAssistantId) {
+    const { data: attachedRow } = await supabase
+      .from("documents")
+      .select("id, file_name, mime_type, profile_id")
+      .eq("id", requestedAttachmentId)
+      .maybeSingle();
+    if (
+      !attachedRow?.profile_id ||
+      !accessibleProfileIds.includes(attachedRow.profile_id)
+    ) {
+      return NextResponse.json(
+        { error: "Couldn't attach that image to your message." },
+        { status: 403 }
+      );
+    }
+    persistCitations = [citationFromDocument(attachedRow)];
+  }
+
   if (!userMsg) {
     const { data: insertedUserMsg, error: userMsgError } = await supabase
       .from("vault_chat_messages")
@@ -1210,7 +1241,7 @@ export async function POST(request: Request) {
         user_id: user.id,
         role: "user",
         content: question,
-        citations: [],
+        citations: persistCitations,
       })
       .select("id, role, content, citations, created_at")
       .single();
@@ -1221,7 +1252,7 @@ export async function POST(request: Request) {
         { status: 502 }
       );
     }
-    userMsg = insertedUserMsg as ChatMessageRow;
+    userMsg = hydrateVaultChatMessage(insertedUserMsg as ChatMessageRow);
   }
 
   let citations: {
@@ -1244,10 +1275,6 @@ export async function POST(request: Request) {
     profileName: active.display_name,
   };
 
-  const requestedAttachmentId =
-    typeof attachmentDocumentIdRaw === "string"
-      ? attachmentDocumentIdRaw.trim()
-      : "";
   const attachmentDocumentId =
     resolveGideonImageAttachmentId({
       requestedId: requestedAttachmentId,
@@ -1335,20 +1362,29 @@ export async function POST(request: Request) {
       attachedFileName = attachedDoc?.fileName;
 
       if (userMsg?.id && attachedDoc) {
-        await supabase
+        const attachedCitations = [
+          {
+            documentId: attachedDoc.documentId,
+            fileName: attachedDoc.fileName,
+            isImage: attachedDoc.isImage,
+            mimeType: attachedDoc.mimeType,
+          },
+        ];
+        const { error: citeError } = await supabase
           .from("vault_chat_messages")
-          .update({
-            citations: [
-              {
-                documentId: attachedDoc.documentId,
-                fileName: attachedDoc.fileName,
-                isImage: attachedDoc.isImage,
-                mimeType: attachedDoc.mimeType,
-              },
-            ],
-          })
+          .update({ citations: attachedCitations })
           .eq("id", userMsg.id)
           .eq("user_id", user.id);
+        if (citeError && persistCitations.length === 0) {
+          return NextResponse.json(
+            { error: "Couldn't attach that image to your message." },
+            { status: 502 }
+          );
+        }
+        userMsg = hydrateVaultChatMessage({
+          ...userMsg,
+          citations: attachedCitations,
+        });
       }
 
       if (
@@ -1535,7 +1571,7 @@ export async function POST(request: Request) {
           active: { id: active.id, display_name: active.display_name },
           chatHomeProfileId,
           chatScopedProfileId,
-          userMsg: userMsg as ChatMessageRow,
+          userMsg: hydrateVaultChatMessage(userMsg as ChatMessageRow),
           question,
           history,
           system,
@@ -1664,10 +1700,10 @@ export async function POST(request: Request) {
   return NextResponse.json({
     chatId,
     chats,
-    messages: [
+    messages: hydrateVaultChatMessages([
       userMsg,
       { ...assistantMsg, vaultScope: responseVaultScope },
-    ] as ChatMessageRow[],
+    ] as ChatMessageRow[]),
     proposedReminder,
     newlyGranted,
     vaultScope: responseVaultScope,

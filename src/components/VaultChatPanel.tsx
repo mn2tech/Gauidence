@@ -103,6 +103,7 @@ import {
   type GideonFocusBlock,
 } from "@/lib/gideon/focusBlock";
 import { isImageFileName } from "@/lib/vault/images";
+import { hydrateVaultChatMessages } from "@/lib/vault/chatAttachments";
 import {
   citationNamedInText,
   extractExplicitSourceFileNames,
@@ -249,6 +250,7 @@ type VaultMessageAttachment = {
   documentId: string;
   fileName: string;
   kind: "image" | "document";
+  mimeType?: string | null;
   previewUrl?: string | null;
 };
 
@@ -260,6 +262,40 @@ function fileTypeBadge(fileName: string): string {
 
 function isPendingAttachmentId(documentId: string): boolean {
   return documentId.startsWith("local-");
+}
+
+function messageAttachments(message: VaultMessage): VaultMessageAttachment[] {
+  if (message.attachments?.length) return message.attachments;
+  return message.attachment ? [message.attachment] : [];
+}
+
+function overlayOptimisticAttachment(
+  message: VaultMessage,
+  optimistic: VaultMessageAttachment | undefined,
+  userContent: string
+): VaultMessage {
+  const hydrated = hydrateVaultChatMessages([message])[0]!;
+  if (hydrated.role !== "user" || !optimistic) return hydrated;
+  const attachments = messageAttachments(hydrated);
+  const hasDoc = attachments.some((item) => item.documentId === optimistic.documentId);
+  const nextAttachments = hasDoc
+    ? attachments.map((item) =>
+        item.documentId === optimistic.documentId
+          ? {
+              ...item,
+              previewUrl: optimistic.previewUrl ?? item.previewUrl,
+              fileName: optimistic.fileName || item.fileName,
+              kind: optimistic.kind || item.kind,
+            }
+          : item
+      )
+    : [optimistic, ...attachments];
+  return {
+    ...hydrated,
+    content: userContent || hydrated.content,
+    attachments: nextAttachments,
+    attachment: nextAttachments[0] ?? null,
+  };
 }
 
 function VaultAttachmentCard({
@@ -363,7 +399,7 @@ function VaultAttachmentCard({
     ? "inline-flex w-[8.5rem] flex-col overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm"
     : "block overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm";
   const href = signedUrl ?? (isImage ? previewUrl : null);
-  const visualSrc = isImage ? previewUrl ?? signedUrl : pdfThumb;
+  const visualSrc = isImage ? signedUrl ?? previewUrl : pdfThumb;
 
   if (imageFailed && isImage) {
     return (
@@ -389,7 +425,12 @@ function VaultAttachmentCard({
                 ? "h-full w-full object-cover object-top"
                 : "max-h-72 w-full object-contain"
             }
-            onError={() => setImageFailed(true)}
+            onError={() => {
+              if (isImage && previewUrl && visualSrc === previewUrl && !pending) {
+                return;
+              }
+              setImageFailed(true);
+            }}
           />
         ) : isImage && (pending || !signedUrl) ? (
           <div className="flex h-full items-center justify-center">
@@ -444,6 +485,7 @@ type VaultMessage = {
   content: string;
   citations?: Citation[] | null;
   attachment?: VaultMessageAttachment | null;
+  attachments?: VaultMessageAttachment[] | null;
   vaultScope?: {
     profileId: string;
     profileName: string;
@@ -1172,7 +1214,9 @@ export default function VaultChatPanel({
       }
       if (body.chats) setChats(body.chats);
       const resolvedChatId = body.chatId ?? chatId;
-      const serverMessages = body.messages ?? [];
+      const serverMessages = hydrateVaultChatMessages(
+        (body.messages ?? []) as VaultMessage[]
+      );
       let applied = false;
 
       const applyThread = () => {
@@ -2621,20 +2665,7 @@ export default function VaultChatPanel({
             ...(options?.attachment?.documentId &&
             !isPendingAttachmentId(options.attachment.documentId)
               ? { attachmentDocumentId: options.attachment.documentId }
-              : (() => {
-                  const lastImage = [...messages]
-                    .reverse()
-                    .find(
-                      (m) =>
-                        m.role === "user" &&
-                        m.attachment?.kind === "image" &&
-                        m.attachment.documentId &&
-                        !isPendingAttachmentId(m.attachment.documentId)
-                    )?.attachment;
-                  return lastImage?.documentId
-                    ? { attachmentDocumentId: lastImage.documentId }
-                    : {};
-                })()),
+              : {}),
           ...(requestedWorkProjectId
             ? { workProjectId: requestedWorkProjectId }
             : {}),
@@ -2739,20 +2770,15 @@ export default function VaultChatPanel({
               : prev
           );
         }
-        const turn = body.messages ?? [];
+        const turn = hydrateVaultChatMessages(body.messages ?? []);
         const optimisticAttachment = options?.attachment;
         const mergedTurn = turn.map((m, index) => {
-          if (
-            index === 0 &&
-            m.role === "user" &&
-            optimisticAttachment &&
-            !m.attachment
-          ) {
-            return {
-              ...m,
-              attachment: optimisticAttachment,
-              content: userContent || m.content,
-            };
+          if (index === 0 && m.role === "user") {
+            return overlayOptimisticAttachment(
+              m,
+              optimisticAttachment,
+              userContent
+            );
           }
           return m;
         });
@@ -2846,15 +2872,11 @@ export default function VaultChatPanel({
                   },
                 ];
               }
-              const userFromServer: VaultMessage = {
-                ...event.userMsg,
-                ...(optimisticAttachment
-                  ? {
-                      attachment: optimisticAttachment,
-                      content: userContent || event.userMsg.content,
-                    }
-                  : {}),
-              };
+              const userFromServer: VaultMessage = overlayOptimisticAttachment(
+                event.userMsg as VaultMessage,
+                optimisticAttachment,
+                userContent
+              );
               return [
                 ...withoutStale,
                 userFromServer,
@@ -3065,7 +3087,7 @@ export default function VaultChatPanel({
     });
     void sendQuestion(userMessage.content, {
       regenerateAssistantId: assistantMessage.id,
-      attachment: userMessage.attachment ?? undefined,
+      attachment: messageAttachments(userMessage)[0],
     });
   };
 
@@ -4367,14 +4389,15 @@ export default function VaultChatPanel({
             m.role === "user" ? (
               <div key={m.id} className="flex justify-end">
                 <div className="flex max-w-[85%] flex-col items-end gap-2">
-                  {m.attachment ? (
+                  {messageAttachments(m).map((attachment) => (
                     <VaultAttachmentCard
-                      documentId={m.attachment.documentId}
-                      fileName={m.attachment.fileName}
-                      kind={m.attachment.kind}
-                      previewUrl={m.attachment.previewUrl}
+                      key={attachment.documentId}
+                      documentId={attachment.documentId}
+                      fileName={attachment.fileName}
+                      kind={attachment.kind}
+                      previewUrl={attachment.previewUrl}
                     />
-                  ) : null}
+                  ))}
                   {m.content.trim() ? (
                     <div className="rounded-2xl bg-stone-100 px-3.5 py-2 text-sm text-foreground">
                       <span className="whitespace-pre-wrap">{m.content}</span>
@@ -4393,10 +4416,11 @@ export default function VaultChatPanel({
                   hideCitationPreviews:
                     index > 0 &&
                     messages[index - 1]?.role === "user" &&
-                    Boolean(messages[index - 1]?.attachment) &&
-                    (m.citations ?? []).some(
-                      (c) =>
-                        c.documentId === messages[index - 1]?.attachment?.documentId
+                    messageAttachments(messages[index - 1]!).length > 0 &&
+                    (m.citations ?? []).some((c) =>
+                      messageAttachments(messages[index - 1]!).some(
+                        (attachment) => attachment.documentId === c.documentId
+                      )
                     ),
                   userMessage:
                     index > 0 && messages[index - 1]?.role === "user"
