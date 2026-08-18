@@ -305,6 +305,13 @@ async function markJobFailed(
         processing_step: "failed",
       })
       .eq("id", job.document_id);
+    await supabase
+      .from("extracted_data")
+      .update({
+        vision_status: "failed",
+        vision_error: message.slice(0, 500),
+      })
+      .eq("document_id", job.document_id);
   } else if (job.job_type === "index_document") {
     await supabase
       .from("documents")
@@ -442,12 +449,22 @@ async function runIndexJob(
 
   const { data: doc } = await supabase
     .from("documents")
-    .select("file_name")
+    .select("file_name, mime_type, content_type")
     .eq("id", documentId)
     .maybeSingle();
 
   const { indexDocumentForVault } = await import("@/lib/vault/indexDocument");
   const { markDocumentIndexCompleted } = await import("@/lib/vault/indexingJobs");
+
+  const contentType =
+    doc?.content_type === "image" ||
+    doc?.content_type === "pdf" ||
+    doc?.content_type === "document" ||
+    doc?.content_type === "generic"
+      ? doc.content_type
+      : doc?.mime_type?.startsWith("image/")
+        ? "image"
+        : undefined;
 
   const indexed = await indexDocumentForVault({
     supabase,
@@ -470,6 +487,7 @@ async function runIndexJob(
           ? (extracted.specialist as Record<string, unknown>)
           : null,
       sourceText: extracted.source_text,
+      contentType,
     },
   });
 

@@ -77,6 +77,8 @@ export type DocumentProcessingFields = {
   knowledge_status?: string | null;
   processing_step?: string | null;
   last_processing_error?: string | null;
+  mime_type?: string | null;
+  file_name?: string | null;
 };
 
 export function isAnalysisComplete(analysisStatus: string): boolean {
@@ -201,7 +203,17 @@ const STEP_TO_STAGE: Record<string, DocumentProcessingStage> = {
 };
 
 export function userFacingStatusLabel(doc: DocumentProcessingFields): string {
+  const mime = (doc.mime_type ?? "").toLowerCase();
+  const isImage =
+    mime.startsWith("image/") ||
+    /\.(png|jpe?g|gif|webp|heic|heif|bmp)$/i.test(doc.file_name ?? "");
   const stage = deriveProcessingStage(doc);
+  if (isImage) {
+    if (stage === "queued" || stage === "analyzing") return "Analyzing image...";
+    if (stage === "failed" || stage === "retryable") return "Analysis failed";
+    if (stage === "ready") return "Vision analyzed";
+    if (stage === "uploaded") return "Uploaded";
+  }
   const step = doc.processing_step;
   // Only use processing_step when it matches the current stage. A stale
   // "queued" step must not hide completed analysis as "Waiting for analysis".

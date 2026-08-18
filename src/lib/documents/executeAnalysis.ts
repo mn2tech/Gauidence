@@ -169,13 +169,17 @@ export async function executeDocumentAnalysis(
         email: accountProfile?.email ?? user.email ?? null,
         companyName,
         timeZone: args.timeZone,
+        spaceName: guardianProfile?.display_name ?? null,
+        profileId: doc.profile_id,
+        documentId: doc.id,
       },
       setStatus
     )
   );
   diagnostics = recordDuration(diagnostics, "llm_analysis_ms", analysisStart);
 
-  const { analysis, classification, routedTo, model, sourceText } = result;
+  const { analysis, classification, routedTo, model, sourceText, vision, analysisType } =
+    result;
   const facts = toDisplayFacts(analysis, args.timeZone);
   const finalStatus: AnalysisStatus =
     analysis.guardian_status === "needs_verification"
@@ -183,6 +187,27 @@ export async function executeDocumentAnalysis(
       : "completed";
 
   const profileId = doc.profile_id as string;
+
+  const visionFields =
+    analysisType === "vision" || vision
+      ? {
+          vision_status: vision?.status ?? "analyzed",
+          vision_model: vision?.model ?? model,
+          vision_summary: vision?.result?.summary ?? analysis.summary,
+          vision_transcription: vision?.result?.transcription ?? null,
+          vision_metadata: vision?.result
+            ? {
+                ...vision.result,
+                source_item_id: doc.id,
+                asset_id: doc.id,
+                source_type: "image",
+                space_id: profileId,
+              }
+            : null,
+          vision_analyzed_at: new Date().toISOString(),
+          vision_error: vision?.status === "failed" ? vision.error ?? null : null,
+        }
+      : {};
 
   const { error: saveError } = await supabase.from("extracted_data").upsert(
     {
@@ -213,12 +238,67 @@ export async function executeDocumentAnalysis(
       source_text: sourceText,
       source_text_indexed_at: null,
       updated_at: new Date().toISOString(),
+      ...visionFields,
     },
     { onConflict: "document_id" }
   );
   if (saveError) {
-    throw new Error("Analysis finished but couldn't be saved.");
+    const missingVisionCol = /vision_|content_type|analysis_type|schema cache/i.test(
+      saveError.message
+    );
+    if (missingVisionCol && Object.keys(visionFields).length) {
+      const retry = await supabase.from("extracted_data").upsert(
+        {
+          document_id: doc.id,
+          user_id: user.id,
+          profile_id: profileId,
+          summary: analysis.summary,
+          facts,
+          model,
+          document_type: analysis.document_type,
+          document_subtype: classification.document_subtype,
+          classification_confidence: classification.classification_confidence,
+          guardian_status: analysis.guardian_status,
+          overall_confidence: analysis.overall_confidence,
+          warnings: analysis.warnings,
+          specialist: {
+            ...analysis.specialist,
+            routed_to: routedTo,
+            classification_reason: classification.classification_reason,
+            people: analysis.people,
+            organizations: analysis.organizations,
+            obligations: analysis.obligations,
+            suggested_actions: analysis.suggested_actions,
+            important_dates: analysis.important_dates,
+            amounts: analysis.amounts,
+          },
+          title: analysis.title,
+          source_text: sourceText,
+          source_text_indexed_at: null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "document_id" }
+      );
+      if (retry.error) {
+        throw new Error("Analysis finished but couldn't be saved.");
+      }
+    } else {
+      throw new Error("Analysis finished but couldn't be saved.");
+    }
   }
+
+  const contentType = doc.mime_type?.startsWith("image/")
+    ? "image"
+    : doc.mime_type === "application/pdf"
+      ? "pdf"
+      : "document";
+  await supabase
+    .from("documents")
+    .update({
+      content_type: contentType,
+      analysis_type: analysisType === "vision" ? "vision" : "document",
+    })
+    .eq("id", doc.id);
 
   await supabase.from("analysis_events").insert({ user_id: user.id });
 

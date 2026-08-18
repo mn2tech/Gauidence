@@ -901,7 +901,7 @@ export default function DocumentManager({
           </button>
         </div>
         <p className="text-xs text-ink-muted">
-          PDF, JPG, PNG, WebP, CSV, JSON, or pasted text — up to 15 MB
+          PDF, JPG, PNG, WebP, HEIC, CSV, JSON, or pasted text — up to 15 MB
         </p>
         <input
           ref={fileInputRef}
@@ -1280,13 +1280,15 @@ export default function DocumentManager({
                           ? progressLabel ??
                             (doc.analysis_status === "queued"
                               ? "Waiting…"
-                              : "Analyzing…")
+                              : doc.mime_type.startsWith("image/")
+                                ? "Analyzing image..."
+                                : "Analyzing…")
                           : readOnly
                             ? "View Analysis"
                             : doc.analysis_status === "failed" ||
                                 processingStatuses[doc.id]?.processingStage ===
                                   "retryable"
-                              ? "Try Again"
+                              ? "Retry"
                               : analysis
                                 ? "View Analysis"
                                 : "Analyze"}

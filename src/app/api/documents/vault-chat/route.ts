@@ -35,6 +35,14 @@ import { looksLikeMusicPracticeSpace } from "@/lib/connectors/trello/boundSpace"
 import { buildGideonQuickActions } from "@/lib/gideon/chiefOfStaff";
 import { loadAttachedVaultDocument } from "@/lib/vault/attachedDocument";
 import { wantsShowPictures } from "@/lib/vault/images";
+import {
+  resolveGideonImageAttachmentId,
+  selectRetrievedImageDocumentIds,
+  uniqueImageDocumentIds,
+  wantsVisualUnderstanding,
+} from "@/lib/vision/gideonImages";
+import { loadAuthorizedVisionImages } from "@/lib/vision/loadAuthorized";
+import { enqueueAnalyzePipeline } from "@/lib/documents/processingJobs";
 import { chatScopedProfilePayload } from "@/lib/vault/detectVaultScope";
 import {
   listGuardianProfiles,
@@ -1236,10 +1244,18 @@ export async function POST(request: Request) {
     profileName: active.display_name,
   };
 
-  const attachmentDocumentId =
+  const requestedAttachmentId =
     typeof attachmentDocumentIdRaw === "string"
       ? attachmentDocumentIdRaw.trim()
       : "";
+  const attachmentDocumentId =
+    resolveGideonImageAttachmentId({
+      requestedId: requestedAttachmentId,
+      question,
+      priorMessages,
+    }) ||
+    requestedAttachmentId ||
+    null;
 
   const workProjectIdForAction =
     typeof workProjectIdRaw === "string" ? workProjectIdRaw.trim() : "";
@@ -1318,6 +1334,42 @@ export async function POST(request: Request) {
         : null;
       attachedFileName = attachedDoc?.fileName;
 
+      if (userMsg?.id && attachedDoc) {
+        await supabase
+          .from("vault_chat_messages")
+          .update({
+            citations: [
+              {
+                documentId: attachedDoc.documentId,
+                fileName: attachedDoc.fileName,
+                isImage: attachedDoc.isImage,
+                mimeType: attachedDoc.mimeType,
+              },
+            ],
+          })
+          .eq("id", userMsg.id)
+          .eq("user_id", user.id);
+      }
+
+      if (
+        attachedDoc?.isImage &&
+        attachedDoc.profileId &&
+        (attachedDoc.analysisStatus === "failed" ||
+          attachedDoc.visionStatus === "failed" ||
+          (!attachedDoc.sourceText &&
+            attachedDoc.analysisStatus !== "queued" &&
+            attachedDoc.analysisStatus !== "analyzing" &&
+            attachedDoc.analysisStatus !== "extracting" &&
+            attachedDoc.analysisStatus !== "classifying" &&
+            attachedDoc.analysisStatus !== "validating"))
+      ) {
+        void enqueueAnalyzePipeline(supabase, {
+          documentId: attachedDoc.documentId,
+          profileId: attachedDoc.profileId,
+          userId: user.id,
+        });
+      }
+
       const gideonRoute = routeGideonRequest({
         question,
         history,
@@ -1326,7 +1378,8 @@ export async function POST(request: Request) {
           wantsVaultFileInventory(question) ||
           wantsTranscription(question) ||
           wantsShowPictures(question) ||
-          wantsOpenChartAttachment(question),
+          wantsOpenChartAttachment(question) ||
+          wantsVisualUnderstanding(question),
       });
       const loadFlags = resolveGideonLoad(gideonRoute);
       const calendarNote = await loadCalendarPromptNote({
@@ -1359,6 +1412,30 @@ export async function POST(request: Request) {
       });
 
       workspaceContext.promptOptions.agentMode = agentMode;
+
+      const retrievedImageIds = selectRetrievedImageDocumentIds({
+        chunks,
+        excludeIds: attachedDoc ? [attachedDoc.documentId] : [],
+        limit: attachedDoc?.isImage ? 2 : 3,
+      });
+      const visionImageIds = uniqueImageDocumentIds(
+        [
+          attachedDoc?.isImage ? attachedDoc.documentId : null,
+          ...retrievedImageIds,
+        ],
+        3
+      );
+      const visionImages = await loadAuthorizedVisionImages(supabase, {
+        documentIds: visionImageIds,
+        allowedProfileIds: accessibleProfileIds,
+        limit: 3,
+      });
+      if (visionImages.length) {
+        workspaceContext.promptOptions.hasVisionImages = true;
+        workspaceContext.promptOptions.hasAttachedDocument =
+          workspaceContext.promptOptions.hasAttachedDocument ||
+          Boolean(attachedDoc);
+      }
 
       const system = buildGideonSystemPrompt(workspaceContext, actionCtx);
       const showPictures = workspaceContext.promptOptions.showPictures;
@@ -1465,6 +1542,7 @@ export async function POST(request: Request) {
           maxTokens: gideonMaxTokens(workspaceContext),
           chunks,
           attachedDoc,
+          visionImages,
           showPictures,
           accessibleProfiles: scopeCandidates,
           isFirstExchange,

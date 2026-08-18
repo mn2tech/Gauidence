@@ -60,6 +60,8 @@ export type WorkspacePromptOptions = {
   spaceCreateAgent: boolean;
   transcriptionMode: boolean;
   hasAttachedDocument: boolean;
+  /** True when one or more images are attached to the multimodal request. */
+  hasVisionImages?: boolean;
   allVaultsNote: string;
   vaultEmptyNote: string;
   focusedWorkMemory: boolean;

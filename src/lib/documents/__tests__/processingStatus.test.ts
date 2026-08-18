@@ -140,6 +140,36 @@ describe("processingStatus", () => {
     );
   });
 
+  it("uses vision labels for image documents", () => {
+    assert.equal(
+      userFacingStatusLabel({
+        analysis_status: "analyzing",
+        processing_step: "analyzing",
+        mime_type: "image/jpeg",
+        file_name: "photo.jpg",
+      }),
+      "Analyzing image..."
+    );
+    assert.equal(
+      userFacingStatusLabel({
+        analysis_status: "completed",
+        indexing_status: "completed",
+        knowledge_status: "skipped",
+        mime_type: "image/png",
+        file_name: "shot.png",
+      }),
+      "Vision analyzed"
+    );
+    assert.equal(
+      userFacingStatusLabel({
+        analysis_status: "failed",
+        mime_type: "image/jpeg",
+        file_name: "photo.jpg",
+      }),
+      "Analysis failed"
+    );
+  });
+
   it("increases progress through pipeline stages", () => {
     assert.ok(
       processingProgressPercent({ analysis_status: "queued" }) <

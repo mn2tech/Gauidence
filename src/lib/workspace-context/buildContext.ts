@@ -624,10 +624,20 @@ Active space in the UI: ${activeProfile.display_name}. Document search includes 
   const attachedContext = attachedDoc
     ? [
         `File: ${attachedDoc.fileName}`,
+        attachedDoc.isImage
+          ? "This is an image already stored in Guardian. The original file is attached to this request — inspect it directly."
+          : "",
+        attachedDoc.visionSummary
+          ? `Vision summary:\n${attachedDoc.visionSummary.slice(0, 4_000)}`
+          : "",
         attachedDoc.sourceText
-          ? `Document text (OCR/native):\n${attachedDoc.sourceText.slice(0, attachedTextLimit)}`
-          : "(no extracted text — use the attached image if present)",
-      ].join("\n\n")
+          ? `Document text:\n${attachedDoc.sourceText.slice(0, attachedTextLimit)}`
+          : attachedDoc.isImage
+            ? "(No extracted text yet — use the attached image. Do not ask the user to re-upload it.)"
+            : "(no extracted text)",
+      ]
+        .filter(Boolean)
+        .join("\n\n")
     : "";
 
   const noDocumentExcerpts = !formatted.context.trim();
@@ -690,6 +700,7 @@ Active space in the UI: ${activeProfile.display_name}. Document search includes 
       spaceCreateAgent,
       transcriptionMode,
       hasAttachedDocument: Boolean(attachedDoc),
+      hasVisionImages: Boolean(attachedDoc?.isImage && attachedDoc.imageBase64),
       allVaultsNote,
       vaultEmptyNote,
       focusedWorkMemory: Boolean(focusedWorkMemory),

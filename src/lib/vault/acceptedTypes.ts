@@ -3,6 +3,8 @@ export const VAULT_ACCEPTED_TYPES: Record<string, string> = {
   "image/jpeg": "JPEG",
   "image/png": "PNG",
   "image/webp": "WebP",
+  "image/heic": "HEIC",
+  "image/heif": "HEIC",
   "text/plain": "Text",
   "text/csv": "CSV",
   "application/csv": "CSV",
@@ -10,7 +12,7 @@ export const VAULT_ACCEPTED_TYPES: Record<string, string> = {
 };
 
 export const VAULT_UNSUPPORTED_TYPE_MESSAGE =
-  "That file type isn't supported. Upload a PDF, JPG, PNG, WebP, CSV, JSON, or paste text.";
+  "That file type isn't supported. Upload a PDF, JPG, PNG, WebP, HEIC, CSV, JSON, or paste text.";
 
 /** File-picker accept string: MIME types plus extensions for Windows/empty-type files. */
 export const VAULT_FILE_ACCEPT = [
@@ -20,6 +22,8 @@ export const VAULT_FILE_ACCEPT = [
   ".jpeg",
   ".png",
   ".webp",
+  ".heic",
+  ".heif",
   ".txt",
   ".csv",
   ".json",
@@ -44,5 +48,7 @@ export function resolveVaultFileMimeType(file: {
   if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
   if (lower.endsWith(".png")) return "image/png";
   if (lower.endsWith(".webp")) return "image/webp";
+  if (lower.endsWith(".heic")) return "image/heic";
+  if (lower.endsWith(".heif")) return "image/heif";
   return direct || "";
 }

@@ -51,6 +51,7 @@ export async function indexDocumentForVault(
   }
 
   const embeddings = await embedTexts(chunks);
+  const contentType = args.source.contentType ?? null;
   const rows = chunks.map((content, chunk_index) => ({
     document_id: args.documentId,
     user_id: args.userId,
@@ -59,6 +60,7 @@ export async function indexDocumentForVault(
     chunk_index,
     content,
     embedding: embeddings[chunk_index],
+    ...(contentType ? { content_type: contentType } : {}),
   }));
 
   const { error } = await args.supabase.from("document_chunks").insert(rows);

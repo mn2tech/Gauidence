@@ -232,13 +232,23 @@ async function indexDocumentFromJob(
 
   const { data: doc } = await supabase
     .from("documents")
-    .select("file_name")
+    .select("file_name, mime_type, content_type")
     .eq("id", documentId)
     .maybeSingle();
 
   if (!doc?.file_name) {
     return { indexed: 0, skipped: "no_document" };
   }
+
+  const contentType =
+    doc.content_type === "image" ||
+    doc.content_type === "pdf" ||
+    doc.content_type === "document" ||
+    doc.content_type === "generic"
+      ? doc.content_type
+      : doc.mime_type?.startsWith("image/")
+        ? "image"
+        : undefined;
 
   return indexDocumentForVault({
     supabase,
@@ -261,6 +271,7 @@ async function indexDocumentFromJob(
           ? (extracted.specialist as Record<string, unknown>)
           : null,
       sourceText: extracted.source_text,
+      contentType,
     },
   });
 }

@@ -17,7 +17,6 @@ import { analyzeGeneral } from "./analyzers/general";
 import {
   ANALYSIS_MODEL,
   VISUAL_ANALYSIS_MODEL,
-  AnalysisLlmError,
   createLlmClient,
   type FilePayload,
   type LlmClient,
@@ -41,6 +40,16 @@ import {
 import { capSourceText } from "@/lib/vault/sourceText";
 import { classificationFromFileName } from "./filenameHints";
 import { enrichAnalysisFromImageTranscription } from "./imageNotes";
+import { shouldAnalyzeImageWithVision } from "@/lib/vision/routeAsset";
+import { getVisionProvider } from "@/lib/vision/provider";
+import { prepareImageForVision } from "@/lib/vision/prepareImage";
+import {
+  buildVisionSourceText,
+  mapVisionResultToAnalysis,
+} from "@/lib/vision/mapAnalysis";
+import { logVisionEvent } from "@/lib/vision/log";
+import type { VisionResult } from "@/lib/vision/types";
+import { AnalysisLlmError } from "@/lib/analysis/llmErrors";
 
 /** Max chars stored/indexed from extraction (large PDFs are truncated). */
 export { SOURCE_TEXT_MAX_CHARS, capSourceText } from "@/lib/vault/sourceText";
@@ -56,6 +65,13 @@ export type PipelineResult = {
   /** Full extracted/OCR text (capped) for persistence and vault indexing. */
   sourceText: string | null;
   diagnostic?: AnalysisDiagnostic;
+  analysisType?: "vision" | "document" | "generic";
+  vision?: {
+    status: "analyzed" | "failed";
+    model?: string;
+    result?: VisionResult;
+    error?: string;
+  };
 };
 
 async function runSpecialist(
@@ -168,15 +184,163 @@ async function maybeOcrFallback(
   };
 }
 
+async function runImageVisionPipeline(
+  file: FilePayload,
+  user: UserContext,
+  onProgress?: PipelineProgress
+): Promise<PipelineResult> {
+  await onProgress?.("analyzing");
+  const started = Date.now();
+  logVisionEvent("vision_started", {
+    documentId: user.documentId,
+    spaceId: user.profileId,
+  });
+
+  let prepared;
+  try {
+    prepared = await prepareImageForVision({
+      mimeType: file.mimeType,
+      base64: file.base64,
+      fileName: file.fileName,
+    });
+  } catch (err) {
+    const message =
+      err instanceof Error
+        ? err.message
+        : "This image format couldn't be prepared for analysis.";
+    logVisionEvent("vision_failed", {
+      documentId: user.documentId,
+      spaceId: user.profileId,
+      durationMs: Date.now() - started,
+      error: message,
+    });
+    throw err instanceof AnalysisLlmError
+      ? err
+      : new AnalysisLlmError(message, 422, "vision_prepare_failed");
+  }
+
+  const visionFile: FilePayload = {
+    ...file,
+    mimeType: prepared.mimeType,
+    base64: prepared.base64,
+    inputMode: "visual",
+    pageImages: [],
+  };
+
+  try {
+    const { result, model } = await getVisionProvider().analyzeImage({
+      fileName: file.fileName,
+      mimeType: prepared.mimeType,
+      base64: prepared.base64,
+      spaceName: user.spaceName,
+    });
+    let analysis = mapVisionResultToAnalysis(result, file.fileName);
+    analysis = validateAnalysis(analysis);
+    if (analysis.overall_confidence < 0.75) {
+      analysis.guardian_status = "needs_verification";
+    }
+    logVisionEvent("vision_completed", {
+      documentId: user.documentId,
+      spaceId: user.profileId,
+      durationMs: Date.now() - started,
+      model,
+    });
+    return {
+      classification: {
+        document_type: analysis.document_type,
+        document_subtype: result.document_type || "image",
+        classification_confidence: result.confidence,
+        classification_reason: "Guardian Vision image analysis",
+      },
+      routedTo: "vision",
+      analysis,
+      model,
+      inputMode: "visual",
+      sourceText: capSourceText(buildVisionSourceText(result, file.fileName)),
+      analysisType: "vision",
+      vision: { status: "analyzed", model, result },
+    };
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Vision analysis failed.";
+    logVisionEvent("vision_failed", {
+      documentId: user.documentId,
+      spaceId: user.profileId,
+      durationMs: Date.now() - started,
+      error: message,
+    });
+    // Fallback: keep the original image on a visual specialist pass.
+    // Never treat empty OCR as success, and never switch this image to text-only.
+    try {
+      const client = createLlmClient();
+      await onProgress?.("classifying");
+      const classification = await classifyDocument(client, visionFile);
+      const routedTo = resolveAnalyzerType(classification, IMPLEMENTED_SPECIALISTS);
+      await onProgress?.("analyzing");
+      const { analysis: rawAnalysis } = await runSpecialist(
+        client,
+        routedTo,
+        visionFile,
+        user,
+        classification.document_type
+      );
+      let analysis = validateAnalysis(rawAnalysis);
+      const hasDescription =
+        Boolean(analysis.summary?.trim()) ||
+        Boolean(analysis.title?.trim()) ||
+        (analysis.facts ?? []).some((f) => String(f.value ?? "").trim());
+      if (!hasDescription) {
+        throw err;
+      }
+      if (analysis.overall_confidence < 0.75) {
+        analysis.guardian_status = "needs_verification";
+      }
+      return {
+        classification,
+        routedTo,
+        analysis,
+        model: VISUAL_ANALYSIS_MODEL,
+        inputMode: "visual",
+        sourceText: capSourceText(analysis.summary || analysis.title || ""),
+        analysisType: "vision",
+        vision: {
+          status: "analyzed",
+          model: VISUAL_ANALYSIS_MODEL,
+          result: {
+            document_type: analysis.document_type,
+            description: analysis.summary || "",
+            transcription: "",
+            summary: analysis.summary || "",
+            entities: [],
+            dates: [],
+            amounts: [],
+            facts: [],
+            tasks: [],
+            confidence: analysis.overall_confidence,
+          },
+        },
+      };
+    } catch {
+      throw err instanceof AnalysisLlmError
+        ? err
+        : new AnalysisLlmError(message, 502, "vision_failed");
+    }
+  }
+}
+
 /**
  * Detect → prepare visual/text → Claude multimodal structured analysis → validate.
- * Does not log full document text in production.
+ * Images use Guardian Vision (not OCR-as-success). Does not log full document text.
  */
 export async function runAnalysisPipeline(
   file: FilePayload,
   user: UserContext,
   onProgress?: PipelineProgress
 ): Promise<PipelineResult> {
+  if (shouldAnalyzeImageWithVision(file.mimeType, file.fileName)) {
+    return runImageVisionPipeline(file, user, onProgress);
+  }
+
   const client = createLlmClient();
 
   await onProgress?.("extracting");
@@ -332,6 +496,7 @@ export async function runAnalysisPipeline(
     model: usedModel,
     inputMode,
     sourceText: capSourceText(extraction.text),
+    analysisType: "document",
   };
 
   if (isAnalysisDebugEnabled()) {

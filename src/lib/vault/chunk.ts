@@ -15,6 +15,7 @@ export type VaultIndexSource = {
   specialist?: Record<string, unknown> | null;
   /** Full native/OCR text from analysis extraction. */
   sourceText?: string | null;
+  contentType?: "image" | "pdf" | "document" | "generic";
 };
 
 /**
@@ -22,6 +23,7 @@ export type VaultIndexSource = {
  */
 export function buildVaultIndexText(source: VaultIndexSource): string {
   const lines: string[] = [`Document: ${source.fileName}`];
+  if (source.contentType) lines.push(`Content type: ${source.contentType}`);
   if (source.title?.trim()) lines.push(`Title: ${source.title.trim()}`);
   if (source.documentType) lines.push(`Type: ${source.documentType}`);
   if (source.summary?.trim()) {
@@ -119,7 +121,9 @@ export function prepareVaultChunks(source: VaultIndexSource): string[] {
 
   const sourceText = source.sourceText?.replace(/\r\n/g, "\n").trim();
   if (sourceText) {
-    const bodyChunks = chunkText(sourceText);
+    const capped =
+      source.contentType === "image" ? sourceText.slice(0, 4_000) : sourceText;
+    const bodyChunks = chunkText(capped);
     for (let i = 0; i < bodyChunks.length; i++) {
       const piece = bodyChunks[i]!;
       const header =

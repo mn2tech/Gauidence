@@ -2618,10 +2618,23 @@ export default function VaultChatPanel({
           ...(options?.regenerateAssistantId
             ? { regenerateAssistantId: options.regenerateAssistantId }
             : {}),
-          ...(options?.attachment?.documentId &&
-          !isPendingAttachmentId(options.attachment.documentId)
-            ? { attachmentDocumentId: options.attachment.documentId }
-            : {}),
+            ...(options?.attachment?.documentId &&
+            !isPendingAttachmentId(options.attachment.documentId)
+              ? { attachmentDocumentId: options.attachment.documentId }
+              : (() => {
+                  const lastImage = [...messages]
+                    .reverse()
+                    .find(
+                      (m) =>
+                        m.role === "user" &&
+                        m.attachment?.kind === "image" &&
+                        m.attachment.documentId &&
+                        !isPendingAttachmentId(m.attachment.documentId)
+                    )?.attachment;
+                  return lastImage?.documentId
+                    ? { attachmentDocumentId: lastImage.documentId }
+                    : {};
+                })()),
           ...(requestedWorkProjectId
             ? { workProjectId: requestedWorkProjectId }
             : {}),

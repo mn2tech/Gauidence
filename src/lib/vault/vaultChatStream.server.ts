@@ -67,6 +67,13 @@ export type VaultChatStreamArgs = {
   maxTokens: number;
   chunks: RetrievedChunk[];
   attachedDoc: AttachedVaultDocument | null;
+  visionImages?: Array<{
+    documentId: string;
+    fileName: string;
+    mimeType: string;
+    base64: string;
+    profileName?: string;
+  }>;
   showPictures: boolean;
   accessibleProfiles: VaultScopeCandidate[];
   isFirstExchange: boolean;
@@ -148,6 +155,23 @@ export function createVaultChatStreamResponse(
         const client = isAnthropicConfigured() ? createLlmClient() : null;
         let answer = "";
 
+        const attachedImages =
+          args.visionImages && args.visionImages.length
+            ? args.visionImages.map((img) => ({
+                mimeType: img.mimeType,
+                base64: img.base64,
+                fileName: img.fileName,
+              }))
+            : args.attachedDoc?.isImage && args.attachedDoc.imageBase64
+              ? [
+                  {
+                    mimeType: args.attachedDoc.mimeType,
+                    base64: args.attachedDoc.imageBase64,
+                    fileName: args.attachedDoc.fileName,
+                  },
+                ]
+              : [];
+
         await withLlmUsage(
           { userId: args.userId, feature: "vault_chat" },
           async () => {
@@ -156,15 +180,7 @@ export function createVaultChatStreamResponse(
               model: CHAT_MODEL,
               maxTokens: args.maxTokens,
               messages: [...args.history, { role: "user", content: args.question }],
-              ...(args.attachedDoc?.isImage && args.attachedDoc.imageBase64
-                ? {
-                    attachedImage: {
-                      mimeType: args.attachedDoc.mimeType,
-                      base64: args.attachedDoc.imageBase64,
-                      fileName: args.attachedDoc.fileName,
-                    },
-                  }
-                : {}),
+              ...(attachedImages.length ? { attachedImages } : {}),
               onDelta: (text) => write({ type: "delta", text }),
             });
           }
@@ -179,15 +195,7 @@ export function createVaultChatStreamResponse(
               ...args.history,
               { role: "user", content: args.question },
             ],
-            ...(args.attachedDoc?.isImage && args.attachedDoc.imageBase64
-              ? {
-                  attachedImage: {
-                    mimeType: args.attachedDoc.mimeType,
-                    base64: args.attachedDoc.imageBase64,
-                    fileName: args.attachedDoc.fileName,
-                  },
-                }
-              : {}),
+            ...(attachedImages.length ? { attachedImages } : {}),
             onDelta: (text) => write({ type: "delta", text }),
           });
         }
@@ -228,6 +236,20 @@ export function createVaultChatStreamResponse(
           const seen = new Set(selected.map((c) => c.documentId));
           if (!seen.has(args.attachedDoc.documentId)) {
             selected = [attachedCitation, ...selected];
+            seen.add(args.attachedDoc.documentId);
+          }
+        }
+        if (args.visionImages?.length) {
+          const seen = new Set(selected.map((c) => c.documentId));
+          for (const img of args.visionImages) {
+            if (seen.has(img.documentId)) continue;
+            selected.push({
+              documentId: img.documentId,
+              fileName: img.fileName,
+              isImage: true,
+              ...(img.profileName ? { profileName: img.profileName } : {}),
+            });
+            seen.add(img.documentId);
           }
         }
         if (args.showPictures) {

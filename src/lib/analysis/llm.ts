@@ -55,6 +55,9 @@ export type UserContext = {
   email?: string | null;
   companyName?: string | null;
   timeZone?: string | null;
+  spaceName?: string | null;
+  profileId?: string | null;
+  documentId?: string | null;
 };
 
 export { AnalysisLlmError } from "@/lib/analysis/llmErrors";
@@ -422,33 +425,54 @@ function imageBlockFromBase64(
   };
 }
 
+export type ChatAttachedImage = {
+  mimeType: string;
+  base64: string;
+  fileName: string;
+};
+
+function normalizeChatImages(args: {
+  attachedImage?: ChatAttachedImage;
+  attachedImages?: ChatAttachedImage[];
+}): ChatAttachedImage[] {
+  const fromList = (args.attachedImages ?? []).filter((img) =>
+    img.base64.trim()
+  );
+  if (fromList.length) return fromList.slice(0, 3);
+  if (args.attachedImage?.base64.trim()) return [args.attachedImage];
+  return [];
+}
+
 function buildChatMessages(
   messages: { role: "user" | "assistant"; content: string }[],
-  attachedImage?: { mimeType: string; base64: string; fileName: string }
+  attachedImages: ChatAttachedImage[]
 ): Anthropic.Messages.MessageParam[] {
   return messages.map((m, index) => {
     const isLastUser =
       m.role === "user" && index === messages.length - 1;
-    if (
-      isLastUser &&
-      attachedImage &&
-      attachedImage.base64.trim()
-    ) {
+    if (isLastUser && attachedImages.length > 0) {
+      const names = attachedImages.map((img) => img.fileName).join(", ");
       const parts: ContentPart[] = [
         {
           type: "text",
-          text: `Attached file: ${attachedImage.fileName}\n\n${m.content}`,
+          text: `Attached image${attachedImages.length > 1 ? "s" : ""}: ${names}\n\nLook at the attached image(s) directly. Do not say you cannot see them, and do not ask the user to re-upload a file Guardian already has.\n\n${m.content}`,
         },
       ];
-      const imageBlock = imageBlockFromBase64(
-        attachedImage.mimeType,
-        attachedImage.base64
-      );
-      if (imageBlock) parts.push(imageBlock);
+      for (const img of attachedImages) {
+        const imageBlock = imageBlockFromBase64(img.mimeType, img.base64);
+        if (imageBlock) parts.push(imageBlock);
+      }
       return { role: "user", content: parts };
     }
     return { role: m.role, content: m.content };
   });
+}
+
+function chatHasVisionImages(args: {
+  attachedImage?: ChatAttachedImage;
+  attachedImages?: ChatAttachedImage[];
+}): boolean {
+  return normalizeChatImages(args).length > 0;
 }
 
 /** Multi-turn chat for Ask-your-document (text-only messages). */
@@ -460,21 +484,31 @@ export async function runChatCompletion(
     model?: string;
     maxTokens?: number;
     /** When set, the image is included on the final user turn (Ask Gideon attachment). */
-    attachedImage?: { mimeType: string; base64: string; fileName: string };
+    attachedImage?: ChatAttachedImage;
+    attachedImages?: ChatAttachedImage[];
   }
 ): Promise<string> {
   const deepseek = await import("@/lib/analysis/deepseek");
+  const visionImages = chatHasVisionImages(args);
+  // Images require a multimodal provider. Never send vision turns to DeepSeek first.
   if (
-    isDeepSeekChatPrimary() ||
-    (!isAnthropicConfigured() && isDeepSeekConfigured())
+    !visionImages &&
+    (isDeepSeekChatPrimary() ||
+      (!isAnthropicConfigured() && isDeepSeekConfigured()))
   ) {
+    return deepseek.runDeepSeekChatCompletion(args);
+  }
+  if (visionImages && !isAnthropicConfigured() && isDeepSeekConfigured()) {
     return deepseek.runDeepSeekChatCompletion(args);
   }
 
   try {
     const anthropic = client ?? createLlmClient();
     const model = args.model ?? ANALYSIS_MODEL;
-    const messages = buildChatMessages(args.messages, args.attachedImage);
+    const messages = buildChatMessages(
+      args.messages,
+      normalizeChatImages(args)
+    );
     const response = await anthropic.messages.create({
       model,
       max_tokens: args.maxTokens ?? 2048,
@@ -505,22 +539,31 @@ export async function runChatCompletionStream(
     messages: { role: "user" | "assistant"; content: string }[];
     model?: string;
     maxTokens?: number;
-    attachedImage?: { mimeType: string; base64: string; fileName: string };
+    attachedImage?: ChatAttachedImage;
+    attachedImages?: ChatAttachedImage[];
     onDelta: (text: string) => void;
   }
 ): Promise<string> {
   const deepseek = await import("@/lib/analysis/deepseek");
+  const visionImages = chatHasVisionImages(args);
   if (
-    isDeepSeekChatPrimary() ||
-    (!isAnthropicConfigured() && isDeepSeekConfigured())
+    !visionImages &&
+    (isDeepSeekChatPrimary() ||
+      (!isAnthropicConfigured() && isDeepSeekConfigured()))
   ) {
+    return deepseek.runDeepSeekChatCompletionStream(args);
+  }
+  if (visionImages && !isAnthropicConfigured() && isDeepSeekConfigured()) {
     return deepseek.runDeepSeekChatCompletionStream(args);
   }
 
   try {
     const anthropic = client ?? createLlmClient();
     const model = args.model ?? ANALYSIS_MODEL;
-    const messages = buildChatMessages(args.messages, args.attachedImage);
+    const messages = buildChatMessages(
+      args.messages,
+      normalizeChatImages(args)
+    );
     const stream = anthropic.messages.stream({
       model,
       max_tokens: args.maxTokens ?? 2048,

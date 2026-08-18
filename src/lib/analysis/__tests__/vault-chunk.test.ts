@@ -57,6 +57,18 @@ describe("vault RAG chunking", () => {
     assert.ok(chunks.some((c) => /Document text/i.test(c) && /sunscreen/i.test(c)));
   });
 
+  it("indexes image vision text with content type metadata", () => {
+    const chunks = prepareVaultChunks({
+      fileName: "service_invoice.jpg",
+      summary: "Mini Cooper oil change.",
+      documentType: "invoice",
+      contentType: "image",
+      sourceText: "Description:\nA Mini Cooper service invoice.\n\nTranscription:\nOil change $129.95",
+    });
+    assert.ok(chunks.some((c) => /Content type: image/.test(c)));
+    assert.ok(chunks.some((c) => /Mini Cooper/.test(c)));
+  });
+
   it("indexes source-only documents without analysis body", () => {
     const chunks = prepareVaultChunks({
       fileName: "notes.txt",

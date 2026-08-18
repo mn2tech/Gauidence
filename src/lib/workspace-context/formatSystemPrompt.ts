@@ -4,6 +4,7 @@ import {
   buildGideonTodayNote,
   GIDEON_ATTACHED_DOCUMENT_NOTE,
   GIDEON_TRANSCRIPTION_NOTE,
+  GIDEON_VISION_NOTE,
   withVaultPersonality,
 } from "@/lib/vault/gideon";
 import { VAULT_CHAT_SYSTEM } from "@/lib/vault/indexDocument";
@@ -54,6 +55,7 @@ export function buildGideonSystemPrompt(
     showPictures,
     transcriptionMode,
     hasAttachedDocument,
+    hasVisionImages,
     allVaultsNote,
     vaultEmptyNote,
     agentMode,
@@ -94,6 +96,8 @@ export function buildGideonSystemPrompt(
   const agentNote = agentMode ? `\n${AGENT_MODE_SYSTEM_NOTE}\n` : "";
   const transcriptionNote = transcriptionMode ? GIDEON_TRANSCRIPTION_NOTE : "";
   const attachedNote = hasAttachedDocument ? GIDEON_ATTACHED_DOCUMENT_NOTE : "";
+  const visionNote =
+    hasVisionImages || hasAttachedDocument ? GIDEON_VISION_NOTE : "";
   const fullLogNote =
     fullLogQuote && loaded.logs
       ? `The user asked for the full Daily Log or client request text. Quote the complete matching entry verbatim from RETRIEVED DAILY LOGS or CLIENT REQUESTS below. Do not paraphrase, shorten, or invent log content. If no matching entry is present in those blocks, say so clearly.`
@@ -217,6 +221,7 @@ ${spaceCreateNote}
 ${agentNote}
 ${transcriptionNote}
 ${attachedNote}
+${visionNote}
 ${retrievalBlocks}`;
 }
 

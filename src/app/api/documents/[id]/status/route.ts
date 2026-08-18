@@ -51,7 +51,7 @@ export async function GET(
   let { data: doc, error } = await supabase
     .from("documents")
     .select(
-      "id, file_name, analysis_status, indexing_status, ontology_status, knowledge_status, processing_step, processing_progress, last_processing_error, processing_started_at, processing_completed_at, processing_diagnostics, profile_id"
+      "id, file_name, analysis_status, indexing_status, ontology_status, knowledge_status, processing_step, processing_progress, last_processing_error, processing_started_at, processing_completed_at, processing_diagnostics, profile_id, mime_type"
     )
     .eq("id", id)
     .maybeSingle();
@@ -79,7 +79,7 @@ export async function GET(
       const refreshed = await supabase
         .from("documents")
         .select(
-          "id, file_name, analysis_status, indexing_status, ontology_status, knowledge_status, processing_step, processing_progress, last_processing_error, processing_started_at, processing_completed_at, processing_diagnostics, profile_id"
+          "id, file_name, analysis_status, indexing_status, ontology_status, knowledge_status, processing_step, processing_progress, last_processing_error, processing_started_at, processing_completed_at, processing_diagnostics, profile_id, mime_type"
         )
         .eq("id", id)
         .maybeSingle();

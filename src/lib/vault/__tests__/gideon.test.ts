@@ -17,6 +17,8 @@ import {
   withVaultPersonality,
   chartSuggestionTitle,
   GIDEON_SYSTEM,
+  GIDEON_ATTACHED_DOCUMENT_NOTE,
+  GIDEON_VISION_NOTE,
   GIDEON_BRAND_LINE,
   EMPTY_VAULT_HEADLINE,
   EMPTY_VAULT_BODY,
@@ -42,6 +44,9 @@ describe("Gideon helpers", () => {
     assert.match(GIDEON_SYSTEM, /including a key suffix/i);
     assert.match(GIDEON_SYSTEM, /YOUTUBE:/i);
     assert.match(GIDEON_SYSTEM, /CURRENT DATE AND TIME is provided/i);
+    assert.match(GIDEON_SYSTEM, /never ask them to re-upload/i);
+    assert.match(GIDEON_ATTACHED_DOCUMENT_NOTE, /Never ask the user to re-upload/i);
+    assert.match(GIDEON_VISION_NOTE, /Never say you cannot see an image/i);
     assert.equal(
       GIDEON_BRAND_LINE,
       "Guardian watches. Gideon explains. You decide."

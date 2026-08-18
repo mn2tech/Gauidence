@@ -206,6 +206,8 @@ export async function POST(request: Request) {
         indexing_status: updated?.indexing_status,
         knowledge_status: updated?.knowledge_status,
         processing_step: updated?.processing_step,
+        mime_type: doc.mime_type,
+        file_name: doc.file_name,
       }),
       processingProgress: processingProgressPercent({
         analysis_status: updated?.analysis_status ?? "completed",
@@ -241,6 +243,8 @@ export async function POST(request: Request) {
     processingLabel: userFacingStatusLabel({
       analysis_status: "queued",
       processing_step: "queued",
+      mime_type: doc.mime_type,
+      file_name: doc.file_name,
     }),
     processingProgress: processingProgressPercent({
       analysis_status: "queued",
