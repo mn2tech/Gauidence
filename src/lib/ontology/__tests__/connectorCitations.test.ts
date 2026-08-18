@@ -202,5 +202,12 @@ describe("isLikelyChordChartFile", () => {
       isLikelyChordChartFile("trello999.pdf", "application/pdf"),
       true
     );
+    assert.equal(
+      isLikelyChordChartFile(
+        "N9BP248929-ACORDAPP25.pdf",
+        "application/pdf"
+      ),
+      false
+    );
   });
 });

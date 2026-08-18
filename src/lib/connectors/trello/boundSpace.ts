@@ -19,8 +19,7 @@ export function isMusicPracticeChatContext(opts: {
 }): boolean {
   return (
     looksLikeMusicPracticeSpace(opts.spaceName) ||
-    looksLikeMusicPracticeSpace(opts.boardName) ||
-    Boolean(opts.hasConnectedCharts)
+    looksLikeMusicPracticeSpace(opts.boardName)
   );
 }
 

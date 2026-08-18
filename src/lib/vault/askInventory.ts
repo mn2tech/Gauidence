@@ -403,9 +403,14 @@ export function looksLikeSongOrChartTitle(title: string): boolean {
     return false;
   }
   if (/^[A-Za-z][\w.]*\s*[-–—]\s*Add\b/i.test(t)) return false;
-  if (/^(sep|sept|oct|nov|dec|jan|feb|mar|apr|may|jun|jul|aug)\.?\s+\d/i.test(t) &&
+  if (
+    /^(sep|sept|oct|nov|dec|jan|feb|mar|apr|may|jun|jul|aug)\.?\s+\d/i.test(t) &&
     /\b(session|practice|meeting)\b/i.test(t)
   ) {
+    return false;
+  }
+  // Form / policy numbers (e.g. N9BP248929-ACORDAPP25), not song titles.
+  if (/^[A-Z0-9]{5,}([-_][A-Z0-9]{3,})+$/i.test(t.replace(/\s+/g, ""))) {
     return false;
   }
   return true;
@@ -425,7 +430,6 @@ function isConnectedPracticeChartItem(
   const combined = [name, cardName, title].filter(Boolean).join(" ");
   if (hasChordChartSignal(combined)) return true;
   if (cardName && looksLikeSongOrChartTitle(cardName)) return true;
-  if (isOpaqueTrelloFileName(name) && cardName) return true;
 
   const isPdf =
     /\.pdf$/i.test(name) ||

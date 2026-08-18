@@ -154,8 +154,8 @@ describe("Gideon helpers", () => {
       "business",
       {
         spaceName: "NM2TECH - Next Move",
-        songTitles: ["WMOI OCTOBER 2021 FINANCIAL HELP REPORT"],
-        hasConnectedCharts: false,
+        songTitles: ["N9BP248929-ACORDAPP25"],
+        hasConnectedCharts: true,
       }
     );
     assert.ok(biz.some((q) => /employees|clients|attention/i.test(q)));

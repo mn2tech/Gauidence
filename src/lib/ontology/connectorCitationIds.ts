@@ -215,6 +215,13 @@ export function isNonChordChartNoise(nameOrTitle: string): boolean {
   if (/\breports?\b|\b(1099|w-?2)\b|\btax\b/i.test(t)) {
     return true;
   }
+  if (/acord/i.test(t)) return true;
+  if (
+    /\b(application|certificate|endorsement|declaration page)\b/i.test(t) &&
+    !/\b(songselect|chord|worship)\b/i.test(t)
+  ) {
+    return true;
+  }
   if (/\b(kfc|junior)\b/i.test(t)) return true;
   // Instrument method / fingering references (not worship charts).
   // Underscored Trello names (e.g. School_Finger_Chart) have no \b before Finger.

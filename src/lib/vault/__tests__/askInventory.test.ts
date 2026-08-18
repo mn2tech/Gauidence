@@ -247,6 +247,14 @@ describe("connected practice stats", () => {
         mime_type: "image/png",
         metadata: { kind: "attachment" },
       },
+      {
+        name: "trello88.pdf",
+        mime_type: "application/pdf",
+        metadata: {
+          kind: "attachment",
+          cardName: "N9BP248929-ACORDAPP25",
+        },
+      },
     ]);
     assert.equal(stats.songCount, 0);
     assert.equal(stats.jpgCount, 0);

@@ -51,6 +51,14 @@ describe("music practice chat context", () => {
       }),
       false
     );
+    assert.equal(
+      isMusicPracticeChatContext({
+        spaceName: "NM2TECH - Next Move",
+        boardName: null,
+        hasConnectedCharts: true,
+      }),
+      false
+    );
   });
 
   it("treats Living Waters charts as music practice even on a business space", () => {
