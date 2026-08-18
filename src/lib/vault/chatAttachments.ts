@@ -18,7 +18,6 @@ export type HydratableChatMessage = {
   attachment?: ChatMessageAttachment | null;
   attachments?: ChatMessageAttachment[] | null;
   created_at: string;
-  [key: string]: unknown;
 };
 
 export function isImageAttachmentCitation(
@@ -100,7 +99,7 @@ export function hydrateVaultChatMessage<T extends HydratableChatMessage>(
       ...message,
       attachments: message.attachments ?? [],
       attachment: message.attachment ?? null,
-    };
+    } as T;
   }
 
   const fromCitations = attachmentsFromUserCitations(message.citations);
@@ -114,7 +113,7 @@ export function hydrateVaultChatMessage<T extends HydratableChatMessage>(
     ...message,
     attachments,
     attachment: attachments[0] ?? null,
-  };
+  } as T;
 }
 
 export function hydrateVaultChatMessages<T extends HydratableChatMessage>(

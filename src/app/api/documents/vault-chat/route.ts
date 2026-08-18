@@ -1167,14 +1167,7 @@ export async function POST(request: Request) {
       );
     }
     question = String(userRow.content);
-    userMsg = hydrateVaultChatMessage<ChatMessageRow>({
-      id: userRow.id,
-      role: "user",
-      content: question,
-      citations:
-        (userRow.citations as ChatMessageRow["citations"] | null) ?? [],
-      created_at: userRow.created_at,
-    });
+    userMsg = hydrateVaultChatMessage(userRow);
     priorMessages = priorMessages.filter(
       (row) => row.id !== regenerateAssistantId
     );
