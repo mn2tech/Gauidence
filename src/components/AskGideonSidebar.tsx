@@ -374,7 +374,7 @@ export default function AskGideonSidebar({
   return (
     <>
       <div className="shrink-0 border-b border-stone-200 px-3 py-3">
-        <GuardianLogo variant="horizontal" size="sm" surface="black" className="mb-3" />
+        <GuardianLogo variant="horizontal" size="sm" className="mb-3" />
         <button
           type="button"
           onClick={() => {

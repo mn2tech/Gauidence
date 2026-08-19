@@ -124,7 +124,7 @@ export default function InviteAcceptClient({ token }: { token: string }) {
   return (
     <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm sm:p-8">
       <div className="flex justify-center">
-        <GuardianIcon size={48} surface="black" />
+        <GuardianIcon size={48} />
       </div>
       <h1 className="mt-4 text-center text-xl font-bold tracking-tight">
         Vault invitation

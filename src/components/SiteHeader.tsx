@@ -123,7 +123,7 @@ export default function SiteHeader() {
           className="flex shrink-0 items-center"
           aria-label="Guardian home"
         >
-          <GuardianLogo variant="horizontal" size="sm" surface="black" priority />
+          <GuardianLogo variant="horizontal" size="sm" priority />
         </Link>
 
         {/* Desktop nav */}

@@ -54,7 +54,6 @@ export default async function Home({
             <GuardianLogo
               variant="lockup"
               size="lg"
-              surface="black"
               priority
               className="mx-auto"
             />

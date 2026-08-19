@@ -112,7 +112,7 @@ export default function UpdatePasswordForm() {
 
   return (
     <div className="w-full max-w-md">
-      <GuardianLogo variant="lockup" size="md" surface="black" priority className="mb-3" />
+      <GuardianLogo variant="lockup" size="md" priority className="mb-3" />
       <p className="mb-8 text-[10px] font-medium uppercase tracking-[0.18em] text-ink-muted">
         {GUARDIAN_BRAND_TAGLINE}
       </p>

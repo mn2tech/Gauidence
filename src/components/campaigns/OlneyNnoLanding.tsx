@@ -30,7 +30,7 @@ export default function OlneyNnoLanding() {
   return (
     <div className="space-y-10">
       <section className="relative overflow-hidden rounded-3xl border border-brand/20 bg-gradient-to-b from-brand-light via-white to-white p-8 sm:p-10">
-        <GuardianLogo variant="lockup" size="md" surface="black" className="mb-4" />
+        <GuardianLogo variant="lockup" size="md" className="mb-4" />
         <p className="mb-6 text-[10px] font-medium uppercase tracking-[0.18em] text-ink-muted">
           {GUARDIAN_BRAND_TAGLINE}
         </p>

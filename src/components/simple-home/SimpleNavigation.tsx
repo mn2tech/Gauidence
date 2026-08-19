@@ -40,7 +40,7 @@ export default function SimpleNavigation() {
               homeActive ? "bg-stone-100" : ""
             }`}
           >
-            <GuardianIcon size={20} surface="black" alt="" />
+            <GuardianIcon size={20} alt="" />
           </span>
           <span className="truncate text-[10px] font-semibold">Home</span>
         </Link>

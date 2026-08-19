@@ -15,8 +15,6 @@ type Props = {
   variant?: "horizontal" | "lockup";
   size?: GuardianLogoSize;
   tone?: GuardianBrandTone;
-  /** Black plate with white star and wordmark. */
-  surface?: "plain" | "black";
   showTagline?: boolean;
   className?: string;
   priority?: boolean;
@@ -51,27 +49,19 @@ export default function GuardianLogo({
   variant = "horizontal",
   size = "md",
   tone = "light",
-  surface = "plain",
   showTagline = false,
   className = "",
   priority = false,
 }: Props) {
-  const onBlack = surface === "black";
-  const markTone: GuardianBrandTone = onBlack ? "dark" : tone;
-
   if (variant === "horizontal") {
     const iconSize = ICON_SIZE[size];
     const wordmarkHeight = WORDMARK_HEIGHT[size];
     const wordmarkWidth = Math.round(wordmarkHeight * (847 / 112));
     return (
-      <span
-        className={`inline-flex items-center gap-2 ${
-          onBlack ? "rounded-md bg-black px-2 py-1" : ""
-        } ${className}`}
-      >
+      <span className={`inline-flex items-center gap-2 ${className}`}>
         <GuardianIcon
           size={iconSize}
-          tone={markTone}
+          tone={tone}
           priority={priority}
           alt=""
         />
@@ -81,7 +71,7 @@ export default function GuardianLogo({
           width={wordmarkWidth}
           height={wordmarkHeight}
           priority={priority}
-          className={guardianBrandToneClass(markTone)}
+          className={guardianBrandToneClass(tone)}
           style={{ width: wordmarkWidth, height: wordmarkHeight }}
         />
         {showTagline ? (
@@ -93,15 +83,11 @@ export default function GuardianLogo({
 
   const width = LOCKUP_WIDTH[size];
   const fullHeight = Math.round(width * (1200 / 1600));
-  const croppedHeight = Math.round(width * (1040 / 1600));
-  const height = showTagline ? fullHeight : croppedHeight;
+  const wordmarkHeight = Math.round(width * (1040 / 1600));
+  const height = showTagline ? fullHeight : wordmarkHeight;
 
   return (
-    <span
-      className={`inline-flex flex-col items-center ${
-        onBlack ? "rounded-xl bg-black p-4 sm:p-5" : ""
-      } ${className}`}
-    >
+    <span className={`inline-flex flex-col items-center ${className}`}>
       <span
         className="relative block overflow-hidden"
         style={{ width, height }}
@@ -112,7 +98,7 @@ export default function GuardianLogo({
           width={1600}
           height={1200}
           priority={priority}
-          className={`object-contain object-top ${guardianBrandToneClass(markTone)}`}
+          className={`object-contain object-top ${guardianBrandToneClass(tone)}`}
           style={{ width: "100%", height: "auto" }}
         />
       </span>

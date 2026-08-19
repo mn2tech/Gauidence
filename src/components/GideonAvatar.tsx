@@ -36,6 +36,6 @@ export default function GideonAvatar({
   }
 
   return (
-    <GuardianIcon size={size} surface="black" pulse={pulse} className={className} alt="" />
+    <GuardianIcon size={size} pulse={pulse} className={className} alt="" />
   );
 }

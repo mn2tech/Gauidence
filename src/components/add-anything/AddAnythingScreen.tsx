@@ -457,7 +457,7 @@ export default function AddAnythingScreen() {
 
       {stage === "processing" ? (
         <div className="simple-home-card flex flex-col items-center gap-4 p-8 text-center">
-          <GuardianIcon size={40} surface="black" pulse />
+          <GuardianIcon size={40} pulse />
           <div>
             <p className="text-sm font-semibold text-foreground">Analyzing…</p>
             <p className="mt-1 text-sm text-ink-muted">
