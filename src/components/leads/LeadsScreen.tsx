@@ -233,7 +233,7 @@ export default function LeadsScreen() {
       const res = await fetch(`/api/leads?${q}`);
       const body = (await res.json().catch(() => ({}))) as {
         error?: string;
-        leads?: unknown;
+        leads?: BusinessLead[];
       };
       if (!res.ok) throw new Error(body.error ?? "Couldn't load leads.");
       setLeads(body.leads ?? []);
