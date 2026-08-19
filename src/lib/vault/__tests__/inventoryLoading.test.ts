@@ -17,6 +17,11 @@ describe("wantsVaultFileInventory", () => {
     assert.equal(wantsVaultFileInventory("what does the invoice say"), false);
     assert.equal(wantsVaultFileInventory("show me Jane Doe payroll"), false);
     assert.equal(wantsVaultFileInventory("when is the renewal due"), false);
+    assert.equal(
+      wantsVaultFileInventory("What dates are in Rising_203rd_20Summer_20Packet_.pdf?"),
+      false
+    );
+    assert.equal(wantsVaultFileInventory("What PDFs are in this space?"), false);
   });
 });
 

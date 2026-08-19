@@ -275,6 +275,26 @@ describe("connected practice stats", () => {
     );
     assert.equal(chartFileTypeListFilter("List the JPG chord charts in this space"), "jpg");
     assert.equal(chartFileTypeListFilter("List the PDF chord charts in this space"), "pdf");
+    assert.equal(chartFileTypeListFilter("What PDFs are in this space?"), null);
+    const namedPdfQuestions = [
+      "What dates and action items are in Rising_203rd_20Summer_20Packet_.pdf?",
+      "What does Q3-budget.pdf say?",
+      "What's in lease.pdf?",
+      "Summarize homework.pdf",
+    ];
+    for (const question of namedPdfQuestions) {
+      assert.equal(chartFileTypeListFilter(question), null);
+      assert.equal(wantsVaultFileInventory(question), false);
+      assert.equal(
+        buildInventoryQuestionAnswer({
+          question,
+          spaceDisplayName: "Any Space",
+          fileInventoryText: `Any Space:
+Documents (1): example.pdf`,
+        }),
+        null
+      );
+    }
   });
 
   it("lists JPG charts from inventory text", () => {

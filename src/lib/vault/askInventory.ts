@@ -15,8 +15,9 @@ const INVENTORY_QUESTION_PATTERN =
 const SONG_LIST_QUESTION_PATTERN =
   /\b((?:list|show|give(?:\s+me)?)\s+(?:(?:me|us)\s+)?(?:the\s+)?(?:list\s+of\s+)?songs?|what songs|songs (?:are |on |in )|song list|song titles?|which songs)\b/i;
 
+/** Practice-stat chips: "List the PDF chord charts in this space". */
 const CHART_FILE_TYPE_LIST_PATTERN =
-  /\b((?:list|show|give(?:\s+me)?|what|which|how many)\b.{0,40}\b(jpe?gs?|pngs?|pdfs?)\b|\b(jpe?gs?|pngs?|pdfs?)\b.{0,40}\b(charts?|chord|files?|attachments?|in this space))\b/i;
+  /\b(?:list|show|give(?:\s+me)?|what|which|how many)\b.{0,60}\b(jpe?g|png|pdf)s?\b.{0,40}\bchord\s*charts?\b|\bchord\s*charts?\b.{0,40}\b(jpe?g|png|pdf)s?\b/i;
 
 export type ChartFileTypeFilter = "jpg" | "png" | "pdf";
 
@@ -29,17 +30,19 @@ export function wantsSongOrChartList(question: string): boolean {
   return SONG_LIST_QUESTION_PATTERN.test(q);
 }
 
-/** JPG / PNG / PDF chart roster questions from practice-stat chips. */
+/** True when the question names a specific image/PDF file (not a type roster). */
+function namesSpecificChartMediaFile(question: string): boolean {
+  return /\b[\w.%+\-]{2,}\.(jpe?g|png|pdf)\b/i.test(question);
+}
+
+/** JPG / PNG / PDF chord-chart roster — never a named school/business/personal file. */
 export function chartFileTypeListFilter(
   question: string
 ): ChartFileTypeFilter | null {
   const q = question.trim().toLowerCase();
-  if (!CHART_FILE_TYPE_LIST_PATTERN.test(q) && !/\b(jpe?gs?|pngs?|pdfs?)\b/.test(q)) {
-    return null;
-  }
-  if (!/\b(list|show|give|what|which|how many|charts?|chord|files?|space)\b/i.test(q)) {
-    return null;
-  }
+  if (namesSpecificChartMediaFile(q)) return null;
+  if (!/\bchord\s*charts?\b/i.test(q)) return null;
+  if (!CHART_FILE_TYPE_LIST_PATTERN.test(q)) return null;
   if (/\bpdfs?\b/.test(q)) return "pdf";
   if (/\bpngs?\b/.test(q)) return "png";
   if (/\bjpe?gs?\b/.test(q)) return "jpg";
