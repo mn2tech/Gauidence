@@ -10,8 +10,8 @@ export type GuardianBrandTone = "light" | "dark" | "auto";
 
 export function guardianBrandToneClass(tone: GuardianBrandTone): string {
   if (tone === "dark") return "invert";
-  if (tone === "auto") return "dark:invert";
-  return "";
+  if (tone === "auto") return "brightness-0 dark:invert";
+  return "brightness-0";
 }
 
 export function guardianEmailLockupHtml(baseUrl: string, width = 168): string {

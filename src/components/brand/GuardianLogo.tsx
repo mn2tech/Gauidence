@@ -28,17 +28,17 @@ const LOCKUP_WIDTH: Record<GuardianLogoSize, number> = {
 };
 
 const ICON_SIZE: Record<GuardianLogoSize, number> = {
-  sm: 22,
-  md: 28,
-  lg: 36,
-  xl: 44,
+  sm: 32,
+  md: 36,
+  lg: 44,
+  xl: 52,
 };
 
 const WORDMARK_HEIGHT: Record<GuardianLogoSize, number> = {
-  sm: 14,
-  md: 16,
-  lg: 20,
-  xl: 24,
+  sm: 16,
+  md: 18,
+  lg: 22,
+  xl: 26,
 };
 
 /**

@@ -36,8 +36,8 @@ export default function GuardianIcon({
         width={size}
         height={size}
         priority={priority}
-        className={`h-full w-full object-contain ${guardianBrandToneClass(tone)}`}
-        style={{ width: "100%", height: "auto" }}
+        className={`object-contain ${guardianBrandToneClass(tone)}`}
+        style={{ width: size, height: size }}
       />
     </span>
   );
