@@ -24,7 +24,7 @@ export default function GlobalError({
             alt=""
             width={56}
             height={56}
-            className="mx-auto h-14 w-14"
+            className="mx-auto h-14 w-14 rounded-md bg-black p-2 invert"
           />
 
           <p className="mt-8 text-sm font-semibold uppercase tracking-widest text-[#0f766e]">

@@ -62,7 +62,7 @@ export default function SimpleAppShell({
             className="flex shrink-0 items-center"
             aria-label="Guardian home"
           >
-            <GuardianLogo variant="horizontal" size="sm" priority />
+            <GuardianLogo variant="horizontal" size="sm" surface="black" priority />
           </Link>
 
           <div className="flex items-center gap-1">

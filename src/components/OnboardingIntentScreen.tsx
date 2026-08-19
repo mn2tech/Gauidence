@@ -90,7 +90,7 @@ export default function OnboardingIntentScreen({ onComplete }: Props) {
   return (
     <div className="flex min-h-[100dvh] flex-col bg-gradient-to-b from-brand-light/60 via-background to-background">
       <div className="mx-auto flex w-full max-w-lg flex-1 flex-col justify-center px-4 py-10 sm:px-6">
-        <GuardianLogo variant="horizontal" size="sm" />
+        <GuardianLogo variant="horizontal" size="sm" surface="black" />
         <p className="mt-2 text-[10px] font-medium uppercase tracking-[0.18em] text-ink-muted">
           {GUARDIAN_BRAND_TAGLINE}
         </p>

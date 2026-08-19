@@ -86,7 +86,7 @@ export default function SimpleHomeScreen() {
     return (
       <div className="mx-auto max-w-2xl px-4 py-8">
         <div className="mb-8 text-center">
-          <GuardianLogo variant="lockup" size="md" className="mx-auto" />
+          <GuardianLogo variant="lockup" size="md" surface="black" className="mx-auto" />
           <p className="mt-3 text-[10px] font-medium uppercase tracking-[0.18em] text-ink-muted">
             {GUARDIAN_BRAND_TAGLINE}
           </p>

@@ -193,7 +193,7 @@ export default function GuardianCoachScreen({ onComplete }: Props) {
   return (
     <div className="flex min-h-[100dvh] flex-col bg-gradient-to-b from-brand-light/60 via-background to-background">
       <div className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 py-6 sm:px-6">
-        <GuardianLogo variant="horizontal" size="sm" />
+        <GuardianLogo variant="horizontal" size="sm" surface="black" />
         <h1 className="mt-2 text-xl font-bold tracking-tight text-foreground sm:text-2xl">
           Meet Gideon — your setup coach
         </h1>

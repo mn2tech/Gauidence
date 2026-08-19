@@ -163,6 +163,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
       <GuardianLogo
         variant="lockup"
         size="md"
+        surface="black"
         priority
         className="mb-3"
       />

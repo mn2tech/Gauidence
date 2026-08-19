@@ -24,7 +24,7 @@ export default function ErrorPageShell({
         <div className="mx-auto w-full max-w-lg text-center">
           <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-64 bg-gradient-to-b from-brand-light via-background to-background" />
 
-          <GuardianIcon size={56} />
+          <GuardianIcon size={56} surface="black" />
 
           <p className="mt-8 text-sm font-semibold uppercase tracking-widest text-brand">
             {code}

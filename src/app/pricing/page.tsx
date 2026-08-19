@@ -57,7 +57,7 @@ export default async function PricingPage() {
         <section className="relative overflow-hidden">
           <div className="absolute inset-0 -z-10 bg-gradient-to-b from-brand-light via-background to-background" />
           <div className="mx-auto max-w-6xl px-6 pb-12 pt-16 text-center sm:pb-16 sm:pt-20">
-            <GuardianLogo variant="lockup" size="sm" className="mx-auto" />
+            <GuardianLogo variant="lockup" size="sm" surface="black" className="mx-auto" />
             <p className="mt-3 text-[10px] font-medium uppercase tracking-[0.18em] text-ink-muted">
               {GUARDIAN_BRAND_TAGLINE}
             </p>
