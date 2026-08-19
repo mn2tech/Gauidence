@@ -91,12 +91,14 @@ export const FEDERAL_STAGES: LeadStatus[] = [
 
 export const SMALL_BUSINESS_STATUSES = [
   "Small Business",
+  "SDB",
   "8(a)",
-  "HUBZone",
   "WOSB",
   "EDWOSB",
+  "HUBZone",
   "SDVOSB",
   "VOSB",
+  "ANC",
   "Other",
   "Unknown",
 ] as const;
@@ -123,8 +125,9 @@ export type LeadSource = (typeof LEAD_SOURCES)[number];
 
 export const LEAD_ACTIVITY_TYPES = [
   "created",
-  "researched",
-  "note",
+    "researched",
+    "research_refreshed",
+    "note",
   "outreach_drafted",
   "contacted",
   "follow_up",
@@ -147,6 +150,7 @@ export type LeadActivityType = (typeof LEAD_ACTIVITY_TYPES)[number];
 export const LEAD_ACTIVITY_LABELS: Record<LeadActivityType, string> = {
   created: "Lead created",
   researched: "Research completed",
+  research_refreshed: "Research refreshed",
   note: "Note",
   outreach_drafted: "Outreach drafted",
   contacted: "Contacted",
@@ -215,6 +219,17 @@ export type BusinessLead = {
   website: string | null;
   address: string | null;
   linkedin_url?: string | null;
+  legal_company_name?: string | null;
+  company_description?: string | null;
+  headquarters?: string | null;
+  primary_naics?: string | null;
+  last_researched_at?: string | null;
+  partner_fit?: Record<string, unknown> | null;
+  research_summary?: Record<string, unknown> | null;
+  recommended_outreach_angle?: string | null;
+  why_company_matters?: string | null;
+  nm2tech_can_bring?: string | null;
+  federal_profile_data?: Record<string, unknown> | null;
   source: string | null;
   source_detail: string | null;
   notes: string | null;
@@ -262,14 +277,23 @@ export type LeadActivity = {
   created_at: string;
 };
 
+export type LeadResearchHistoryItem = {
+  id: string;
+  mode: string;
+  summary: Record<string, unknown> | null;
+  partner_fit: Record<string, unknown> | null;
+  created_at: string;
+};
+
 export type LeadWithActivities = BusinessLead & {
   activities: LeadActivity[];
   contacts?: LeadContact[];
   opportunities?: LeadOpportunityLink[];
+  research_runs?: LeadResearchHistoryItem[];
 };
 
 export const LEAD_SELECT =
-  "id,business_profile_id,lead_type,company_name,contact_name,job_title,email,phone,website,address,linkedin_url,source,source_detail,notes,status,lead_score,recommended_service,opportunity_summary,conversation_angle,next_action,next_action_date,last_activity_at,last_contact_at,relationship_owner,small_business_status,uei,cage_code,naics_codes,primary_capabilities,federal_agencies_served,contract_vehicles,known_contracts,current_opportunities,past_performance_areas,technology_areas,market_agency,match_explanation,recommended_approach,proposal_id,document_id,opportunity_brief,created_by,created_at,updated_at";
+  "id,business_profile_id,lead_type,company_name,contact_name,job_title,email,phone,website,address,linkedin_url,legal_company_name,company_description,headquarters,primary_naics,last_researched_at,partner_fit,research_summary,recommended_outreach_angle,why_company_matters,nm2tech_can_bring,federal_profile_data,source,source_detail,notes,status,lead_score,recommended_service,opportunity_summary,conversation_angle,next_action,next_action_date,last_activity_at,last_contact_at,relationship_owner,small_business_status,uei,cage_code,naics_codes,primary_capabilities,federal_agencies_served,contract_vehicles,known_contracts,current_opportunities,past_performance_areas,technology_areas,market_agency,match_explanation,recommended_approach,proposal_id,document_id,opportunity_brief,created_by,created_at,updated_at";
 
 export const LEAD_ACTIVITY_SELECT =
   "id,lead_id,activity_type,description,metadata,contact_id,occurred_at,created_by,created_at";

@@ -6,6 +6,8 @@ import {
   resolveBusinessProfile,
 } from "@/lib/leads/auth";
 import { findPotentialDuplicates } from "@/lib/leads/duplicates";
+import { persistLeadResearch } from "@/lib/leads/research/persist";
+import type { LeadResearchSnapshot } from "@/lib/leads/research/types";
 import { recordLeadActivity, listBusinessLeads, upsertPrimaryContactFromLead } from "@/lib/leads/server";
 import { LEAD_SELECT, defaultStatusForLeadType, type BusinessLead } from "@/lib/leads/types";
 import {
@@ -15,6 +17,7 @@ import {
   parseLeadStatus,
   parseLeadType,
   parseOptionalText,
+  parseResearchSnapshot,
   parseUuid,
 } from "@/lib/leads/validators";
 
@@ -184,5 +187,54 @@ export async function POST(request: Request) {
     // Lead was created; activity logging is non-critical for V1.
   }
 
-  return NextResponse.json({ lead: data }, { status: 201 });
+  const snapshot = parseResearchSnapshot(
+    body.researchSnapshot ?? body.research_snapshot
+  ) as LeadResearchSnapshot | null;
+  if (snapshot) {
+    try {
+      await persistLeadResearch(supabase, {
+        leadId: String(data.id),
+        businessProfileId: business.id,
+        userId: user.id,
+        snapshot,
+        applyDenormalized: false,
+        overwriteRelationshipOwner: false,
+      });
+      await supabase
+        .from("business_leads")
+        .update({
+          last_researched_at: snapshot.researchedAt,
+          partner_fit: snapshot.partnerFit,
+          research_summary: snapshot.summary,
+          federal_profile_data: {
+            naics: snapshot.naics,
+            agencies: snapshot.agencies,
+            vehicles: snapshot.vehicles,
+            contracts: snapshot.contracts,
+            opportunities: snapshot.opportunities,
+            opportunitiesVerified: snapshot.opportunitiesVerified,
+            capabilityTags: snapshot.capabilityTags,
+            pastPerformanceTags: snapshot.pastPerformanceTags,
+            technologyTags: snapshot.technologyTags,
+            smallBusinessStatuses: snapshot.smallBusinessStatuses,
+            facts: snapshot.facts,
+            suggestedRelationshipOwner: snapshot.suggestedRelationshipOwner,
+            checklist: snapshot.checklist,
+          },
+        })
+        .eq("id", data.id);
+    } catch (err) {
+      console.warn("Lead research persist failed", {
+        message: err instanceof Error ? err.message.slice(0, 180) : "unknown",
+      });
+    }
+  }
+
+  const { data: saved } = await supabase
+    .from("business_leads")
+    .select(LEAD_SELECT)
+    .eq("id", data.id)
+    .maybeSingle();
+
+  return NextResponse.json({ lead: saved ?? data }, { status: 201 });
 }

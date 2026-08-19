@@ -117,14 +117,33 @@ export async function loadLeadDetail(
 ): Promise<LeadWithActivities | null> {
   const lead = await getBusinessLeadById(supabase, leadId);
   if (!lead) return null;
-  const [activities, contacts, opportunities] = await Promise.all([
+  const [activities, contacts, opportunities, researchRuns] = await Promise.all([
     loadLeadActivities(supabase, leadId).catch(() => [] as LeadActivity[]),
     loadLeadContacts(supabase, leadId).catch(() => [] as LeadContact[]),
     loadLeadOpportunities(supabase, leadId).catch(
       () => [] as LeadOpportunityLink[]
     ),
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from("lead_research_runs")
+          .select("id, mode, summary, partner_fit, created_at")
+          .eq("lead_id", leadId)
+          .order("created_at", { ascending: false })
+          .limit(20);
+        return data ?? [];
+      } catch {
+        return [];
+      }
+    })(),
   ]);
-  return { ...lead, activities, contacts, opportunities };
+  return {
+    ...lead,
+    activities,
+    contacts,
+    opportunities,
+    research_runs: researchRuns as LeadWithActivities["research_runs"],
+  };
 }
 
 export async function recordLeadActivity(

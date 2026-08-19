@@ -29,8 +29,11 @@ import LeadInteractionForm from "@/components/leads/LeadInteractionForm";
 import LeadOpportunitiesPanel from "@/components/leads/LeadOpportunitiesPanel";
 import LeadOpportunityBriefCard from "@/components/leads/LeadOpportunityBriefCard";
 import LeadOutreachPanel from "@/components/leads/LeadOutreachPanel";
+import LeadPartnerFitCard from "@/components/leads/LeadPartnerFitCard";
+import LeadResearchHistory from "@/components/leads/LeadResearchHistory";
 import LeadStatusBadge from "@/components/leads/LeadStatusBadge";
 import LeadTypeBadge from "@/components/leads/LeadTypeBadge";
+import { snapshotFromLead } from "@/lib/leads/research/formPatch";
 import {
   applyLeadListFilters,
   computeLeadSummary,
@@ -78,6 +81,7 @@ function leadToFormValues(lead: BusinessLead): Partial<LeadFormValues> {
   return {
     leadType: leadTypeOf(lead),
     companyName: lead.company_name ?? "",
+    legalCompanyName: lead.legal_company_name ?? "",
     contactName: lead.contact_name ?? "",
     jobTitle: lead.job_title ?? "",
     email: lead.email ?? "",
@@ -88,6 +92,8 @@ function leadToFormValues(lead: BusinessLead): Partial<LeadFormValues> {
     sourceDetail: lead.source_detail ?? "",
     notes: lead.notes ?? "",
     linkedinUrl: lead.linkedin_url ?? "",
+    headquarters: lead.headquarters ?? lead.address ?? "",
+    companyDescription: lead.company_description ?? "",
     relationshipOwner: lead.relationship_owner ?? "",
     smallBusinessStatus: lead.small_business_status ?? "",
     uei: lead.uei ?? "",
@@ -101,12 +107,20 @@ function leadToFormValues(lead: BusinessLead): Partial<LeadFormValues> {
     pastPerformanceAreas: lead.past_performance_areas ?? "",
     technologyAreas: lead.technology_areas ?? "",
     marketAgency: lead.market_agency ?? "",
+    recommendedOutreachAngle: lead.recommended_outreach_angle ?? "",
+    whyCompanyMatters: lead.why_company_matters ?? "",
+    nm2techCanBring: lead.nm2tech_can_bring ?? "",
+    researchSnapshot: snapshotFromLead(lead),
   };
 }
 
 function leadProfilePayload(values: LeadFormValues) {
   return {
     linkedinUrl: values.linkedinUrl.trim() || null,
+    legalCompanyName: values.legalCompanyName.trim() || null,
+    headquarters: values.headquarters.trim() || null,
+    address: values.headquarters.trim() || null,
+    companyDescription: values.companyDescription.trim() || null,
     relationshipOwner: values.relationshipOwner.trim() || null,
     smallBusinessStatus: values.smallBusinessStatus.trim() || null,
     uei: values.uei.trim() || null,
@@ -120,6 +134,10 @@ function leadProfilePayload(values: LeadFormValues) {
     pastPerformanceAreas: values.pastPerformanceAreas.trim() || null,
     technologyAreas: values.technologyAreas.trim() || null,
     marketAgency: values.marketAgency.trim() || null,
+    recommendedOutreachAngle: values.recommendedOutreachAngle.trim() || null,
+    whyCompanyMatters: values.whyCompanyMatters.trim() || null,
+    nm2techCanBring: values.nm2techCanBring.trim() || null,
+    researchSnapshot: values.researchSnapshot,
   };
 }
 
@@ -665,6 +683,8 @@ export default function LeadsScreen() {
                       onSubmit={handleUpdateLead}
                       onCancel={() => setEditing(false)}
                       submitLabel="Save changes"
+                      businessProfileId={businessProfileId}
+                      leadId={lead.id}
                     />
                   </div>
                 </>
@@ -761,6 +781,11 @@ export default function LeadsScreen() {
                   </div>
 
                   <LeadFederalProfile lead={lead} />
+                  {lead.partner_fit || lead.why_company_matters ? (
+                    <div className="mt-4">
+                      <LeadPartnerFitCard fit={lead.partner_fit} />
+                    </div>
+                  ) : null}
 
                   <div className="mt-4">
                     <label className="text-sm font-medium">Stage</label>
@@ -887,6 +912,7 @@ export default function LeadsScreen() {
                 ) : null}
                 <LeadDocumentsCard lead={selectedLead} />
                 <LeadInsightsCard lead={selectedLead} />
+                <LeadResearchHistory runs={selectedLead.research_runs} />
               </>
             ) : null}
 
@@ -1018,6 +1044,7 @@ export default function LeadsScreen() {
               onSubmit={handleCreateLead}
               onCancel={() => setShowAddForm(false)}
               submitLabel="Save lead"
+              businessProfileId={businessProfileId}
             />
           </div>
         </div>

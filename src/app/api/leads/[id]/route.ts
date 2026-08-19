@@ -4,6 +4,8 @@ import {
   requireEditableBusinessProfile,
   requireLeadUser,
 } from "@/lib/leads/auth";
+import { persistLeadResearch } from "@/lib/leads/research/persist";
+import type { LeadResearchSnapshot } from "@/lib/leads/research/types";
 import {
   getBusinessLeadById,
   loadLeadDetail,
@@ -16,6 +18,7 @@ import {
   parseLeadStatus,
   parseLeadType,
   parseOptionalText,
+  parseResearchSnapshot,
 } from "@/lib/leads/validators";
 import { requireOwnedGuardianProfile } from "@/lib/profiles/server";
 
@@ -151,6 +154,53 @@ export async function PATCH(request: Request, context: RouteContext) {
       });
     } catch {
       // Non-critical.
+    }
+  }
+
+  const snapshot = parseResearchSnapshot(
+    body.researchSnapshot ?? body.research_snapshot
+  ) as LeadResearchSnapshot | null;
+  const alreadyStored =
+    snapshot &&
+    existing.last_researched_at &&
+    snapshot.researchedAt === existing.last_researched_at;
+  if (snapshot && !alreadyStored) {
+    try {
+      await persistLeadResearch(supabase, {
+        leadId: id,
+        businessProfileId: existing.business_profile_id,
+        userId: user.id,
+        snapshot,
+        applyDenormalized: false,
+        overwriteRelationshipOwner: false,
+      });
+      await supabase
+        .from("business_leads")
+        .update({
+          last_researched_at: snapshot.researchedAt,
+          partner_fit: snapshot.partnerFit,
+          research_summary: snapshot.summary,
+          federal_profile_data: {
+            naics: snapshot.naics,
+            agencies: snapshot.agencies,
+            vehicles: snapshot.vehicles,
+            contracts: snapshot.contracts,
+            opportunities: snapshot.opportunities,
+            opportunitiesVerified: snapshot.opportunitiesVerified,
+            capabilityTags: snapshot.capabilityTags,
+            pastPerformanceTags: snapshot.pastPerformanceTags,
+            technologyTags: snapshot.technologyTags,
+            smallBusinessStatuses: snapshot.smallBusinessStatuses,
+            facts: snapshot.facts,
+            suggestedRelationshipOwner: snapshot.suggestedRelationshipOwner,
+            checklist: snapshot.checklist,
+          },
+        })
+        .eq("id", id);
+    } catch (err) {
+      console.warn("Lead research persist failed", {
+        message: err instanceof Error ? err.message.slice(0, 180) : "unknown",
+      });
     }
   }
 

@@ -123,6 +123,7 @@ export default function LeadCardScanModal({
 
       const payload = {
         businessProfileId,
+        leadType: values.leadType,
         companyName: values.companyName.trim() || null,
         contactName: values.contactName.trim() || null,
         jobTitle: values.jobTitle.trim() || null,
@@ -133,6 +134,27 @@ export default function LeadCardScanModal({
         sourceDetail: values.sourceDetail.trim() || null,
         notes: values.notes.trim() || null,
         documentId: upload.documentId,
+        linkedinUrl: values.linkedinUrl.trim() || null,
+        legalCompanyName: values.legalCompanyName.trim() || null,
+        headquarters: values.headquarters.trim() || null,
+        companyDescription: values.companyDescription.trim() || null,
+        relationshipOwner: values.relationshipOwner.trim() || null,
+        smallBusinessStatus: values.smallBusinessStatus.trim() || null,
+        uei: values.uei.trim() || null,
+        cageCode: values.cageCode.trim() || null,
+        naicsCodes: values.naicsCodes.trim() || null,
+        primaryCapabilities: values.primaryCapabilities.trim() || null,
+        federalAgenciesServed: values.federalAgenciesServed.trim() || null,
+        contractVehicles: values.contractVehicles.trim() || null,
+        knownContracts: values.knownContracts.trim() || null,
+        currentOpportunities: values.currentOpportunities.trim() || null,
+        pastPerformanceAreas: values.pastPerformanceAreas.trim() || null,
+        technologyAreas: values.technologyAreas.trim() || null,
+        marketAgency: values.marketAgency.trim() || null,
+        recommendedOutreachAngle: values.recommendedOutreachAngle.trim() || null,
+        whyCompanyMatters: values.whyCompanyMatters.trim() || null,
+        nm2techCanBring: values.nm2techCanBring.trim() || null,
+        researchSnapshot: values.researchSnapshot,
       };
 
       const res = await fetch("/api/leads", {
@@ -243,6 +265,7 @@ export default function LeadCardScanModal({
                   onSubmit={handleConfirm}
                   onCancel={handleClose}
                   submitLabel={saving ? "Saving…" : "Confirm and create lead"}
+                  businessProfileId={businessProfileId}
                 />
               </div>
             ) : null}

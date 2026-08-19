@@ -2,7 +2,6 @@ import {
   LEAD_ACTIVITY_TYPES,
   LEAD_STATUSES,
   LEAD_TYPES,
-  SMALL_BUSINESS_STATUSES,
   type LeadActivityType,
   type LeadStatus,
   type LeadType,
@@ -68,12 +67,15 @@ export function parseLeadActivityType(value: unknown): LeadActivityType | null {
 }
 
 export function parseSmallBusinessStatus(value: unknown): string | null {
+  if (Array.isArray(value)) {
+    const parts = value
+      .map((v) => parseOptionalText(v))
+      .filter((v): v is string => Boolean(v));
+    return parts.length > 0 ? parts.join(", ") : null;
+  }
   const text = parseOptionalText(value);
   if (!text) return null;
-  const match = SMALL_BUSINESS_STATUSES.find(
-    (s) => s.toLowerCase() === text.toLowerCase()
-  );
-  return match ?? text;
+  return text;
 }
 
 export function parseOptionalDate(value: unknown): string | null {
@@ -98,6 +100,13 @@ export function parseLeadProfileFields(
   const out: Record<string, unknown> = {};
   const textFields: Array<[string, string[]]> = [
     ["linkedin_url", ["linkedinUrl", "linkedin_url", "linkedin"]],
+    ["legal_company_name", ["legalCompanyName", "legal_company_name"]],
+    ["company_description", ["companyDescription", "company_description"]],
+    ["headquarters", ["headquarters"]],
+    ["primary_naics", ["primaryNaics", "primary_naics"]],
+    ["recommended_outreach_angle", ["recommendedOutreachAngle", "recommended_outreach_angle"]],
+    ["why_company_matters", ["whyCompanyMatters", "why_company_matters"]],
+    ["nm2tech_can_bring", ["nm2techCanBring", "nm2tech_can_bring"]],
     ["relationship_owner", ["relationshipOwner", "relationship_owner", "owner"]],
     ["uei", ["uei"]],
     ["cage_code", ["cageCode", "cage_code"]],
@@ -125,9 +134,9 @@ export function parseLeadProfileFields(
       }
     }
   }
-  if (body.smallBusinessStatus !== undefined || body.small_business_status !== undefined) {
+  if (body.smallBusinessStatus !== undefined || body.small_business_status !== undefined || body.smallBusinessStatuses !== undefined) {
     out.small_business_status = parseSmallBusinessStatus(
-      body.smallBusinessStatus ?? body.small_business_status
+      body.smallBusinessStatuses ?? body.smallBusinessStatus ?? body.small_business_status
     );
   }
   if (body.nextActionDate !== undefined || body.next_action_date !== undefined) {
@@ -136,4 +145,13 @@ export function parseLeadProfileFields(
     );
   }
   return out;
+}
+
+export function parseResearchSnapshot(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const row = value as Record<string, unknown>;
+  if (typeof row.researchedAt !== "string" && typeof row.companyName !== "string") {
+    return null;
+  }
+  return row;
 }
