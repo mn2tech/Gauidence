@@ -109,3 +109,46 @@ stored in this repo or in Vercel.
   `/dashboard`; unauthenticated visits to `/dashboard` redirect to `/login`.
 - Until the env vars are set, the auth pages show a "not configured" notice
   and the rest of the site keeps working.
+
+## 6. Google Drive connections (separate from sign-in)
+
+Sign-in only needs Google in the **Supabase Dashboard**. Drive connections
+need the same **Guardian Web** OAuth client ID and secret **in the app**,
+because Guardian exchanges the code for a Drive refresh token itself.
+
+If Connections shows *"Google Drive isn't configured on this deployment"*,
+the app is missing `GOOGLE_DRIVE_CLIENT_ID` / `GOOGLE_DRIVE_CLIENT_SECRET`.
+
+### Google Cloud (project `nm2bibleai`, client **Guardian Web**)
+
+1. [Enable the Google Drive API](https://console.cloud.google.com/apis/library/drive.googleapis.com).
+2. **APIs & Services → OAuth consent screen → Data Access (Scopes):**
+   add `https://www.googleapis.com/auth/drive.readonly`.
+   If the app is in Testing, add your Google account as a test user.
+3. **APIs & Services → Credentials → Guardian Web** — add **Authorized
+   redirect URIs** (keep the existing Supabase `/auth/v1/callback` URI):
+   - `http://localhost:3000/api/connections/google-drive/callback`
+   - `http://localhost:3001/api/connections/google-drive/callback`
+   - `https://guardian.nm2tech.com/api/connections/google-drive/callback`
+4. Copy the **Client ID** and **Client Secret** from that same client
+   (also visible in Supabase → Authentication → Providers → Google).
+
+### App environment
+
+`.env.local` (restart `next dev` after saving):
+
+```
+GOOGLE_DRIVE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+GOOGLE_DRIVE_CLIENT_SECRET=your-client-secret
+```
+
+Vercel → Project → Settings → Environment Variables (Production and Preview),
+then redeploy:
+
+```
+GOOGLE_DRIVE_CLIENT_ID
+GOOGLE_DRIVE_CLIENT_SECRET
+```
+
+Also run `supabase/migrations/0085_google_drive_connected_source.sql` in the
+Supabase SQL Editor if that migration has not been applied yet.
