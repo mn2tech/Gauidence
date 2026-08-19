@@ -6,6 +6,7 @@ import {
   LEAD_CONTACT_SELECT,
   LEAD_OPPORTUNITY_SELECT,
   LEAD_SELECT,
+  LEAD_SELECT_CORE,
   type BusinessLead,
   type LeadActivity,
   type LeadActivityType,
@@ -14,6 +15,65 @@ import {
   type LeadType,
   type LeadWithActivities,
 } from "@/lib/leads/types";
+
+function isMissingLeadColumnError(error: {
+  code?: string;
+  message?: string;
+  details?: string;
+} | null): boolean {
+  if (!error) return false;
+  if (error.code === "42703" || error.code === "PGRST204") return true;
+  const msg = `${error.message ?? ""} ${error.details ?? ""}`;
+  return /does not exist|schema cache|could not find the/i.test(msg);
+}
+
+function leadSearchFilter(q: string, extended: boolean): string {
+  const safe = q.replace(/%/g, "");
+  const core = `company_name.ilike.%${safe}%,contact_name.ilike.%${safe}%,email.ilike.%${safe}%,notes.ilike.%${safe}%`;
+  if (!extended) return core;
+  return `${core},market_agency.ilike.%${safe}%,naics_codes.ilike.%${safe}%,federal_agencies_served.ilike.%${safe}%`;
+}
+
+async function queryBusinessLeads(
+  supabase: SupabaseClient,
+  businessProfileId: string,
+  options: {
+    status?: string | null;
+    search?: string | null;
+    leadType?: LeadType | null;
+    needsFollowUp?: boolean;
+    limit?: number;
+  } | undefined,
+  mode: "full" | "core" | "star"
+): Promise<{ data: BusinessLead[] | null; error: { code?: string; message?: string; details?: string } | null }> {
+  const select =
+    mode === "full" ? LEAD_SELECT : mode === "core" ? LEAD_SELECT_CORE : "*";
+  let query = supabase
+    .from("business_leads")
+    .select(select)
+    .eq("business_profile_id", businessProfileId)
+    .order("updated_at", { ascending: false });
+
+  if (options?.status) {
+    query = query.eq("status", options.status);
+  }
+  if (mode === "full" && options?.leadType) {
+    query = query.eq("lead_type", options.leadType);
+  }
+  if (mode === "full" && options?.needsFollowUp) {
+    const today = new Date().toISOString().slice(0, 10);
+    query = query.or(
+      `next_action_date.lte.${today},next_action.is.null,next_action.eq.`
+    );
+    query = query.not("status", "in", "(won,lost,dormant)");
+  }
+  if (options?.search) {
+    query = query.or(leadSearchFilter(options.search, mode === "full"));
+  }
+
+  const { data, error } = await query.limit(options?.limit ?? 200);
+  return { data: (data as BusinessLead[] | null) ?? null, error };
+}
 
 export async function listBusinessLeads(
   supabase: SupabaseClient,
@@ -26,48 +86,70 @@ export async function listBusinessLeads(
     limit?: number;
   }
 ): Promise<BusinessLead[]> {
-  let query = supabase
-    .from("business_leads")
-    .select(LEAD_SELECT)
-    .eq("business_profile_id", businessProfileId)
-    .order("updated_at", { ascending: false });
+  const full = await queryBusinessLeads(supabase, businessProfileId, options, "full");
+  if (!full.error) return full.data ?? [];
 
-  if (options?.status) {
-    query = query.eq("status", options.status);
-  }
-  if (options?.leadType) {
-    query = query.eq("lead_type", options.leadType);
-  }
-  if (options?.needsFollowUp) {
-    const today = new Date().toISOString().slice(0, 10);
-    query = query.or(
-      `next_action_date.lte.${today},next_action.is.null,next_action.eq.`
+  if (isMissingLeadColumnError(full.error)) {
+    console.warn("Leads list falling back to core columns", {
+      message: full.error.message?.slice(0, 180),
+    });
+    const core = await queryBusinessLeads(
+      supabase,
+      businessProfileId,
+      options,
+      "core"
     );
-    query = query.not("status", "in", "(won,lost,dormant)");
-  }
-  if (options?.search) {
-    const q = options.search.replace(/%/g, "");
-    query = query.or(
-      `company_name.ilike.%${q}%,contact_name.ilike.%${q}%,email.ilike.%${q}%,notes.ilike.%${q}%,market_agency.ilike.%${q}%,naics_codes.ilike.%${q}%,federal_agencies_served.ilike.%${q}%`
-    );
+    if (!core.error) return core.data ?? [];
+    if (isMissingLeadColumnError(core.error)) {
+      const star = await queryBusinessLeads(
+        supabase,
+        businessProfileId,
+        options,
+        "star"
+      );
+      if (!star.error) return star.data ?? [];
+      throw star.error;
+    }
+    throw core.error;
   }
 
-  const { data, error } = await query.limit(options?.limit ?? 200);
-  if (error) throw error;
-  return (data ?? []) as BusinessLead[];
+  throw full.error;
 }
 
 export async function getBusinessLeadById(
   supabase: SupabaseClient,
   leadId: string
 ): Promise<BusinessLead | null> {
-  const { data, error } = await supabase
+  const full = await supabase
     .from("business_leads")
     .select(LEAD_SELECT)
     .eq("id", leadId)
     .maybeSingle();
-  if (error) throw error;
-  return (data as BusinessLead | null) ?? null;
+  if (!full.error) return (full.data as BusinessLead | null) ?? null;
+
+  if (isMissingLeadColumnError(full.error)) {
+    console.warn("Lead detail falling back to core columns", {
+      message: full.error.message?.slice(0, 180),
+    });
+    const core = await supabase
+      .from("business_leads")
+      .select(LEAD_SELECT_CORE)
+      .eq("id", leadId)
+      .maybeSingle();
+    if (!core.error) return (core.data as BusinessLead | null) ?? null;
+    if (isMissingLeadColumnError(core.error)) {
+      const star = await supabase
+        .from("business_leads")
+        .select("*")
+        .eq("id", leadId)
+        .maybeSingle();
+      if (star.error) throw star.error;
+      return (star.data as BusinessLead | null) ?? null;
+    }
+    throw core.error;
+  }
+
+  throw full.error;
 }
 
 export async function loadLeadActivities(

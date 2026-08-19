@@ -231,7 +231,10 @@ export default function LeadsScreen() {
       if (typeFilter !== "all") q.set("leadType", typeFilter);
       if (search.trim()) q.set("q", search.trim());
       const res = await fetch(`/api/leads?${q}`);
-      const body = await res.json();
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        leads?: unknown;
+      };
       if (!res.ok) throw new Error(body.error ?? "Couldn't load leads.");
       setLeads(body.leads ?? []);
     } catch (err) {

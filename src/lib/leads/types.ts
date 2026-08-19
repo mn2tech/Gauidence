@@ -295,6 +295,10 @@ export type LeadWithActivities = BusinessLead & {
 export const LEAD_SELECT =
   "id,business_profile_id,lead_type,company_name,contact_name,job_title,email,phone,website,address,linkedin_url,legal_company_name,company_description,headquarters,primary_naics,last_researched_at,partner_fit,research_summary,recommended_outreach_angle,why_company_matters,nm2tech_can_bring,federal_profile_data,source,source_detail,notes,status,lead_score,recommended_service,opportunity_summary,conversation_angle,next_action,next_action_date,last_activity_at,last_contact_at,relationship_owner,small_business_status,uei,cage_code,naics_codes,primary_capabilities,federal_agencies_served,contract_vehicles,known_contracts,current_opportunities,past_performance_areas,technology_areas,market_agency,match_explanation,recommended_approach,proposal_id,document_id,opportunity_brief,created_by,created_at,updated_at";
 
+/** Columns from 0071 + 0072. Used when pipeline/research migrations are not applied yet. */
+export const LEAD_SELECT_CORE =
+  "id,business_profile_id,company_name,contact_name,job_title,email,phone,website,address,source,source_detail,notes,status,lead_score,recommended_service,opportunity_summary,conversation_angle,next_action,last_activity_at,proposal_id,document_id,opportunity_brief,created_by,created_at,updated_at";
+
 export const LEAD_ACTIVITY_SELECT =
   "id,lead_id,activity_type,description,metadata,contact_id,occurred_at,created_by,created_at";
 

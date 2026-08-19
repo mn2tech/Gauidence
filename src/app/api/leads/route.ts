@@ -58,9 +58,29 @@ export async function GET(request: Request) {
       needsFollowUp,
     });
     return NextResponse.json({ leads });
-  } catch {
+  } catch (err) {
+    const message =
+      err && typeof err === "object" && "message" in err
+        ? String((err as { message?: unknown }).message ?? "")
+        : err instanceof Error
+          ? err.message
+          : "";
+    console.error("List leads failed", {
+      message: message.slice(0, 240),
+      code:
+        err && typeof err === "object" && "code" in err
+          ? String((err as { code?: unknown }).code ?? "")
+          : undefined,
+    });
+    const schemaBehind = /does not exist|schema cache|could not find the/i.test(
+      message
+    );
     return NextResponse.json(
-      { error: "Couldn't load leads." },
+      {
+        error: schemaBehind
+          ? "Couldn't load leads. Apply Supabase migrations 0071, 0072, 0087, and 0088, then reload."
+          : "Couldn't load leads.",
+      },
       { status: 500 }
     );
   }
