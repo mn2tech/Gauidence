@@ -46,6 +46,9 @@ describe("Gideon helpers", () => {
     assert.match(GIDEON_SYSTEM, /CURRENT DATE AND TIME is provided/i);
     assert.match(GIDEON_SYSTEM, /never ask them to re-upload/i);
     assert.match(GIDEON_ATTACHED_DOCUMENT_NOTE, /Never ask the user to re-upload/i);
+    assert.match(GIDEON_ATTACHED_DOCUMENT_NOTE, /FROM YOUR DOCUMENTS/);
+    assert.match(GIDEON_ATTACHED_DOCUMENT_NOTE, /primary source/i);
+    assert.match(GIDEON_SYSTEM, /never for a worksheet or packet they attached/i);
     assert.match(GIDEON_VISION_NOTE, /Never say you cannot see an image/i);
     assert.equal(
       GIDEON_BRAND_LINE,

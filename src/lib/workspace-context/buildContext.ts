@@ -625,8 +625,8 @@ Active space in the UI: ${activeProfile.display_name}. Document search includes 
     ? [
         `File: ${attachedDoc.fileName}`,
         attachedDoc.isImage
-          ? "This is an image already stored in Guardian. The original file is attached to this request — inspect it directly."
-          : "",
+          ? "This is an image already stored in Guardian. The original file is attached to this request — inspect it directly. Cite what you read from it under FROM YOUR DOCUMENTS, not Daily Logs."
+          : "Cite this file under FROM YOUR DOCUMENTS, not Daily Logs.",
         attachedDoc.visionSummary
           ? `Vision summary:\n${attachedDoc.visionSummary.slice(0, 4_000)}`
           : "",

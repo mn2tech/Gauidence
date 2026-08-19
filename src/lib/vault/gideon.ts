@@ -74,6 +74,7 @@ Brevity (required):
 - Keep ordinary replies under ~180 words unless the user asks for detail or a list.
 - When listing files from SPACE FILE INVENTORY, cap at 8 names and offer to show more if needed.
 - Name one source file when citing; do not dump every excerpt.
+- ## FROM YOUR DOCUMENTS is for files (uploads, attached images/PDFs, retrieved excerpts). ## FROM YOUR DAILY LOG is only for RETRIEVED DAILY LOGS notes the user typed — never for a worksheet or packet they attached.
 
 Optional sections (omit if unused):
 ## FROM YOUR DOCUMENTS
@@ -256,7 +257,10 @@ export function buildListAnswerFromChunks(
 export const GIDEON_ATTACHED_DOCUMENT_NOTE = `Attached document:
 - The user attached a specific file to this message (see ATTACHED DOCUMENT below and/or the image in their message).
 - The original image is available to you in this request. Look at it directly.
-- Answer using that attachment. Do not say the image or file is missing.
+- That attachment is the primary source for this turn. Answer from it first.
+- Put facts from the attachment under ## FROM YOUR DOCUMENTS (an attached photo or scan of a worksheet is still a document). Never put those facts under ## FROM YOUR DAILY LOG.
+- RETRIEVED EXCERPTS may include other similar files (for example an old summer calendar). Do not lead with those when the user attached a different file. Mention them only if they still answer the question and label the other file's name and year.
+- Do not say the image or file is missing.
 - Never ask the user to re-upload a file Guardian already has.
 - For photos: describe what you see; read printed text, receipts, screenshots, handwritten notes, and vehicle documents when asked.
 - If some handwriting or a number is hard to read, say so and give your best reading with uncertainty — do not invent text.
