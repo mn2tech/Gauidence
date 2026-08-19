@@ -6,13 +6,13 @@ import { useRouter } from "next/navigation";
 import {
   Camera,
   FileText,
-  Loader2,
   Mail,
   Mic,
   Plus,
   ScanLine,
   Sparkles,
 } from "lucide-react";
+import GuardianIcon from "@/components/brand/GuardianIcon";
 import ProfileSetupHub from "@/components/ProfileSetupHub";
 import ProcessingTracePanel from "@/components/add-anything/ProcessingTracePanel";
 import SmartUploadSuggestionCard from "@/components/SmartUploadSuggestionCard";
@@ -457,7 +457,7 @@ export default function AddAnythingScreen() {
 
       {stage === "processing" ? (
         <div className="simple-home-card flex flex-col items-center gap-4 p-8 text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-brand" />
+          <GuardianIcon size={40} pulse />
           <div>
             <p className="text-sm font-semibold text-foreground">Analyzing…</p>
             <p className="mt-1 text-sm text-ink-muted">

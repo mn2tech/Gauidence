@@ -3,6 +3,8 @@ import Link from "next/link";
 import { Check, ArrowRight } from "lucide-react";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
+import GuardianLogo from "@/components/brand/GuardianLogo";
+import { GUARDIAN_BRAND_TAGLINE } from "@/lib/branding";
 import { createClient } from "@/lib/supabase/server";
 import {
   FREE_PRICE_DISPLAY,
@@ -55,7 +57,11 @@ export default async function PricingPage() {
         <section className="relative overflow-hidden">
           <div className="absolute inset-0 -z-10 bg-gradient-to-b from-brand-light via-background to-background" />
           <div className="mx-auto max-w-6xl px-6 pb-12 pt-16 text-center sm:pb-16 sm:pt-20">
-            <h1 className="text-3xl font-bold tracking-tight sm:text-5xl">
+            <GuardianLogo variant="lockup" size="sm" className="mx-auto" />
+            <p className="mt-3 text-[10px] font-medium uppercase tracking-[0.18em] text-ink-muted">
+              {GUARDIAN_BRAND_TAGLINE}
+            </p>
+            <h1 className="mt-8 text-3xl font-bold tracking-tight sm:text-5xl">
               Simple pricing for every vault
             </h1>
             <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-ink-muted sm:text-lg">

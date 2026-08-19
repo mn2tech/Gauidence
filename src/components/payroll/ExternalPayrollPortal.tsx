@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Download, Loader2, ShieldCheck } from "lucide-react";
+import { Download, Loader2 } from "lucide-react";
+import GuardianIcon from "@/components/brand/GuardianIcon";
 import type { ExternalPayrollReportData } from "@/lib/payroll/types";
 import { formatPayPeriod } from "@/lib/payroll/compute";
 import PayrollVerificationForm from "./PayrollVerificationForm";
@@ -79,8 +80,8 @@ export default function ExternalPayrollPortal({ token }: Props) {
   return (
     <div className="space-y-8">
       <div className="rounded-2xl border border-stone-700 bg-stone-900 p-6">
-        <div className="flex items-center gap-2 text-sm text-emerald-400">
-          <ShieldCheck className="h-4 w-4" />
+        <div className="flex items-center gap-2 text-sm text-stone-100">
+          <GuardianIcon size={16} tone="dark" alt="" />
           Secure Payroll Report powered by Guardian
         </div>
         <h1 className="mt-4 text-2xl font-bold text-stone-100">{report.businessName}</h1>

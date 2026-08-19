@@ -5,10 +5,10 @@ import {
   CheckCircle2,
   FileUp,
   Loader2,
-  ShieldCheck,
   Upload,
 } from "lucide-react";
 import IntakeVerificationForm from "./IntakeVerificationForm";
+import GuardianIcon from "@/components/brand/GuardianIcon";
 import { INTAKE_ACCEPTED_TYPES, type EmploymentKind } from "@/lib/intake/types";
 import { formatPhoneInput } from "@/lib/intake/contact";
 
@@ -211,8 +211,8 @@ export default function ContractorIntakePortal({ token }: Props) {
   return (
     <div className="mx-auto max-w-lg space-y-6">
       <div className="rounded-2xl border border-stone-700 bg-stone-900 p-6">
-        <div className="flex items-center gap-2 text-sm text-emerald-400">
-          <ShieldCheck className="h-4 w-4" />
+        <div className="flex items-center gap-2 text-sm text-stone-100">
+          <GuardianIcon size={16} tone="dark" alt="" />
           Secure intake powered by Guardian
         </div>
         <h1 className="mt-4 text-2xl font-bold text-stone-100">

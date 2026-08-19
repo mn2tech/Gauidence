@@ -5128,7 +5128,7 @@ export default function VaultChatPanel({
           >
             <Menu className="h-5 w-5" />
           </button>
-          <GideonAvatar size={32} className="hidden sm:inline-flex" />
+          <GideonAvatar size={32} />
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
               <AskTitleProfileSwitch

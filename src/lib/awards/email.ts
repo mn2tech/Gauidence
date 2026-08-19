@@ -2,6 +2,7 @@ import "server-only";
 
 import { Resend } from "resend";
 import { awardByKey, type AwardKey } from "@/lib/awards/definitions";
+import { guardianEmailLockupHtml } from "@/lib/branding";
 import { appBaseUrl } from "@/lib/profiles/invitations";
 
 function escapeHtml(value: string) {
@@ -21,7 +22,7 @@ export function renderAwardEarnedEmail(awardKey: AwardKey, firstName: string) {
   <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#fafaf9;padding:32px 16px;">
     <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e7e5e4;border-radius:16px;overflow:hidden;">
       <div style="padding:24px;">
-        <div style="font-size:18px;font-weight:700;color:#1c1917;">Guardian</div>
+        ${guardianEmailLockupHtml(appBaseUrl())}
         <p style="margin:16px 0 8px;font-size:15px;color:#1c1917;line-height:1.5;">
           Hi ${escapeHtml(firstName)}, congratulations!
         </p>

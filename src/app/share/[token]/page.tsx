@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ShieldCheck } from "lucide-react";
+import GuardianIcon from "@/components/brand/GuardianIcon";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 import SharedDocumentView from "@/components/SharedDocumentView";
@@ -21,7 +21,7 @@ export default async function SharePage({ params }: Props) {
       <main className="flex-1">
         <section className="mx-auto max-w-2xl px-6 py-12">
           <div className="mb-8 flex items-center gap-2 text-sm text-ink-muted">
-            <ShieldCheck className="h-4 w-4 text-brand" />
+            <GuardianIcon size={16} alt="" />
             <span>Shared securely via Guardian</span>
             <span className="text-stone-300">·</span>
             <Link href="/" className="text-brand hover:text-brand-dark">

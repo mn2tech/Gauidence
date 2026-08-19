@@ -9,9 +9,9 @@ import {
   Menu,
   Search,
   Settings,
-  ShieldCheck,
   X,
 } from "lucide-react";
+import GuardianLogo from "@/components/brand/GuardianLogo";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import ProfileSwitcher from "@/components/ProfileSwitcher";
@@ -59,12 +59,10 @@ export default function SimpleAppShell({
         <div className="mx-auto flex h-14 max-w-2xl items-center justify-between gap-3 px-4">
           <Link
             href={SIMPLE_HOME_PATH}
-            className="flex shrink-0 items-center gap-2 font-semibold tracking-tight"
+            className="flex shrink-0 items-center"
+            aria-label="Guardian home"
           >
-            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand text-white shadow-sm">
-              <ShieldCheck className="h-5 w-5" />
-            </span>
-            Guardian
+            <GuardianLogo variant="horizontal" size="sm" priority />
           </Link>
 
           <div className="flex items-center gap-1">

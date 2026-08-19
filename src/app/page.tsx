@@ -4,6 +4,8 @@ import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 import SecuritySection from "@/components/SecuritySection";
 import MeetGideonSection from "@/components/MeetGideonSection";
+import GuardianLogo from "@/components/brand/GuardianLogo";
+import { GUARDIAN_BRAND_TAGLINE } from "@/lib/branding";
 
 const features = [
   {
@@ -48,8 +50,17 @@ export default async function Home({
         {/* Hero */}
         <section className="relative overflow-hidden">
           <div className="absolute inset-0 -z-10 bg-gradient-to-b from-brand-light via-background to-background" />
-          <div className="mx-auto max-w-6xl px-6 pb-20 pt-20 text-center sm:pb-28 sm:pt-28">
-            <p className="mx-auto inline-flex items-center gap-2 rounded-full border border-brand/20 bg-white px-4 py-1.5 text-sm font-medium text-brand">
+          <div className="mx-auto max-w-6xl px-6 pb-20 pt-16 text-center sm:pb-28 sm:pt-20">
+            <GuardianLogo
+              variant="lockup"
+              size="lg"
+              priority
+              className="mx-auto"
+            />
+            <p className="mt-4 text-[11px] font-medium uppercase tracking-[0.18em] text-ink-muted sm:text-xs">
+              {GUARDIAN_BRAND_TAGLINE}
+            </p>
+            <p className="mx-auto mt-8 inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white px-4 py-1.5 text-sm font-medium text-foreground">
               <ShieldCheck className="h-4 w-4" />
               Private by default
             </p>

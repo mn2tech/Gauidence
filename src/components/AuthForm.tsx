@@ -6,7 +6,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import GoogleIcon from "@/components/GoogleIcon";
+import GuardianLogo from "@/components/brand/GuardianLogo";
 import { campaignSignupWelcome } from "@/lib/campaigns/olney-nno";
+import { GUARDIAN_BRAND_TAGLINE } from "@/lib/branding";
 
 const ERROR_MESSAGES: Record<string, string> = {
   access_denied:
@@ -158,6 +160,15 @@ export default function AuthForm({ mode }: { mode: Mode }) {
 
   return (
     <div className="w-full max-w-md">
+      <GuardianLogo
+        variant="lockup"
+        size="md"
+        priority
+        className="mb-3"
+      />
+      <p className="mb-8 text-[10px] font-medium uppercase tracking-[0.18em] text-ink-muted">
+        {GUARDIAN_BRAND_TAGLINE}
+      </p>
       <h1 className="text-2xl font-bold tracking-tight">
         {isSignup ? "Create your account" : "Welcome back"}
       </h1>

@@ -4,7 +4,8 @@ import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Camera, LogOut, Menu, Search, ShieldCheck, X } from "lucide-react";
+import { Camera, LogOut, Menu, Search, X } from "lucide-react";
+import GuardianLogo from "@/components/brand/GuardianLogo";
 import { createClient } from "@/lib/supabase/client";
 import ProfileSwitcher from "@/components/ProfileSwitcher";
 import { useActiveProfile } from "@/components/ProfileProvider";
@@ -119,12 +120,10 @@ export default function SiteHeader() {
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 sm:h-16 sm:px-6">
         <Link
           href={signedIn ? homeHref : "/"}
-          className="flex shrink-0 items-center gap-2 font-semibold tracking-tight"
+          className="flex shrink-0 items-center"
+          aria-label="Guardian home"
         >
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand text-white">
-            <ShieldCheck className="h-5 w-5" />
-          </span>
-          Guardian
+          <GuardianLogo variant="horizontal" size="sm" priority />
         </Link>
 
         {/* Desktop nav */}

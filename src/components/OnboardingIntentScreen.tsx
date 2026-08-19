@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
+import GuardianLogo from "@/components/brand/GuardianLogo";
+import { GUARDIAN_BRAND_TAGLINE } from "@/lib/branding";
 import {
   INTENT_OPTIONS,
   SCHOOL_INTENT_OPTIONS,
@@ -88,7 +90,10 @@ export default function OnboardingIntentScreen({ onComplete }: Props) {
   return (
     <div className="flex min-h-[100dvh] flex-col bg-gradient-to-b from-brand-light/60 via-background to-background">
       <div className="mx-auto flex w-full max-w-lg flex-1 flex-col justify-center px-4 py-10 sm:px-6">
-        <p className="text-sm font-semibold tracking-tight text-brand">Guardian</p>
+        <GuardianLogo variant="horizontal" size="sm" />
+        <p className="mt-2 text-[10px] font-medium uppercase tracking-[0.18em] text-ink-muted">
+          {GUARDIAN_BRAND_TAGLINE}
+        </p>
         {step === "intent" ? (
           <>
             <h1 className="mt-3 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">

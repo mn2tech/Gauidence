@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ShieldCheck } from "lucide-react";
+import GuardianIcon from "@/components/brand/GuardianIcon";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 
@@ -24,9 +24,7 @@ export default function ErrorPageShell({
         <div className="mx-auto w-full max-w-lg text-center">
           <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-64 bg-gradient-to-b from-brand-light via-background to-background" />
 
-          <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-light text-brand shadow-card">
-            <ShieldCheck className="h-7 w-7" aria-hidden />
-          </span>
+          <GuardianIcon size={56} />
 
           <p className="mt-8 text-sm font-semibold uppercase tracking-widest text-brand">
             {code}

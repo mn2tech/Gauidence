@@ -1,12 +1,18 @@
 import "server-only";
 
 import { Resend } from "resend";
+import { guardianEmailLockupHtml } from "@/lib/branding";
+import { getAppBaseUrl } from "@/lib/url/appBaseUrl";
 
 export type ReminderItem = {
   title: string;
   dueDate: string; // ISO date (yyyy-mm-dd)
   daysLeft: number;
 };
+
+function brandHeaderHtml() {
+  return guardianEmailLockupHtml(getAppBaseUrl());
+}
 
 function escapeHtml(value: string) {
   return value
@@ -65,7 +71,7 @@ export function renderReminderEmail(items: ReminderItem[]) {
   <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#fafaf9;padding:32px 16px;">
     <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e7e5e4;border-radius:16px;overflow:hidden;">
       <div style="padding:24px 24px 8px;">
-        <div style="font-size:18px;font-weight:700;color:#1c1917;">Guardian</div>
+        ${brandHeaderHtml()}
         <p style="margin:16px 0 4px;font-size:15px;color:#1c1917;">
           You have ${count === 1 ? "an upcoming deadline" : `${count} upcoming deadlines`} from your documents:
         </p>
@@ -148,7 +154,7 @@ export function renderVaultInviteEmail(args: VaultInviteEmailArgs) {
   <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#fafaf9;padding:32px 16px;">
     <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e7e5e4;border-radius:16px;overflow:hidden;">
       <div style="padding:24px;">
-        <div style="font-size:18px;font-weight:700;color:#1c1917;">Guardian</div>
+        ${brandHeaderHtml()}
         <p style="margin:16px 0 8px;font-size:15px;color:#1c1917;line-height:1.5;">
           ${escapeHtml(args.inviterName)} invited you to collaborate on
           <strong>${escapeHtml(args.vaultName)}</strong> as ${accessLabel}.
@@ -214,7 +220,7 @@ export function renderVaultActivityEmail(args: VaultActivityEmailArgs) {
   <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#fafaf9;padding:32px 16px;">
     <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e7e5e4;border-radius:16px;overflow:hidden;">
       <div style="padding:24px;">
-        <div style="font-size:18px;font-weight:700;color:#1c1917;">Guardian</div>
+        ${brandHeaderHtml()}
         <p style="margin:16px 0 8px;font-size:15px;color:#1c1917;line-height:1.5;">
           <strong>${escapeHtml(args.actorName)}</strong> ${action} to
           <strong>${escapeHtml(args.vaultName)}</strong>.
@@ -306,7 +312,7 @@ export function renderClientRequestEmail(args: ClientRequestEmailArgs) {
   <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#fafaf9;padding:32px 16px;">
     <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e7e5e4;border-radius:16px;overflow:hidden;">
       <div style="padding:24px;">
-        <div style="font-size:18px;font-weight:700;color:#1c1917;">Guardian</div>
+        ${brandHeaderHtml()}
         <p style="margin:16px 0 8px;font-size:15px;color:#1c1917;line-height:1.5;">
           <strong>${escapeHtml(args.actorName)}</strong> ${action} in
           <strong>${escapeHtml(args.vaultName)}</strong>.
@@ -425,7 +431,7 @@ export function renderExpertAssignedEmail(args: ExpertAssignedEmailArgs) {
   <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#fafaf9;padding:32px 16px;">
     <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e7e5e4;border-radius:16px;overflow:hidden;">
       <div style="padding:24px;">
-        <div style="font-size:18px;font-weight:700;color:#1c1917;">Guardian</div>
+        ${brandHeaderHtml()}
         <p style="margin:16px 0 8px;font-size:15px;color:#1c1917;line-height:1.5;">
           ${escapeHtml(args.assignerName)} ${action}
           <strong>${escapeHtml(args.expertName)}</strong>${args.grantOnly ? "" : " to your account"}.

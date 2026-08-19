@@ -1,10 +1,10 @@
+import { GUARDIAN_BRAND_TAGLINE, GUARDIAN_ICON_SRC } from "@/lib/branding";
 import type { Metadata, Viewport } from "next";
 import { getAppBaseUrl } from "@/lib/url/appBaseUrl";
 
 export const SITE_NAME = "Guardian";
 
-export const SITE_TAGLINE =
-  "Keep your most important documents safe and understood";
+export const SITE_TAGLINE = GUARDIAN_BRAND_TAGLINE;
 
 export const SITE_DESCRIPTION =
   "Guardian helps you store, understand, and act on the documents that matter most. Private by default, protected by authenticated access.";
@@ -13,7 +13,7 @@ export function getSiteUrl(): string {
   return getAppBaseUrl();
 }
 
-/** Social preview image — replace `public/og-image.png` (1200×630) when available. */
+/** Social preview image — square Guardian star. */
 export const SITE_OG_IMAGE_PATH = "/icons/icon-512.png";
 
 export const rootMetadata: Metadata = {
@@ -49,7 +49,7 @@ export const rootMetadata: Metadata = {
         url: SITE_OG_IMAGE_PATH,
         width: 512,
         height: 512,
-        alt: `${SITE_NAME} — private document vault`,
+        alt: `${SITE_NAME} — ${SITE_TAGLINE}`,
       },
     ],
   },
@@ -64,9 +64,12 @@ export const rootMetadata: Metadata = {
     follow: true,
   },
   icons: {
-    icon: [{ url: "/icon.png", type: "image/png" }],
+    icon: [
+      { url: GUARDIAN_ICON_SRC, type: "image/png" },
+      { url: "/icon.png", type: "image/png" },
+    ],
     apple: [{ url: "/apple-icon.png", type: "image/png" }],
-    shortcut: "/icon.png",
+    shortcut: GUARDIAN_ICON_SRC,
   },
   appleWebApp: {
     capable: true,
@@ -82,6 +85,9 @@ export const rootViewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
-  themeColor: "#0f766e",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#000000" },
+  ],
   colorScheme: "light",
 };

@@ -3,6 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
+import GuardianLogo from "@/components/brand/GuardianLogo";
+import { GUARDIAN_BRAND_TAGLINE } from "@/lib/branding";
 import { createClient } from "@/lib/supabase/client";
 
 export default function ForgotPasswordForm() {
@@ -44,6 +46,10 @@ export default function ForgotPasswordForm() {
 
   return (
     <div className="w-full max-w-md">
+      <GuardianLogo variant="lockup" size="md" priority className="mb-3" />
+      <p className="mb-8 text-[10px] font-medium uppercase tracking-[0.18em] text-ink-muted">
+        {GUARDIAN_BRAND_TAGLINE}
+      </p>
       <h1 className="text-2xl font-bold tracking-tight">Reset your password</h1>
       <p className="mt-2 text-sm text-ink-muted">
         Enter the email for your Guardian account and we&apos;ll send a link to

@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import GuardianLogo from "@/components/brand/GuardianLogo";
+import { GUARDIAN_BRAND_TAGLINE } from "@/lib/branding";
 
 export default function UpdatePasswordForm() {
   const router = useRouter();
@@ -110,6 +112,10 @@ export default function UpdatePasswordForm() {
 
   return (
     <div className="w-full max-w-md">
+      <GuardianLogo variant="lockup" size="md" priority className="mb-3" />
+      <p className="mb-8 text-[10px] font-medium uppercase tracking-[0.18em] text-ink-muted">
+        {GUARDIAN_BRAND_TAGLINE}
+      </p>
       <h1 className="text-2xl font-bold tracking-tight">Choose a new password</h1>
       <p className="mt-2 text-sm text-ink-muted">
         Enter a new password for your Guardian account. Use at least 8

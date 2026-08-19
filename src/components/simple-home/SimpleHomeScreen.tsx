@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import ProfileAvatar from "@/components/ProfileAvatar";
 import ProfileSetupHub from "@/components/ProfileSetupHub";
+import GuardianLogo from "@/components/brand/GuardianLogo";
+import { GUARDIAN_BRAND_TAGLINE } from "@/lib/branding";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import { useSimpleHomeData } from "@/hooks/useSimpleHomeData";
 import {
@@ -84,7 +86,11 @@ export default function SimpleHomeScreen() {
     return (
       <div className="mx-auto max-w-2xl px-4 py-8">
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight">Welcome to Guardian</h1>
+          <GuardianLogo variant="lockup" size="md" className="mx-auto" />
+          <p className="mt-3 text-[10px] font-medium uppercase tracking-[0.18em] text-ink-muted">
+            {GUARDIAN_BRAND_TAGLINE}
+          </p>
+          <h1 className="mt-6 text-2xl font-semibold tracking-tight">Welcome to Guardian</h1>
           <p className="mt-2 text-sm text-ink-muted">
             Guardian becomes more useful as it remembers the things that matter to you.
           </p>

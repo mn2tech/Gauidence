@@ -9,6 +9,7 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
+import GuardianLogo from "@/components/brand/GuardianLogo";
 import ProfileAvatar from "@/components/ProfileAvatar";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
@@ -372,7 +373,8 @@ export default function AskGideonSidebar({
 
   return (
     <>
-      <div className="shrink-0 border-b border-stone-200 p-3">
+      <div className="shrink-0 border-b border-stone-200 px-3 py-3">
+        <GuardianLogo variant="horizontal" size="sm" className="mb-3" />
         <button
           type="button"
           onClick={() => {

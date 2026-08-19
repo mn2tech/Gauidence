@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2, ShieldCheck } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import GuardianIcon from "@/components/brand/GuardianIcon";
 import { createClient } from "@/lib/supabase/client";
 import { collaboratorRoleLabel } from "@/lib/profiles/types";
 
@@ -123,9 +124,7 @@ export default function InviteAcceptClient({ token }: { token: string }) {
   return (
     <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm sm:p-8">
       <div className="flex justify-center">
-        <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand text-white">
-          <ShieldCheck className="h-6 w-6" />
-        </span>
+        <GuardianIcon size={48} />
       </div>
       <h1 className="mt-4 text-center text-xl font-bold tracking-tight">
         Vault invitation
