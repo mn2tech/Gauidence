@@ -50,6 +50,7 @@ describe("simple home helpers", () => {
     assert.equal(timeOfDayGreeting(new Date("2026-07-30T09:00:00")), "Good morning");
     assert.equal(timeOfDayGreeting(new Date("2026-07-30T14:00:00")), "Good afternoon");
     assert.equal(timeOfDayGreeting(new Date("2026-07-30T19:00:00")), "Good evening");
+    assert.equal(timeOfDayGreeting(new Date("2026-07-30T02:00:00")), "You're up late");
   });
 });
 

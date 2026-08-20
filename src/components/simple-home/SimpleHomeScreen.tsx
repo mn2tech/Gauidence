@@ -2,11 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
 import {
   ArrowRight,
   FolderPlus,
-  MessageCircle,
   NotebookPen,
   Plus,
   Sparkles,
@@ -17,11 +15,8 @@ import GuardianLogo from "@/components/brand/GuardianLogo";
 import { GUARDIAN_BRAND_TAGLINE } from "@/lib/branding";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import { useSimpleHomeData } from "@/hooks/useSimpleHomeData";
-import {
-  formatActivityWhen,
-  greetingName,
-  timeOfDayGreeting,
-} from "@/lib/simple-home/helpers";
+import GideonWelcome from "@/components/gideon-welcome/GideonWelcome";
+import { formatActivityWhen } from "@/lib/simple-home/helpers";
 import {
   ADD_ANYTHING_PATH,
   ASK_GIDEON_PATH,
@@ -73,10 +68,9 @@ const PRIMARY_ACTIONS = [
 
 export default function SimpleHomeScreen() {
   const router = useRouter();
-  const { active, profiles, accountName, loading: profilesLoading, switchProfile } =
+  const { active, profiles, loading: profilesLoading, switchProfile } =
     useActiveProfile();
   const { data, loading } = useSimpleHomeData();
-  const [question, setQuestion] = useState("");
 
   if (profilesLoading) {
     return <p className="p-6 text-sm text-ink-muted">Loading your home…</p>;
@@ -117,27 +111,9 @@ export default function SimpleHomeScreen() {
     );
   }
 
-  const greeting = timeOfDayGreeting();
-  const name = greetingName(accountName, active?.display_name);
-
-  function handleAskSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const trimmed = question.trim();
-    if (trimmed) {
-      router.push(`${ASK_GIDEON_PATH}?draft=${encodeURIComponent(trimmed)}`);
-      return;
-    }
-    router.push(ASK_GIDEON_PATH);
-  }
-
   return (
     <div className="simple-home-page mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-6 sm:gap-7 sm:py-8">
-      <header className="welcome-strip">
-        <p className="text-2xl font-semibold tracking-tight text-foreground sm:text-[1.75rem] sm:leading-tight">
-          {greeting}, {name}
-        </p>
-        <p className="mt-1.5 text-sm text-ink-muted">What would you like to do?</p>
-      </header>
+      <GideonWelcome />
 
       <div
         className="grid gap-3 welcome-strip sm:grid-cols-3"
@@ -190,36 +166,6 @@ export default function SimpleHomeScreen() {
           </span>
         </span>
       </Link>
-
-      <form
-        onSubmit={handleAskSubmit}
-        className="simple-gideon-hero welcome-strip p-4 sm:p-5"
-        style={{ animationDelay: "0.1s" }}
-      >
-        <label htmlFor="home-ask-gideon" className="sr-only">
-          Ask Gideon
-        </label>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
-          <input
-            id="home-ask-gideon"
-            type="text"
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            placeholder="Ask Gideon anything across your spaces…"
-            className="min-w-0 flex-1 rounded-xl border border-border-subtle bg-white px-4 py-3 text-sm text-foreground shadow-sm placeholder:text-ink-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/25"
-          />
-          <button
-            type="submit"
-            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-brand px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-dark"
-          >
-            <MessageCircle className="h-4 w-4" />
-            Ask
-          </button>
-        </div>
-        <p className="mt-2 text-xs text-ink-muted">
-          Searching everything you have access to — no space selection needed.
-        </p>
-      </form>
 
       {data.recentActivity.length > 0 ? (
         <Section title="Recent activity">

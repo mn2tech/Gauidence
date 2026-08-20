@@ -29,9 +29,19 @@ export function simpleHomeProfileCategory(
 
 export function timeOfDayGreeting(date = new Date()): string {
   const hour = date.getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 17) return "Good afternoon";
-  return "Good evening";
+  if (hour >= 5 && hour < 12) return "Good morning";
+  if (hour >= 12 && hour < 17) return "Good afternoon";
+  if (hour >= 17) return "Good evening";
+  return "You're up late";
+}
+
+/** First name for greetings, or null when unavailable. */
+export function greetingFirstName(
+  accountName: string,
+  activeDisplayName?: string | null
+): string | null {
+  const name = greetingName(accountName, activeDisplayName);
+  return name === "there" ? null : name;
 }
 
 export function greetingName(
