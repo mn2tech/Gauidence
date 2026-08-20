@@ -186,13 +186,55 @@ function pickEvidenceSnippets(entity360: Entity360, limit = 4): string[] {
   return snippets;
 }
 
+function isTopicLikeEntityName(name: string): boolean {
+  const n = name.trim();
+  if (!n) return true;
+  // Concepts extracted from disclosures — not standalone documents or work items.
+  return (
+    /\b(fee structure|asset-?based|compensation model|discretionary (management|authority)|portfolio management|financial planning|retirement planning|investment recommendations?)\b/i.test(
+      n
+    ) && !looksLikeReferencedSourceTitle(n)
+  );
+}
+
 function isLikelyDocumentEntity(item: {
   name: string;
   type: string;
   summary?: string | null;
 }): boolean {
-  if (/^(document|policy|procedure|file)$/i.test(item.type)) return true;
-  return /\b(form\s+(adv|crs)|part\s+2a|handbook|policy|agreement|brochure)\b/i.test(
+  if (isTopicLikeEntityName(item.name)) return false;
+  if (/^(document|policy|procedure|file)$/i.test(item.type)) {
+    return looksLikeReferencedSourceTitle(item.name);
+  }
+  return looksLikeReferencedSourceTitle(`${item.name} ${item.summary ?? ""}`);
+}
+
+function looksLikeReferencedSourceTitle(name: string): boolean {
+  const n = name.trim();
+  if (!n || n.length < 4) return false;
+  if (
+    /\b(fee structure|asset-?based|compensation|discretionary|portfolio management|financial planning|retirement planning)\b/i.test(
+      n
+    ) &&
+    !/\b(form|policy|handbook|agreement|brochure|schedule|part\s+2)\b/i.test(n)
+  ) {
+    return false;
+  }
+  return (
+    /\b(form\s+(adv|crs)|part\s+2a|handbook|polic(?:y|ies)|procedure|agreement|brochure|disclosure|schedule A|exhibit)\b/i.test(
+      n
+    ) || /\.(pdf|docx?|txt)$/i.test(n)
+  );
+}
+
+function isRealWorkAssessment(item: {
+  name: string;
+  type: string;
+  summary?: string | null;
+}): boolean {
+  if (isTopicLikeEntityName(item.name)) return false;
+  if (isLikelyDocumentEntity(item)) return true;
+  return /\b(assessment|audit|review|diagnostic|remediation)\b/i.test(
     `${item.name} ${item.summary ?? ""}`
   );
 }
@@ -279,13 +321,14 @@ export function formatEntity360UserAnswer(entity360: Entity360): string {
     parts.push("");
   }
 
-  const availableAssessments = entity360.assessments.filter((a) => {
+  const workAssessments = entity360.assessments.filter(isRealWorkAssessment);
+  const availableAssessments = workAssessments.filter((a) => {
     if (!isLikelyDocumentEntity(a)) return true;
     return availableDocs.some((label) =>
       label.toLowerCase().includes(a.name.toLowerCase().slice(0, 12))
     );
   });
-  const mentionedOnlyDocs = entity360.assessments.filter(
+  const mentionedOnlyDocs = workAssessments.filter(
     (a) => !availableAssessments.includes(a) && isLikelyDocumentEntity(a)
   );
 
@@ -349,19 +392,41 @@ export function formatEntity360UserAnswer(entity360: Entity360): string {
     availableDocumentLabels: availableDocs,
   });
   for (const doc of mentionedOnlyDocs) {
-    if (!unavailableRefs.some((u) => u.toLowerCase().includes(doc.name.toLowerCase().slice(0, 10)))) {
+    if (
+      !unavailableRefs.some((u) =>
+        u.toLowerCase().includes(doc.name.toLowerCase().slice(0, 10))
+      )
+    ) {
       unavailableRefs.push(doc.name);
     }
   }
 
-  const gapLines: string[] = [...entity360.gaps.slice(0, 3)];
+  const gapLines: string[] = [];
+  const seenGaps = new Set<string>();
+  const pushGap = (line: string) => {
+    const key = line.toLowerCase().replace(/\s+/g, " ").trim();
+    if (!key || seenGaps.has(key)) return;
+    seenGaps.add(key);
+    gapLines.push(line);
+  };
+
+  for (const g of entity360.gaps) {
+    // Drop legacy CRM absence gaps if any remain in stored/older payloads.
+    if (
+      /proposals linked|active project linked|contact people were found/i.test(g)
+    ) {
+      continue;
+    }
+    pushGap(g);
+  }
   for (const ref of unavailableRefs.slice(0, 3)) {
-    gapLines.push(
+    pushGap(
       `Available sources reference ${ref}, but that document does not appear to be available in this Space.`
     );
   }
+  // Only mention missing projects when this entity actually has proposals.
   if (entity360.proposals.length && !entity360.projects.length) {
-    gapLines.push(
+    pushGap(
       "Guardian does not currently show an active linked project for open proposals."
     );
   }

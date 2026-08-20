@@ -115,8 +115,64 @@ describe("formatEntity360UserAnswer evidence boundaries", () => {
     assert.match(text, /Kendall Capital/i);
     assert.match(text, /financial planning/i);
     assert.match(text, /Missing information|not (currently )?available|reference/i);
+    assert.match(text, /Form ADV Part 2A/i);
     assert.doesNotMatch(text, /Guardian contains Form ADV/i);
     assert.doesNotMatch(text, /—\[SERVES\]→/);
     assert.doesNotMatch(text, /^Relationship$/m);
+    assert.doesNotMatch(text, /proposals linked|active project linked|contact people/i);
+  });
+
+  it("does not treat fee topics or CRM absences as missing documents", () => {
+    const entity360: Entity360 = {
+      entity: {
+        id: "1",
+        name: "Kendall Capital Management, Inc.",
+        type: "organization",
+        aliases: [],
+        description: "Fee-only advisory firm.",
+        domain: null,
+        confidence: 0.9,
+      },
+      relationships: [],
+      people: [],
+      proposals: [],
+      projects: [],
+      contracts: [],
+      assessments: [
+        {
+          id: "d3",
+          name: "Asset-Based Fee Structure",
+          type: "document",
+          summary: "Fees vary by account value",
+        },
+      ],
+      commitments: [],
+      risks: [],
+      recentActivity: [],
+      evidence: [
+        {
+          id: "e1",
+          text: "We charge an asset-based fee. See Form ADV Part 2A for details.",
+          documentName: "2025 Form CRS.pdf",
+          documentId: "doc-crs",
+          sourceType: "document",
+        },
+      ],
+      gaps: [
+        "Guardian currently shows no matching proposals linked to this entity by client name.",
+        "I could not find an active project linked to this entity in the ontology.",
+        "Available sources reference Form ADV Part 2A, but that document does not appear to be available in this Space.",
+      ],
+    };
+    const text = formatEntity360UserAnswer(entity360);
+    assert.match(text, /Form ADV Part 2A/i);
+    assert.doesNotMatch(text, /Asset-Based Fee Structure/i);
+    assert.doesNotMatch(text, /proposals linked/i);
+    assert.doesNotMatch(text, /active project linked/i);
+    // Fee concept may appear in evidence prose, but not as a missing document.
+    assert.doesNotMatch(
+      text,
+      /Available sources reference Asset-Based Fee Structure/i
+    );
   });
 });

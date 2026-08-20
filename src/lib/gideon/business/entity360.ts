@@ -540,24 +540,13 @@ export async function buildEntity360(
     availableDocumentLabels: availableDocLabels,
   });
 
+  // Only surface real referenced-source gaps — never CRM absences
+  // (missing proposals/projects/contacts) as if they were knowledge gaps.
   const gaps: string[] = [];
   for (const ref of mentionedUnavailable.slice(0, 3)) {
     gaps.push(
       `Available sources reference ${ref}, but that document does not appear to be available in this Space.`
     );
-  }
-  if (!proposals.length) {
-    gaps.push(
-      "Guardian currently shows no matching proposals linked to this entity by client name."
-    );
-  }
-  if (!projects.length) {
-    gaps.push(
-      "I could not find an active project linked to this entity in the ontology."
-    );
-  }
-  if (!people.length) {
-    gaps.push("No contact people were found in Guardian for this entity yet.");
   }
 
   const entity360: Entity360 = {
