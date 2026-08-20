@@ -8,6 +8,7 @@ import {
   formatRelationshipProse,
   inferencePrefix,
 } from "@/lib/gideon/evidenceBoundaries";
+import { filterUnavailableGapsAgainstSpaceDocs } from "@/lib/gideon/documentGrounding";
 import type {
   AdvisoryInsight,
   BusinessQueryPlan,
@@ -156,12 +157,15 @@ function formatCommercialLine(
 }
 
 function availableDocumentLabelsFromEntity360(entity360: Entity360): string[] {
-  const labels: string[] = [];
+  const labels: string[] = [...(entity360.availableDocumentLabels ?? [])];
   for (const ev of entity360.evidence) {
     if (ev.documentId && ev.documentName) labels.push(ev.documentName);
     else if (ev.documentId && ev.text) labels.push(ev.text.slice(0, 80));
   }
-  return labels;
+  for (const a of entity360.assessments) {
+    if (looksLikeReferencedSourceTitle(a.name)) labels.push(a.name);
+  }
+  return [...new Set(labels.filter(Boolean))];
 }
 
 function evidenceCorpus(entity360: Entity360): string[] {
@@ -424,6 +428,13 @@ export function formatEntity360UserAnswer(entity360: Entity360): string {
       `Available sources reference ${ref}, but that document does not appear to be available in this Space.`
     );
   }
+  // Re-check against Space inventory — uploaded Form ADV must not stay "missing".
+  const cleanedGaps = filterUnavailableGapsAgainstSpaceDocs(
+    gapLines,
+    availableDocs
+  );
+  gapLines.length = 0;
+  gapLines.push(...cleanedGaps);
   // Only mention missing projects when this entity actually has proposals.
   if (entity360.proposals.length && !entity360.projects.length) {
     pushGap(
@@ -436,10 +447,18 @@ export function formatEntity360UserAnswer(entity360: Entity360): string {
     for (const g of gapLines.slice(0, 4)) {
       parts.push(`• ${g}`);
     }
-    if (unavailableRefs[0]) {
-      parts.push(
-        `Adding ${unavailableRefs[0]} would let Guardian answer more detailed questions from that source.`
+    const firstMissingRef = gapLines.find((g) =>
+      /Available sources reference/i.test(g)
+    );
+    if (firstMissingRef) {
+      const m = firstMissingRef.match(
+        /Available sources reference (.+?), but that document/i
       );
+      if (m?.[1]) {
+        parts.push(
+          `Adding ${m[1].trim()} would let Guardian answer more detailed questions from that source.`
+        );
+      }
     }
     parts.push("");
   }

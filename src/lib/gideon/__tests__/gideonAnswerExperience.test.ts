@@ -122,6 +122,49 @@ describe("formatEntity360UserAnswer evidence boundaries", () => {
     assert.doesNotMatch(text, /proposals linked|active project linked|contact people/i);
   });
 
+  it("does not claim Form ADV is missing when the Space already has it", () => {
+    const entity360: Entity360 = {
+      entity: {
+        id: "1",
+        name: "Kendall Capital Management, Inc.",
+        type: "organization",
+        aliases: ["Kendall Capital"],
+        description: "SEC-registered investment adviser.",
+        domain: null,
+        confidence: 0.9,
+      },
+      relationships: [],
+      people: [],
+      proposals: [],
+      projects: [],
+      contracts: [],
+      assessments: [],
+      commitments: [],
+      risks: [],
+      recentActivity: [],
+      evidence: [
+        {
+          id: "e1",
+          text: "Please see Form ADV Part 2A for additional information about fees.",
+          documentName: "2025 Form CRS.pdf",
+          documentId: "doc-crs",
+          sourceType: "document",
+        },
+      ],
+      gaps: [
+        "Available sources reference Form ADV Part 2A, but that document does not appear to be available in this Space.",
+      ],
+      availableDocumentLabels: [
+        "2025 Form CRS.pdf",
+        "Form ADV Part 2A - Firm Disclosure Brochure - Kendall Capital Management, Inc..pdf",
+        "1026427.pdf",
+      ],
+    };
+    const text = formatEntity360UserAnswer(entity360);
+    assert.doesNotMatch(text, /does not appear to be available/i);
+    assert.doesNotMatch(text, /Adding Form ADV/i);
+  });
+
   it("does not treat fee topics or CRM absences as missing documents", () => {
     const entity360: Entity360 = {
       entity: {

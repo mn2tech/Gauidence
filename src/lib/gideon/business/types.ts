@@ -152,6 +152,8 @@ export type Entity360 = {
   recentActivity: Entity360Item[];
   evidence: Entity360Evidence[];
   gaps: string[];
+  /** Space file names / titles that count as AVAILABLE for gap checks. */
+  availableDocumentLabels?: string[];
 };
 
 export type ProposalFollowUpCandidate = {

@@ -9,11 +9,16 @@ import { wantsSongOrChartList } from "@/lib/vault/askInventory";
 import { mergePinnedChunks } from "@/lib/vault/retrieve";
 import { embedQuery } from "@/lib/vault/embeddings";
 import { hybridRetrieveVaultChunks } from "@/lib/vault/hybridRetrieval";
+import { loadRegulatoryDisclosureChunks } from "@/lib/vault/pinDisclosureChunks";
 import { getEmbeddingCacheStats } from "@/lib/vault/embeddingCache";
 import {
   hashQueryForDiagnostics,
   logRetrievalDiagnostics,
 } from "@/lib/vault/retrievalDiagnostics";
+import {
+  expandDocumentContentRetrievalQuery,
+  isDocumentContentQuestion,
+} from "@/lib/gideon/documentGrounding";
 import { isKnowledgeEngineV2Enabled } from "@/lib/features/knowledge-engine-v2";
 import { isGuardianOntologyEnabled } from "@/lib/features/ontology";
 import { retrieveStructuredKnowledge } from "@/lib/knowledge/v2/retrieve";
@@ -184,9 +189,12 @@ export async function loadWorkspaceContext(
     (packEngineOn || ontologyOn)
       ? planBusinessQuery(question)
       : null;
+  const forceDocumentSearch = isDocumentContentQuestion(question);
   const runDocumentSearch =
     load.documents &&
-    (!businessPlan || biPlanRequiresDocumentSearch(businessPlan));
+    (forceDocumentSearch ||
+      !businessPlan ||
+      biPlanRequiresDocumentSearch(businessPlan));
 
   const scopeCandidates = meta.accessibleProfiles.map((p) => ({
     id: p.id,
@@ -224,10 +232,14 @@ export async function loadWorkspaceContext(
   let mergedCandidateCount = 0;
   let knowledgeCandidateCount = 0;
 
+  const documentRetrievalQuery = expandDocumentContentRetrievalQuery(
+    retrievalQuestion
+  );
+
   const embeddingStarted = Date.now();
   const queryEmbedding =
     runDocumentSearch && chunkCount > 0 && !songListOnly
-      ? await embedQuery(retrievalQuestion).catch((embedErr) => {
+      ? await embedQuery(documentRetrievalQuery).catch((embedErr) => {
           console.warn(
             "Vault chat embedding failed; continuing without document search:",
             embedErr instanceof Error ? embedErr.message : "error"
@@ -251,7 +263,7 @@ export async function loadWorkspaceContext(
     const retrievalStarted = Date.now();
     const hybrid = await hybridRetrieveVaultChunks({
       supabase,
-      query: retrievalQuestion,
+      query: documentRetrievalQuery,
       queryEmbedding,
       scopes: rollupScopes,
       finalTopK: matchCount,
@@ -263,7 +275,19 @@ export async function loadWorkspaceContext(
     retrievedChunks = hybrid.results;
   }
 
-  const chunks = mergePinnedChunks(attachedDoc?.chunks ?? [], retrievedChunks);
+  const disclosurePins =
+    runDocumentSearch && !songListOnly
+      ? await loadRegulatoryDisclosureChunks(supabase, {
+          question,
+          profileIds: effectiveSearchIds,
+          limit: 6,
+        })
+      : [];
+
+  const chunks = mergePinnedChunks(
+    [...(attachedDoc?.chunks ?? []), ...disclosurePins],
+    retrievedChunks
+  );
   const formatted = formatRetrievalContext(chunks, {
     maxChunkChars: transcriptionMode ? 4000 : undefined,
   });
@@ -656,13 +680,17 @@ Active space in the UI: ${activeProfile.display_name}. Document search includes 
     }
   }
 
+  const suppressRawDocsForBi =
+    Boolean(businessPlan) &&
+    !biPlanRequiresDocumentSearch(businessPlan!) &&
+    !forceDocumentSearch;
+
   const context: WorkspaceContextData = {
     ...meta,
     blocks: {
-      excerpts:
-        businessPlan && !biPlanRequiresDocumentSearch(businessPlan)
-          ? "(none — use BUSINESS INTELLIGENCE; do not invent a raw fact list from documents)"
-          : formatted.context.trim() || "(none)",
+      excerpts: suppressRawDocsForBi
+        ? "(none — use BUSINESS INTELLIGENCE; do not invent a raw fact list from documents)"
+        : formatted.context.trim() || "(none)",
       fileInventory: fileInventoryContext,
       attachedDocument: attachedContext.trim() || "(none)",
       dailyLogs: logContext.trim() || "(none)",
@@ -674,10 +702,9 @@ Active space in the UI: ${activeProfile.display_name}. Document search includes 
       workMemory:
         workMemoryContext.trim() ||
         "(none — user has no active work projects)",
-      structuredKnowledge:
-        businessPlan && !biPlanRequiresDocumentSearch(businessPlan)
-          ? "(none — use BUSINESS INTELLIGENCE)"
-          : structuredKnowledgeContext,
+      structuredKnowledge: suppressRawDocsForBi
+        ? "(none — use BUSINESS INTELLIGENCE)"
+        : structuredKnowledgeContext,
       ontology:
         businessPlan?.intent === "ENTITY_360" ||
         businessPlan?.intent === "RELATIONSHIP_QUERY" ||
@@ -734,12 +761,15 @@ Active space in the UI: ${activeProfile.display_name}. Document search includes 
 
   return {
     context,
-    chunks:
-      businessPlan && !biPlanRequiresDocumentSearch(businessPlan) ? [] : chunks,
+    chunks: suppressRawDocsForBi ? [] : chunks,
     explicitSpaceName: explicitSpace?.display_name ?? null,
     connectorCitations,
     youtubeUrls: ontologyBundle.youtubeUrls ?? [],
     businessClaims: businessIntelligenceBundle?.claims,
-    businessAnswerDraft: businessIntelligenceBundle?.userAnswerDraft ?? null,
+    // Fee / ADV / CRS questions must use document excerpts + LLM, not a BI draft
+    // that may still claim Form ADV is missing after it was uploaded.
+    businessAnswerDraft: forceDocumentSearch
+      ? null
+      : (businessIntelligenceBundle?.userAnswerDraft ?? null),
   };
 }

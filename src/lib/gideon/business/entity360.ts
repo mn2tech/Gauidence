@@ -525,9 +525,23 @@ export async function buildEntity360(
       sourceType: ev.source_type,
     }));
 
-  const availableDocLabels = evidence
-    .map((ev) => ev.documentName)
-    .filter((n): n is string => Boolean(n?.trim()));
+  // Space uploads count as AVAILABLE even when ontology evidence still cites
+  // an older source (e.g. CRS mentions Form ADV after ADV was uploaded).
+  const { data: spaceDocRows } = await supabase
+    .from("documents")
+    .select("file_name")
+    .in("profile_id", args.spaceIds)
+    .limit(100);
+  const spaceDocLabels = (spaceDocRows ?? [])
+    .map((row) => String(row.file_name ?? "").trim())
+    .filter(Boolean);
+
+  const availableDocLabels = [
+    ...evidence
+      .map((ev) => ev.documentName)
+      .filter((n): n is string => Boolean(n?.trim())),
+    ...spaceDocLabels,
+  ];
 
   const evidenceTexts = [
     resolved.entity.description ?? "",
@@ -581,6 +595,7 @@ export async function buildEntity360(
       })),
     evidence,
     gaps,
+    availableDocumentLabels: availableDocLabels,
   };
 
   const claims: GideonClaim[] = [];
