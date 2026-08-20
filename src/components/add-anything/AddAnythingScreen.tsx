@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   Camera,
   FileText,
+  Globe,
   Mail,
   Mic,
   Plus,
@@ -79,12 +80,19 @@ export default function AddAnythingScreen() {
   const stagingProfileIdRef = useRef<string | null>(null);
   const pastePanelRef = useRef<HTMLFormElement>(null);
   const pasteTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const websitePanelRef = useRef<HTMLFormElement>(null);
+  const websiteInputRef = useRef<HTMLInputElement>(null);
   const [stage, setStage] = useState<Stage>("input");
   const [status, setStatus] = useState("");
   const [processingSlow, setProcessingSlow] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pasteText, setPasteText] = useState("");
   const [showPaste, setShowPaste] = useState(false);
+  const [websiteUrl, setWebsiteUrl] = useState("");
+  const [showWebsite, setShowWebsite] = useState(false);
+  const [websiteImportCount, setWebsiteImportCount] = useState<number | null>(
+    null
+  );
   const [presentation, setPresentation] = useState<
     ReturnType<typeof buildSmartUploadPresentation>
   >(null);
@@ -162,6 +170,18 @@ export default function AddAnythingScreen() {
     });
     return () => window.cancelAnimationFrame(frame);
   }, [showPaste]);
+
+  useEffect(() => {
+    if (!showWebsite) return;
+    const frame = window.requestAnimationFrame(() => {
+      websitePanelRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+      websiteInputRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [showWebsite]);
 
   useEffect(() => {
     if (!snapshot || stage !== "processing") return;
@@ -279,6 +299,56 @@ export default function AddAnythingScreen() {
     await processFile(file);
   }
 
+  async function handleWebsiteSubmit() {
+    const trimmed = websiteUrl.trim();
+    if (!trimmed) return;
+    if (!profile) {
+      setError("Set up a space before importing a website.");
+      return;
+    }
+    setError(null);
+    setShowWebsite(false);
+    setWebsiteImportCount(null);
+    setStage("processing");
+    setStatus("Fetching website pages…");
+
+    try {
+      const res = await fetch("/api/documents/import-website", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: trimmed,
+          profileId: profile.id,
+        }),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        documentCount?: number;
+        documents?: { documentId: string; fileName: string }[];
+        warnings?: string[];
+      };
+      if (!res.ok) {
+        throw new Error(body.error || "Couldn't import that website.");
+      }
+      const count = body.documentCount ?? body.documents?.length ?? 0;
+      setWebsiteImportCount(count);
+      setWebsiteUrl("");
+      void kickDocumentProcessingJobs(5);
+      setSavedProfileId(profile.id);
+      stagingProfileIdRef.current = null;
+      setStatus(
+        count === 1
+          ? "Imported 1 page. Guardian is analyzing it…"
+          : `Imported ${count} pages. Guardian is analyzing them…`
+      );
+      setStage("done");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Website import failed.");
+      setStage("input");
+      setShowWebsite(true);
+    }
+  }
+
   function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -304,7 +374,7 @@ export default function AddAnythingScreen() {
           Add Anything
         </h1>
         <p className="mt-1.5 text-sm text-ink-muted">
-          Upload, paste, or capture — Guardian will organize it for you.
+          Upload, paste, import a website, or capture — Guardian will organize it for you.
         </p>
       </header>
 
@@ -337,7 +407,10 @@ export default function AddAnythingScreen() {
             </button>
             <button
               type="button"
-              onClick={() => setShowPaste(true)}
+              onClick={() => {
+                setShowWebsite(false);
+                setShowPaste(true);
+              }}
               aria-expanded={showPaste}
               className={`simple-home-card flex flex-col items-start gap-3 p-5 text-left transition hover:border-brand/40 hover:shadow-card ${
                 showPaste ? "border-brand/50 ring-2 ring-brand/20" : ""
@@ -350,6 +423,27 @@ export default function AddAnythingScreen() {
                 <span className="block text-sm font-semibold">Paste text</span>
                 <span className="mt-0.5 block text-xs text-ink-muted">
                   Notes, receipts, or copied content
+                </span>
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowPaste(false);
+                setShowWebsite(true);
+              }}
+              aria-expanded={showWebsite}
+              className={`simple-home-card flex flex-col items-start gap-3 p-5 text-left transition hover:border-brand/40 hover:shadow-card ${
+                showWebsite ? "border-brand/50 ring-2 ring-brand/20" : ""
+              }`}
+            >
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-light text-brand">
+                <Globe className="h-5 w-5" />
+              </span>
+              <span>
+                <span className="block text-sm font-semibold">Import website</span>
+                <span className="mt-0.5 block text-xs text-ink-muted">
+                  Pull public pages into {profile?.display_name ?? "this Space"}
                 </span>
               </span>
             </button>
@@ -413,6 +507,54 @@ export default function AddAnythingScreen() {
             </form>
           ) : null}
 
+          {showWebsite ? (
+            <form
+              ref={websitePanelRef}
+              className="simple-home-card scroll-mt-24 space-y-3 p-5"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void handleWebsiteSubmit();
+              }}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <label htmlFor="website-url" className="text-sm font-semibold">
+                  Website URL
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowWebsite(false)}
+                  className="text-xs font-medium text-ink-muted hover:text-foreground"
+                >
+                  Close
+                </button>
+              </div>
+              <p className="text-xs text-ink-muted">
+                Guardian fetches public pages from this site (up to 8) and saves
+                them in {profile?.display_name ?? "your Space"} so Ask Gideon can
+                use them as sources. Only import sites you own or have permission
+                to use.
+              </p>
+              <input
+                ref={websiteInputRef}
+                id="website-url"
+                type="url"
+                inputMode="url"
+                autoComplete="url"
+                value={websiteUrl}
+                onChange={(e) => setWebsiteUrl(e.target.value)}
+                placeholder="https://kendallcapital.com"
+                className="w-full rounded-xl border border-border-subtle px-4 py-3 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/25"
+              />
+              <button
+                type="submit"
+                disabled={!websiteUrl.trim()}
+                className="rounded-xl bg-brand px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50"
+              >
+                Import website
+              </button>
+            </form>
+          ) : null}
+
           <div className="grid gap-3 sm:grid-cols-2">
             {(
               [
@@ -465,9 +607,20 @@ export default function AddAnythingScreen() {
             </p>
           </div>
           <ul className="text-left text-xs text-ink-muted">
-            <li>Extracting document type</li>
-            <li>Identifying people and entities</li>
-            <li>Matching to your spaces</li>
+            {status.toLowerCase().includes("website") ||
+            status.toLowerCase().includes("fetching") ? (
+              <>
+                <li>Loading public pages</li>
+                <li>Extracting readable text</li>
+                <li>Saving pages into your Space</li>
+              </>
+            ) : (
+              <>
+                <li>Extracting document type</li>
+                <li>Identifying people and entities</li>
+                <li>Matching to your spaces</li>
+              </>
+            )}
           </ul>
           {snapshot?.processingTrace ? (
             <ProcessingTracePanel trace={snapshot.processingTrace} compact />
@@ -547,8 +700,11 @@ export default function AddAnythingScreen() {
         <div className="simple-home-card space-y-4 p-6 text-center">
           <p className="text-lg font-semibold text-foreground">Saved!</p>
           <p className="text-sm text-ink-muted">
-            Guardian saved your content. Search indexing may finish in the
-            background.
+            {websiteImportCount != null
+              ? websiteImportCount === 1
+                ? "Imported 1 website page into this Space. Ask Gideon can use it once analysis finishes."
+                : `Imported ${websiteImportCount} website pages into this Space. Ask Gideon can use them once analysis finishes.`
+              : "Guardian saved your content. Search indexing may finish in the background."}
           </p>
           <div className="flex flex-wrap justify-center gap-2">
             {savedProfileId ? (
@@ -560,7 +716,11 @@ export default function AddAnythingScreen() {
               </Link>
             ) : null}
             <Link
-              href={ASK_GIDEON_PATH}
+              href={
+                savedProfileId
+                  ? `${ASK_GIDEON_PATH}?profileId=${encodeURIComponent(savedProfileId)}`
+                  : ASK_GIDEON_PATH
+              }
               className="rounded-xl border border-stone-200 px-5 py-2.5 text-sm font-semibold hover:bg-stone-50"
             >
               Ask Gideon
@@ -571,6 +731,8 @@ export default function AddAnythingScreen() {
                 setStage("input");
                 setPresentation(null);
                 setPasteText("");
+                setWebsiteUrl("");
+                setWebsiteImportCount(null);
                 setProcessingDocId(null);
               }}
               className="rounded-xl border border-stone-200 px-5 py-2.5 text-sm font-semibold hover:bg-stone-50"
