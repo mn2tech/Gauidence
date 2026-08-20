@@ -75,10 +75,9 @@ describe("shared vault helpers", () => {
     }
   });
 
-  it("blocks sharing on containers and private vault types", () => {
+  it("blocks sharing on personal and family container vault types", () => {
     const blocked = [
       "personal",
-      "business",
       "family",
       "vehicles",
       "hobby",
@@ -91,7 +90,14 @@ describe("shared vault helpers", () => {
         profileType
       );
     }
-    assert.equal(canManageProfileAccess(sample()), false);
+    assert.equal(
+      canShareGuardianProfile(sample({ profile_type: "business" })),
+      true
+    );
+    assert.equal(
+      canManageProfileAccess(sample({ profile_type: "business" })),
+      true
+    );
     assert.equal(
       canShareGuardianProfile(sample({ profile_type: "personal" })),
       false

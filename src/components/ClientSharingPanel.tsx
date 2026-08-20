@@ -15,9 +15,15 @@ type DocRow = {
 type Props = {
   profileId: string;
   vaultName?: string;
+  /** Override heading — business Spaces use "viewers" not "clients". */
+  audienceLabel?: "clients" | "viewers";
 };
 
-export default function ClientSharingPanel({ profileId, vaultName }: Props) {
+export default function ClientSharingPanel({
+  profileId,
+  vaultName,
+  audienceLabel = "clients",
+}: Props) {
   const [documents, setDocuments] = useState<DocRow[]>([]);
   const [viewerCount, setViewerCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -114,14 +120,15 @@ export default function ClientSharingPanel({ profileId, vaultName }: Props) {
           <Shield className="h-4 w-4" />
         </span>
         <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-semibold">What clients can see</h2>
+          <h2 className="text-sm font-semibold">
+            What {audienceLabel} can see
+          </h2>
           <p className="mt-1 text-xs leading-relaxed text-ink-muted">
             {vaultName ? (
               <>
                 Viewers invited to <strong>{vaultName}</strong> only see documents
-                you mark as shared. Your parent company vault and other client
-                vaults stay private. Internal notes and Daily Logs are never
-                visible to viewers.
+                you mark as shared. Other Spaces stay private. Internal notes and
+                Daily Logs are never visible to viewers.
               </>
             ) : (
               <>
@@ -162,7 +169,7 @@ export default function ClientSharingPanel({ profileId, vaultName }: Props) {
             onClick={() => void setAll(false)}
             className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium hover:bg-stone-50 disabled:opacity-50"
           >
-            Hide all from clients
+                Hide all from {audienceLabel}
           </button>
         </div>
       ) : null}

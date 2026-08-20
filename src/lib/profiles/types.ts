@@ -327,8 +327,10 @@ export function effectiveClientStatus(
 export const ACTIVE_CLIENTS_GROUP_LABEL = "Active clients";
 export const INACTIVE_CLIENTS_GROUP_LABEL = "Inactive clients";
 
-/** Leaf vault types that can invite Editor collaborators (exact vault only). */
+/** Spaces that can invite Editor/Viewer collaborators (exact Space only). */
 export const SHAREABLE_PROFILE_TYPES = [
+  "business",
+  "non_profit",
   "client",
   "employee",
   "vehicle",

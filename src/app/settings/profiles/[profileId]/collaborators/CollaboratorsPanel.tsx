@@ -248,14 +248,33 @@ export default function CollaboratorsPanel({
           <p className="mt-1 text-sm text-ink-muted">
             Invite people to the{" "}
             <span className="font-medium text-foreground">
-              {profileTypeLabel(vaultKind).toLowerCase()} vault
+              {profileTypeLabel(vaultKind).toLowerCase()} Space
             </span>{" "}
             <span className="font-medium text-foreground">{vaultName}</span>.
-            Choose view or edit access. Invite clients as{" "}
-            <strong>View</strong> (read-only). Editors can add documents and
-            Daily Logs. Use <strong>What clients can see</strong> below to
-            choose which files viewers can access — other documents stay
-            internal. Parent business vaults and other clients are not shared.
+            {vaultKind === "client" ? (
+              <>
+                {" "}
+                Invite clients as <strong>View</strong> (read-only). Editors can
+                add documents and Daily Logs. Use{" "}
+                <strong>What clients can see</strong> below to choose which files
+                viewers can access — other documents stay internal. Sibling
+                Spaces are not shared.
+              </>
+            ) : vaultKind === "business" || vaultKind === "non_profit" ? (
+              <>
+                {" "}
+                For a stakeholder demo, invite as <strong>Edit</strong> so they
+                can open Files and Ask Gideon across this Space&apos;s documents.
+                Viewers only see documents marked shared below. Nested client
+                Spaces are not included unless invited separately.
+              </>
+            ) : (
+              <>
+                {" "}
+                Choose view or edit access. Editors can add documents and Daily
+                Logs. Viewers only see documents you mark as shared below.
+              </>
+            )}
           </p>
         </div>
         <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-light text-brand">
@@ -424,7 +443,15 @@ export default function CollaboratorsPanel({
         </section>
       ) : null}
 
-      <ClientSharingPanel profileId={profileId} vaultName={vaultName} />
+      {vaultKind === "client" ? (
+        <ClientSharingPanel profileId={profileId} vaultName={vaultName} />
+      ) : vaultKind === "business" || vaultKind === "non_profit" ? (
+        <ClientSharingPanel
+          profileId={profileId}
+          vaultName={vaultName}
+          audienceLabel="viewers"
+        />
+      ) : null}
 
       <button
         type="button"

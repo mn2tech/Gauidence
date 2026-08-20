@@ -452,6 +452,21 @@ export default function SimpleVaultsScreen() {
                 </div>
               ) : null}
 
+              {!organizeMode && canManageProfileAccess(space) ? (
+                <div className="border-t border-border-subtle px-4 py-2.5">
+                  <Link
+                    href={`/settings/profiles/${space.id}/collaborators`}
+                    className="inline-flex w-full items-center justify-between gap-2 rounded-lg px-1 py-1 text-left text-sm font-medium text-foreground transition hover:bg-stone-50"
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      <Users className="h-3.5 w-3.5 text-ink-muted" aria-hidden />
+                      Invite people to this Space
+                    </span>
+                    <ChevronRight className="h-3.5 w-3.5 text-ink-muted" aria-hidden />
+                  </Link>
+                </div>
+              ) : null}
+
               {expanded && nestedChildren.length > 0 ? (
                 <ul className="border-t border-border-subtle px-2 pb-2">
                   {nestedChildren.map((child) => {
