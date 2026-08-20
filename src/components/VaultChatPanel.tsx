@@ -987,7 +987,7 @@ export default function VaultChatPanel({
   const skipResumeOnBootstrapRef = useRef(false);
   const deepLinkChatConsumed = useRef<string | null>(null);
   const requestedChatIdRef = useRef<string | null>(requestedChatId);
-  const draftAppliedRef = useRef(false);
+  const draftAppliedRef = useRef<string | false>(false);
   useEffect(() => {
     if (requestedChatId) requestedChatIdRef.current = requestedChatId;
   }, [requestedChatId]);
@@ -1015,11 +1015,6 @@ export default function VaultChatPanel({
       return fromMessages;
     });
   }, [messages, timeZone]);
-  useEffect(() => {
-    if (draftAppliedRef.current || !requestedDraft?.trim() || isScopedPanel) return;
-    draftAppliedRef.current = true;
-    setInput(requestedDraft.trim());
-  }, [requestedDraft, isScopedPanel]);
   useEffect(() => {
     const seen = readGideonWelcomeSeen();
     if (seen) {
@@ -1105,8 +1100,10 @@ export default function VaultChatPanel({
       if (typeof window === "undefined") return;
       const params = new URLSearchParams(window.location.search);
       params.delete("chatId");
-      params.delete("profileId");
+      // Keep profileId / draft from the landing URL so Space-scoped welcome chips
+      // (and pending auto-send drafts) are not wiped mid-bootstrap.
       if (chatId) params.set("chatId", chatId);
+      else params.delete("chatId");
       const qs = params.toString();
       const next = `${window.location.pathname}${qs ? `?${qs}` : ""}`;
       const current = `${window.location.pathname}${window.location.search}`;
@@ -1120,6 +1117,43 @@ export default function VaultChatPanel({
   );
   const syncAskUrlRef = useRef(syncAskUrl);
   syncAskUrlRef.current = syncAskUrl;
+
+  // Welcome / deep-link chips land on /ask?draft=…&profileId=… — auto-send once
+  // the target Space is active and history has finished loading.
+  useEffect(() => {
+    if (isScopedPanel) return;
+    const draft = requestedDraft?.trim();
+    if (!draft) {
+      draftAppliedRef.current = false;
+      return;
+    }
+    // Allow a new chip click (different draft) after a prior auto-send.
+    if (draftAppliedRef.current === draft) return;
+    if (profilesLoading || loadingHistory || sending || vaultBusy) return;
+    if (!profileId) return;
+    const urlProfile = readUrlProfileId();
+    if (urlProfile && active?.id !== urlProfile) return;
+
+    draftAppliedRef.current = draft;
+    setInput("");
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      params.delete("draft");
+      const qs = params.toString();
+      const next = `${window.location.pathname}${qs ? `?${qs}` : ""}`;
+      window.history.replaceState(window.history.state, "", next);
+    }
+    void sendQuestionRef.current(draft);
+  }, [
+    requestedDraft,
+    isScopedPanel,
+    profilesLoading,
+    loadingHistory,
+    sending,
+    vaultBusy,
+    profileId,
+    active?.id,
+  ]);
 
   const {
     listening: voiceListening,

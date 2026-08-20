@@ -6,6 +6,7 @@ import { useState } from "react";
 import GreetingHeader from "@/components/gideon-welcome/GreetingHeader";
 import SpaceStatus from "@/components/gideon-welcome/SpaceStatus";
 import SuggestedActions from "@/components/gideon-welcome/SuggestedActions";
+import { useActiveProfile } from "@/components/ProfileProvider";
 import { useGideonWelcomeData } from "@/hooks/useGideonWelcomeData";
 import { timeOfDayGreeting } from "@/lib/simple-home/helpers";
 import { ASK_GIDEON_PATH } from "@/lib/simple-home/routing";
@@ -18,6 +19,7 @@ export default function GideonWelcome({
   className?: string;
 }) {
   const router = useRouter();
+  const { active } = useActiveProfile();
   const { view, loading } = useGideonWelcomeData();
   const [question, setQuestion] = useState("");
   const greeting = timeOfDayGreeting();
@@ -37,10 +39,16 @@ export default function GideonWelcome({
     e.preventDefault();
     const trimmed = question.trim();
     if (trimmed) {
-      router.push(`${ASK_GIDEON_PATH}?draft=${encodeURIComponent(trimmed)}`);
+      const params = new URLSearchParams({ draft: trimmed });
+      if (active?.id) params.set("profileId", active.id);
+      router.push(`${ASK_GIDEON_PATH}?${params.toString()}`);
       return;
     }
-    router.push(ASK_GIDEON_PATH);
+    router.push(
+      active?.id
+        ? `${ASK_GIDEON_PATH}?profileId=${encodeURIComponent(active.id)}`
+        : ASK_GIDEON_PATH
+    );
   }
 
   const showActionPrompt =
