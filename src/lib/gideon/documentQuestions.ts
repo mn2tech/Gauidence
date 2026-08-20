@@ -1,6 +1,6 @@
 /**
  * Derive Ask Gideon starter questions from uploaded document metadata.
- * Prefer stored analysis questions; otherwise build from title/type/orgs/summary.
+ * Prefer content-grounded prompts over generic analysis leftovers.
  * No Space-specific hardcoding.
  */
 
@@ -18,9 +18,20 @@ export type DocumentQuestionHint = {
 const MAX_QUESTIONS = 4;
 const MAX_WORDS = 10;
 
+/** Generic chips that are rarely useful as Space welcome prompts. */
+const LOW_VALUE_QUESTION =
+  /\b(important dates|key details|who is mentioned|what is this document about)\b/i;
+
 function normalizeQuestion(q: string): string {
-  const cleaned = q.trim().replace(/\s+/g, " ").replace(/[?]+$/g, "?");
-  return cleaned.endsWith("?") ? cleaned : `${cleaned}?`;
+  const cleaned = q
+    .trim()
+    .replace(/\s+/g, " ")
+    // Fix "details.?" / "Management,?" style leftovers from stored analysis.
+    .replace(/[,:;.\-–—]+$/g, "")
+    .replace(/[?]+$/g, "")
+    .trim();
+  if (!cleaned) return "";
+  return `${cleaned}?`;
 }
 
 function wordCount(q: string): number {
@@ -30,6 +41,8 @@ function wordCount(q: string): number {
 function shortLabel(raw: string, maxWords = 4): string {
   const cleaned = raw
     .replace(/\.(pdf|docx?|txt|md)$/i, "")
+    .replace(/,?\s*(Inc|LLC|Ltd|Corp|Co|PLC)\.?$/i, "")
+    .replace(/[,:;.\-–—]+$/g, "")
     .replace(/\s+/g, " ")
     .trim();
   const parts = cleaned.split(/\s+/).filter(Boolean);
@@ -37,9 +50,17 @@ function shortLabel(raw: string, maxWords = 4): string {
   return parts.slice(0, maxWords).join(" ");
 }
 
+function isUsefulStoredQuestion(q: string): boolean {
+  const normalized = normalizeQuestion(q);
+  if (!normalized || wordCount(normalized) > MAX_WORDS) return false;
+  if (LOW_VALUE_QUESTION.test(normalized)) return false;
+  return true;
+}
+
 function pushUnique(out: string[], seen: Set<string>, candidate: string): void {
   const q = normalizeQuestion(candidate);
   if (!q || wordCount(q) > MAX_WORDS) return;
+  if (LOW_VALUE_QUESTION.test(q)) return;
   const key = q.toLowerCase();
   if (seen.has(key)) return;
   seen.add(key);
@@ -61,6 +82,7 @@ function blobFor(doc: DocumentQuestionHint): string {
 
 /**
  * Build up to 4 document-grounded Ask Gideon questions for a Space.
+ * Content themes first; stored analysis questions only when they are useful.
  */
 export function buildQuestionsFromDocuments(
   docs: DocumentQuestionHint[]
@@ -69,45 +91,35 @@ export function buildQuestionsFromDocuments(
 
   const out: string[] = [];
   const seen = new Set<string>();
+  const combined = docs.map(blobFor).join(" ");
 
-  // 1) Prefer questions already stored on analyzed documents
-  for (const doc of docs) {
-    for (const q of doc.suggestedQuestions ?? []) {
-      pushUnique(out, seen, q);
-      if (out.length >= MAX_QUESTIONS) return out;
-    }
-  }
-
-  // 2) Organization-centric ("what do we know about X")
+  // 1) Organization-centric — strongest for business Spaces
   const orgs = [
     ...new Set(
       docs
         .flatMap((d) => d.organizations ?? [])
-        .map((o) => o.trim())
+        .map((o) => shortLabel(o.trim(), 3))
         .filter((o) => o.length >= 2)
     ),
   ];
   for (const org of orgs.slice(0, 2)) {
-    const label = shortLabel(org, 3);
-    pushUnique(out, seen, `What do we know about ${label}?`);
-    if (out.length >= MAX_QUESTIONS) return out;
+    pushUnique(out, seen, `What do we know about ${org}?`);
   }
 
-  // 3) Theme questions from title / type / summary (generic, content-driven)
-  const combined = docs.map(blobFor).join(" ");
-  if (/\b(fee|fees|compensation|cost)\b/i.test(combined)) {
-    pushUnique(out, seen, "What does this say about fees?");
-  }
-  if (/\b(conflict|conflicts of interest)\b/i.test(combined)) {
-    pushUnique(out, seen, "What conflicts are disclosed?");
+  // 2) Theme questions from title / type / summary
+  if (/\b(form\s+crs|client relationship summary|form\s+adv)\b/i.test(combined)) {
+    pushUnique(out, seen, "What does the Form CRS cover?");
   }
   if (
     /\b(service|services|planning|portfolio|advisory|invest)\b/i.test(combined)
   ) {
     pushUnique(out, seen, "What services are described?");
   }
-  if (/\b(form\s+crs|client relationship summary|form\s+adv)\b/i.test(combined)) {
-    pushUnique(out, seen, "What does the Form CRS cover?");
+  if (/\b(fee|fees|compensation|cost)\b/i.test(combined)) {
+    pushUnique(out, seen, "What does this say about fees?");
+  }
+  if (/\b(conflict|conflicts of interest)\b/i.test(combined)) {
+    pushUnique(out, seen, "What conflicts are disclosed?");
   }
   if (/\b(policy|policies|procedure)\b/i.test(combined)) {
     pushUnique(out, seen, "What does this policy require?");
@@ -119,8 +131,18 @@ export function buildQuestionsFromDocuments(
     pushUnique(out, seen, "What amounts are listed?");
   }
 
-  // 4) Summarize the most recent / primary document
-  const primary = docs.find((d) => (d.title || d.fileName || "").trim()) ?? docs[0];
+  // 3) High-quality stored questions (skip generic leftovers)
+  for (const doc of docs) {
+    for (const q of doc.suggestedQuestions ?? []) {
+      if (!isUsefulStoredQuestion(q)) continue;
+      pushUnique(out, seen, q);
+      if (out.length >= MAX_QUESTIONS) return out.slice(0, MAX_QUESTIONS);
+    }
+  }
+
+  // 4) Summarize primary document
+  const primary =
+    docs.find((d) => (d.title || d.fileName || "").trim()) ?? docs[0];
   if (primary) {
     const name = shortLabel(
       (primary.title || primary.fileName || "this document").trim(),
@@ -162,6 +184,7 @@ export function parseStoredSuggestedQuestions(raw: unknown): string[] {
       .filter((q): q is string => typeof q === "string")
       .map((q) => q.trim())
       .filter(Boolean)
+      .filter(isUsefulStoredQuestion)
       .slice(0, 8);
   }
   if (typeof raw === "string") {

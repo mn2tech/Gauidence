@@ -76,8 +76,17 @@ function inferQuestions(analysis: GuardianAnalysis): string[] {
     .toLowerCase();
 
   for (const org of analysis.organizations.slice(0, 2)) {
-    const short = org.trim().split(/\s+/).slice(0, 3).join(" ");
+    const short = org
+      .trim()
+      .replace(/,?\s*(Inc|LLC|Ltd|Corp|Co)\.?$/i, "")
+      .replace(/[,:;]+$/g, "")
+      .split(/\s+/)
+      .slice(0, 3)
+      .join(" ");
     if (short.length >= 2) qs.push(`What do we know about ${short}?`);
+  }
+  if (/\b(form\s+crs|client relationship summary)\b/i.test(blob)) {
+    qs.push("What does the Form CRS cover?");
   }
   if (/\b(fee|fees|compensation)\b/i.test(blob)) {
     qs.push("What does this say about fees?");
@@ -89,15 +98,12 @@ function inferQuestions(analysis: GuardianAnalysis): string[] {
     qs.push("What services are described?");
   }
   if (analysis.title) {
-    qs.push(`Summarize ${analysis.title.split(/\s+/).slice(0, 4).join(" ")}`);
-  } else if (analysis.facts.length > 0) {
-    qs.push("Summarize the key details.");
-  }
-  if (analysis.people.length > 0 && qs.length < 4) {
-    qs.push("Who is mentioned in this document?");
-  }
-  if (analysis.important_dates.length > 0 && qs.length < 4) {
-    qs.push("What are the important dates?");
+    const titleShort = analysis.title
+      .replace(/[,:;]+$/g, "")
+      .split(/\s+/)
+      .slice(0, 4)
+      .join(" ");
+    qs.push(`Summarize ${titleShort}`);
   }
   return [...new Set(qs)].slice(0, 5);
 }

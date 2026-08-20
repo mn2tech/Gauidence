@@ -13,26 +13,36 @@ describe("buildQuestionsFromDocuments", () => {
         summary:
           "Kendall Capital Management offers financial planning, portfolio management, and discloses conflicts of interest and fees.",
         organizations: ["Kendall Capital Management, Inc."],
-      },
-    ]);
-    assert.ok(qs.length >= 3 && qs.length <= 4);
-    assert.ok(qs.some((q) => /Kendall Capital/i.test(q)));
-    assert.ok(
-      qs.some((q) => /fees|services|conflicts|Form CRS|Summarize/i.test(q))
-    );
-  });
-
-  it("prefers stored suggested_questions", () => {
-    const qs = buildQuestionsFromDocuments([
-      {
-        title: "Policy",
         suggestedQuestions: [
-          "What does the cybersecurity policy require?",
-          "Who owns this policy?",
+          "What are the important dates?",
+          "Summarize the key details.",
+          "What do we know about Kendall Capital Management,",
         ],
       },
     ]);
-    assert.equal(qs[0], "What does the cybersecurity policy require?");
+    assert.ok(qs.length >= 3 && qs.length <= 4);
+    assert.ok(qs.some((q) => /What do we know about Kendall Capital/i.test(q)));
+    assert.ok(
+      qs.some((q) => /fees|services|conflicts|Form CRS|Summarize/i.test(q))
+    );
+    assert.ok(!qs.some((q) => /important dates|key details/i.test(q)));
+    assert.ok(!qs.some((q) => /\.\?|,\?/.test(q)));
+    assert.ok(!qs.some((q) => /Inc\??$/i.test(q)));
+  });
+
+  it("prefers useful stored suggested_questions", () => {
+    const qs = buildQuestionsFromDocuments([
+      {
+        title: "Policy",
+        summary: "Cybersecurity policy requirements for vendors.",
+        suggestedQuestions: [
+          "What does the cybersecurity policy require?",
+          "What are the important dates?",
+        ],
+      },
+    ]);
+    assert.ok(qs.some((q) => /cybersecurity policy/i.test(q)));
+    assert.ok(!qs.some((q) => /important dates/i.test(q)));
   });
 });
 
