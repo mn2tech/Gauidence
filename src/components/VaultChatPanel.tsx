@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import GideonAvatar from "@/components/GideonAvatar";
+import GideonWelcome from "@/components/gideon-welcome/GideonWelcome";
 import GideonThinkingPanel from "@/components/GideonThinkingPanel";
 import GideonActionTimeline, {
   type ActionTimelineItem,
@@ -3900,6 +3901,11 @@ export default function VaultChatPanel({
   };
 
   const welcomeBlock = welcome && (
+    isPage && showMinimalWelcome && !emptyVault ? (
+      <div className="mx-auto max-w-xl px-1 py-4 sm:py-6">
+        <GideonWelcome showAskForm={false} />
+      </div>
+    ) : (
     <div
       className={
         showMinimalWelcome && !emptyVault
@@ -4360,6 +4366,7 @@ export default function VaultChatPanel({
         </div>
       </div>
     </div>
+    )
   );
 
   const askSidebar = (

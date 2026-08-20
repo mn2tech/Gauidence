@@ -19,8 +19,14 @@ describe("guardian simple home feature flag", () => {
     else process.env.GUARDIAN_SIMPLE_HOME_FLAG = original;
   });
 
-  it("defaults to disabled", () => {
+  it("defaults to enabled", () => {
     delete process.env.GUARDIAN_SIMPLE_HOME_FLAG;
+    assert.equal(getGuardianSimpleHomeFlag(), "enabled");
+    assert.equal(canAccessSimpleHome({ email: "user@example.com" }), true);
+  });
+
+  it("respects explicit disabled flag", () => {
+    process.env.GUARDIAN_SIMPLE_HOME_FLAG = "disabled";
     assert.equal(getGuardianSimpleHomeFlag(), "disabled");
     assert.equal(canAccessSimpleHome({ email: "user@example.com" }), false);
   });

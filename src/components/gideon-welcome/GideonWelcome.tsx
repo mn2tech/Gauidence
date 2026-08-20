@@ -10,7 +10,13 @@ import { useGideonWelcomeData } from "@/hooks/useGideonWelcomeData";
 import { timeOfDayGreeting } from "@/lib/simple-home/helpers";
 import { ASK_GIDEON_PATH } from "@/lib/simple-home/routing";
 
-export default function GideonWelcome() {
+export default function GideonWelcome({
+  showAskForm = true,
+  className = "",
+}: {
+  showAskForm?: boolean;
+  className?: string;
+}) {
   const router = useRouter();
   const { view, loading } = useGideonWelcomeData();
   const [question, setQuestion] = useState("");
@@ -41,11 +47,14 @@ export default function GideonWelcome() {
     !view.isEmptySpace && view.statusItems.length > 0 && !view.statusUnavailable;
 
   return (
-    <section className="gideon-welcome simple-home-card welcome-strip space-y-4 p-4 sm:space-y-5 sm:p-5">
+    <section
+      className={`gideon-welcome simple-home-card welcome-strip space-y-4 p-4 sm:space-y-5 sm:p-5 ${className}`.trim()}
+    >
       <GreetingHeader greeting={greeting} view={view} />
       <SpaceStatus view={view} />
       <SuggestedActions actions={view.actions} showPrompt={showActionPrompt} />
 
+      {showAskForm ? (
       <form
         onSubmit={handleAskSubmit}
         className="border-t border-border-subtle pt-4"
@@ -71,6 +80,7 @@ export default function GideonWelcome() {
           </button>
         </div>
       </form>
+      ) : null}
     </section>
   );
 }

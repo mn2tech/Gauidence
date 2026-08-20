@@ -8,7 +8,7 @@ export type GuardianSimpleHomeFlag =
 
 function readFlag(): GuardianSimpleHomeFlag {
   const raw =
-    process.env.GUARDIAN_SIMPLE_HOME_FLAG?.trim().toLowerCase() ?? "disabled";
+    process.env.GUARDIAN_SIMPLE_HOME_FLAG?.trim().toLowerCase() ?? "enabled";
   if (
     raw === "disabled" ||
     raw === "admin-only" ||
