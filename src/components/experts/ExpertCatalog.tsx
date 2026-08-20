@@ -6,6 +6,11 @@ import type { UserExpert } from "@/lib/experts/expert-types";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import ExpertCatalogCard from "./ExpertCatalogCard";
 import ExpertInstallDialog from "./ExpertInstallDialog";
+import StudentGradePackages from "./StudentGradePackages";
+import {
+  isStudentGradePackageExpert,
+  packageForGradeLevel,
+} from "@/lib/experts/student-packages";
 
 type Props = {
   initialExperts: ExpertCatalogItem[];
@@ -16,7 +21,7 @@ export default function ExpertCatalog({
   initialExperts,
   initialInstallations,
 }: Props) {
-  const { profiles } = useActiveProfile();
+  const { profiles, active } = useActiveProfile();
   const [experts] = useState(initialExperts);
   const [installations, setInstallations] = useState(initialInstallations);
   const [query, setQuery] = useState("");
@@ -24,7 +29,15 @@ export default function ExpertCatalog({
   const [selectedExpert, setSelectedExpert] = useState<ExpertCatalogItem | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const recommendedExpertId =
+    packageForGradeLevel(active?.grade_level)?.expertId ?? null;
+
+  const gradePackageIds = new Set(
+    experts.filter((expert) => isStudentGradePackageExpert(expert.id)).map((e) => e.id)
+  );
+
   const filtered = experts.filter((expert) => {
+    if (gradePackageIds.has(expert.id)) return false;
     const matchesCategory = category === "All" || expert.category === category;
     const haystack = `${expert.name} ${expert.description} ${expert.category}`.toLowerCase();
     const matchesQuery = !query.trim() || haystack.includes(query.trim().toLowerCase());
@@ -56,13 +69,20 @@ export default function ExpertCatalog({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      <StudentGradePackages
+        experts={experts}
+        installations={installations}
+        recommendedExpertId={recommendedExpertId}
+        onInstall={(expert) => setSelectedExpert(expert)}
+      />
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <input
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search experts"
+          placeholder="Search other experts"
           className="w-full rounded-xl border border-stone-300 px-4 py-2.5 text-sm sm:max-w-sm"
         />
         <div className="flex flex-wrap gap-2">
@@ -89,19 +109,7 @@ export default function ExpertCatalog({
         </p>
       ) : null}
 
-      {experts.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-stone-200 p-8 text-center text-sm text-ink-muted">
-          <p className="font-medium text-foreground">No experts assigned yet</p>
-          <p className="mt-2">
-            Restricted experts only appear here after an admin grants you access. Contact
-            your administrator if you expected to see one.
-          </p>
-        </div>
-      ) : Object.keys(grouped).length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-stone-200 p-8 text-center text-sm text-ink-muted">
-          No experts match your search.
-        </div>
-      ) : (
+      {Object.keys(grouped).length > 0 ? (
         Object.entries(grouped).map(([group, items]) => (
           <section key={group} className="space-y-4">
             <h2 className="text-lg font-semibold">{group}</h2>
@@ -117,7 +125,11 @@ export default function ExpertCatalog({
             </div>
           </section>
         ))
-      )}
+      ) : query.trim() || category !== "All" ? (
+        <div className="rounded-2xl border border-dashed border-stone-200 p-8 text-center text-sm text-ink-muted">
+          No other experts match your search.
+        </div>
+      ) : null}
 
       <ExpertInstallDialog
         expert={selectedExpert}

@@ -1,14 +1,14 @@
 {
   "id": "ninth-grade-study-coach",
-  "version": "1.0.0",
-  "name": "9th Grade Study Coach",
-  "shortName": "Study Coach",
+  "version": "1.1.0",
+  "name": "9th Grade Success Package",
+  "shortName": "Grade 9",
   "category": "Learning",
   "icon": "graduation-cap",
   "status": "beta",
-  "description": "A friendly coach for freshman year: study skills, core subjects, and getting ready for tests.",
-  "longDescription": "Build confidence in 9th grade with practical study habits, help across typical freshman subjects (Algebra I, English 9, Biology, history), and strategies for tests and projects. Designed for students — clear, encouraging, and focused on understanding.",
-  "primaryGoal": "Learn how to study smarter, understand core 9th grade topics, and build habits that last through high school.",
+  "description": "Help 9th graders succeed across typical freshman material: Algebra I, English 9, Biology, world history and geography, plus study skills, tests, and projects.",
+  "longDescription": "A full freshman-year package for typical 9th grade courses. Students get study habits, Algebra I (equations, graphs, systems, polynomials), English 9 (reading, thesis, evidence, grammar), Biology (cells, genetics, ecosystems), world history and geography, and coaching for tests and projects. Clear, encouraging, and focused on understanding — not copying graded work.",
+  "primaryGoal": "Help 9th grade students keep up with core classes, study with a plan, and build habits that last through high school.",
   "disclaimer": "For learning and practice only. Follow your school's honor code — this coach helps you understand ideas, not copy answers on graded work. Do not share personal information (full name, school address, passwords) in Ask. Talk to a parent, teacher, or counselor for serious academic or personal concerns.",
 
   "theme": {
@@ -20,7 +20,7 @@
     {
       "id": "learn",
       "title": "Learn",
-      "description": "Follow modules on study skills, freshman subjects, and test prep.",
+      "description": "Follow modules on study skills and typical 9th grade subjects.",
       "icon": "book-open",
       "route": "learn",
       "enabled": true
@@ -44,14 +44,14 @@
     {
       "id": "quiz",
       "title": "Quiz",
-      "description": "Check your study skills and subject basics.",
+      "description": "Check study skills and core 9th grade subject basics.",
       "icon": "brain",
       "route": "quiz",
       "enabled": true
     }
   ],
 
-  "systemPrompt": "You are the 9th Grade Study Coach inside Guardian — a supportive tutor for high school freshmen (about age 14–15). Help students with study skills, organization, and typical 9th grade subjects: Algebra I (linear equations, graphing, exponents), English 9 (reading, thesis, paragraphs, evidence), Biology (cells, ecosystems, scientific method), and introductory history/civics (sources, timelines, short essays). Use clear, encouraging language — respectful and not childish. Break problems into steps. When explaining math or writing, teach the process; give hints before full solutions on practice problems. For assigned homework the student must turn in, do NOT provide final answers to copy — guide them with questions, similar examples, and the next step instead. Promote academic integrity and asking teachers for help. Never collect personal details. If a topic is beyond 9th grade scope, say so briefly and offer a simpler foundation. Encourage breaks, sleep, and talking to adults when stressed.",
+  "systemPrompt": "You are the 9th Grade Success Package coach inside Guardian — a supportive tutor for high school freshmen (about age 14–15). Help students succeed in typical 9th grade courses: Algebra I (linear equations, inequalities, graphing, systems, exponents, polynomials), English 9 (reading literature, thesis, evidence, grammar, MLA), Biology (cells, scientific method, genetics, photosynthesis, ecosystems), and world history/geography (sources, timelines, maps, cause and effect). Also coach weekly planning, notes, test prep, and projects. Use clear, encouraging language — respectful and not childish. Break problems into steps. Teach the process; give hints before full solutions on practice problems. For assigned homework the student must turn in, do NOT provide final answers to copy — guide with questions, similar examples, and the next step. Promote academic integrity and asking teachers for help. Never collect personal details. If a topic is beyond 9th grade, say so briefly and offer a simpler foundation. Schools vary — if their class uses Geometry or Earth Science instead, still help at a 9th-grade level. Encourage breaks, sleep, and talking to adults when stressed.",
 
   "responseRules": [
     "Use short paragraphs and numbered steps when explaining.",
@@ -65,7 +65,8 @@
   "starterQuestions": [
     "How should I study for a biology test?",
     "How do I write a thesis statement for an essay?",
-    "What is the best way to solve a two-step equation?",
+    "How do I solve a system of two equations?",
+    "What is the difference between genotype and phenotype?",
     "I have two tests and a project due — how do I plan my week?"
   ],
 
@@ -73,36 +74,81 @@
     {
       "id": "module-study-skills",
       "order": 1,
-      "title": "Study Skills & Organization",
-      "description": "Build habits that make freshman year manageable.",
-      "estimatedMinutes": 15,
+      "title": "Freshman Study Skills",
+      "description": "Habits that make 9th grade manageable from week one.",
+      "estimatedMinutes": 20,
       "learningObjectives": [
         "Use a simple weekly planning routine",
         "Take notes you can actually review",
-        "Know when and how to ask teachers for help"
+        "Ask teachers for help before you fall behind"
       ],
-      "lessonTopicIds": ["topic-planning", "topic-note-taking"],
+      "lessonTopicIds": ["topic-planning", "topic-note-taking", "topic-freshman-habits"],
       "quizIds": ["quiz-study-skills"],
       "status": "published"
     },
     {
-      "id": "module-core-subjects",
+      "id": "module-algebra",
       "order": 2,
-      "title": "Core 9th Grade Subjects",
-      "description": "Foundations in math, English, science, and history.",
+      "title": "Algebra I",
+      "description": "Equations, graphs, systems, and polynomials — show your work.",
+      "estimatedMinutes": 30,
+      "learningObjectives": [
+        "Solve linear equations and check answers",
+        "Graph lines and interpret slope",
+        "Tackle inequalities, systems, exponents, and basic polynomials"
+      ],
+      "lessonTopicIds": ["topic-algebra", "topic-inequalities-systems", "topic-exponents-polynomials"],
+      "quizIds": ["quiz-algebra"],
+      "status": "published"
+    },
+    {
+      "id": "module-english",
+      "order": 3,
+      "title": "English 9",
+      "description": "Reading, thesis-driven writing, evidence, and sentence control.",
       "estimatedMinutes": 25,
       "learningObjectives": [
-        "Recognize key skills in Algebra I and English 9",
-        "Explain basic biology vocabulary and the scientific method",
-        "Use sources and timelines in history work"
+        "Write a clear thesis and body paragraphs with evidence",
+        "Annotate literature for theme, character, and craft",
+        "Fix run-ons, fragments, and citation basics"
       ],
-      "lessonTopicIds": ["topic-algebra", "topic-english", "topic-biology", "topic-history"],
-      "quizIds": ["quiz-subjects"],
+      "lessonTopicIds": ["topic-english", "topic-reading-lit", "topic-grammar"],
+      "quizIds": ["quiz-english"],
+      "status": "published"
+    },
+    {
+      "id": "module-biology",
+      "order": 4,
+      "title": "Biology",
+      "description": "Cells, genetics, energy, and ecosystems with the scientific method.",
+      "estimatedMinutes": 25,
+      "learningObjectives": [
+        "Explain cell parts and the scientific method",
+        "Connect DNA, genes, and traits",
+        "Describe energy flow in ecosystems"
+      ],
+      "lessonTopicIds": ["topic-biology", "topic-genetics", "topic-ecology-energy"],
+      "quizIds": ["quiz-biology"],
+      "status": "published"
+    },
+    {
+      "id": "module-history",
+      "order": 5,
+      "title": "World History & Geography",
+      "description": "Evidence, maps, timelines, and cause-and-effect writing.",
+      "estimatedMinutes": 20,
+      "learningObjectives": [
+        "Tell primary sources from secondary sources",
+        "Use maps and timelines for context",
+        "Support a claim with documents"
+      ],
+      "lessonTopicIds": ["topic-history", "topic-geography"],
+      "quizIds": ["quiz-history"],
       "status": "published"
     },
     {
       "id": "module-tests-projects",
-      "order": 3,
+      "order": 6,
       "title": "Tests & Projects",
       "description": "Prepare for exams and longer assignments without cramming.",
       "estimatedMinutes": 15,
@@ -112,7 +158,7 @@
         "Manage test-day stress with simple strategies"
       ],
       "lessonTopicIds": ["topic-test-prep", "topic-projects"],
-      "quizIds": [],
+      "quizIds": ["quiz-subjects"],
       "status": "published"
     }
   ],
@@ -149,7 +195,7 @@
         "How do I plan when everything is due the same week?",
         "What is a good study block length?"
       ],
-      "relatedTopicIds": ["topic-note-taking", "topic-test-prep"],
+      "relatedTopicIds": ["topic-note-taking", "topic-test-prep", "topic-freshman-habits"],
       "sourceType": "guardian-curated"
     },
     {
@@ -183,7 +229,41 @@
         "What should I write down in class?",
         "How do I study from my notes?"
       ],
-      "relatedTopicIds": ["topic-planning", "topic-test-prep"],
+      "relatedTopicIds": ["topic-planning", "topic-test-prep", "topic-freshman-habits"],
+      "sourceType": "guardian-curated"
+    },
+    {
+      "id": "topic-freshman-habits",
+      "title": "Staying Caught Up in 9th Grade",
+      "category": "study-skills",
+      "summary": "High school moves faster — small daily habits beat catching up after a bad week.",
+      "details": [
+        "Check the syllabus and learning platform (Google Classroom, Canvas, etc.) every school day.",
+        "If you miss a class, get notes and the assignment the same day — not the night before the quiz.",
+        "Ask your teacher during or right after class when something is unclear; office hours exist for a reason.",
+        "Keep a simple homework folder (paper or digital) so nothing lives only in a locker or a chat thread.",
+        "Protect sleep: most freshmen need about 8–10 hours. Tired brains forget formulas and essay plans."
+      ],
+      "examples": [
+        {
+          "title": "Missed algebra",
+          "description": "Email or message: 'I was absent Tuesday — what should I complete before Thursday's quiz?' Attach what you already tried."
+        }
+      ],
+      "keyPoints": [
+        "Check assignments daily",
+        "Ask early, not the night before",
+        "Sleep is a study skill"
+      ],
+      "commonMistakes": [
+        "Waiting until Sunday to open the class site",
+        "Assuming 'I'll remember it' without writing the due date down"
+      ],
+      "starterQuestions": [
+        "What should I do if I missed class?",
+        "How do I talk to a teacher when I am confused?"
+      ],
+      "relatedTopicIds": ["topic-planning", "topic-note-taking"],
       "sourceType": "guardian-curated"
     },
     {
@@ -217,7 +297,75 @@
         "How do I solve a two-step equation?",
         "What is slope in a graph?"
       ],
-      "relatedTopicIds": ["topic-planning"],
+      "relatedTopicIds": ["topic-inequalities-systems", "topic-planning"],
+      "sourceType": "guardian-curated"
+    },
+    {
+      "id": "topic-inequalities-systems",
+      "title": "Inequalities & Systems",
+      "category": "math",
+      "summary": "Inequalities use the same inverse operations as equations — flip the inequality if you multiply or divide by a negative. Systems ask where two lines meet.",
+      "details": [
+        "Solve inequalities like equations; graph the solution on a number line (open circle for < or >, closed for ≤ or ≥).",
+        "When you multiply or divide both sides by a negative number, reverse the inequality sign.",
+        "A system of two linear equations can be solved by graphing, substitution, or elimination.",
+        "Substitution: solve one equation for a variable, plug into the other.",
+        "Check by plugging both values back into both original equations."
+      ],
+      "examples": [
+        {
+          "title": "Substitution",
+          "description": "y = 2x + 1 and x + y = 7 → x + (2x + 1) = 7 → 3x = 6 → x = 2, y = 5."
+        }
+      ],
+      "keyPoints": [
+        "Flip the sign only for negative multiply/divide",
+        "A solution to a system works in both equations",
+        "Sketch graphs when stuck"
+      ],
+      "commonMistakes": [
+        "Forgetting to reverse the inequality",
+        "Finding x but never solving for y"
+      ],
+      "starterQuestions": [
+        "When do I flip an inequality?",
+        "How do I solve a system by substitution?"
+      ],
+      "relatedTopicIds": ["topic-algebra", "topic-exponents-polynomials"],
+      "sourceType": "guardian-curated"
+    },
+    {
+      "id": "topic-exponents-polynomials",
+      "title": "Exponents & Polynomials",
+      "category": "math",
+      "summary": "Exponent rules keep powers organized; polynomials are sums of terms like 3x² + 2x − 5.",
+      "details": [
+        "Product rule: x^a · x^b = x^(a+b). Quotient: x^a / x^b = x^(a−b). Power: (x^a)^b = x^(ab).",
+        "x^0 = 1 (for x ≠ 0). Negative exponents mean reciprocals: x^(−n) = 1/x^n.",
+        "Combine like terms: 4x² + 3x² = 7x². You cannot combine 4x² and 3x.",
+        "Distribute: 2(x + 5) = 2x + 10. FOIL for (x + 2)(x + 3) = x² + 5x + 6.",
+        "Factor when you can pull out a GCF: 6x + 9 = 3(2x + 3)."
+      ],
+      "examples": [
+        {
+          "title": "Like terms",
+          "description": "Simplify 5x² − 2x + 3x² + x → (5x² + 3x²) + (−2x + x) = 8x² − x."
+        }
+      ],
+      "keyPoints": [
+        "Add exponents when multiplying the same base",
+        "Only like terms combine",
+        "Distribute before combining"
+      ],
+      "commonMistakes": [
+        "Adding bases instead of exponents (2³ · 2² is not 4^5)",
+        "Combining 3x² and 3x"
+      ],
+      "starterQuestions": [
+        "What is the product rule for exponents?",
+        "How do I multiply two binomials?"
+      ],
+      "relatedTopicIds": ["topic-algebra", "topic-inequalities-systems"],
       "sourceType": "guardian-curated"
     },
     {
@@ -251,7 +399,75 @@
         "How do I write a thesis?",
         "How long should a body paragraph be?"
       ],
-      "relatedTopicIds": ["topic-projects"],
+      "relatedTopicIds": ["topic-projects", "topic-reading-lit", "topic-grammar"],
+      "sourceType": "guardian-curated"
+    },
+    {
+      "id": "topic-reading-lit",
+      "title": "Reading Literature",
+      "category": "english",
+      "summary": "9th grade English asks what a text means and how the author built that meaning — not only what happened.",
+      "details": [
+        "Track characters: what they want, what they fear, how they change.",
+        "Theme is a message about life the story suggests — not just the topic (love vs. 'jealousy destroys trust').",
+        "Notice craft: imagery, symbolism, irony, point of view, and how dialogue reveals character.",
+        "Annotate: short margin notes on 'why this line matters,' not only highlights.",
+        "For poetry, read aloud once, then look at line breaks, repetition, and the turn (shift) in meaning."
+      ],
+      "examples": [
+        {
+          "title": "Theme vs plot",
+          "description": "Plot: a student lies about a test. Theme might be: honesty is harder than the short-term fix, but it rebuilds trust."
+        }
+      ],
+      "keyPoints": [
+        "Theme is a full idea, not one word",
+        "Quotes need explanation",
+        "Characters change for a reason"
+      ],
+      "commonMistakes": [
+        "Retelling the whole plot instead of analyzing a few key moments",
+        "Calling the topic (war, family) the theme"
+      ],
+      "starterQuestions": [
+        "How do I find the theme of a story?",
+        "What should I annotate while I read?"
+      ],
+      "relatedTopicIds": ["topic-english", "topic-grammar"],
+      "sourceType": "guardian-curated"
+    },
+    {
+      "id": "topic-grammar",
+      "title": "Sentences & Citations",
+      "category": "english",
+      "summary": "Clear sentences and honest citations make essays readable and keep you in honor-code territory.",
+      "details": [
+        "A complete sentence needs a subject and a verb and a complete thought. Fragments are missing one of those.",
+        "Run-ons smash two sentences together. Fix with a period, semicolon, or a comma plus a coordinating conjunction (FANBOYS).",
+        "Keep verb tense consistent unless time actually changes in the story.",
+        "MLA in-text: author and page, like (Lee 23). Works Cited lists full sources.",
+        "Paraphrase still needs a citation if the idea is not yours. Quotes need quotation marks plus a citation."
+      ],
+      "examples": [
+        {
+          "title": "Fix a run-on",
+          "description": "Wrong: The narrator is afraid she still goes outside. Right: The narrator is afraid, but she still goes outside."
+        }
+      ],
+      "keyPoints": [
+        "One complete thought per sentence (or join them correctly)",
+        "Cite ideas you borrowed",
+        "Read drafts aloud to catch errors"
+      ],
+      "commonMistakes": [
+        "Comma splices (comma only between two full sentences)",
+        "Dropping a quote with no page or explanation"
+      ],
+      "starterQuestions": [
+        "How do I fix a run-on sentence?",
+        "When do I need an MLA citation?"
+      ],
+      "relatedTopicIds": ["topic-english", "topic-projects"],
       "sourceType": "guardian-curated"
     },
     {
@@ -285,7 +501,75 @@
         "What are the main parts of a cell?",
         "How does the scientific method work?"
       ],
-      "relatedTopicIds": ["topic-test-prep"],
+      "relatedTopicIds": ["topic-test-prep", "topic-genetics", "topic-ecology-energy"],
+      "sourceType": "guardian-curated"
+    },
+    {
+      "id": "topic-genetics",
+      "title": "Genetics Basics",
+      "category": "science",
+      "summary": "DNA carries instructions; genes are segments of DNA; traits show up through dominant and recessive alleles.",
+      "details": [
+        "DNA → genes → proteins → traits (a simplified chain you will see on quizzes).",
+        "Alleles are versions of a gene. Dominant alleles can mask recessive ones in the phenotype.",
+        "Genotype is the allele pair (Bb); phenotype is what you observe (brown eyes, if B is brown).",
+        "Punnett squares predict probable offspring genotypes — they are not guarantees for one child.",
+        "Homozygous means two of the same allele (BB or bb); heterozygous means two different (Bb)."
+      ],
+      "examples": [
+        {
+          "title": "Punnett square",
+          "description": "Cross Bb × Bb. Offspring genotypes: 1 BB : 2 Bb : 1 bb. If B is dominant, 3/4 show the dominant phenotype."
+        }
+      ],
+      "keyPoints": [
+        "Genotype vs phenotype",
+        "Punnett squares show probability",
+        "Learn the vocabulary with a tiny sketch"
+      ],
+      "commonMistakes": [
+        "Thinking a 3:1 ratio means the next child must be dominant",
+        "Mixing up gene, DNA, and chromosome"
+      ],
+      "starterQuestions": [
+        "What is the difference between genotype and phenotype?",
+        "How do I fill in a Punnett square?"
+      ],
+      "relatedTopicIds": ["topic-biology", "topic-ecology-energy"],
+      "sourceType": "guardian-curated"
+    },
+    {
+      "id": "topic-ecology-energy",
+      "title": "Energy, Photosynthesis & Ecosystems",
+      "category": "science",
+      "summary": "Plants capture light energy; food webs pass energy (with losses) from producers to consumers.",
+      "details": [
+        "Photosynthesis: plants use light, water, and carbon dioxide to make sugar and oxygen.",
+        "Cellular respiration releases energy (ATP) from sugar — happens in plants and animals.",
+        "Producers make their own food; consumers eat others; decomposers recycle matter.",
+        "Energy pyramids: only about 10% of energy typically moves up each trophic level — the rest is used or lost as heat.",
+        "Matter cycles (carbon, water, nitrogen); energy flows one way through the ecosystem."
+      ],
+      "examples": [
+        {
+          "title": "Food chain",
+          "description": "Grass (producer) → rabbit (primary consumer) → fox (secondary). Most energy is not passed to the fox."
+        }
+      ],
+      "keyPoints": [
+        "Photosynthesis stores energy; respiration releases it",
+        "Energy flows, matter cycles",
+        "Labels on diagrams matter on tests"
+      ],
+      "commonMistakes": [
+        "Saying energy is recycled the same way as carbon",
+        "Skipping units and arrows on lab graphs"
+      ],
+      "starterQuestions": [
+        "What do plants need for photosynthesis?",
+        "Why are there fewer hawks than rabbits in a food web?"
+      ],
+      "relatedTopicIds": ["topic-biology", "topic-genetics"],
       "sourceType": "guardian-curated"
     },
     {
@@ -319,7 +603,41 @@
         "What is a primary source?",
         "How do I study for a history test?"
       ],
-      "relatedTopicIds": ["topic-english", "topic-test-prep"],
+      "relatedTopicIds": ["topic-english", "topic-test-prep", "topic-geography"],
+      "sourceType": "guardian-curated"
+    },
+    {
+      "id": "topic-geography",
+      "title": "Maps, Regions & Context",
+      "category": "social-studies",
+      "summary": "Geography explains where events happen and why place (rivers, trade routes, climate) shapes history.",
+      "details": [
+        "Read map keys, scale, and compass rose before you interpret a map.",
+        "Physical maps show landforms; political maps show borders; thematic maps show a topic (population, resources).",
+        "Ask: how did mountains, rivers, or coastlines help or limit a civilization?",
+        "Regions group places by shared features (climate, language, culture) — borders are often messy.",
+        "Pair maps with timelines: the same river valley can matter in different centuries for different reasons."
+      ],
+      "examples": [
+        {
+          "title": "River valley",
+          "description": "Farming near a river often meant surplus food, cities, and trade — and also floods that societies had to manage."
+        }
+      ],
+      "keyPoints": [
+        "Always read the legend",
+        "Place is part of cause and effect",
+        "Compare two maps from different times"
+      ],
+      "commonMistakes": [
+        "Memorizing names with no idea where they are",
+        "Ignoring the map title and thinking every map is the same type"
+      ],
+      "starterQuestions": [
+        "How do I read a historical map?",
+        "Why do rivers show up so often in world history?"
+      ],
+      "relatedTopicIds": ["topic-history", "topic-test-prep"],
       "sourceType": "guardian-curated"
     },
     {
@@ -406,6 +724,36 @@
       "relatedTopicIds": ["topic-algebra"]
     },
     {
+      "term": "Punnett Square",
+      "definition": "A grid that shows possible allele combinations from two parents and the probability of each genotype.",
+      "category": "science",
+      "relatedTopicIds": ["topic-genetics"]
+    },
+    {
+      "term": "Photosynthesis",
+      "definition": "The process plants use to turn light, water, and carbon dioxide into sugar and oxygen.",
+      "category": "science",
+      "relatedTopicIds": ["topic-ecology-energy"]
+    },
+    {
+      "term": "System of Equations",
+      "definition": "Two or more equations considered together; the solution is the pair (or set) of values that works in all of them.",
+      "category": "math",
+      "relatedTopicIds": ["topic-inequalities-systems"]
+    },
+    {
+      "term": "Theme",
+      "definition": "A message about life suggested by a story or poem — more than a one-word topic.",
+      "category": "english",
+      "relatedTopicIds": ["topic-reading-lit"]
+    },
+    {
+      "term": "MLA",
+      "definition": "A common citation style in English class: short in-text citations plus a Works Cited list.",
+      "category": "english",
+      "relatedTopicIds": ["topic-grammar"]
+    },
+    {
       "term": "Primary Source",
       "definition": "A document or artifact from the time period being studied.",
       "category": "social-studies",
@@ -478,7 +826,7 @@
     {
       "id": "quiz-subjects",
       "title": "9th Grade Subject Basics",
-      "moduleId": "module-core-subjects",
+      "moduleId": "module-tests-projects",
       "description": "Quick check on math, English, science, and history foundations.",
       "passingScore": 70,
       "questions": [
@@ -523,6 +871,150 @@
           ],
           "correctOptionIndex": 1,
           "explanation": "Each paragraph should support the thesis with evidence and your analysis."
+        }
+      ]
+    },
+    {
+      "id": "quiz-algebra",
+      "title": "Algebra I Check",
+      "moduleId": "module-algebra",
+      "description": "Equations, slope, systems, and exponents.",
+      "passingScore": 70,
+      "questions": [
+        {
+          "id": "q-alg-1",
+          "type": "multiple-choice",
+          "question": "Solve 4x − 6 = 10. What is x?",
+          "options": ["1", "4", "16", "2.5"],
+          "correctOptionIndex": 1,
+          "explanation": "Add 6 to both sides → 4x = 16 → divide by 4 → x = 4. Check: 4(4) − 6 = 10."
+        },
+        {
+          "id": "q-alg-2",
+          "type": "true-false",
+          "question": "When you multiply both sides of an inequality by a negative number, you reverse the inequality sign.",
+          "options": ["True", "False"],
+          "correctOptionIndex": 0,
+          "explanation": "That flip is required so the inequality still describes the same set of numbers."
+        },
+        {
+          "id": "q-alg-3",
+          "type": "multiple-choice",
+          "question": "x² · x³ equals",
+          "options": ["x^5", "x^6", "2x^5", "x"],
+          "correctOptionIndex": 0,
+          "explanation": "Product rule: add exponents when the bases are the same — 2 + 3 = 5."
+        }
+      ]
+    },
+    {
+      "id": "quiz-english",
+      "title": "English 9 Check",
+      "moduleId": "module-english",
+      "description": "Thesis, theme, and sentences.",
+      "passingScore": 70,
+      "questions": [
+        {
+          "id": "q-eng-1",
+          "type": "multiple-choice",
+          "question": "Which is the best description of a thesis?",
+          "options": [
+            "A one-word topic like 'friendship'",
+            "The main argument you will prove in the essay",
+            "A quote from the book with no explanation",
+            "The last sentence of the story"
+          ],
+          "correctOptionIndex": 1,
+          "explanation": "A thesis is a claim the rest of the essay supports with evidence."
+        },
+        {
+          "id": "q-eng-2",
+          "type": "true-false",
+          "question": "A run-on can be fixed with a period or with a comma plus a coordinating conjunction.",
+          "options": ["True", "False"],
+          "correctOptionIndex": 0,
+          "explanation": "You can also use a semicolon. A comma alone is a comma splice — not enough."
+        },
+        {
+          "id": "q-eng-3",
+          "type": "multiple-choice",
+          "question": "Theme is best described as",
+          "options": [
+            "A one-word topic",
+            "A message about life the text suggests",
+            "The author's biography",
+            "The page count"
+          ],
+          "correctOptionIndex": 1,
+          "explanation": "Theme is an idea the work explores, not just the subject matter."
+        }
+      ]
+    },
+    {
+      "id": "quiz-biology",
+      "title": "Biology Check",
+      "moduleId": "module-biology",
+      "description": "Cells, genetics, and energy.",
+      "passingScore": 70,
+      "questions": [
+        {
+          "id": "q-bio-1",
+          "type": "multiple-choice",
+          "question": "Genotype refers to",
+          "options": [
+            "The observable trait",
+            "The allele combination",
+            "The food web level",
+            "The cell membrane only"
+          ],
+          "correctOptionIndex": 1,
+          "explanation": "Genotype is the alleles (e.g. Bb). Phenotype is what you see."
+        },
+        {
+          "id": "q-bio-2",
+          "type": "true-false",
+          "question": "Photosynthesis uses light, water, and carbon dioxide to make sugar and oxygen.",
+          "options": ["True", "False"],
+          "correctOptionIndex": 0,
+          "explanation": "That is the core process 9th grade biology expects you to state and label."
+        },
+        {
+          "id": "q-bio-3",
+          "type": "multiple-choice",
+          "question": "In a typical energy pyramid, as you move to higher trophic levels, available energy",
+          "options": ["Increases", "Stays the same", "Decreases", "Cycles back fully"],
+          "correctOptionIndex": 2,
+          "explanation": "Energy is used or lost as heat; only a fraction moves up. Matter cycles; energy flows."
+        }
+      ]
+    },
+    {
+      "id": "quiz-history",
+      "title": "History & Geography Check",
+      "moduleId": "module-history",
+      "description": "Sources, maps, and evidence.",
+      "passingScore": 70,
+      "questions": [
+        {
+          "id": "q-his-1",
+          "type": "multiple-choice",
+          "question": "A political map mainly shows",
+          "options": [
+            "Elevation and rivers only",
+            "Borders and places of government",
+            "Average rainfall",
+            "Food webs"
+          ],
+          "correctOptionIndex": 1,
+          "explanation": "Political maps emphasize countries, cities, and borders; physical maps emphasize landforms."
+        },
+        {
+          "id": "q-his-2",
+          "type": "true-false",
+          "question": "A diary written during the time you are studying is usually a primary source.",
+          "options": ["True", "False"],
+          "correctOptionIndex": 0,
+          "explanation": "Primary sources come from the period; later textbooks are secondary."
         }
       ]
     }
@@ -579,6 +1071,52 @@
         "Teachers expect questions when you are stuck",
         "Copying undermines learning and can have serious consequences"
       ]
+    },
+    {
+      "id": "scenario-essay-week",
+      "title": "English Essay Week",
+      "difficulty": "beginner",
+      "category": "english",
+      "fictional": true,
+      "notice": "Fictional school situation for practice.",
+      "context": "Your English 9 essay is due Friday. You have read the book but have not written a thesis. Soccer is Tuesday and Thursday.",
+      "question": "What is the strongest plan?",
+      "choices": [
+        "Write the whole essay Thursday after practice",
+        "Draft a thesis and outline Monday, write a body paragraph Tuesday, revise Wednesday, proofread Thursday",
+        "Copy a sample essay from the internet and change a few words",
+        "Skip soccer for the rest of the year"
+      ],
+      "correctChoiceIndex": 1,
+      "explanation": "Breaking writing into thesis, draft, and revise beats one late night — and keeps academic integrity.",
+      "learningPoints": [
+        "Thesis first, then paragraphs",
+        "Revision needs calendar space",
+        "Do not submit copied work"
+      ]
+    },
+    {
+      "id": "scenario-lab-report",
+      "title": "Biology Lab Confusion",
+      "difficulty": "intermediate",
+      "category": "science",
+      "fictional": true,
+      "notice": "Fictional lab situation for practice.",
+      "context": "Your photosynthesis lab graph does not match the class average. The lab is graded on method, data, and a written conclusion.",
+      "question": "What should you do?",
+      "choices": [
+        "Change your numbers so they match the class",
+        "Report your real data, check your units and procedure, and explain possible error in the conclusion",
+        "Leave the conclusion blank",
+        "Copy a lab from last year's student"
+      ],
+      "correctChoiceIndex": 1,
+      "explanation": "Science values honest data plus reasoning. Unexpected results can still earn credit if you explain method and error.",
+      "learningPoints": [
+        "Never fake data",
+        "Check units and procedure first",
+        "Conclusions should match your evidence"
+      ]
     }
   ],
 
@@ -598,6 +1136,38 @@
       "followUpQuestions": [
         "Which subject needs the most time in your routine?",
         "What distracts you most when studying?"
+      ]
+    },
+    {
+      "id": "interview-algebra-check",
+      "category": "math",
+      "difficulty": "beginner",
+      "question": "Explain how you would check that x = 4 is the solution to 3x + 2 = 14.",
+      "answerGuide": [
+        "Substitute 4 in for x",
+        "Compute 3(4) + 2",
+        "Confirm it equals 14",
+        "If it does not, redo the inverse operations"
+      ],
+      "followUpQuestions": [
+        "What would you try if the check failed?",
+        "How do you keep negative signs from disappearing?"
+      ]
+    },
+    {
+      "id": "interview-thesis",
+      "category": "english",
+      "difficulty": "beginner",
+      "question": "What makes a strong thesis for a literary analysis essay?",
+      "answerGuide": [
+        "It is a claim, not just a topic",
+        "It can be supported with quotes",
+        "It is specific enough to prove in a few paragraphs",
+        "It is not a plot summary"
+      ],
+      "followUpQuestions": [
+        "How would you turn 'friendship' into a thesis?",
+        "Where does the thesis usually appear?"
       ]
     }
   ]

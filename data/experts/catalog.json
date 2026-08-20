@@ -2,15 +2,15 @@
   "experts": [
     {
       "id": "ninth-grade-study-coach",
-      "name": "9th Grade Study Coach",
-      "shortName": "Study Coach",
+      "name": "9th Grade Success Package",
+      "shortName": "Grade 9",
       "category": "Learning",
-      "description": "A friendly coach for freshman year: study skills, core subjects, and getting ready for tests.",
+      "description": "Help 9th graders succeed across typical freshman material: Algebra I, English 9, Biology, world history and geography, plus study skills, tests, and projects.",
       "icon": "graduation-cap",
       "status": "beta",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "file": "ninth-grade-study-coach.json",
-      "visibility": "restricted"
+      "visibility": "public"
     },
     {
       "id": "empi-coordinator",

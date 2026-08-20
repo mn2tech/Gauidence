@@ -40,8 +40,9 @@ export default async function ExpertsPage({ searchParams }: PageProps) {
         <section className="mx-auto max-w-6xl px-6 py-14">
           <h1 className="text-2xl font-bold tracking-tight">Guardian Experts</h1>
           <p className="mt-2 max-w-2xl text-sm text-ink-muted">
-            Install reusable experts for structured learning, practice, and guided Q&amp;A.
-            Each expert is defined by versioned JSON and keeps your progress in Guardian.
+            Student grade packages help with typical class material for that year — starting
+            with 9th grade. You can also install other experts for structured learning and
+            guided Q&amp;A. Progress stays in Guardian.
           </p>
           <div className="mt-8">
             <ExpertCatalog

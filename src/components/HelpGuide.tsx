@@ -215,8 +215,10 @@ export default function HelpGuide({ signedIn }: { signedIn: boolean }) {
             <p className="mt-2 text-sm leading-relaxed text-ink-muted">
               Think of Guardian as a smart binder for school. You scan syllabi and
               assignments, jot quick Daily Logs when something changes, and ask
-              Gideon when you forget a due date or what you wrote last week. It
-              helps you stay organized — it does not do your homework for you.
+              Gideon when you forget a due date. 9th graders can install the{" "}
+              <strong>9th Grade Success Package</strong> for help with typical
+              freshman material (Algebra I, English 9, Biology, history) — it
+              coaches understanding and does not do graded homework for you.
             </p>
           </div>
         </div>
@@ -263,23 +265,28 @@ export default function HelpGuide({ signedIn }: { signedIn: boolean }) {
         <ol className="mt-5 space-y-2 text-sm text-ink-muted">
           <li>
             <span className="font-semibold text-foreground">1.</span> Create a{" "}
-            <strong>Student</strong> vault (add school name / grade if you like).
+            <strong>Student</strong> vault and set your grade (choose 9th for the
+            freshman success package).
           </li>
           <li>
-            <span className="font-semibold text-foreground">2.</span> Scan or
+            <span className="font-semibold text-foreground">2.</span> Open{" "}
+            <Link href="/experts" className="font-semibold text-brand hover:text-brand-dark">
+              Experts
+            </Link>{" "}
+            and install your grade package (Grade 9 is ready; 10–12 coming soon).
+          </li>
+          <li>
+            <span className="font-semibold text-foreground">3.</span> Scan or
             upload your syllabus.
           </li>
           <li>
-            <span className="font-semibold text-foreground">3.</span> Write one
+            <span className="font-semibold text-foreground">4.</span> Write one
             Daily Log for what&apos;s due this week.
           </li>
           <li>
-            <span className="font-semibold text-foreground">4.</span> Ask Gideon
-            about deadlines or your notes.
-          </li>
-          <li>
-            <span className="font-semibold text-foreground">5.</span> Turn on
-            email reminders in Settings for date alerts from your documents.
+            <span className="font-semibold text-foreground">5.</span> Ask Gideon
+            about deadlines or your notes — and use the grade package Ask for
+            class topics.
           </li>
         </ol>
 
@@ -300,6 +307,12 @@ export default function HelpGuide({ signedIn }: { signedIn: boolean }) {
             >
               Create student vault
               <ArrowRight className="h-4 w-4" aria-hidden />
+            </Link>
+            <Link
+              href="/experts"
+              className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-semibold hover:bg-stone-50"
+            >
+              Grade packages
             </Link>
             <Link
               href="/ask"

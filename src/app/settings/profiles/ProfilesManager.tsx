@@ -16,7 +16,7 @@ import {
   type GuardianProfile,
   type ProfileCreateGroupId,
 } from "@/lib/profiles/types";
-import { dispatchAwardsFromResponse } from "@/lib/awards/client";
+import GradeLevelSelect from "@/components/GradeLevelSelect";
 
 export default function ProfilesManager() {
   const router = useRouter();
@@ -515,12 +515,11 @@ export default function ProfilesManager() {
                     </label>
                     <label className="block text-sm">
                       <span className="text-ink-muted">Grade (optional)</span>
-                      <input
+                      <GradeLevelSelect
                         value={extra.gradeLevel ?? ""}
-                        onChange={(e) =>
-                          setExtra((x) => ({ ...x, gradeLevel: e.target.value }))
+                        onChange={(gradeLevel) =>
+                          setExtra((x) => ({ ...x, gradeLevel }))
                         }
-                        className="mt-1 w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none ring-brand focus:ring-2"
                       />
                     </label>
                   </>

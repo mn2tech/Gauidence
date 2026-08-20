@@ -4,12 +4,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { GraduationCap, Loader2, Plus, Users } from "lucide-react";
 import { useActiveProfile } from "@/components/ProfileProvider";
-import {
-  canManageProfileAccess,
-  studentsOf,
-  unlinkedOfTypes,
-  type GuardianProfile,
-} from "@/lib/profiles/types";
+import GradeLevelSelect from "@/components/GradeLevelSelect";
 
 type Props = {
   parent: GuardianProfile;
@@ -209,12 +204,7 @@ export default function LinkedStudentsPanel({ parent }: Props) {
           </label>
           <label className="block text-sm">
             <span className="text-ink-muted">Grade (optional)</span>
-            <input
-              value={gradeLevel}
-              onChange={(e) => setGradeLevel(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none ring-brand focus:ring-2"
-              placeholder="10th"
-            />
+            <GradeLevelSelect value={gradeLevel} onChange={setGradeLevel} />
           </label>
           <div className="flex flex-wrap gap-2">
             <button

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ExpertCatalogItem } from "@/lib/experts/expert-schema";
 import type { GuardianProfile } from "@/lib/profiles/types";
+import { isStudentGradePackageExpert } from "@/lib/experts/student-packages";
 
 type Props = {
   expert: ExpertCatalogItem | null;
@@ -12,6 +13,16 @@ type Props = {
   onConfirm: (profileId: string) => Promise<void>;
 };
 
+function preferredProfileId(expert: ExpertCatalogItem, profiles: GuardianProfile[]): string {
+  if (isStudentGradePackageExpert(expert.id)) {
+    const student = profiles.find(
+      (profile) => profile.profile_type === "student" || profile.profile_type === "child"
+    );
+    if (student) return student.id;
+  }
+  return profiles[0]?.id ?? "";
+}
+
 export default function ExpertInstallDialog({
   expert,
   profiles,
@@ -19,8 +30,13 @@ export default function ExpertInstallDialog({
   onClose,
   onConfirm,
 }: Props) {
-  const [profileId, setProfileId] = useState(profiles[0]?.id ?? "");
+  const [profileId, setProfileId] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!open || !expert) return;
+    setProfileId(preferredProfileId(expert, profiles));
+  }, [open, expert, profiles]);
 
   if (!open || !expert) return null;
 
@@ -36,6 +52,11 @@ export default function ExpertInstallDialog({
           Install {expert.name}
         </h2>
         <p className="mt-2 text-sm text-ink-muted">{expert.description}</p>
+        {isStudentGradePackageExpert(expert.id) ? (
+          <p className="mt-2 text-xs text-ink-muted">
+            Install this on a Student vault so Ask, lessons, and quizzes stay with school work.
+          </p>
+        ) : null}
 
         <label className="mt-5 block text-sm font-medium">
           Choose profile
