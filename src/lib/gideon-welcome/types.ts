@@ -23,6 +23,8 @@ export type GideonWelcomeSpaceStats = {
   upcomingAlertsCount: number;
   openRequestCount: number;
   hasAnyData: boolean;
+  /** Ask Gideon questions derived from uploaded documents in this Space. */
+  documentQuestions?: string[];
 };
 
 export type GideonWelcomeViewModel = {

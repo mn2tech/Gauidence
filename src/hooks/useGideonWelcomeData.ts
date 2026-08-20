@@ -15,6 +15,11 @@ import {
 } from "@/lib/simple-home/helpers";
 import { calendarDateInUserZone } from "@/lib/timezone";
 import { isOrgStyleProfile } from "@/lib/profiles/types";
+import {
+  buildQuestionsFromDocuments,
+  orgsFromSpecialist,
+  parseStoredSuggestedQuestions,
+} from "@/lib/gideon/documentQuestions";
 
 const EMPTY_STATS: GideonWelcomeSpaceStats = {
   category: "personal",
@@ -25,6 +30,7 @@ const EMPTY_STATS: GideonWelcomeSpaceStats = {
   upcomingAlertsCount: 0,
   openRequestCount: 0,
   hasAnyData: false,
+  documentQuestions: [],
 };
 
 const AWAITING_PROPOSAL_STATUSES = new Set(["sent", "viewed"]);
@@ -152,6 +158,8 @@ export function useGideonWelcomeData() {
         alertsRes,
         requestsRes,
         businessCounts,
+        extractedRes,
+        recentDocRowsRes,
       ] = await Promise.all([
         supabase
           .from("documents")
@@ -188,7 +196,37 @@ export function useGideonWelcomeData() {
               leadsNeedFollowUp: 0,
               proposalsAwaitingResponse: 0,
             }),
+        supabase
+          .from("extracted_data")
+          .select(
+            "document_id, document_type, title, summary, suggested_questions, specialist"
+          )
+          .eq("profile_id", profileId)
+          .order("updated_at", { ascending: false })
+          .limit(8),
+        supabase
+          .from("documents")
+          .select("id, file_name")
+          .eq("profile_id", profileId)
+          .order("created_at", { ascending: false })
+          .limit(8),
       ]);
+
+      let extractedRows = extractedRes.data ?? [];
+      if (
+        extractedRes.error &&
+        /suggested_questions|schema cache|could not find/i.test(
+          extractedRes.error.message
+        )
+      ) {
+        const fallback = await supabase
+          .from("extracted_data")
+          .select("document_id, document_type, title, summary, specialist")
+          .eq("profile_id", profileId)
+          .order("updated_at", { ascending: false })
+          .limit(8);
+        extractedRows = fallback.data ?? [];
+      }
 
       const docTotal = docsTotalRes.count ?? 0;
       const logTotal = logsTotalRes.count ?? 0;
@@ -197,6 +235,35 @@ export function useGideonWelcomeData() {
         (recentDocsRes.count ?? 0) + (recentLogsRes.count ?? 0);
       const upcomingAlertsCount = alertsRes.count ?? 0;
       const openRequestCount = requestsRes.count ?? 0;
+
+      const nameById = new Map(
+        (recentDocRowsRes.data ?? []).map((d) => [
+          String(d.id),
+          String(d.file_name ?? ""),
+        ])
+      );
+      let documentQuestions = buildQuestionsFromDocuments(
+        extractedRows.map((row) => ({
+          title: typeof row.title === "string" ? row.title : null,
+          fileName: nameById.get(String(row.document_id)) ?? null,
+          documentType:
+            typeof row.document_type === "string" ? row.document_type : null,
+          summary: typeof row.summary === "string" ? row.summary : null,
+          organizations: orgsFromSpecialist(row.specialist),
+          suggestedQuestions: parseStoredSuggestedQuestions(
+            "suggested_questions" in row ? row.suggested_questions : null
+          ),
+        }))
+      );
+
+      // If analysis rows are missing, still seed from filenames.
+      if (!documentQuestions.length && (recentDocRowsRes.data ?? []).length) {
+        documentQuestions = buildQuestionsFromDocuments(
+          (recentDocRowsRes.data ?? []).map((d) => ({
+            fileName: String(d.file_name ?? ""),
+          }))
+        );
+      }
 
       const hasSpaceData =
         docTotal +
@@ -219,6 +286,7 @@ export function useGideonWelcomeData() {
         upcomingAlertsCount,
         openRequestCount,
         hasAnyData: hasSpaceData || hasBusinessData,
+        documentQuestions,
       };
 
       const isNewUser =

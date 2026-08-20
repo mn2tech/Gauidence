@@ -33,6 +33,10 @@ import {
 } from "@/lib/vault/gideon";
 import { isMusicPracticeChatContext } from "@/lib/connectors/trello/boundSpace";
 import { buildGideonQuickActions } from "@/lib/gideon/chiefOfStaff";
+import {
+  orgsFromSpecialist,
+  parseStoredSuggestedQuestions,
+} from "@/lib/gideon/documentQuestions";
 import { loadAttachedVaultDocument } from "@/lib/vault/attachedDocument";
 import {
   citationFromDocument,
@@ -601,17 +605,39 @@ export async function GET(request: Request) {
     if (docCount > 0 || connectedHints.hasConnectedCharts) {
       const hints: VaultDocHint[] = [];
       if (docCount > 0) {
-        const { data: extracted } = await supabase
+        const extractedQuery = await supabase
           .from("extracted_data")
-          .select("document_id, document_type, guardian_status, title")
+          .select(
+            "document_id, document_type, guardian_status, title, summary, suggested_questions, specialist"
+          )
           .eq("profile_id", active.id);
+        let extractedRows = extractedQuery.data ?? [];
+        if (
+          extractedQuery.error &&
+          /suggested_questions|schema cache|could not find/i.test(
+            extractedQuery.error.message
+          )
+        ) {
+          const fallback = await supabase
+            .from("extracted_data")
+            .select(
+              "document_id, document_type, guardian_status, title, summary, specialist"
+            )
+            .eq("profile_id", active.id);
+          extractedRows = fallback.data ?? [];
+        }
         const nameById = new Map(docs.map((d) => [d.id, d.file_name]));
         hints.push(
-          ...(extracted ?? []).map((row) => ({
+          ...extractedRows.map((row) => ({
             documentType: row.document_type,
             guardianStatus: row.guardian_status,
             title: row.title,
+            summary: typeof row.summary === "string" ? row.summary : null,
             fileName: nameById.get(row.document_id) ?? null,
+            organizations: orgsFromSpecialist(row.specialist),
+            suggestedQuestions: parseStoredSuggestedQuestions(
+              "suggested_questions" in row ? row.suggested_questions : null
+            ),
           }))
         );
         if (hints.length === 0) {

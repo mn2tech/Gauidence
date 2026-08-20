@@ -13,6 +13,7 @@ import { isJsonMimeOrName, normalizeJsonText } from "@/lib/analysis/jsonText";
 import { toDisplayFacts, collectDeadlines } from "@/lib/analysis/display";
 import { documentTypeToCategory } from "@/lib/analysis/llm";
 import type { AnalysisStatus } from "@/lib/analysis/types";
+import { buildOrganizationAiOutput } from "@/lib/organization/buildFromAnalysis";
 import { withLlmUsage } from "@/lib/usage/record";
 import {
   createDiagnostics,
@@ -209,6 +210,12 @@ export async function executeDocumentAnalysis(
         }
       : {};
 
+  const suggestedQuestions = buildOrganizationAiOutput(
+    analysis,
+    classification,
+    null
+  ).suggested_questions;
+
   const { error: saveError } = await supabase.from("extracted_data").upsert(
     {
       document_id: doc.id,
@@ -223,6 +230,7 @@ export async function executeDocumentAnalysis(
       guardian_status: analysis.guardian_status,
       overall_confidence: analysis.overall_confidence,
       warnings: analysis.warnings,
+      suggested_questions: suggestedQuestions,
       specialist: {
         ...analysis.specialist,
         routed_to: routedTo,
@@ -243,10 +251,11 @@ export async function executeDocumentAnalysis(
     { onConflict: "document_id" }
   );
   if (saveError) {
-    const missingVisionCol = /vision_|content_type|analysis_type|schema cache/i.test(
-      saveError.message
-    );
-    if (missingVisionCol && Object.keys(visionFields).length) {
+    const missingOptionalCol =
+      /vision_|content_type|analysis_type|suggested_questions|schema cache|could not find/i.test(
+        saveError.message
+      );
+    if (missingOptionalCol) {
       const retry = await supabase.from("extracted_data").upsert(
         {
           document_id: doc.id,

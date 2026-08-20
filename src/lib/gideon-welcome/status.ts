@@ -121,10 +121,36 @@ function buildEmptyActions(profileId?: string): GideonWelcomeAction[] {
   ];
 }
 
+function buildDocumentAskActions(
+  questions: string[],
+  profileId?: string
+): GideonWelcomeAction[] {
+  return questions.slice(0, 3).map((question, index) => ({
+    id: `doc-q-${index}`,
+    label: question,
+    href: askHref(question, profileId),
+    question,
+  }));
+}
+
 function buildBusinessActions(
   stats: GideonWelcomeSpaceStats,
   profileId?: string
 ): GideonWelcomeAction[] {
+  const docQuestions = (stats.documentQuestions ?? []).filter(Boolean);
+  if (docQuestions.length > 0) {
+    const actions = buildDocumentAskActions(docQuestions, profileId);
+    actions.push({
+      id: "ask",
+      label: "Ask Gideon",
+      href: profileId ? `${ASK_GIDEON_PATH}?profileId=${profileId}` : ASK_GIDEON_PATH,
+    });
+    if (actions.length < 4) {
+      actions.push({ id: "add", label: "Add something", href: ADD_ANYTHING_PATH });
+    }
+    return actions.slice(0, 4);
+  }
+
   const actions: GideonWelcomeAction[] = [
     {
       id: "attention",
@@ -158,6 +184,20 @@ function buildGeneralActions(
   stats: GideonWelcomeSpaceStats,
   profileId?: string
 ): GideonWelcomeAction[] {
+  const docQuestions = (stats.documentQuestions ?? []).filter(Boolean);
+  if (docQuestions.length > 0) {
+    const actions = buildDocumentAskActions(docQuestions, profileId);
+    actions.push({
+      id: "ask",
+      label: "Ask Gideon",
+      href: profileId ? `${ASK_GIDEON_PATH}?profileId=${profileId}` : ASK_GIDEON_PATH,
+    });
+    if (actions.length < 4) {
+      actions.push({ id: "add", label: "Add something", href: ADD_ANYTHING_PATH });
+    }
+    return actions.slice(0, 4);
+  }
+
   const actions: GideonWelcomeAction[] = [
     {
       id: "attention",

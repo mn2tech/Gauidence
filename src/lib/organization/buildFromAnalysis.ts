@@ -65,19 +65,41 @@ function inferTags(analysis: GuardianAnalysis): string[] {
 
 function inferQuestions(analysis: GuardianAnalysis): string[] {
   const qs: string[] = [];
+  const blob = [
+    analysis.title,
+    analysis.summary,
+    analysis.document_type,
+    ...analysis.organizations,
+    ...analysis.facts.slice(0, 8).map((f) => `${f.label} ${f.value}`),
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  for (const org of analysis.organizations.slice(0, 2)) {
+    const short = org.trim().split(/\s+/).slice(0, 3).join(" ");
+    if (short.length >= 2) qs.push(`What do we know about ${short}?`);
+  }
+  if (/\b(fee|fees|compensation)\b/i.test(blob)) {
+    qs.push("What does this say about fees?");
+  }
+  if (/\bconflict/i.test(blob)) {
+    qs.push("What conflicts are disclosed?");
+  }
+  if (/\b(service|services|planning|portfolio|advisory)\b/i.test(blob)) {
+    qs.push("What services are described?");
+  }
   if (analysis.title) {
-    qs.push(`What is this document about (${analysis.title})?`);
+    qs.push(`Summarize ${analysis.title.split(/\s+/).slice(0, 4).join(" ")}`);
+  } else if (analysis.facts.length > 0) {
+    qs.push("Summarize the key details.");
   }
-  if (analysis.people.length > 0) {
-    qs.push(`Who is mentioned in this document?`);
+  if (analysis.people.length > 0 && qs.length < 4) {
+    qs.push("Who is mentioned in this document?");
   }
-  if (analysis.important_dates.length > 0) {
-    qs.push(`What are the important dates?`);
+  if (analysis.important_dates.length > 0 && qs.length < 4) {
+    qs.push("What are the important dates?");
   }
-  if (analysis.facts.length > 0) {
-    qs.push(`Summarize the key details.`);
-  }
-  return qs.slice(0, 5);
+  return [...new Set(qs)].slice(0, 5);
 }
 
 /** Build and validate organization AI output from pipeline analysis. */
