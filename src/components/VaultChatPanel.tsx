@@ -485,6 +485,7 @@ type VaultMessage = {
   role: "user" | "assistant";
   content: string;
   citations?: Citation[] | null;
+  suggestedQuestions?: string[] | null;
   attachment?: VaultMessageAttachment | null;
   attachments?: VaultMessageAttachment[] | null;
   vaultScope?: {
@@ -755,6 +756,29 @@ function writeConfirmedDailyLogIds(chatId: string | null, ids: Set<string>) {
 
 function isChatNotFoundError(message: string): boolean {
   return message === "Chat not found." || message === "Chat not found";
+}
+
+const GIDEON_GENERIC_REQUEST_ERROR =
+  "Gideon couldn't complete that request. Please try again.";
+
+/** Map browser/network/raw errors to user-facing copy without masking auth errors. */
+function friendlyGideonError(message: string | null | undefined, code?: string): string {
+  const raw = (message ?? "").trim();
+  if (code === "unauthorized" || code === "forbidden" || /not authorized|forbidden|permission|access denied/i.test(raw)) {
+    return raw || "You don't have permission to do that in this space.";
+  }
+  if (
+    !raw ||
+    /^failed to fetch$/i.test(raw) ||
+    /^networkerror/i.test(raw) ||
+    /^load failed$/i.test(raw) ||
+    /^network error$/i.test(raw) ||
+    /networkrequestfailed/i.test(raw) ||
+    /err_network|econnrefused|econnreset|etimedout/i.test(raw)
+  ) {
+    return GIDEON_GENERIC_REQUEST_ERROR;
+  }
+  return raw;
 }
 
 function readUrlChatId(): string | null {
@@ -2853,8 +2877,11 @@ export default function VaultChatPanel({
         }
         setInput(question);
         setError(
-          errBody.error ??
-            "I couldn't complete that request right now. Please try again.",
+          friendlyGideonError(
+            errBody.error ??
+              "I couldn't complete that request right now. Please try again.",
+            errBody.code
+          ),
           errBody.code
         );
         return;
@@ -2954,7 +2981,7 @@ export default function VaultChatPanel({
               });
             }
             setInput(question);
-            setError(message, code);
+            setError(friendlyGideonError(message, code), code);
           },
         });
         return;
@@ -2981,9 +3008,11 @@ export default function VaultChatPanel({
       }
       setInput(question);
       setError(
-        err instanceof Error && err.message.trim()
-          ? err.message
-          : "I couldn't complete that request right now. Please try again."
+        friendlyGideonError(
+          err instanceof Error && err.message.trim()
+            ? err.message
+            : GIDEON_GENERIC_REQUEST_ERROR
+        )
       );
     } finally {
       setSending(false);
@@ -3121,6 +3150,7 @@ export default function VaultChatPanel({
       hideCitationPreviews?: boolean;
       userMessage?: VaultMessage;
       isStreaming?: boolean;
+      showSuggestedQuestions?: boolean;
     }
   ) => {
     const proposedReminder = parseProposedReminder(m.content, Date.now(), timeZone);
@@ -3820,6 +3850,30 @@ export default function VaultChatPanel({
             ))}
           </div>
         ) : null}
+        {!options?.isStreaming &&
+        options?.showSuggestedQuestions &&
+        m.role === "assistant" &&
+        Array.isArray(m.suggestedQuestions) &&
+        m.suggestedQuestions.length > 0 ? (
+          <div className="space-y-2 pt-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
+              You might also ask
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {m.suggestedQuestions.slice(0, 4).map((q) => (
+                <button
+                  key={q}
+                  type="button"
+                  disabled={sending || vaultBusy || Boolean(streamingAssistantId)}
+                  onClick={() => void sendQuestion(q)}
+                  className="min-h-10 max-w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-left text-xs font-medium leading-snug text-foreground transition hover:border-brand hover:bg-brand-light/40 disabled:opacity-50 sm:min-h-0 sm:rounded-full sm:py-1.5"
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
         {showActions ? (
           <GideonAssistantActions
             messageId={m.id}
@@ -4464,6 +4518,13 @@ export default function VaultChatPanel({
                       ? messages[index - 1]
                       : undefined,
                   isStreaming: streamingAssistantId === m.id,
+                  showSuggestedQuestions:
+                    !streamingAssistantId &&
+                    index ===
+                      messages.reduce(
+                        (last, msg, i) => (msg.role === "assistant" ? i : last),
+                        -1
+                      ),
                 })}
                   </>
                 )}

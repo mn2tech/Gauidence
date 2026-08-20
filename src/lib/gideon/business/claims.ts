@@ -75,15 +75,25 @@ export function formatEvidenceAnswerFromClaims(claims: GideonClaim[]): string {
   if (!claims.length) {
     return [
       "I do not have stored claim evidence from the immediately preceding answer in this chat.",
-      "Ask a business question first (for example about a client, proposal, or relationship), then ask where the information came from.",
+      "Ask a question about this Space first, then ask which source supports the answer.",
     ].join("\n");
   }
 
-  const lines = ["I used these Guardian sources:"];
+  const lines = [
+    "These are the sources that supported the prior answer in this conversation:",
+  ];
   let i = 1;
   const seen = new Set<string>();
   for (const claim of claims) {
     for (const ev of claim.evidence) {
+      // Ontology-only labels without a document/proposal source are not citable files.
+      if (
+        ev.sourceType === "ontology_entity" &&
+        !ev.href &&
+        !/document|form|pdf|crs|adv/i.test(ev.label ?? "")
+      ) {
+        continue;
+      }
       const key = `${ev.sourceType}:${ev.sourceId}:${ev.label ?? ""}`;
       if (seen.has(key)) continue;
       seen.add(key);
@@ -99,5 +109,13 @@ export function formatEvidenceAnswerFromClaims(claims: GideonClaim[]): string {
     }
     if (i > 10) break;
   }
+
+  if (i === 1) {
+    return [
+      "I could not identify a concrete uploaded source from the prior turn's evidence.",
+      "Ask again after a document-grounded answer, or open the Source chips on that reply when present.",
+    ].join("\n");
+  }
+
   return lines.join("\n");
 }

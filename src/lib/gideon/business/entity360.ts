@@ -11,6 +11,7 @@ import {
 import { formatMoney } from "@/lib/proposals/pricing";
 import { PROPOSAL_SELECT } from "@/lib/proposals/types";
 import { mapProposalRow } from "@/lib/proposals/server";
+import { findMentionedButUnavailable } from "@/lib/gideon/evidenceBoundaries";
 import { shouldExcludeFromBusinessOntology } from "./knowledgeFilter";
 import { listCommitmentsForClient } from "./commitments";
 import type { Entity360, Entity360Evidence, GideonClaim } from "./types";
@@ -524,7 +525,27 @@ export async function buildEntity360(
       sourceType: ev.source_type,
     }));
 
+  const availableDocLabels = evidence
+    .map((ev) => ev.documentName)
+    .filter((n): n is string => Boolean(n?.trim()));
+
+  const evidenceTexts = [
+    resolved.entity.description ?? "",
+    ...evidence.map((ev) => ev.text),
+    ...assessments.map((a) => `${a.name} ${a.summary ?? ""}`),
+  ];
+
+  const mentionedUnavailable = findMentionedButUnavailable({
+    evidenceTexts,
+    availableDocumentLabels: availableDocLabels,
+  });
+
   const gaps: string[] = [];
+  for (const ref of mentionedUnavailable.slice(0, 3)) {
+    gaps.push(
+      `Available sources reference ${ref}, but that document does not appear to be available in this Space.`
+    );
+  }
   if (!proposals.length) {
     gaps.push(
       "Guardian currently shows no matching proposals linked to this entity by client name."
@@ -575,7 +596,7 @@ export async function buildEntity360(
 
   const claims: GideonClaim[] = [];
   claims.push({
-    claim: `${entity360.entity.name} appears in Guardian as a ${entity360.entity.type}.`,
+    claim: `${entity360.entity.name} appears in this Space as a ${entity360.entity.type}.`,
     kind: "KNOWN_FACT",
     confidence: resolved.confidence,
     evidence: evidence.slice(0, 2).map((ev) => ({
@@ -605,10 +626,18 @@ export async function buildEntity360(
     });
   }
   for (const a of assessments.slice(0, 2)) {
+    const hasSourceDoc = evidence.some(
+      (ev) =>
+        ev.documentId &&
+        (ev.documentName?.toLowerCase().includes(a.name.toLowerCase().slice(0, 10)) ||
+          a.name.toLowerCase().includes((ev.documentName ?? "").toLowerCase().slice(0, 10)))
+    );
     claims.push({
-      claim: `Guardian contains ${a.name} related to ${entity360.entity.name}.`,
+      claim: hasSourceDoc
+        ? `${a.name} is available in this Space and relates to ${entity360.entity.name}.`
+        : `${a.name} is mentioned in connection with ${entity360.entity.name}; confirm whether the source file is uploaded.`,
       kind: "KNOWN_FACT",
-      confidence: 0.75,
+      confidence: hasSourceDoc ? 0.75 : 0.45,
       evidence: [
         {
           sourceId: a.id,
@@ -695,20 +724,19 @@ export async function buildMentionKnowledgeBrief(
     )
     .slice(0, 6);
 
-  const parts: string[] = [
-    mention.toUpperCase(),
-    "",
-    "Relationship",
+  const parts: string[] = [];
+  parts.push(
     orgs.length
-      ? `${mention} appears in Guardian ontology as: ${orgs
-          .map((o) => `${o.name} (${o.entity_type})`)
+      ? `${mention} appears in this Space as: ${orgs
+          .map((o) => o.name)
+          .slice(0, 4)
           .join(", ")}.`
-      : `Guardian does not yet have a dedicated client/organization entity named ${mention}, but related knowledge was found in this Space.`,
-    "",
-  ];
+      : `Guardian does not yet have a dedicated organization entity named ${mention}, but related knowledge was found in this Space.`
+  );
+  parts.push("");
 
   if (assessments.length) {
-    parts.push("Assessments / Documents");
+    parts.push("Important details");
     for (const a of assessments) {
       const desc = (a.description ?? "").trim();
       // Keep short business prose — not every extracted attribute.
@@ -736,7 +764,7 @@ export async function buildMentionKnowledgeBrief(
   }
 
   if (proposals.length) {
-    parts.push("Commercial Activity");
+    parts.push("Commercial activity");
     for (const p of proposals.slice(0, 5)) {
       parts.push(
         `• ${p.title} — ${formatMoney(p.total_cents, p.currency)} (status: ${p.status})`
@@ -747,42 +775,45 @@ export async function buildMentionKnowledgeBrief(
 
   if (people.length) {
     parts.push("People");
-    for (const p of people) parts.push(`• ${p.name} (${p.entity_type})`);
+    for (const p of people) parts.push(`• ${p.name}`);
     parts.push("");
   }
 
   if (other.length) {
     parts.push("Related knowledge");
     for (const o of other) {
-      parts.push(`• ${o.name} (${o.entity_type})`);
+      parts.push(`• ${o.name}`);
     }
     parts.push("");
   }
 
-  parts.push("Items Requiring Attention");
-  parts.push("Gideon recommendation:");
+  const gapBits: string[] = [];
   if (!orgs.length) {
-    parts.push(
-      `• Confirm ${mention} as a canonical client/organization in Ontology so future Entity 360 answers are stronger.`
+    gapBits.push(
+      `Confirm the exact name used for ${mention} so future summaries are stronger.`
     );
   }
-  if (assessments.length) {
-    parts.push(
-      "• Review whether assessment findings and remediation were completed."
+  if (proposals.length && !assessments.length) {
+    gapBits.push(
+      "Confirm whether supporting documents for these proposals are uploaded in this Space."
     );
   }
-  if (proposals.length) {
-    parts.push("• Confirm status of related proposals and whether a project should be opened.");
+  if (gapBits.length) {
+    parts.push("Missing information");
+    for (const g of gapBits) parts.push(`• ${g}`);
+    parts.push("");
   }
-  parts.push("");
-  parts.push("Sources");
-  for (const a of assessments.slice(0, 4)) parts.push(`• ${a.name}`);
-  for (const p of proposals.slice(0, 3)) parts.push(`• ${p.title} (proposal)`);
+
+  if (assessments.length || proposals.length) {
+    parts.push("Sources");
+    for (const a of assessments.slice(0, 4)) parts.push(`• ${a.name}`);
+    for (const p of proposals.slice(0, 3)) parts.push(`• ${p.title}`);
+  }
 
   const claims: GideonClaim[] = [];
   for (const a of assessments.slice(0, 3)) {
     claims.push({
-      claim: `Guardian contains ${a.name} related to ${mention}.`,
+      claim: `${a.name} is related to ${mention} in this Space's knowledge.`,
       kind: "KNOWN_FACT",
       confidence: 0.7,
       evidence: [

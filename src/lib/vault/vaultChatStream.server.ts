@@ -46,6 +46,8 @@ import { refreshUserAwards } from "@/lib/awards/grant";
 import { formatVaultChatError, buildGideonEmptyAnswerFallback } from "@/lib/vault/vaultChatErrors";
 import { buildListAnswerFromChunks } from "@/lib/vault/gideon";
 import { buildOntologyAnswerFallback } from "@/lib/ontology/formatForGideon";
+import { buildSuggestedQuestions, parseSuggestedQuestions } from "@/lib/gideon/suggestedQuestions";
+import { extractBusinessEntityMentions } from "@/lib/gideon/business/queryPlanner";
 import {
   listActionTimeline,
   recordActionEvent,
@@ -296,6 +298,18 @@ export function createVaultChatStreamResponse(
         }
         const citations = markImageCitations(dedupeVaultCitations(selected));
 
+        const suggestedQuestions = buildSuggestedQuestions({
+          question: args.question,
+          answer,
+          entityNames: extractBusinessEntityMentions(args.question),
+          availableDocumentLabels: citations.map((c) => c.fileName),
+          evidenceTexts: args.chunks
+            .slice(0, 8)
+            .map((c) => c.content ?? "")
+            .filter(Boolean),
+          preferEvidenceOrGap: true,
+        });
+
         const resolvedWriteVault = resolveGideonWriteVault({
           question: args.question,
           activeProfileId: defaultGideonWriteProfileId({
@@ -328,6 +342,7 @@ export function createVaultChatStreamResponse(
           role: string;
           content: string;
           citations: unknown;
+          suggested_questions?: unknown;
           created_at: string;
         } | null = null;
         let assistantError: { message?: string; code?: string } | null = null;
@@ -338,21 +353,24 @@ export function createVaultChatStreamResponse(
             .insert({
               ...baseInsert,
               ...(claimsPayload.length ? { claims: claimsPayload } : {}),
+              ...(suggestedQuestions.length
+                ? { suggested_questions: suggestedQuestions }
+                : {}),
             })
-            .select("id, role, content, citations, created_at")
+            .select("id, role, content, citations, suggested_questions, created_at")
             .single();
           assistantMsg = first.data;
           assistantError = first.error;
 
-          // Migration 0083 adds claims — retry without it if the column is missing.
-          const missingClaimsCol =
+          // Migrations 0083/0089 add claims + suggested_questions — retry without extras.
+          const missingExtraCol =
             Boolean(assistantError) &&
-            /claims|schema cache|could not find/i.test(
+            /claims|suggested_questions|schema cache|could not find/i.test(
               assistantError?.message ?? ""
             );
-          if ((!assistantMsg || assistantError) && missingClaimsCol) {
+          if ((!assistantMsg || assistantError) && missingExtraCol) {
             console.warn(
-              "vault_chat_messages.claims unavailable; saving without claims:",
+              "vault_chat_messages optional columns unavailable; saving core row:",
               assistantError?.message
             );
             const retry = await args.supabase
@@ -477,7 +495,14 @@ export function createVaultChatStreamResponse(
           chats,
           messages: [
             args.userMsg,
-            { ...assistantMsg, vaultScope: responseVaultScope },
+            {
+              ...assistantMsg,
+              vaultScope: responseVaultScope,
+              suggestedQuestions:
+                suggestedQuestions.length > 0
+                  ? suggestedQuestions
+                  : parseSuggestedQuestions(assistantMsg.suggested_questions),
+            },
           ],
           proposedReminder,
           newlyGranted,

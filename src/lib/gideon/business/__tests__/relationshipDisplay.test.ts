@@ -112,9 +112,10 @@ describe("relationshipDisplay", () => {
       "Onyx Government Services, LLC.",
       rows
     ).join("\n");
-    assert.match(text, /Serves \/ markets/);
+    assert.match(text, /offers or relates to|Department of Defense/i);
     assert.match(text, /Department of Defense/);
     assert.doesNotMatch(text, /Pasted - Job Description/);
     assert.doesNotMatch(text, /MENTIONED_IN/);
+    assert.doesNotMatch(text, /—\[/);
   });
 });

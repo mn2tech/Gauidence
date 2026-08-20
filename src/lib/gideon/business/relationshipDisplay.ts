@@ -2,6 +2,8 @@
  * Relationship display helpers for Business Intelligence (no server-only).
  */
 
+import { formatRelationshipProse } from "@/lib/gideon/evidenceBoundaries";
+
 const NOISY_REL_TYPES = /^(MENTIONED_IN|EXTRACTED_FROM|APPEARS_IN|DERIVED_FROM|FOUND_IN)$/i;
 
 const REL_TYPE_ALIASES: Record<string, string> = {
@@ -121,8 +123,7 @@ export function formatEntityRelationshipsAnswer(
 ): string[] {
   if (!rows.length) {
     return [
-      `Relationships involving ${entityName}:`,
-      "Guardian currently shows no ontology relationships for this entity.",
+      `Based on the information currently available in this Space, Guardian does not show ontology relationships for ${entityName} yet.`,
     ];
   }
 
@@ -136,17 +137,23 @@ export function formatEntityRelationshipsAnswer(
       !/^(HAS_PROJECT|WORKS_ON|OWNS)$/i.test(r.type)
   );
 
-  const lines: string[] = [`Relationships involving ${entityName}:`];
+  const lines: string[] = [
+    `${entityName} connects to the following based on Guardian's knowledge in this Space:`,
+  ];
 
   if (serves.length) {
-    lines.push("", "Serves / markets");
-    for (const r of serves.slice(0, 8)) {
-      lines.push(`• ${r.relatedName}`);
-    }
+    lines.push("");
+    lines.push(
+      `${entityName} offers or relates to: ${serves
+        .slice(0, 8)
+        .map((r) => r.relatedName)
+        .join(", ")}.`
+    );
   }
 
   if (projects.length) {
-    lines.push("", "Projects & assets");
+    lines.push("");
+    lines.push("Projects and assets");
     const seen = new Set<string>();
     for (const r of projects.slice(0, 10)) {
       const key = compactEntityKey(r.relatedName);
@@ -157,13 +164,17 @@ export function formatEntityRelationshipsAnswer(
   }
 
   if (other.length) {
-    lines.push("", "Other relationships");
+    lines.push("");
+    lines.push("Other connections");
     for (const r of other.slice(0, 6)) {
-      if (r.direction === "outgoing") {
-        lines.push(`• ${entityName} —[${r.type}]→ ${r.relatedName}`);
-      } else {
-        lines.push(`• ${r.relatedName} —[${r.type}]→ ${entityName}`);
-      }
+      lines.push(
+        `• ${formatRelationshipProse({
+          subject: entityName,
+          type: r.type,
+          related: r.relatedName,
+          direction: r.direction,
+        })}`
+      );
     }
   }
 

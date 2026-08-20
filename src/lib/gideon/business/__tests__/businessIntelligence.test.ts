@@ -44,6 +44,14 @@ describe("business query planner", () => {
       "EVIDENCE_REQUEST"
     );
     assert.equal(
+      detectBusinessQueryIntent("Which source supports this?"),
+      "EVIDENCE_REQUEST"
+    );
+    assert.equal(
+      detectBusinessQueryIntent("What information is missing?"),
+      "KNOWLEDGE_GAP"
+    );
+    assert.equal(
       detectBusinessQueryIntent("What should I focus on next?"),
       "ADVISORY"
     );
@@ -194,7 +202,7 @@ describe("claims and evidence", () => {
     ]);
     const answer = formatEvidenceAnswerFromClaims(claims);
     assert.match(answer, /Homepage Redesign Sprint Proposal/);
-    assert.match(answer, /Guardian sources/i);
+    assert.match(answer, /sources that supported/i);
   });
 });
 

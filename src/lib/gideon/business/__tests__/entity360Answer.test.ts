@@ -212,10 +212,13 @@ describe("formatEntity360UserAnswer", () => {
       gaps: [],
     };
     const text = formatEntity360UserAnswer(entity360);
-    assert.match(text, /NM2TECH|client\/prospect/i);
+    assert.match(text, /NM2TECH|client\/prospect|offers or relates/i);
     assert.doesNotMatch(text, /Authenticated Follow-up Review/);
     assert.match(text, /Homepage Redesign Sprint/);
     assert.doesNotMatch(text, /Washington Christian|Ashton Manor|SSVFD/);
+    assert.doesNotMatch(text, /—\[SERVES\]→/);
+    assert.doesNotMatch(text, /^Relationship$/m);
+    assert.doesNotMatch(text, /Guardian contains/i);
   });
 
   it("ignores mis-typed assessment PROPOSED_TO edges and uses CRM proposals", () => {

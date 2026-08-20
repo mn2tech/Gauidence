@@ -25,6 +25,8 @@ export type VaultChatStreamMessage = {
   role: "user" | "assistant";
   content: string;
   citations?: VaultChatCitation[];
+  /** Contextual follow-up chips for this assistant turn. */
+  suggestedQuestions?: string[];
   attachment?: {
     documentId: string;
     fileName: string;

@@ -62,6 +62,11 @@ import { assertBillingQuota, recordChatEvent } from "@/lib/billing/quota";
 import { refreshUserAwards } from "@/lib/awards/grant";
 import { createVaultChatStreamResponse } from "@/lib/vault/vaultChatStream.server";
 import { formatVaultChatError } from "@/lib/vault/vaultChatErrors";
+import {
+  buildSuggestedQuestions,
+  parseSuggestedQuestions,
+} from "@/lib/gideon/suggestedQuestions";
+import { extractBusinessEntityMentions } from "@/lib/gideon/business/queryPlanner";
 import { isChatLlmConfigured } from "@/lib/analysis/chatProvider";
 import { runDirectAction } from "@/lib/actions/runner.server";
 import { getMatchingActions } from "@/lib/actions/registry";
@@ -121,6 +126,8 @@ type ChatMessageRow = {
     mimeType?: string | null;
   }[];
   claims?: unknown;
+  suggested_questions?: unknown;
+  suggestedQuestions?: string[];
   vaultScope?: {
     profileId: string;
     profileName: string;
@@ -492,11 +499,25 @@ export async function GET(request: Request) {
 
     const { data: messages, error } = await supabase
       .from("vault_chat_messages")
-      .select("id, role, content, citations, created_at")
+      .select("id, role, content, citations, suggested_questions, created_at")
       .eq("chat_id", chat.id)
       .order("created_at", { ascending: true });
 
-    if (error) {
+    let historyRows = (messages ?? []) as ChatMessageRow[];
+    if (error && /suggested_questions|schema cache|could not find/i.test(error.message)) {
+      const fallback = await supabase
+        .from("vault_chat_messages")
+        .select("id, role, content, citations, created_at")
+        .eq("chat_id", chat.id)
+        .order("created_at", { ascending: true });
+      if (fallback.error) {
+        return NextResponse.json(
+          { error: "Couldn't load vault chat history." },
+          { status: 502 }
+        );
+      }
+      historyRows = (fallback.data ?? []) as ChatMessageRow[];
+    } else if (error) {
       return NextResponse.json(
         { error: "Couldn't load vault chat history." },
         { status: 502 }
@@ -517,7 +538,12 @@ export async function GET(request: Request) {
       chatId: chat.id,
       title: chat.title,
       messages: hydrateVaultChatMessages(
-        (messages ?? []) as ChatMessageRow[]
+        historyRows.map((row) => ({
+          ...row,
+          suggestedQuestions: parseSuggestedQuestions(
+            row.suggestedQuestions ?? row.suggested_questions
+          ),
+        }))
       ),
       meta: {
         profileId: chatProfile.id,
@@ -1599,6 +1625,15 @@ export async function POST(request: Request) {
     }
   }
 
+  const suggestedQuestions = buildSuggestedQuestions({
+    question,
+    answer,
+    entityNames: extractBusinessEntityMentions(question),
+    availableDocumentLabels: (citations ?? []).map((c) => c.fileName),
+    evidenceTexts: [answer],
+    preferEvidenceOrGap: true,
+  });
+
   const baseAssistantInsert = {
     chat_id: chatId,
     user_id: user.id,
@@ -1611,6 +1646,7 @@ export async function POST(request: Request) {
     role: string;
     content: string;
     citations: unknown;
+    suggested_questions?: unknown;
     created_at: string;
   } | null = null;
   let assistantError: { message?: string } | null = null;
@@ -1620,14 +1656,19 @@ export async function POST(request: Request) {
       .insert({
         ...baseAssistantInsert,
         ...(pendingClaims.length ? { claims: pendingClaims } : {}),
+        ...(suggestedQuestions.length
+          ? { suggested_questions: suggestedQuestions }
+          : {}),
       })
-      .select("id, role, content, citations, created_at")
+      .select("id, role, content, citations, suggested_questions, created_at")
       .single();
     assistantMsg = first.data;
     assistantError = first.error;
     if (
       (!assistantMsg || assistantError) &&
-      /claims|schema cache|could not find/i.test(assistantError?.message ?? "")
+      /claims|suggested_questions|schema cache|could not find/i.test(
+        assistantError?.message ?? ""
+      )
     ) {
       const retry = await supabase
         .from("vault_chat_messages")
@@ -1699,7 +1740,14 @@ export async function POST(request: Request) {
     chats,
     messages: hydrateVaultChatMessages([
       userMsg,
-      { ...assistantMsg, vaultScope: responseVaultScope },
+      {
+        ...assistantMsg,
+        vaultScope: responseVaultScope,
+        suggestedQuestions:
+          suggestedQuestions.length > 0
+            ? suggestedQuestions
+            : parseSuggestedQuestions(assistantMsg.suggested_questions),
+      },
     ] as ChatMessageRow[]),
     proposedReminder,
     newlyGranted,

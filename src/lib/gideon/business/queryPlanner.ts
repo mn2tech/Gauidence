@@ -21,7 +21,10 @@ const COMMITMENT_ANALYSIS =
   /\b(what (did we |have we )?(promise|promised|commit|committed)|commitments?|obligations?|deliverables? (to|for) (each )?client|what are we responsible for)\b/i;
 
 const EVIDENCE_REQUEST =
-  /\b(where did you get|where (did|does) that (come|info)|what('s| is) (your |the )?source|show (me )?(the )?evidence|cite (your |the )?sources?|how do you know|provenance)\b/i;
+  /\b(where did you get|where (did|does) that (come|info)|what('s| is) (your |the )?source|which source supports|show (me )?(the )?evidence|cite (your |the )?sources?|how do you know|provenance)\b/i;
+
+const KNOWLEDGE_GAP =
+  /\b(what (information |info )?(is |are )?(missing|unavailable|not (currently )?available)|what (can'?t|cannot) .{0,24}answer|what document should i add|what('s| is) missing|what would .{0,40} tell us)\b/i;
 
 const ADVISORY =
   /\b(what should i (focus|follow up|do|prioritize)|what needs (my )?attention|priorit(y|ies)|focus on next|what('s| is) (most )?important (next|now)|chief of staff)\b/i;
@@ -106,6 +109,8 @@ function strategyFor(intent: BusinessQueryIntent): string {
       return "commitments_by_client";
     case "EVIDENCE_REQUEST":
       return "prior_claims_only";
+    case "KNOWLEDGE_GAP":
+      return "gaps_from_entity_and_prior_claims";
     case "ADVISORY":
       return "business_state+priority_rank";
     case "BUSINESS_STATUS":
@@ -162,6 +167,13 @@ function flagsFor(intent: BusinessQueryIntent): Omit<
       return {
         requiresOntology: false,
         requiresStructuredData: false,
+        requiresSearch: false,
+        requiresEvidence: true,
+      };
+    case "KNOWLEDGE_GAP":
+      return {
+        requiresOntology: true,
+        requiresStructuredData: true,
         requiresSearch: false,
         requiresEvidence: true,
       };
@@ -244,6 +256,7 @@ export function detectBusinessQueryIntent(question: string): BusinessQueryIntent
   if (!q) return "GENERAL_KNOWLEDGE";
 
   if (EVIDENCE_REQUEST.test(q)) return "EVIDENCE_REQUEST";
+  if (KNOWLEDGE_GAP.test(q)) return "KNOWLEDGE_GAP";
   if (ADVISORY.test(q)) return "ADVISORY";
   if (COMMITMENT_ANALYSIS.test(q)) return "COMMITMENT_ANALYSIS";
   if (PROPOSAL_ANALYSIS.test(q)) return "PROPOSAL_ANALYSIS";

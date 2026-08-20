@@ -3,6 +3,11 @@
  * Instructs synthesis + facts vs recommendations — not raw dumps.
  */
 
+import {
+  findMentionedButUnavailable,
+  formatRelationshipProse,
+  inferencePrefix,
+} from "@/lib/gideon/evidenceBoundaries";
 import type {
   AdvisoryInsight,
   BusinessQueryPlan,
@@ -14,19 +19,23 @@ import type {
 export const BUSINESS_INTELLIGENCE_PROMPT_V11 = `BUSINESS INTELLIGENCE (Guardian Business Pack V1.1):
 You reason over Guardian organizational knowledge — do not dump raw ontology lists or internal workflow items.
 
-Response style:
-- Synthesize a concise business briefing with clear sections when relevant:
-  Entity Summary · Relationships · Proposals · Projects · Commitments · Risks · Recommendations · Sources
-- "Everything we know" means a comprehensive business summary, not every extracted fact.
-- Prefer identity, relationship, contacts, engagements, proposals, contracts, projects, commitments, risks, recent activity, and important evidence.
-- Never invent amounts, dates, statuses, or relationships. If missing, say "I could not find…" / "Guardian currently shows…".
-- Clearly separate:
-  Known from Guardian: … 
-  Gideon recommendation: …
-- Do not present recommendations as if they came from a source document.
-- Do not expose SYSTEM/PROCESS metadata (queued documents, extraction jobs, configure settings) as client facts.
-- For evidence questions, use PRIOR CLAIMS / SOURCES below — do not run a new unrelated search narrative.
-- Keep answers business-oriented and scannable. Offer drill-down ("ask for more detail on proposals") instead of dumping everything.`;
+Answer the user's question first in natural language. Never begin with ontology/database labels such as "Relationship", "MATCHED ENTITIES", "HAS_RELATIONSHIP", "entity_id", or lines like "Name —[SERVES]→ Target".
+
+Preferred adaptive structure (omit empty sections):
+1) Direct answer in plain prose
+2) Important details when useful
+3) Knowledge gaps when something is referenced but not available, or cannot be determined
+4) Sources / evidence (use available source names only)
+
+Evidence boundaries (strict):
+- AVAILABLE: only documents/sources actually present in RETRIEVED EXCERPTS, SPACE FILE INVENTORY, citations, or evidence rows with a real document id/name from this Space's authorized scope.
+- MENTIONED: a person, org, policy, form, or document named inside an AVAILABLE source. Mention ≠ available. Never say "this Space contains X" or "Guardian contains X" for something only mentioned.
+- INFERRED: conclusions you derive — prefix with "Based on the available information…" / "This suggests…" / "Guardian can infer…".
+
+If Document A references Document B, say B is referenced but not currently available unless retrieval confirms B is present.
+Do not invent fees, dates, statuses, or relationships. Do not expose SYSTEM/PROCESS metadata as client facts.
+For evidence questions, use PRIOR CLAIMS / SOURCES — only cite sources that were actually used.
+Keep answers business-oriented and scannable. Do not paste raw RELATIONSHIPS lists unless the user asked to inspect the ontology or knowledge graph.`;
 
 export function formatEntity360ForGideon(entity360: Entity360): string {
   const lines: string[] = [];
@@ -146,14 +155,55 @@ function formatCommercialLine(
   return `• ${head}${amount} (status: ${proposal.status})`;
 }
 
+function availableDocumentLabelsFromEntity360(entity360: Entity360): string[] {
+  const labels: string[] = [];
+  for (const ev of entity360.evidence) {
+    if (ev.documentId && ev.documentName) labels.push(ev.documentName);
+    else if (ev.documentId && ev.text) labels.push(ev.text.slice(0, 80));
+  }
+  return labels;
+}
+
+function evidenceCorpus(entity360: Entity360): string[] {
+  const texts: string[] = [];
+  if (entity360.entity.description) texts.push(entity360.entity.description);
+  for (const ev of entity360.evidence) texts.push(ev.text);
+  for (const a of entity360.assessments) {
+    if (a.summary) texts.push(a.summary);
+    texts.push(a.name);
+  }
+  return texts;
+}
+
+function pickEvidenceSnippets(entity360: Entity360, limit = 4): string[] {
+  const snippets: string[] = [];
+  for (const ev of entity360.evidence) {
+    const text = ev.text.replace(/\s+/g, " ").trim();
+    if (text.length < 24) continue;
+    snippets.push(text.slice(0, 220));
+    if (snippets.length >= limit) break;
+  }
+  return snippets;
+}
+
+function isLikelyDocumentEntity(item: {
+  name: string;
+  type: string;
+  summary?: string | null;
+}): boolean {
+  if (/^(document|policy|procedure|file)$/i.test(item.type)) return true;
+  return /\b(form\s+(adv|crs)|part\s+2a|handbook|policy|agreement|brochure)\b/i.test(
+    `${item.name} ${item.summary ?? ""}`
+  );
+}
+
 /**
- * User-facing Entity 360 answer — synthesized briefing, not a numbered fact dump.
+ * User-facing Entity 360 answer — natural-language briefing, not ontology syntax.
  */
 export function formatEntity360UserAnswer(entity360: Entity360): string {
   const name = entity360.entity.name;
-  const parts: string[] = [name, ""];
-
-  parts.push("Relationship");
+  const parts: string[] = [];
+  const availableDocs = availableDocumentLabelsFromEntity360(entity360);
   const usableRels = entity360.relationships.filter(
     (r) => !isNoisyRelatedName(r.relatedName)
   );
@@ -171,55 +221,93 @@ export function formatEntity360UserAnswer(entity360: Entity360): string {
         !isNoisyRelatedName(r.relatedName)
     );
 
-  if (preferredRel) {
-    if (/^SERVES$/i.test(preferredRel.type) && preferredRel.direction === "incoming") {
-      parts.push(
-        `${name} appears in Guardian as a client/prospect related to ${preferredRel.relatedName}.`
-      );
-    } else if (/^PROPOSED_TO$/i.test(preferredRel.type)) {
-      parts.push(
-        `Guardian links proposal activity involving ${name} (${preferredRel.relatedName}).`
-      );
-    } else if (preferredRel.direction === "incoming") {
-      parts.push(
-        `${preferredRel.relatedName} —[${preferredRel.type}]→ ${name}.`
-      );
-    } else {
-      parts.push(
-        `${name} —[${preferredRel.type}]→ ${preferredRel.relatedName}.`
-      );
-    }
+  const serveTargets = usableRels
+    .filter((r) => /^(SERVES|SERVICES|CLIENT_OF)$/i.test(r.type))
+    .map((r) => r.relatedName)
+    .filter((n) => !isNoisyRelatedName(n));
+
+  // --- Direct answer ---
+  const lead: string[] = [];
+  if (entity360.entity.description?.trim()) {
+    lead.push(
+      `${name} — ${entity360.entity.description.trim().replace(/\s+/g, " ").slice(0, 280)}`
+    );
+  } else if (serveTargets.length) {
+    lead.push(
+      `${name} is described in this Space as offering or relating to ${serveTargets
+        .slice(0, 4)
+        .join(", ")}.`
+    );
+  } else if (preferredRel) {
+    lead.push(
+      formatRelationshipProse({
+        subject: name,
+        type: preferredRel.type,
+        related: preferredRel.relatedName,
+        direction: preferredRel.direction,
+      })
+    );
   } else if (entity360.proposals.length) {
     const sample = entity360.proposals[0]?.title ?? "an open proposal";
-    parts.push(
-      `${name} appears in Guardian as a client/prospect with commercial proposal activity (${sample}).`
+    lead.push(
+      `${inferencePrefix()}, ${name} appears as a client or prospect with commercial proposal activity (${sample}).`
     );
-  } else if (entity360.entity.type) {
-    parts.push(
-      `${name} appears in Guardian as a ${entity360.entity.type}${
+  } else {
+    lead.push(
+      `${name} appears in this Space as a ${entity360.entity.type}${
         entity360.entity.domain ? ` (${entity360.entity.domain})` : ""
       }.`
     );
   }
+
+  const sourceHint = availableDocs[0];
+  if (sourceHint) {
+    lead.push(
+      `${inferencePrefix()} in ${sourceHint}, Guardian can summarize the details below.`
+    );
+  }
+  parts.push(lead.join(" "));
   parts.push("");
 
-  if (entity360.assessments.length || entity360.risks.length) {
-    parts.push("Current Work / Assessments");
-    for (const a of entity360.assessments.slice(0, 3)) {
+  // --- Important details from evidence ---
+  const snippets = pickEvidenceSnippets(entity360);
+  if (snippets.length) {
+    parts.push("Important details");
+    for (const s of snippets) {
+      parts.push(`• ${s}${s.length >= 220 ? "…" : ""}`);
+    }
+    parts.push("");
+  }
+
+  const availableAssessments = entity360.assessments.filter((a) => {
+    if (!isLikelyDocumentEntity(a)) return true;
+    return availableDocs.some((label) =>
+      label.toLowerCase().includes(a.name.toLowerCase().slice(0, 12))
+    );
+  });
+  const mentionedOnlyDocs = entity360.assessments.filter(
+    (a) => !availableAssessments.includes(a) && isLikelyDocumentEntity(a)
+  );
+
+  if (availableAssessments.length || entity360.risks.length) {
+    parts.push("Current work");
+    for (const a of availableAssessments.slice(0, 3)) {
       parts.push(
         a.summary
-          ? `Guardian contains ${a.name}: ${a.summary.slice(0, 200)}`
-          : `Guardian contains ${a.name}.`
+          ? `• ${a.name}: ${a.summary.slice(0, 200)}`
+          : `• ${a.name}`
       );
     }
     for (const r of entity360.risks.slice(0, 3)) {
-      parts.push(`• Risk: ${r.name}${r.summary ? ` — ${r.summary.slice(0, 120)}` : ""}`);
+      parts.push(
+        `• Risk noted: ${r.name}${r.summary ? ` — ${r.summary.slice(0, 120)}` : ""}`
+      );
     }
     parts.push("");
   }
 
   if (entity360.proposals.length) {
-    parts.push("Commercial Activity");
+    parts.push("Commercial activity");
     for (const p of entity360.proposals.slice(0, 4)) {
       parts.push(formatCommercialLine(name, p));
     }
@@ -227,12 +315,12 @@ export function formatEntity360UserAnswer(entity360: Entity360): string {
   }
 
   if (entity360.projects.length || entity360.contracts.length) {
-    parts.push("Projects & Contracts");
+    parts.push("Projects & contracts");
     for (const p of entity360.projects.slice(0, 4)) {
-      parts.push(`• Project: ${p.name}${p.status ? ` (${p.status})` : ""}`);
+      parts.push(`• ${p.name}${p.status ? ` (${p.status})` : ""}`);
     }
     for (const c of entity360.contracts.slice(0, 4)) {
-      parts.push(`• Contract: ${c.name}`);
+      parts.push(`• ${c.name}`);
     }
     parts.push("");
   }
@@ -240,7 +328,7 @@ export function formatEntity360UserAnswer(entity360: Entity360): string {
   if (entity360.people.length) {
     parts.push("People");
     for (const p of entity360.people.slice(0, 5)) {
-      parts.push(`• ${p.name} (${p.type})`);
+      parts.push(`• ${p.name}`);
     }
     parts.push("");
   }
@@ -255,44 +343,59 @@ export function formatEntity360UserAnswer(entity360: Entity360): string {
     parts.push("");
   }
 
-  const attention: string[] = [];
-  if (entity360.risks.length) {
-    attention.push("Confirm whether critical security remediation was completed.");
+  // --- Knowledge gaps (referenced ≠ available) ---
+  const unavailableRefs = findMentionedButUnavailable({
+    evidenceTexts: evidenceCorpus(entity360),
+    availableDocumentLabels: availableDocs,
+  });
+  for (const doc of mentionedOnlyDocs) {
+    if (!unavailableRefs.some((u) => u.toLowerCase().includes(doc.name.toLowerCase().slice(0, 10)))) {
+      unavailableRefs.push(doc.name);
+    }
   }
-  if (entity360.proposals.length && !entity360.projects.length) {
-    attention.push(
-      "Determine the current status of open proposals — Guardian does not currently show an active linked project."
+
+  const gapLines: string[] = [...entity360.gaps.slice(0, 3)];
+  for (const ref of unavailableRefs.slice(0, 3)) {
+    gapLines.push(
+      `Available sources reference ${ref}, but that document does not appear to be available in this Space.`
     );
   }
-  for (const g of entity360.gaps.slice(0, 2)) {
-    attention.push(g);
+  if (entity360.proposals.length && !entity360.projects.length) {
+    gapLines.push(
+      "Guardian does not currently show an active linked project for open proposals."
+    );
   }
-  if (attention.length) {
-    parts.push("Items Requiring Attention");
-    parts.push("Gideon recommendation:");
-    for (const item of attention.slice(0, 4)) {
-      parts.push(`• ${item}`);
+
+  if (gapLines.length) {
+    parts.push("Missing information");
+    for (const g of gapLines.slice(0, 4)) {
+      parts.push(`• ${g}`);
+    }
+    if (unavailableRefs[0]) {
+      parts.push(
+        `Adding ${unavailableRefs[0]} would let Guardian answer more detailed questions from that source.`
+      );
     }
     parts.push("");
   }
 
-  if (entity360.evidence.length) {
+  // --- Sources (available only) ---
+  if (availableDocs.length || entity360.evidence.some((e) => e.documentName)) {
     parts.push("Sources");
     const seen = new Set<string>();
     for (const ev of entity360.evidence.slice(0, 5)) {
-      const label = ev.documentName ?? ev.text.slice(0, 60);
+      if (!ev.documentId && !ev.documentName) continue;
+      const label = ev.documentName ?? "Source in this Space";
       if (seen.has(label)) continue;
       seen.add(label);
       parts.push(`• ${label}`);
     }
   }
 
-  parts.push("");
-  parts.push(
-    "Known from Guardian: the sections above. Ask a follow-up to drill into proposals, risks, or evidence."
-  );
-
-  return parts.filter((line, i, arr) => !(line === "" && arr[i - 1] === "")).join("\n");
+  return parts
+    .filter((line, i, arr) => !(line === "" && arr[i - 1] === ""))
+    .join("\n")
+    .trim();
 }
 
 export function formatProposalFollowUpsForGideon(

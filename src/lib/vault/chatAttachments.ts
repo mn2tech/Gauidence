@@ -1,5 +1,6 @@
 import { isImageFileName, isImageMimeType } from "./images";
 import type { VaultChatCitation } from "./vaultChatStream";
+import { parseSuggestedQuestions } from "@/lib/gideon/suggestedQuestions";
 
 /** Persistent chat attachment pointing at a Guardian document (not a blob URL). */
 export type ChatMessageAttachment = {
@@ -15,6 +16,8 @@ export type HydratableChatMessage = {
   role: "user" | "assistant";
   content: string;
   citations?: VaultChatCitation[] | null;
+  suggestedQuestions?: string[] | null;
+  suggested_questions?: unknown;
   attachment?: ChatMessageAttachment | null;
   attachments?: ChatMessageAttachment[] | null;
   created_at: string;
@@ -94,11 +97,17 @@ function mergeAttachments(
 export function hydrateVaultChatMessage<T extends HydratableChatMessage>(
   message: T
 ): T {
+  const suggestedQuestions = parseSuggestedQuestions(
+    message.suggestedQuestions ?? message.suggested_questions
+  );
+
   if (message.role !== "user") {
     return {
       ...message,
       attachments: message.attachments ?? [],
       attachment: message.attachment ?? null,
+      suggestedQuestions:
+        suggestedQuestions.length > 0 ? suggestedQuestions : undefined,
     } as T;
   }
 
@@ -113,6 +122,8 @@ export function hydrateVaultChatMessage<T extends HydratableChatMessage>(
     ...message,
     attachments,
     attachment: attachments[0] ?? null,
+    suggestedQuestions:
+      suggestedQuestions.length > 0 ? suggestedQuestions : undefined,
   } as T;
 }
 

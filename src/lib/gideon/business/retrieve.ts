@@ -161,6 +161,110 @@ export async function loadBusinessIntelligence(
     };
   }
 
+  // --- KNOWLEDGE_GAP: surface referenced-but-unavailable items ---
+  if (plan.intent === "KNOWLEDGE_GAP") {
+    let mention = plan.entities[0] ?? null;
+    if (!mention && priorClaims.length) {
+      const fromClaim = priorClaims
+        .map((c) => c.claim)
+        .join(" ")
+        .match(
+          /\b([A-Z][A-Za-z0-9.&'-]+(?:\s+[A-Z][A-Za-z0-9.&'-]+){0,4})\b/
+        );
+      if (fromClaim?.[1] && !/^(Guardian|Based|Missing|Form)\b/i.test(fromClaim[1])) {
+        mention = fromClaim[1];
+      }
+    }
+    const gapLines: string[] = [
+      "Missing information",
+      "",
+    ];
+
+    if (mention) {
+      const built = await buildEntity360(args.supabase, {
+        spaceIds,
+        businessProfileId: args.businessProfileId,
+        mention,
+        profileNames,
+      });
+      if (built?.entity360.gaps.length) {
+        entity360 = built.entity360;
+        claims = mergeClaims(claims, built.claims);
+        for (const g of built.entity360.gaps.slice(0, 6)) {
+          gapLines.push(`• ${g}`);
+        }
+        const available = built.entity360.evidence
+          .map((e) => e.documentName)
+          .filter((n): n is string => Boolean(n));
+        if (available.length) {
+          gapLines.push("");
+          gapLines.push(
+            `Currently available in this Space: ${available.slice(0, 4).join(", ")}.`
+          );
+        }
+        gapLines.push("");
+        gapLines.push(
+          "Guardian does not invent contents of documents that are only referenced. Adding the missing source would expand what can be answered."
+        );
+      } else {
+        gapLines.push(
+          `I could not build a detailed gap list for "${mention}" from structured knowledge yet.`
+        );
+        gapLines.push(
+          "Ask what is known first, or upload the source document that should fill the gap."
+        );
+      }
+    } else if (priorClaims.length) {
+      claims = priorClaims;
+      const labels = priorClaims.flatMap((c) =>
+        c.evidence.map((e) => e.label ?? e.reference ?? "").filter(Boolean)
+      );
+      gapLines.push(
+        "From the prior answer, Guardian may still be missing referenced documents or details not present in the available sources."
+      );
+      if (labels.length) {
+        gapLines.push(
+          `Prior sources mentioned: ${[...new Set(labels)].slice(0, 5).join(", ")}.`
+        );
+      }
+      gapLines.push(
+        "Ask which source supports a specific claim, or upload the referenced document if it is not in this Space."
+      );
+    } else {
+      gapLines.push(
+        "I do not yet have enough context to list missing information for this Space."
+      );
+      gapLines.push(
+        "Ask what is known about a person, organization, or topic first, then ask what is missing."
+      );
+    }
+
+    userAnswerDraft = gapLines.join("\n");
+    sections.push("KNOWLEDGE GAP MODE:");
+    sections.push(userAnswerDraft);
+    const observability = buildBiObservability({
+      question: args.question,
+      plan,
+      evidenceSelected: claims.reduce((n, c) => n + c.evidence.length, 0),
+      claimsGenerated: claims.length,
+    });
+    logBusinessIntelligenceTrace(observability);
+
+    return {
+      plan,
+      entity360,
+      relationshipAnswers: [],
+      proposalFollowUps: [],
+      commitmentsByClient: [],
+      advisory: [],
+      priorClaims,
+      claims,
+      promptBlock: formatBusinessIntelligenceBlock({ plan, sections }),
+      userAnswerDraft,
+      observability,
+    };
+  }
+
   // Shared proposals load when structured data is required
   let proposals: Proposal[] = [];
   if (plan.requiresStructuredData) {
