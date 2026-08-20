@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
+import { Suspense } from "react";
 import UpdatePasswordForm from "@/components/UpdatePasswordForm";
 
 export const metadata: Metadata = {
@@ -23,7 +24,13 @@ export default async function UpdatePasswordPage() {
     <div className="flex min-h-screen flex-col">
       <SiteHeader />
       <main className="flex flex-1 items-center justify-center px-6 py-16">
-        <UpdatePasswordForm />
+        <Suspense
+          fallback={
+            <p className="text-sm text-ink-muted">Loading password reset…</p>
+          }
+        >
+          <UpdatePasswordForm />
+        </Suspense>
       </main>
       <SiteFooter />
     </div>

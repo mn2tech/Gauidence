@@ -2,14 +2,19 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import GuardianLogo from "@/components/brand/GuardianLogo";
 import { GUARDIAN_BRAND_TAGLINE } from "@/lib/branding";
+import {
+  RECOVERY_SESSION_ERROR,
+  establishRecoverySession,
+} from "@/lib/auth/recoverySession";
 
 export default function UpdatePasswordForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [configured] = useState(() => createClient() !== null);
 
   const [password, setPassword] = useState("");
@@ -29,25 +34,31 @@ export default function UpdatePasswordForm() {
     let cancelled = false;
 
     async function waitForSession() {
+      const code = searchParams.get("code");
+      const initial = await establishRecoverySession(supabase!, code);
+      if (cancelled) return;
+      if (initial.ok) {
+        setSessionReady(true);
+        setCheckingSession(false);
+        return;
+      }
+
       // Cookies from /auth/callback may need a brief moment after redirect.
-      for (let attempt = 0; attempt < 6; attempt++) {
-        const {
-          data: { user },
-        } = await supabase!.auth.getUser();
+      for (let attempt = 0; attempt < 10; attempt++) {
+        await new Promise((r) => setTimeout(r, 250));
+        const retry = await establishRecoverySession(supabase!);
         if (cancelled) return;
-        if (user) {
+        if (retry.ok) {
           setSessionReady(true);
           setCheckingSession(false);
           return;
         }
-        await new Promise((r) => setTimeout(r, 200));
       }
+
       if (!cancelled) {
         setSessionReady(false);
         setCheckingSession(false);
-        setError(
-          "This reset link is invalid or has expired. Request a new one and try again."
-        );
+        setError(initial.error ?? RECOVERY_SESSION_ERROR);
       }
     }
 
@@ -55,7 +66,7 @@ export default function UpdatePasswordForm() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [searchParams]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -78,29 +89,26 @@ export default function UpdatePasswordForm() {
 
     setLoading(true);
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
+      const session = await establishRecoverySession(supabase);
+      if (!session.ok) {
+        setError(session.error ?? RECOVERY_SESSION_ERROR);
+        setLoading(false);
+        return;
+      }
+
+      const { error: updateError } = await supabase.auth.updateUser({ password });
+      if (updateError) {
         setError(
-          "This reset link is invalid or has expired. Request a new one and try again."
+          /reauthentication|recent|session/i.test(updateError.message)
+            ? RECOVERY_SESSION_ERROR
+            : updateError.message
         );
         setLoading(false);
         return;
       }
 
-      const { error } = await supabase.auth.updateUser({ password });
-      if (error) {
-        setError(
-          /reauthentication|recent|session/i.test(error.message)
-            ? "This reset link is invalid or has expired. Request a new one and try again."
-            : error.message
-        );
-        setLoading(false);
-        return;
-      }
-
-      router.push("/dashboard?passwordUpdated=1");
+      await supabase.auth.signOut();
+      router.push("/login?notice=password_updated");
       router.refresh();
     } catch {
       setError(

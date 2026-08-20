@@ -23,6 +23,11 @@ const ERROR_MESSAGES: Record<string, string> = {
     "Google sign-in isn't available yet on this site. You can create an account with email and password instead.",
 };
 
+const NOTICE_MESSAGES: Record<string, string> = {
+  password_updated:
+    "Your password was updated. Sign in with your new password.",
+};
+
 type Mode = "login" | "signup";
 
 export default function AuthForm({ mode }: { mode: Mode }) {
@@ -31,10 +36,13 @@ export default function AuthForm({ mode }: { mode: Mode }) {
   const supabase = createClient();
 
   const urlError = searchParams.get("error");
+  const urlNotice = searchParams.get("notice");
   const [error, setError] = useState<string | null>(
     urlError ? ERROR_MESSAGES[urlError] ?? ERROR_MESSAGES.provider_error : null
   );
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(
+    urlNotice ? NOTICE_MESSAGES[urlNotice] ?? null : null
+  );
   const [googleLoading, setGoogleLoading] = useState(false);
   const [emailLoading, setEmailLoading] = useState(false);
   const [fullName, setFullName] = useState("");

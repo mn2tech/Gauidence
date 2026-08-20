@@ -52,10 +52,13 @@ Supabase Dashboard → **Authentication → URL Configuration**:
   - `https://guardian-app-delta.vercel.app/auth/callback` (legacy; optional)
   - `https://guardian-app-delta.vercel.app/auth/callback?**` (optional)
 
-Password reset uses `/auth/callback?next=/auth/update-password`. If resets
-bounce you back to forgot-password or login, confirm the callback URLs above
-are allowlisted (including a `?**` wildcard if your project requires exact
-query matches).
+Password reset uses `/auth/update-password` (and optionally
+`/auth/callback?next=/auth/update-password`). If resets bounce you back to
+forgot-password or login, confirm these URLs are allowlisted (including a `?**`
+wildcard if your project requires exact query matches):
+
+- `https://guardian.nm2tech.com/auth/update-password`
+- `https://guardian.nm2tech.com/auth/update-password?**`
 
 If you later add a custom domain, add `https://yourdomain.com/auth/callback`
 here too and update the Google authorized origins.

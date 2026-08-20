@@ -9,6 +9,17 @@ import {
 import { ensureDefaultGuardianProfile, getActiveGuardianProfile } from "@/lib/profiles/server";
 import { signedInLandingPath } from "@/lib/simple-home/routing";
 
+function redirectWithSessionCookies(
+  url: string,
+  sessionResponse: NextResponse
+): NextResponse {
+  const redirect = NextResponse.redirect(url);
+  sessionResponse.cookies.getAll().forEach(({ name, value }) => {
+    redirect.cookies.set(name, value);
+  });
+  return redirect;
+}
+
 /**
  * OAuth / email-confirmation / password-recovery callback.
  * Exchanges the auth code for a session, ensures a profile row exists
@@ -113,9 +124,7 @@ export async function GET(request: Request) {
   }
 
   if (redirectPath !== safeNext) {
-    return NextResponse.redirect(`${origin}${redirectPath}`, {
-      headers: response.headers,
-    });
+    return redirectWithSessionCookies(`${origin}${redirectPath}`, response);
   }
 
   return response;
