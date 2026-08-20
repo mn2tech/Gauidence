@@ -17,6 +17,7 @@ import {
   type ProfileCreateGroupId,
 } from "@/lib/profiles/types";
 import GradeLevelSelect from "@/components/GradeLevelSelect";
+import { dispatchAwardsFromResponse } from "@/lib/awards/client";
 
 export default function ProfilesManager() {
   const router = useRouter();

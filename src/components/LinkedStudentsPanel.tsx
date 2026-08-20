@@ -5,6 +5,12 @@ import Link from "next/link";
 import { GraduationCap, Loader2, Plus, Users } from "lucide-react";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import GradeLevelSelect from "@/components/GradeLevelSelect";
+import {
+  canManageProfileAccess,
+  studentsOf,
+  unlinkedOfTypes,
+  type GuardianProfile,
+} from "@/lib/profiles/types";
 
 type Props = {
   parent: GuardianProfile;
