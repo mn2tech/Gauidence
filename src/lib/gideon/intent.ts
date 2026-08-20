@@ -30,6 +30,7 @@ export type GideonRoute = {
 
 import type { ChatTurn } from "@/lib/vault/expandRetrievalQuestion";
 import { looksLikeChartTitleQuery } from "@/lib/vault/expandRetrievalQuestion";
+import { isDocumentContentQuestion } from "@/lib/gideon/documentGrounding";
 
 export type ClassifyGideonIntentArgs = {
   question: string;
@@ -176,6 +177,7 @@ function route(
 
 function isKnowledgeQuestion(q: string): boolean {
   return (
+    isDocumentContentQuestion(q) ||
     KNOWLEDGE_EXPLICIT.test(q) ||
     KNOWLEDGE_SAY.test(q) ||
     KNOWLEDGE_SUMMARIZE.test(q) ||

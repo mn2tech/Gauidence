@@ -33,6 +33,7 @@ import {
 } from "@/lib/vault/gideon";
 import { isMusicPracticeChatContext } from "@/lib/connectors/trello/boundSpace";
 import { buildGideonQuickActions } from "@/lib/gideon/chiefOfStaff";
+import { isDocumentContentQuestion } from "@/lib/gideon/documentGrounding";
 import {
   orgsFromSpecialist,
   parseStoredSuggestedQuestions,
@@ -1472,7 +1473,8 @@ export async function POST(request: Request) {
           wantsTranscription(question) ||
           wantsShowPictures(question) ||
           wantsOpenChartAttachment(question) ||
-          wantsVisualUnderstanding(question),
+          wantsVisualUnderstanding(question) ||
+          isDocumentContentQuestion(question),
       });
       const loadFlags = resolveGideonLoad(gideonRoute);
       const calendarNote = await loadCalendarPromptNote({

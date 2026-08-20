@@ -36,6 +36,25 @@ describe("Gideon intent router — acceptance", () => {
     assert.ok(route.statusSteps.includes("Searching Guardian..."));
   });
 
+  it("fee / Form ADV questions search Guardian documents", () => {
+    const fees = classifyGideonIntent({
+      question: "How are fees described?",
+    });
+    assert.equal(fees.intent, "knowledge_search");
+    assert.equal(shouldSearchGuardianKnowledge(fees), true);
+    assert.equal(loadFlagsForRoute(fees).documents, true);
+
+    const adv = classifyGideonIntent({
+      question: "What does Form ADV say about fees?",
+    });
+    assert.equal(shouldSearchGuardianKnowledge(adv), true);
+
+    const services = classifyGideonIntent({
+      question: "What services are described?",
+    });
+    assert.equal(shouldSearchGuardianKnowledge(services), true);
+  });
+
   it("Test 4: plan today is Chief of Staff", () => {
     const route = classifyGideonIntent({ question: "Help me plan today." });
     assert.equal(route.intent, "chief_of_staff");
