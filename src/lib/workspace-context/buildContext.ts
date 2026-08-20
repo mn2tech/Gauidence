@@ -289,7 +289,11 @@ export async function loadWorkspaceContext(
     retrievedChunks
   );
   const formatted = formatRetrievalContext(chunks, {
-    maxChunkChars: transcriptionMode ? 4000 : undefined,
+    maxChunkChars: transcriptionMode
+      ? 4000
+      : forceDocumentSearch
+        ? 2800
+        : undefined,
   });
 
   const ontologySpaceId =
