@@ -6,6 +6,7 @@ import {
   ChevronDown,
   Import,
   MessageSquarePlus,
+  PanelLeftClose,
   Plus,
   Trash2,
 } from "lucide-react";
@@ -352,6 +353,7 @@ type Props = {
   onDeleteChat: (chatId: string, e: MouseEvent) => void;
   onImportChats?: () => void;
   onSidebarAction?: () => void;
+  onToggleCollapsed?: () => void;
 };
 
 export default function AskGideonSidebar({
@@ -365,6 +367,7 @@ export default function AskGideonSidebar({
   onDeleteChat,
   onImportChats,
   onSidebarAction,
+  onToggleCollapsed,
 }: Props) {
   const vaultLabel = activeVaultName?.trim() || "this space";
   const [vaultsOpen, setVaultsOpen] = useState(true);
@@ -374,7 +377,20 @@ export default function AskGideonSidebar({
   return (
     <>
       <div className="shrink-0 border-b border-stone-200 px-3 py-3">
-        <GuardianLogo variant="horizontal" size="sm" className="mb-3" />
+        <div className="mb-3 flex items-start justify-between gap-2">
+          <GuardianLogo variant="horizontal" size="sm" className="min-w-0" />
+          {onToggleCollapsed ? (
+            <button
+              type="button"
+              onClick={onToggleCollapsed}
+              aria-label="Minimize sidebar"
+              title="Minimize sidebar"
+              className="shrink-0 rounded-full p-1.5 text-ink-muted transition hover:bg-white hover:text-foreground"
+            >
+              <PanelLeftClose className="h-4 w-4" />
+            </button>
+          ) : null}
+        </div>
         <button
           type="button"
           onClick={() => {

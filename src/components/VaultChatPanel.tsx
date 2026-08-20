@@ -781,6 +781,25 @@ function clearStaleChatPointer(
   }
 }
 
+const ASK_SIDEBAR_COLLAPSED_KEY = "guardian.askSidebarCollapsed";
+
+function readAskSidebarCollapsed(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return localStorage.getItem(ASK_SIDEBAR_COLLAPSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function persistAskSidebarCollapsed(collapsed: boolean) {
+  try {
+    localStorage.setItem(ASK_SIDEBAR_COLLAPSED_KEY, collapsed ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+}
+
 export default function VaultChatPanel({
   variant = "embedded",
   scopedProfileId,
@@ -837,6 +856,7 @@ export default function VaultChatPanel({
     else setErrorState(code ? { message, code } : { message });
   };
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [gideonWelcomeSeen, setGideonWelcomeSeen] = useState(readGideonWelcomeSeen);
   const [whyOpen, setWhyOpen] = useState(false);
   const [plusOpen, setPlusOpen] = useState(false);
@@ -948,6 +968,9 @@ export default function VaultChatPanel({
   }, [requestedChatId]);
   useEffect(() => {
     setFocusBlock(readStoredFocusBlock());
+  }, []);
+  useEffect(() => {
+    setSidebarCollapsed(readAskSidebarCollapsed());
   }, []);
   useEffect(() => {
     writeStoredFocusBlock(focusBlock);
@@ -4351,6 +4374,13 @@ export default function VaultChatPanel({
       onDeleteChat={(id, e) => void deleteChat(id, e)}
       onImportChats={() => setImportOpen(true)}
       onSidebarAction={() => setSidebarOpen(false)}
+      onToggleCollapsed={() => {
+        setSidebarCollapsed((prev) => {
+          const next = !prev;
+          persistAskSidebarCollapsed(next);
+          return next;
+        });
+      }}
     />
   );
 
@@ -5089,8 +5119,47 @@ export default function VaultChatPanel({
   return (
     <>
     <div className="flex h-full w-full overflow-hidden bg-white">
-      <aside className="hidden h-full w-64 shrink-0 flex-col border-r border-stone-200 bg-stone-50 md:flex">
-        {askSidebar}
+      <aside
+        className={`hidden h-full shrink-0 flex-col border-r border-stone-200 bg-stone-50 transition-[width] duration-200 md:flex ${
+          sidebarCollapsed ? "w-14" : "w-64"
+        }`}
+      >
+        {sidebarCollapsed ? (
+          <div className="flex h-full flex-col items-center gap-1 py-3">
+            <button
+              type="button"
+              onClick={() => {
+                setSidebarCollapsed(false);
+                persistAskSidebarCollapsed(false);
+              }}
+              aria-label="Expand sidebar"
+              title="Expand sidebar"
+              className="rounded-full p-2 text-ink-muted transition hover:bg-white hover:text-foreground"
+            >
+              <PanelRightOpen className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => void startNewChat()}
+              disabled={sending}
+              aria-label="New chat"
+              title="New chat"
+              className="rounded-full p-2 text-brand transition hover:bg-white disabled:opacity-50"
+            >
+              <MessageSquarePlus className="h-5 w-5" />
+            </button>
+            <Link
+              href={docsHref}
+              aria-label="Docs"
+              title="Docs"
+              className="rounded-full p-2 text-ink-muted transition hover:bg-white hover:text-foreground"
+            >
+              <FileText className="h-5 w-5" />
+            </Link>
+          </div>
+        ) : (
+          askSidebar
+        )}
       </aside>
 
       {sidebarOpen && (
@@ -5128,6 +5197,20 @@ export default function VaultChatPanel({
           >
             <Menu className="h-5 w-5" />
           </button>
+          {sidebarCollapsed ? (
+            <button
+              type="button"
+              className="hidden rounded-full p-2 text-ink-muted hover:bg-stone-100 md:inline-flex"
+              aria-label="Expand sidebar"
+              title="Expand sidebar"
+              onClick={() => {
+                setSidebarCollapsed(false);
+                persistAskSidebarCollapsed(false);
+              }}
+            >
+              <PanelRightOpen className="h-5 w-5" />
+            </button>
+          ) : null}
           <GideonAvatar size={32} />
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
