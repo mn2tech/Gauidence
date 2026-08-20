@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { MessageCircle, Search, ShieldCheck } from "lucide-react";
 import SpaceOverview from "@/components/space/SpaceOverview";
+import SpaceConversationPanel from "@/components/space/SpaceConversationPanel";
+import SpaceDecisionsPanel from "@/components/space/SpaceDecisionsPanel";
 import DocumentManager from "@/components/DocumentManager";
 import GlobalVaultSearch from "@/components/GlobalVaultSearch";
 import { VaultHeaderProfileSwitch } from "@/components/ProfileSwitcher";
@@ -157,6 +159,8 @@ function useVaultSectionDefaults(profileId: string) {
 
     return {
       files: sectionOpen(`documents-${profileId}`),
+      conversation: matches(`conversation-${profileId}`),
+      decisions: matches(`decisions-${profileId}`),
       dailyLog: sectionOpen(`daily-log-${profileId}`),
       attention: matches(`attention-${profileId}`),
       employees: matches(`employees-${profileId}`),
@@ -351,6 +355,15 @@ export default function DashboardVault({ userId }: { userId: string }) {
             />
           </Suspense>
         </VaultSection>
+
+        <VaultSection
+          id={`conversation-${active.id}`}
+          title="Conversation"
+          defaultOpen={false}
+        >
+          <SpaceConversationPanel profile={active} userId={userId} />
+        </VaultSection>
+
         <GlobalVaultSearch
           open={vaultSearchOpen}
           onClose={() => setVaultSearchOpen(false)}
@@ -448,6 +461,22 @@ export default function DashboardVault({ userId }: { userId: string }) {
             ownerUserId={active.owner_user_id}
           />
         </Suspense>
+      </VaultSection>
+
+      <VaultSection
+        id={`conversation-${active.id}`}
+        title="Conversation"
+        defaultOpen={sectionDefaults.conversation}
+      >
+        <SpaceConversationPanel profile={active} userId={userId} />
+      </VaultSection>
+
+      <VaultSection
+        id={`decisions-${active.id}`}
+        title="Decisions"
+        defaultOpen={sectionDefaults.decisions}
+      >
+        <SpaceDecisionsPanel profileId={active.id} decisionsOnly />
       </VaultSection>
 
       <VaultSection
@@ -602,8 +631,10 @@ export default function DashboardVault({ userId }: { userId: string }) {
           <ShieldCheck className="h-4 w-4" />
         </span>
         <p className="text-sm leading-relaxed text-ink-muted">
-          Files and Daily Logs belong to the active profile. Use the section
-          chips above to jump quickly, or tap a title to expand or collapse.
+          Files, Conversation, and Daily Logs belong to the active Space. Use the
+          section chips above to jump quickly, or tap a title to expand or
+          collapse. Promote important messages to Decisions so Gideon can
+          remember them.
         </p>
       </div>
       <GlobalVaultSearch

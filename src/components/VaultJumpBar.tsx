@@ -23,7 +23,10 @@ function buildChips(profile: GuardianProfile): JumpChip[] {
   const id = profile.id;
   const type = profile.profile_type;
   const chips: JumpChip[] = [
+    { sectionId: `overview-${id}`, label: "Overview" },
     { sectionId: `documents-${id}`, label: "Files" },
+    { sectionId: `conversation-${id}`, label: "Conversation" },
+    { sectionId: `decisions-${id}`, label: "Decisions" },
     { sectionId: `daily-log-${id}`, label: "Daily Log" },
     { sectionId: `attention-${id}`, label: "Alerts" },
   ];

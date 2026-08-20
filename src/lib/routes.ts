@@ -39,6 +39,18 @@ export function dailyLogHref(profileId?: string | null): string {
   return `/dashboard?${q.toString()}#daily-log-${profileId}`;
 }
 
+export function conversationHref(profileId?: string | null): string {
+  if (!profileId) return DOCUMENTS_PATH;
+  const q = new URLSearchParams({ docs: "1", profileId });
+  return `/dashboard?${q.toString()}#conversation-${profileId}`;
+}
+
+export function decisionsHref(profileId?: string | null): string {
+  if (!profileId) return DOCUMENTS_PATH;
+  const q = new URLSearchParams({ docs: "1", profileId });
+  return `/dashboard?${q.toString()}#decisions-${profileId}`;
+}
+
 export function hasDocumentsIntent(
   params: Record<string, string | string[] | undefined>
 ): boolean {
