@@ -212,7 +212,14 @@ export function useGideonWelcomeData() {
           .limit(8),
       ]);
 
-      let extractedRows = extractedRes.data ?? [];
+      let extractedRows: Array<{
+        document_id: string;
+        document_type?: string | null;
+        title?: string | null;
+        summary?: string | null;
+        suggested_questions?: unknown;
+        specialist?: unknown;
+      }> = extractedRes.data ?? [];
       if (
         extractedRes.error &&
         /suggested_questions|schema cache|could not find/i.test(

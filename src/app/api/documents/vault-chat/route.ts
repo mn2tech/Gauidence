@@ -611,7 +611,15 @@ export async function GET(request: Request) {
             "document_id, document_type, guardian_status, title, summary, suggested_questions, specialist"
           )
           .eq("profile_id", active.id);
-        let extractedRows = extractedQuery.data ?? [];
+        let extractedRows: Array<{
+          document_id: string;
+          document_type?: string | null;
+          guardian_status?: string | null;
+          title?: string | null;
+          summary?: string | null;
+          suggested_questions?: unknown;
+          specialist?: unknown;
+        }> = extractedQuery.data ?? [];
         if (
           extractedQuery.error &&
           /suggested_questions|schema cache|could not find/i.test(
