@@ -580,6 +580,10 @@ export async function GET(request: Request) {
   const chats = await listChats(supabase, user.id, active.id);
 
   {
+    const accessibleProfiles = await listGuardianProfiles(supabase, user.id);
+    const otherSpaceNames = accessibleProfiles
+      .filter((p) => p.id !== active.id)
+      .map((p) => p.display_name);
     const { docs, inventory } = await loadAskVaultInventory(
       supabase,
       active.id
@@ -657,6 +661,7 @@ export async function GET(request: Request) {
       }
       suggestions = buildGideonSuggestions(hints, profileKind, {
         spaceName: active.display_name,
+        otherSpaceNames,
         boardName: musicPractice ? connectedHints.boardName : null,
         songTitles: musicPractice ? connectedHints.songTitles : [],
         hasConnectedCharts: musicPractice && connectedHints.hasConnectedCharts,
@@ -676,6 +681,7 @@ export async function GET(request: Request) {
       suggestions = musicPractice
         ? buildGideonSuggestions([], profileKind, {
             spaceName: active.display_name,
+            otherSpaceNames,
             boardName: connectedHints.boardName,
             songTitles: connectedHints.songTitles,
             hasConnectedCharts: false,

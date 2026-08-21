@@ -323,6 +323,8 @@ export type VaultDocHint = {
 /** Optional space + connected-source signals for suggestion chips. */
 export type GideonSuggestionContext = {
   spaceName?: string | null;
+  /** Other Spaces — exclude “what do we know about …” chips for these. */
+  otherSpaceNames?: string[];
   boardName?: string | null;
   songTitles?: string[];
   hasConnectedCharts?: boolean;
@@ -1055,7 +1057,11 @@ export function buildGideonSuggestions(
       summary: d.summary,
       organizations: d.organizations,
       suggestedQuestions: d.suggestedQuestions,
-    }))
+    })),
+    {
+      spaceName: context.spaceName,
+      otherSpaceNames: context.otherSpaceNames,
+    }
   );
 
   const types = new Set(

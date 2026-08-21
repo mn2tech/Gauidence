@@ -4,6 +4,9 @@
  * No Space-specific hardcoding.
  */
 
+import { namesMatch } from "@/lib/organization/normalize";
+import { compactProfileName } from "@/lib/vault/detectVaultScope";
+
 export type DocumentQuestionHint = {
   title?: string | null;
   fileName?: string | null;
@@ -13,6 +16,13 @@ export type DocumentQuestionHint = {
   people?: string[] | null;
   /** From extracted_data.suggested_questions when present. */
   suggestedQuestions?: string[] | null;
+};
+
+export type DocumentQuestionsOptions = {
+  /** Active Space display name — prefer chips about this Space. */
+  spaceName?: string | null;
+  /** Other Spaces the user has — never suggest “what do we know about” those. */
+  otherSpaceNames?: string[];
 };
 
 const MAX_QUESTIONS = 4;
@@ -57,6 +67,36 @@ function isUsefulStoredQuestion(q: string): boolean {
   return true;
 }
 
+function refersToNamedSpace(text: string, spaceName: string): boolean {
+  const needle = spaceName.trim();
+  if (needle.length < 2) return false;
+  if (namesMatch(text, needle)) return true;
+  const textCompact = compactProfileName(text);
+  const spaceCompact = compactProfileName(needle);
+  if (spaceCompact.length < 6) return false;
+  return (
+    textCompact.includes(spaceCompact) ||
+    (textCompact.length >= 6 && spaceCompact.includes(textCompact))
+  );
+}
+
+/** True when text is about another Space the user owns (not the active one). */
+export function refersToOtherSpace(
+  text: string,
+  otherSpaceNames: string[] | undefined
+): boolean {
+  if (!otherSpaceNames?.length) return false;
+  return otherSpaceNames.some((name) => refersToNamedSpace(text, name));
+}
+
+function matchesCurrentSpace(
+  text: string,
+  spaceName: string | null | undefined
+): boolean {
+  if (!spaceName?.trim()) return false;
+  return refersToNamedSpace(text, spaceName);
+}
+
 function pushUnique(out: string[], seen: Set<string>, candidate: string): void {
   const q = normalizeQuestion(candidate);
   if (!q || wordCount(q) > MAX_WORDS) return;
@@ -83,17 +123,33 @@ function blobFor(doc: DocumentQuestionHint): string {
 /**
  * Build up to 4 document-grounded Ask Gideon questions for a Space.
  * Content themes first; stored analysis questions only when they are useful.
+ * Org chips stay on the active Space — never promote other Spaces.
  */
 export function buildQuestionsFromDocuments(
-  docs: DocumentQuestionHint[]
+  docs: DocumentQuestionHint[],
+  options: DocumentQuestionsOptions = {}
 ): string[] {
   if (!docs.length) return [];
 
   const out: string[] = [];
   const seen = new Set<string>();
+  const spaceName = options.spaceName?.trim() || null;
+  const otherSpaceNames = (options.otherSpaceNames ?? [])
+    .map((n) => n.trim())
+    .filter((n) => n.length >= 2)
+    .filter((n) => !spaceName || !namesMatch(n, spaceName));
   const combined = docs.map(blobFor).join(" ");
 
-  // 1) Organization-centric — strongest for business Spaces
+  // 0) Prefer the active Space itself when we have content here.
+  if (spaceName) {
+    pushUnique(
+      out,
+      seen,
+      `What do we know about ${shortLabel(spaceName, 4)}?`
+    );
+  }
+
+  // 1) Organization-centric — only orgs that match this Space (not siblings).
   const orgs = [
     ...new Set(
       docs
@@ -101,7 +157,12 @@ export function buildQuestionsFromDocuments(
         .map((o) => shortLabel(o.trim(), 3))
         .filter((o) => o.length >= 2)
     ),
-  ];
+  ].filter((org) => {
+    if (refersToOtherSpace(org, otherSpaceNames)) return false;
+    // If we know the Space name, skip unrelated third-party orgs in the chips.
+    if (spaceName && !matchesCurrentSpace(org, spaceName)) return false;
+    return true;
+  });
   for (const org of orgs.slice(0, 2)) {
     pushUnique(out, seen, `What do we know about ${org}?`);
   }
@@ -131,10 +192,11 @@ export function buildQuestionsFromDocuments(
     pushUnique(out, seen, "What amounts are listed?");
   }
 
-  // 3) High-quality stored questions (skip generic leftovers)
+  // 3) High-quality stored questions (skip generic leftovers + other Spaces)
   for (const doc of docs) {
     for (const q of doc.suggestedQuestions ?? []) {
       if (!isUsefulStoredQuestion(q)) continue;
+      if (refersToOtherSpace(q, otherSpaceNames)) continue;
       pushUnique(out, seen, q);
       if (out.length >= MAX_QUESTIONS) return out.slice(0, MAX_QUESTIONS);
     }
@@ -148,7 +210,9 @@ export function buildQuestionsFromDocuments(
       (primary.title || primary.fileName || "this document").trim(),
       4
     );
-    pushUnique(out, seen, `Summarize ${name}`);
+    if (!refersToOtherSpace(name, otherSpaceNames)) {
+      pushUnique(out, seen, `Summarize ${name}`);
+    }
   }
 
   pushUnique(out, seen, "What information is missing?");

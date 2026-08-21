@@ -161,7 +161,7 @@ describe("Gideon helpers", () => {
         hasConnectedCharts: true,
       }
     );
-    assert.ok(biz.some((q) => /employees|clients|attention/i.test(q)));
+    assert.ok(biz.some((q) => /NM2TECH|employees|clients|attention|Summarize/i.test(q)));
     assert.ok(!biz.some((q) => /songs?|chord|practice/i.test(q)));
   });
 

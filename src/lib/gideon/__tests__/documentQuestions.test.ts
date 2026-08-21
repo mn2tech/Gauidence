@@ -5,21 +5,24 @@ import { buildGideonSuggestions } from "@/lib/vault/gideon";
 
 describe("buildQuestionsFromDocuments", () => {
   it("builds Form CRS style questions from analysis metadata", () => {
-    const qs = buildQuestionsFromDocuments([
-      {
-        title: "Client Relationship Summary",
-        fileName: "2025 Form CRS.pdf",
-        documentType: "general",
-        summary:
-          "Kendall Capital Management offers financial planning, portfolio management, and discloses conflicts of interest and fees.",
-        organizations: ["Kendall Capital Management, Inc."],
-        suggestedQuestions: [
-          "What are the important dates?",
-          "Summarize the key details.",
-          "What do we know about Kendall Capital Management,",
-        ],
-      },
-    ]);
+    const qs = buildQuestionsFromDocuments(
+      [
+        {
+          title: "Client Relationship Summary",
+          fileName: "2025 Form CRS.pdf",
+          documentType: "general",
+          summary:
+            "Kendall Capital Management offers financial planning, portfolio management, and discloses conflicts of interest and fees.",
+          organizations: ["Kendall Capital Management, Inc."],
+          suggestedQuestions: [
+            "What are the important dates?",
+            "Summarize the key details.",
+            "What do we know about Kendall Capital Management,",
+          ],
+        },
+      ],
+      { spaceName: "Kendall Capital" }
+    );
     assert.ok(qs.length >= 3 && qs.length <= 4);
     assert.ok(qs.some((q) => /What do we know about Kendall Capital/i.test(q)));
     assert.ok(
@@ -28,6 +31,31 @@ describe("buildQuestionsFromDocuments", () => {
     assert.ok(!qs.some((q) => /important dates|key details/i.test(q)));
     assert.ok(!qs.some((q) => /\.\?|,\?/.test(q)));
     assert.ok(!qs.some((q) => /Inc\??$/i.test(q)));
+  });
+
+  it("does not suggest other Spaces while on NM2TECH", () => {
+    const qs = buildQuestionsFromDocuments(
+      [
+        {
+          title: "Client Relationship Summary",
+          fileName: "Form CRS.pdf",
+          summary:
+            "Kendall Capital Management Form CRS stored for reference in NM2TECH.",
+          organizations: ["Kendall Capital Management, Inc.", "NM2TECH"],
+          suggestedQuestions: [
+            "What do we know about Kendall Capital Management?",
+            "What does the Form CRS cover?",
+          ],
+        },
+      ],
+      {
+        spaceName: "NM2TECH - Next Move",
+        otherSpaceNames: ["Kendall Capital", "Crossroadsconnect"],
+      }
+    );
+    assert.ok(qs.some((q) => /What do we know about NM2TECH/i.test(q)));
+    assert.ok(!qs.some((q) => /Kendall Capital/i.test(q)));
+    assert.ok(qs.some((q) => /Form CRS|fees|services|missing/i.test(q)));
   });
 
   it("prefers useful stored suggested_questions", () => {
@@ -58,7 +86,11 @@ describe("buildGideonSuggestions document preference", () => {
           organizations: ["Kendall Capital"],
         },
       ],
-      "business"
+      "business",
+      {
+        spaceName: "Kendall Capital",
+        otherSpaceNames: ["NM2TECH - Next Move"],
+      }
     );
     assert.ok(qs.some((q) => /Kendall Capital|services|fees|Form CRS/i.test(q)));
     assert.ok(!qs.some((q) => /How many employees/i.test(q)));

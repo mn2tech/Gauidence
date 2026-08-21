@@ -260,7 +260,13 @@ export function useGideonWelcomeData() {
           suggestedQuestions: parseStoredSuggestedQuestions(
             "suggested_questions" in row ? row.suggested_questions : null
           ),
-        }))
+        })),
+        {
+          spaceName: active.display_name,
+          otherSpaceNames: profiles
+            .filter((p) => p.id !== profileId)
+            .map((p) => p.display_name),
+        }
       );
 
       // If analysis rows are missing, still seed from filenames.
@@ -268,7 +274,13 @@ export function useGideonWelcomeData() {
         documentQuestions = buildQuestionsFromDocuments(
           (recentDocRowsRes.data ?? []).map((d) => ({
             fileName: String(d.file_name ?? ""),
-          }))
+          })),
+          {
+            spaceName: active.display_name,
+            otherSpaceNames: profiles
+              .filter((p) => p.id !== profileId)
+              .map((p) => p.display_name),
+          }
         );
       }
 
