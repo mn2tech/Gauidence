@@ -8,6 +8,7 @@ import {
   profileMentionedInQuestion,
   resolveExplicitSpaceScope,
   resolveGideonWriteVault,
+  resolveNamedSpaceOutsideSearch,
 } from "../detectVaultScope";
 
 const profiles = [
@@ -159,6 +160,77 @@ describe("detectMentionedVault", () => {
         display_name: "Crossroadsconnect",
         profile_type: "event",
       }
+    );
+  });
+});
+
+describe("resolveNamedSpaceOutsideSearch", () => {
+  it("finds Kendall Capital while searching NM2TECH only", () => {
+    const spaces = [
+      { id: "nm2", display_name: "NM2TECH", profile_type: "business" as const },
+      {
+        id: "kendall",
+        display_name: "Kendall Capital",
+        profile_type: "business" as const,
+      },
+    ];
+    assert.deepEqual(
+      resolveNamedSpaceOutsideSearch({
+        question: "What do we know about Kendall Capital?",
+        accessibleProfiles: spaces,
+        currentSearchProfileIds: ["nm2"],
+      }),
+      {
+        id: "kendall",
+        display_name: "Kendall Capital",
+        profile_type: "business",
+      }
+    );
+  });
+
+  it("matches suggested-chip phrasing Kendall Capital Management", () => {
+    const spaces = [
+      {
+        id: "nm2b",
+        display_name: "NM2TECH - Next Move",
+        profile_type: "business" as const,
+      },
+      {
+        id: "kendall",
+        display_name: "Kendall Capital",
+        profile_type: "business" as const,
+      },
+    ];
+    assert.deepEqual(
+      resolveNamedSpaceOutsideSearch({
+        question: "What do we know about Kendall Capital Management?",
+        accessibleProfiles: spaces,
+        currentSearchProfileIds: ["nm2b"],
+      }),
+      {
+        id: "kendall",
+        display_name: "Kendall Capital",
+        profile_type: "business",
+      }
+    );
+  });
+
+  it("returns null when the named Space is already in search scope", () => {
+    const spaces = [
+      { id: "nm2", display_name: "NM2TECH", profile_type: "business" as const },
+      {
+        id: "kendall",
+        display_name: "Kendall Capital",
+        profile_type: "business" as const,
+      },
+    ];
+    assert.equal(
+      resolveNamedSpaceOutsideSearch({
+        question: "What do we know about Kendall Capital?",
+        accessibleProfiles: spaces,
+        currentSearchProfileIds: ["nm2", "kendall"],
+      }),
+      null
     );
   });
 });

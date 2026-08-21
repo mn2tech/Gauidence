@@ -338,6 +338,28 @@ export function resolveExplicitSpaceScope(args: {
 }
 
 /**
+ * When the user names another accessible Space that is outside the current
+ * workspace search set (e.g. "Kendall Capital" while on NM2TECH), return it so
+ * Ask can expand retrieval for this turn.
+ */
+export function resolveNamedSpaceOutsideSearch(args: {
+  question: string;
+  accessibleProfiles: VaultScopeCandidate[];
+  currentSearchProfileIds: string[];
+}): VaultScopeCandidate | null {
+  const inSearch = new Set(
+    args.currentSearchProfileIds.filter((id) => typeof id === "string" && id)
+  );
+  const outside = args.accessibleProfiles.filter((p) => !inSearch.has(p.id));
+  if (outside.length === 0) return null;
+
+  return detectMentionedVault({
+    question: args.question,
+    accessibleProfiles: outside,
+  });
+}
+
+/**
  * Vault profiles Gideon searches when answering in a chat thread.
  * workspace = chat home (+ optional scoped vault); global = every accessible vault.
  */

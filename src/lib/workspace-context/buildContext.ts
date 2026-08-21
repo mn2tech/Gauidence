@@ -86,7 +86,10 @@ import { formatProposalsForGideon } from "@/lib/proposals/retrieve";
 import { PROPOSAL_SELECT } from "@/lib/proposals/types";
 import { mapProposalRow } from "@/lib/proposals/server";
 import type { AttachedVaultDocument } from "@/lib/vault/attachedDocument";
-import { resolveExplicitSpaceScope } from "@/lib/vault/detectVaultScope";
+import {
+  resolveExplicitSpaceScope,
+  resolveNamedSpaceOutsideSearch,
+} from "@/lib/vault/detectVaultScope";
 import { isOrgStyleProfile, type GuardianProfileType } from "@/lib/profiles/types";
 import { collaboratorDisplayName } from "@/lib/profiles/collaboratorDisplay";
 import { isGuardianPackEngineEnabled } from "@/lib/features/packs";
@@ -190,12 +193,6 @@ export async function loadWorkspaceContext(
       ? planBusinessQuery(question)
       : null;
   const forceDocumentSearch = isDocumentContentQuestion(question);
-  const runDocumentSearch =
-    load.documents &&
-    (forceDocumentSearch ||
-      !businessPlan ||
-      biPlanRequiresDocumentSearch(businessPlan));
-
   const scopeCandidates = meta.accessibleProfiles.map((p) => ({
     id: p.id,
     display_name: p.display_name,
@@ -205,13 +202,43 @@ export async function loadWorkspaceContext(
     question: retrievalQuestion,
     accessibleProfiles: scopeCandidates,
   });
-  const effectiveSearchIds =
-    explicitSpace && searchProfileIds.includes(explicitSpace.id)
-      ? [explicitSpace.id]
-      : searchProfileIds;
-  const effectiveRetrievalScopes = explicitSpace
-    ? retrievalScopes.filter((scope) => scope.id === explicitSpace.id)
-    : retrievalScopes;
+  // e.g. on NM2TECH asking about "Kendall Capital" — pull that Space's files.
+  const namedOutsideSpace = resolveNamedSpaceOutsideSearch({
+    question: retrievalQuestion,
+    accessibleProfiles: scopeCandidates,
+    currentSearchProfileIds: searchProfileIds,
+  });
+
+  let effectiveSearchIds = searchProfileIds;
+  let effectiveRetrievalScopes = retrievalScopes;
+  let focusedSpaceName: string | null = null;
+
+  if (explicitSpace && searchProfileIds.includes(explicitSpace.id)) {
+    effectiveSearchIds = [explicitSpace.id];
+    effectiveRetrievalScopes = retrievalScopes.filter(
+      (scope) => scope.id === explicitSpace.id
+    );
+    focusedSpaceName = explicitSpace.display_name;
+  } else if (namedOutsideSpace) {
+    effectiveSearchIds = [namedOutsideSpace.id];
+    effectiveRetrievalScopes = [
+      {
+        id: namedOutsideSpace.id,
+        display_name: namedOutsideSpace.display_name,
+        profile_type:
+          namedOutsideSpace.profile_type ?? activeProfile.profile_type,
+      },
+    ];
+    focusedSpaceName = namedOutsideSpace.display_name;
+  }
+
+  const forceNamedSpaceDocs = Boolean(namedOutsideSpace);
+  const runDocumentSearch =
+    load.documents &&
+    (forceDocumentSearch ||
+      forceNamedSpaceDocs ||
+      !businessPlan ||
+      biPlanRequiresDocumentSearch(businessPlan));
   const showPictures = wantsShowPictures(question);
   const transcriptionMode = wantsTranscription(question);
   const songListOnly = wantsSongOrChartList(question);
@@ -236,9 +263,22 @@ export async function loadWorkspaceContext(
     retrievalQuestion
   );
 
+  let searchableChunkCount = chunkCount;
+  if (
+    forceNamedSpaceDocs &&
+    namedOutsideSpace &&
+    !searchProfileIds.includes(namedOutsideSpace.id)
+  ) {
+    const { count } = await supabase
+      .from("document_chunks")
+      .select("id", { count: "exact", head: true })
+      .in("profile_id", effectiveSearchIds);
+    searchableChunkCount = count ?? 0;
+  }
+
   const embeddingStarted = Date.now();
   const queryEmbedding =
-    runDocumentSearch && chunkCount > 0 && !songListOnly
+    runDocumentSearch && searchableChunkCount > 0 && !songListOnly
       ? await embedQuery(documentRetrievalQuery).catch((embedErr) => {
           console.warn(
             "Vault chat embedding failed; continuing without document search:",
@@ -297,7 +337,10 @@ export async function loadWorkspaceContext(
   });
 
   const ontologySpaceId =
-    explicitSpace?.id ?? meta.chatScopedProfileId ?? activeProfile.id;
+    explicitSpace?.id ??
+    namedOutsideSpace?.id ??
+    meta.chatScopedProfileId ??
+    activeProfile.id;
   const clientProfileIds = effectiveRetrievalScopes
     .filter((scope) => scope.profile_type === "client")
     .map((scope) => scope.id);
@@ -630,8 +673,12 @@ export async function loadWorkspaceContext(
     ? `The user clicked "Continue with Gideon" to resume this project. Prioritize this project's mission, step, blockers, and recent sessions.\n\n${workMemoryBody}`
     : workMemoryBody;
 
-  const explicitScopeNote = explicitSpace
-    ? `This question is scoped to the ${explicitSpace.display_name} space only. Use RETRIEVED EXCERPTS, DAILY LOGS, and SPACE FILE INVENTORY for that space.${
+  const explicitScopeNote = focusedSpaceName
+    ? `This question is scoped to the ${focusedSpaceName} space only. Use RETRIEVED EXCERPTS, DAILY LOGS, and SPACE FILE INVENTORY for that space.${
+        namedOutsideSpace
+          ? ` The user named ${focusedSpaceName} while working from ${activeProfile.display_name}.`
+          : ""
+      }${
         /\babout\b/i.test(retrievalQuestion)
           ? " Filter to the topic named in the question — do not dump full file lists from other spaces; one brief redirect sentence is enough if nothing matches."
           : ""
@@ -673,8 +720,8 @@ Active space in the UI: ${activeProfile.display_name}. Document search includes 
     !logContext.trim() || logContext.trim() === "(none)";
   let vaultEmptyNote = "";
   if (noDocumentExcerpts && !attachedContext.trim()) {
-    if (explicitSpace) {
-      vaultEmptyNote = `No document excerpts matched in ${explicitSpace.display_name}. Check RETRIEVED DAILY LOGS and SPACE FILE INVENTORY below for this space. If nothing matches the question (including names or topics mentioned), say clearly you could not find that in ${explicitSpace.display_name}. Do not invent facts. You must always reply in complete sentences — never return a blank response.`;
+    if (focusedSpaceName) {
+      vaultEmptyNote = `No document excerpts matched in ${focusedSpaceName}. Check RETRIEVED DAILY LOGS and SPACE FILE INVENTORY below for this space. If nothing matches the question (including names or topics mentioned), say clearly you could not find that in ${focusedSpaceName}. Do not invent facts. You must always reply in complete sentences — never return a blank response.`;
     } else if (noMatchedLogs) {
       vaultEmptyNote =
         "No document excerpts or Daily Logs matched this question. If SPACE FILE INVENTORY lists relevant files, you may name them; otherwise say you could not find it. Do not invent facts. You must always reply — never return a blank response.";
@@ -687,7 +734,8 @@ Active space in the UI: ${activeProfile.display_name}. Document search includes 
   const suppressRawDocsForBi =
     Boolean(businessPlan) &&
     !biPlanRequiresDocumentSearch(businessPlan!) &&
-    !forceDocumentSearch;
+    !forceDocumentSearch &&
+    !forceNamedSpaceDocs;
 
   const context: WorkspaceContextData = {
     ...meta,
@@ -766,14 +814,15 @@ Active space in the UI: ${activeProfile.display_name}. Document search includes 
   return {
     context,
     chunks: suppressRawDocsForBi ? [] : chunks,
-    explicitSpaceName: explicitSpace?.display_name ?? null,
+    explicitSpaceName: focusedSpaceName,
     connectorCitations,
     youtubeUrls: ontologyBundle.youtubeUrls ?? [],
     businessClaims: businessIntelligenceBundle?.claims,
     // Fee / ADV / CRS questions must use document excerpts + LLM, not a BI draft
     // that may still claim Form ADV is missing after it was uploaded.
-    businessAnswerDraft: forceDocumentSearch
-      ? null
-      : (businessIntelligenceBundle?.userAnswerDraft ?? null),
+    businessAnswerDraft:
+      forceDocumentSearch || forceNamedSpaceDocs
+        ? null
+        : (businessIntelligenceBundle?.userAnswerDraft ?? null),
   };
 }
