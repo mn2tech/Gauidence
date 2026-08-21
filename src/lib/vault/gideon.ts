@@ -231,7 +231,38 @@ export function wantsTranscription(question: string): boolean {
 const SKIP_LIST_LABELS =
   /^(document|title|type|summary|warnings?|specialist fields|facts)$/i;
 
-/** Numbered list from retrieved fact lines when the model returns a blank reply. */
+/** Count numbered list lines like "1. Name — Org". */
+export function countNumberedListItems(text: string): number {
+  return (text.match(/^\s*\d+[\.)]\s+\S+/gm) ?? []).length;
+}
+
+/** Stated headcount in answers like "27 confirmed". */
+export function statedListCount(text: string): number | null {
+  const m =
+    text.match(/\b(\d+)\s+confirmed\b/i) ||
+    text.match(
+      /\b(\d+)\s+(?:people|attendees|guests|members|names|participants)\b/i
+    );
+  if (!m?.[1]) return null;
+  const n = Number(m[1]);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function pushListItem(
+  items: string[],
+  seen: Set<string>,
+  value: string
+): void {
+  const cleaned = value.replace(/\s+/g, " ").trim();
+  if (!cleaned || cleaned.length > 220) return;
+  if (SKIP_LIST_LABELS.test(cleaned)) return;
+  const key = cleaned.toLowerCase();
+  if (seen.has(key)) return;
+  seen.add(key);
+  items.push(cleaned);
+}
+
+/** Numbered list from retrieved fact / roster lines when the model returns a blank or short reply. */
 export function buildListAnswerFromChunks(
   chunks: { content: string; file_name?: string }[]
 ): string | null {
@@ -248,28 +279,77 @@ export function buildListAnswerFromChunks(
         title = titleMatch[1].trim();
         continue;
       }
-      const fact = line.match(/^[-*•]\s+(?:([^:]{1,40}):\s*)?(.+)$/);
-      if (!fact) continue;
-      const label = (fact[1] ?? "").trim();
-      const value = (fact[2] ?? "").trim();
-      if (
-        !value ||
-        value.length > 120 ||
-        SKIP_LIST_LABELS.test(label) ||
-        SKIP_LIST_LABELS.test(value)
-      ) {
+      const numbered = line.match(/^\d+[\.)]\s+(.+)$/);
+      if (numbered?.[1]) {
+        pushListItem(items, seen, numbered[1]);
         continue;
       }
-      const key = value.toLowerCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
-      items.push(value);
+      const dashName = line.match(
+        /^([A-Z][A-Za-z'.-]+(?:\s+[A-Z][A-Za-z'.-]+){0,3})\s*[—–-]\s+(.+)$/
+      );
+      if (dashName?.[1] && dashName[2]) {
+        pushListItem(items, seen, `${dashName[1]} — ${dashName[2].trim()}`);
+        continue;
+      }
+      const fact = line.match(/^[-*•]\s+(?:([^:]{1,40}):\s*)?(.+)$/);
+      if (fact) {
+        const label = (fact[1] ?? "").trim();
+        const value = (fact[2] ?? "").trim();
+        if (!SKIP_LIST_LABELS.test(label) && !SKIP_LIST_LABELS.test(value)) {
+          pushListItem(items, seen, value);
+        }
+        continue;
+      }
+      // CSV-style roster rows: Name,email,company,...
+      const csv = line.match(
+        /^"?([A-Z][A-Za-z'.-]+(?:\s+[A-Z][A-Za-z'.-]+){0,3})"?\s*,\s*([^,\n]+)/
+      );
+      if (csv?.[1] && !/^name$/i.test(csv[1])) {
+        const org = line.split(",").slice(2, 4).map((s) => s.trim().replace(/^"|"$/g, "")).filter(Boolean);
+        const suffix = org.length ? ` — ${org.join(", ")}` : "";
+        pushListItem(items, seen, `${csv[1]}${suffix}`);
+      }
     }
   }
 
   if (items.length < 2) return null;
   const heading = title || "From your documents";
   return `${heading}\n\n${items.map((item, i) => `${i + 1}. ${item}`).join("\n")}`;
+}
+
+/**
+ * Prefer a fuller deterministic roster when the model truncates early
+ * (e.g. says "27 confirmed" but only lists 12 names).
+ */
+export function preferFullerListAnswer(
+  modelAnswer: string,
+  chunks: { content: string; file_name?: string }[]
+): string {
+  const fromChunks = buildListAnswerFromChunks(chunks);
+  if (!fromChunks) return modelAnswer;
+
+  const modelCount = countNumberedListItems(modelAnswer);
+  const chunkCount = countNumberedListItems(fromChunks);
+  const stated = statedListCount(modelAnswer);
+
+  const modelIncomplete =
+    (stated != null && modelCount > 0 && modelCount < stated) ||
+    (chunkCount >= modelCount + 3 && chunkCount >= 5);
+
+  if (!modelIncomplete) return modelAnswer;
+
+  const headerLine = modelAnswer
+    .split(/\n/)
+    .map((l) => l.trim())
+    .find((l) => l && !/^\d+[\.)]\s+/.test(l) && l.length < 160);
+
+  if (headerLine && !fromChunks.startsWith(headerLine)) {
+    const body = fromChunks.includes("\n\n")
+      ? fromChunks.slice(fromChunks.indexOf("\n\n") + 2)
+      : fromChunks;
+    return `${headerLine}\n\n${body}`;
+  }
+  return fromChunks;
 }
 
 export const GIDEON_ATTACHED_DOCUMENT_NOTE = `Attached document:
@@ -292,15 +372,15 @@ export const GIDEON_CROSS_VAULT_NOTE = `All-spaces search:
 - New files, notes, and reminders still belong in the active space.`;
 
 export const GIDEON_TRANSCRIPTION_NOTE = `Transcription mode:
-- The user wants a readable transcription or list from their space (often a photo or scan).
-- Lead with a short friendly title if helpful (e.g. "Book names"), then a clean numbered list.
-- Prefer the attached image and "Document text" / vision transcription excerpts.
-- Include every name, title, and line item visible (rosters, program sheets, attendance lists).
+- The user wants a readable transcription or list from their space (often a photo, scan, CSV, or roster file).
+- Lead with a short friendly title if helpful (e.g. "August 2026 event · 27 confirmed"), then a clean numbered list.
+- Prefer the attached image and "Document text" / vision transcription excerpts / RETRIEVED EXCERPTS.
+- Include EVERY name, title, and line item present in the retrieval blocks (rosters, RSVP lists, program sheets, attendance lists). Never stop early, summarize, or show only a sample.
+- If you state a count (e.g. "27 confirmed"), the numbered list must include that many people when those names appear in the excerpts. If excerpts are incomplete, say how many names you can list from available sources — do not invent the rest.
 - Preserve non-English text in its original script (Telugu, Hindi, Tamil, etc.); do not romanize, translate, or skip names because of language.
 - Fix obvious spelling and title capitalization in English when confident; do not invent items.
-- Use simple numbered lines (1. 2. 3.). You may exceed the usual brevity limit for lists.
+- Use simple numbered lines (1. 2. 3.). You MUST exceed the usual brevity / word limit for complete lists — full rosters are required.
 - If the file is already attached or listed in SPACE FILE INVENTORY, never ask the user to re-upload it. If text is hard to read, say so and describe what you can see.`;
-
 export const GIDEON_VISION_NOTE = `Guardian Vision:
 - When images are attached to this request, you can see them. Use the pixels, not only extracted text.
 - If ATTACHED DOCUMENT says no extracted text yet, still inspect the attached image and answer.

@@ -252,6 +252,6 @@ export function gideonMaxTokens(context: WorkspaceContextData): number {
   ) {
     return 1100;
   }
-  if (transcriptionMode) return 2000;
+  if (transcriptionMode) return 4000;
   return 900;
 }

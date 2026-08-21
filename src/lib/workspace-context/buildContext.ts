@@ -63,6 +63,7 @@ import {
   wantsOpenChartAttachment,
   type ChatTurn,
 } from "@/lib/vault/expandRetrievalQuestion";
+import { expandTranscriptionDocumentChunks } from "@/lib/vault/expandTranscriptionChunks";
 import {
   filterCitationsToChordCharts,
   isLikelyChordChartFile,
@@ -313,6 +314,13 @@ export async function loadWorkspaceContext(
     keywordCandidateCount = hybrid.keywordCount;
     mergedCandidateCount = hybrid.mergedCount;
     retrievedChunks = hybrid.results;
+    if (transcriptionMode && retrievedChunks.length > 0) {
+      retrievedChunks = await expandTranscriptionDocumentChunks(
+        supabase,
+        retrievedChunks,
+        { maxDocuments: 3, maxChunks: 80 }
+      );
+    }
   }
 
   const disclosurePins =
@@ -330,7 +338,7 @@ export async function loadWorkspaceContext(
   );
   const formatted = formatRetrievalContext(chunks, {
     maxChunkChars: transcriptionMode
-      ? 4000
+      ? 8000
       : forceDocumentSearch
         ? 2800
         : undefined,

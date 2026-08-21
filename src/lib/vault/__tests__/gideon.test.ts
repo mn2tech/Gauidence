@@ -11,6 +11,7 @@ import {
   isSimpleTodayDateQuestion,
   firstNameFrom,
   buildListAnswerFromChunks,
+  preferFullerListAnswer,
   getVaultTemplate,
   gideonChatContextLabel,
   parseGideonSections,
@@ -370,6 +371,47 @@ Facts:
     assert.match(answer ?? "", /Member Roster/);
     assert.match(answer ?? "", /1\. Ada Lovelace/);
     assert.match(answer ?? "", /3\. Grace Hopper/);
+  });
+
+  it("replaces a truncated confirmed list with the fuller source list", () => {
+    const chunks = [
+      {
+        file_name: "rsvp.csv",
+        content: `Title: August 2026 event
+1. Joshua Mughogho — Triwell Tech
+2. Maverick Durant — TriWellTech
+3. John Anselmo — Truist
+4. Tom Powell — Offit Kurman
+5. Ryan Weaver — Simple Story Bible
+6. Sephora — Kumon
+7. Jed D — Vizual Intel
+8. Zachary Hylton — ZH Accounting
+9. Stuart Tart — Montgomery College
+10. Isaac Sandoval — Happy Capital
+11. Dianne Scott — RBC
+12. Robert Satarla — Hebron IT
+13. Person Thirteen — Org
+14. Person Fourteen — Org
+15. Person Fifteen — Org`,
+      },
+    ];
+    const truncated = `August 2026 event · 27 confirmed · today's event, Aug 21
+
+1. Joshua Mughogho — Triwell Tech
+2. Maverick Durant — TriWellTech
+3. John Anselmo — Truist (Mortgage Loan Officer)
+4. Tom Powell — Offit Kurman, P.A. (Principal)
+5. Ryan Weaver — Simple Story Bible (Owner)
+6. Sephora — Kumon (Director)
+7. Jed D — Vizual Intel (Founder)
+8. Zachary Hylton — ZH Accounting Services (CPA)
+9. Stuart Tart — Montgomery College
+10. Isaac Sandoval — Happy Capital (Managing Partner)
+11. Dianne Scott — RBC Wealth Management (Financial Advisor)
+12. Robert Satarla — Hebron IT USA (Managing`;
+    const fuller = preferFullerListAnswer(truncated, chunks);
+    assert.match(fuller, /15\. Person Fifteen/);
+    assert.match(fuller, /27 confirmed/);
   });
 });
 

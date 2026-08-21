@@ -44,7 +44,7 @@ import { withLlmUsage } from "@/lib/usage/record";
 import { recordChatEvent } from "@/lib/billing/quota";
 import { refreshUserAwards } from "@/lib/awards/grant";
 import { formatVaultChatError, buildGideonEmptyAnswerFallback } from "@/lib/vault/vaultChatErrors";
-import { buildListAnswerFromChunks } from "@/lib/vault/gideon";
+import { buildListAnswerFromChunks, preferFullerListAnswer, wantsTranscription, countNumberedListItems } from "@/lib/vault/gideon";
 import { buildOntologyAnswerFallback } from "@/lib/ontology/formatForGideon";
 import { buildSuggestedQuestions, parseSuggestedQuestions, extractPeopleFromAnswer } from "@/lib/gideon/suggestedQuestions";
 import { extractBusinessEntityMentions } from "@/lib/gideon/business/queryPlanner";
@@ -174,9 +174,23 @@ export function createVaultChatStreamResponse(
                 ]
               : [];
 
+        const prebuiltRoster =
+          wantsTranscription(args.question)
+            ? buildListAnswerFromChunks(args.chunks)
+            : null;
+        const prebuiltCount = prebuiltRoster
+          ? countNumberedListItems(prebuiltRoster)
+          : 0;
+
         await withLlmUsage(
           { userId: args.userId, feature: "vault_chat" },
           async () => {
+            // Long rosters: prefer the full list from Space sources over a truncated model sample.
+            if (prebuiltRoster && prebuiltCount >= 10) {
+              answer = prebuiltRoster;
+              write({ type: "delta", text: answer });
+              return;
+            }
             answer = await runChatCompletionStream(client, {
               system: args.system,
               model: CHAT_MODEL,
@@ -210,6 +224,8 @@ export function createVaultChatStreamResponse(
               chunks: args.chunks,
               explicitSpaceName: args.explicitSpaceName,
             });
+        } else if (wantsTranscription(args.question)) {
+          answer = preferFullerListAnswer(answer, args.chunks);
         }
 
         if (args.youtubeUrls?.length) {
