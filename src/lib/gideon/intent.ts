@@ -76,6 +76,17 @@ const KNOWLEDGE_BUSINESS =
 const KNOWLEDGE_SPACE_OVERVIEW =
   /\b(what(?:'s| is) (uploaded|stored|in (this|my|the) (space|workspace|event))|summarize (this|my|the) (space|workspace|event)|what (files?|documents?|notes?) (are|do i have) (in )?(this|my|the)?\s*(space|workspace|event)?|recap (this|my|the) (space|workspace|event))\b/i;
 
+/**
+ * “Tell me / give me details about X” — Space knowledge, not pure chat.
+ * Keep broader than DEFINITION_QUESTION so Space docs are searched first.
+ */
+const KNOWLEDGE_ABOUT =
+  /\b(give me (the )?(details|info|information|rundown|summary) (on|about)|details about|info(?:rmation)? (on|about)|tell me (more )?about|what can you tell me about)\b/i;
+
+/** Event planning content that lives in Event Space uploads (RSVP lists, etc.). */
+const KNOWLEDGE_EVENT_CONTENT =
+  /\b(launch event|rsvp|guest list|registration list|attendees?|run[- ]?of[- ]?show|event (details|plan|timeline|budget|vendors?)|(june|august|september|october) .{0,20}\bevent\b)\b/i;
+
 /** Dental Pack practice operations questions. */
 const KNOWLEDGE_DENTAL =
   /\b((what|which|our|my|the) patients?\b|patients? (have|with|need|are)|upcoming appointments?|insurance claims?|claims? (need|pending|denied|follow)|treatment plans?|lab cases?|who is treating|dental (practice|clinic|office|centre|center)|hygienist|dentist|payer|referrals?|office hours|hours of operation|(what|which) services?\b|membership plan|zen suite|practice profile)\b/i;
@@ -192,6 +203,8 @@ function isKnowledgeQuestion(q: string): boolean {
     KNOWLEDGE_CONNECTED.test(q) ||
     KNOWLEDGE_BUSINESS.test(q) ||
     KNOWLEDGE_SPACE_OVERVIEW.test(q) ||
+    KNOWLEDGE_ABOUT.test(q) ||
+    KNOWLEDGE_EVENT_CONTENT.test(q) ||
     KNOWLEDGE_DENTAL.test(q) ||
     KNOWLEDGE_PRACTICE_FACTS.test(q) ||
     looksLikeChartTitleQuery(q)
