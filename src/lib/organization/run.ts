@@ -13,6 +13,7 @@ import type {
   OrganizationAiOutput,
   OrganizationSuggestionPayload,
 } from "./types";
+import { canAutoApplyOrganizationMove } from "./autoApply";
 
 async function loadAutoOrganizeSettings(
   supabase: SupabaseClient,
@@ -189,13 +190,19 @@ export async function runOrganizationAfterAnalysis(
     ai
   );
 
+  const currentProfile = profiles.find((p) => p.id === params.currentProfileId);
   const shouldAutoApply =
-    settings.mode === "auto" &&
-    match.recommendedAction === "save_to_existing" &&
-    match.confidence >= settings.threshold &&
-    Boolean(match.suggestedVaultId);
+    canAutoApplyOrganizationMove({
+      mode: settings.mode,
+      recommendedAction: match.recommendedAction,
+      confidence: match.confidence,
+      threshold: settings.threshold,
+      suggestedVaultId: match.suggestedVaultId,
+      currentProfileId: params.currentProfileId,
+      currentProfile,
+    }) || Boolean(params.autoApply);
 
-  if (shouldAutoApply || params.autoApply) {
+  if (shouldAutoApply) {
     const { resolveOrganizationSuggestion } = await import("./resolve");
     const resolved = await resolveOrganizationSuggestion(supabase, {
       userId: params.userId,
