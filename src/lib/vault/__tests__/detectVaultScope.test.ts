@@ -114,6 +114,53 @@ describe("detectMentionedVault", () => {
       null
     );
   });
+
+  it("does not match Connect With Jesus from CrossRoads Connect", () => {
+    const eventProfiles = [
+      {
+        id: "crossroads",
+        display_name: "Crossroadsconnect",
+        profile_type: "event" as const,
+      },
+      {
+        id: "cwj",
+        display_name: "Connect With Jesus",
+        profile_type: "hobby" as const,
+      },
+    ];
+    assert.equal(
+      profileMentionedInQuestion(
+        "What do we know about CrossRoads Connect?",
+        "Connect With Jesus"
+      ),
+      false
+    );
+    assert.deepEqual(
+      detectMentionedVault({
+        question: "What do we know about CrossRoads Connect?",
+        accessibleProfiles: eventProfiles,
+        preferProfileId: "crossroads",
+      }),
+      {
+        id: "crossroads",
+        display_name: "Crossroadsconnect",
+        profile_type: "event",
+      }
+    );
+    assert.deepEqual(
+      resolveGideonWriteVault({
+        question: "What do we know about CrossRoads Connect?",
+        activeProfileId: "crossroads",
+        accessibleProfiles: eventProfiles,
+        retrievedChunks: [],
+      }),
+      {
+        id: "crossroads",
+        display_name: "Crossroadsconnect",
+        profile_type: "event",
+      }
+    );
+  });
 });
 
 describe("resolveGideonWriteVault", () => {

@@ -17,13 +17,72 @@ function possessiveSuffixPattern(): string {
   return "(?:'s|s(?=\\s|$))";
 }
 
-/** Tokens to match in a question (full name + first name for multi-word names). */
+/**
+ * First words that are too generic to imply a Space by themselves.
+ * Prevents "CrossRoads Connect" from matching a Space named "Connect With Jesus".
+ */
+const WEAK_MENTION_TOKENS = new Set([
+  "a",
+  "an",
+  "and",
+  "at",
+  "by",
+  "connect",
+  "connection",
+  "cross",
+  "event",
+  "for",
+  "from",
+  "group",
+  "home",
+  "in",
+  "my",
+  "new",
+  "of",
+  "on",
+  "our",
+  "project",
+  "roads",
+  "space",
+  "team",
+  "the",
+  "this",
+  "to",
+  "with",
+  "workspace",
+]);
+
+function isWeakMentionToken(token: string): boolean {
+  return WEAK_MENTION_TOKENS.has(token.trim().toLowerCase());
+}
+
+/** Compact alphanumeric form: "CrossRoads Connect" → "crossroadsconnect". */
+export function compactProfileName(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+/** True when the question contains the profile name ignoring spaces/punctuation. */
+export function compactNameMentionedInQuestion(
+  question: string,
+  displayName: string
+): boolean {
+  const needle = compactProfileName(displayName);
+  // Short needles collide (e.g. "nolan" inside "nolansmith").
+  if (needle.length < 8) return false;
+  return compactProfileName(question).includes(needle);
+}
+
+/** Tokens to match in a question (full name + strong first name for multi-word names). */
 export function mentionTokensForDisplayName(displayName: string): string[] {
   const trimmed = displayName.trim();
   if (trimmed.length < 2) return [];
   const parts = trimmed.split(/\s+/).filter((p) => p.length >= 2);
   const tokens =
-    parts.length > 1 ? [trimmed, parts[0]!] : [trimmed];
+    parts.length > 1
+      ? isWeakMentionToken(parts[0]!)
+        ? [trimmed]
+        : [trimmed, parts[0]!]
+      : [trimmed];
   const seen = new Set<string>();
   const out: string[] = [];
   for (const token of tokens) {
@@ -91,6 +150,7 @@ export function detectCrossVaultScope(args: {
     if (!profileMentionedInQuestion(args.question, p.display_name)) return false;
 
     if (fullNameMentioned(args.question, p.display_name)) return true;
+    if (compactNameMentionedInQuestion(args.question, p.display_name)) return true;
 
     const tokens = mentionTokensForDisplayName(p.display_name);
     const firstName = (tokens.length > 1 ? tokens[1] : tokens[0])?.toLowerCase();
@@ -100,7 +160,8 @@ export function detectCrossVaultScope(args: {
       (other) =>
         other.id !== p.id &&
         other.display_name.trim().length > p.display_name.trim().length &&
-        fullNameMentioned(args.question, other.display_name)
+        (fullNameMentioned(args.question, other.display_name) ||
+          compactNameMentionedInQuestion(args.question, other.display_name))
     );
     return !longerMatch;
   });
@@ -108,8 +169,10 @@ export function detectCrossVaultScope(args: {
   if (candidates.length === 1) return candidates[0]!;
   if (candidates.length === 0) return null;
 
-  const fullNameMatches = candidates.filter((p) =>
-    fullNameMentioned(args.question, p.display_name)
+  const fullNameMatches = candidates.filter(
+    (p) =>
+      fullNameMentioned(args.question, p.display_name) ||
+      compactNameMentionedInQuestion(args.question, p.display_name)
   );
   if (fullNameMatches.length === 1) return fullNameMatches[0]!;
 
@@ -123,16 +186,40 @@ export function detectCrossVaultScope(args: {
 export function detectMentionedVault(args: {
   question: string;
   accessibleProfiles: VaultScopeCandidate[];
+  /** Prefer this profile when the question also names it (compact or full). */
+  preferProfileId?: string | null;
 }): VaultScopeCandidate | null {
+  const preferId =
+    typeof args.preferProfileId === "string" && args.preferProfileId.trim()
+      ? args.preferProfileId.trim()
+      : null;
+  if (preferId) {
+    const preferred = args.accessibleProfiles.find((p) => p.id === preferId);
+    if (
+      preferred &&
+      (fullNameMentioned(args.question, preferred.display_name) ||
+        compactNameMentionedInQuestion(args.question, preferred.display_name) ||
+        profileMentionedInQuestion(args.question, preferred.display_name))
+    ) {
+      return preferred;
+    }
+  }
+
   const candidates = args.accessibleProfiles.filter((p) => {
-    if (!profileMentionedInQuestion(args.question, p.display_name)) return false;
+    if (!profileMentionedInQuestion(args.question, p.display_name)) {
+      return compactNameMentionedInQuestion(args.question, p.display_name);
+    }
     if (fullNameMentioned(args.question, p.display_name)) return true;
+    if (compactNameMentionedInQuestion(args.question, p.display_name)) {
+      return true;
+    }
 
     const longerMatch = args.accessibleProfiles.some(
       (other) =>
         other.id !== p.id &&
         other.display_name.trim().length > p.display_name.trim().length &&
-        fullNameMentioned(args.question, other.display_name)
+        (fullNameMentioned(args.question, other.display_name) ||
+          compactNameMentionedInQuestion(args.question, other.display_name))
     );
     return !longerMatch;
   });
@@ -140,10 +227,16 @@ export function detectMentionedVault(args: {
   if (candidates.length === 1) return candidates[0]!;
   if (candidates.length === 0) return null;
 
-  const fullNameMatches = candidates.filter((p) =>
-    fullNameMentioned(args.question, p.display_name)
+  const fullNameMatches = candidates.filter(
+    (p) =>
+      fullNameMentioned(args.question, p.display_name) ||
+      compactNameMentionedInQuestion(args.question, p.display_name)
   );
   if (fullNameMatches.length === 1) return fullNameMatches[0]!;
+  if (preferId) {
+    const preferred = fullNameMatches.find((p) => p.id === preferId);
+    if (preferred) return preferred;
+  }
 
   return null;
 }
@@ -307,6 +400,7 @@ export function resolveGideonWriteVault(args: {
   const mentioned = detectMentionedVault({
     question: args.question,
     accessibleProfiles: args.accessibleProfiles,
+    preferProfileId: args.activeProfileId,
   });
   if (mentioned) return mentioned;
 
