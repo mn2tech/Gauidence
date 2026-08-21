@@ -13,7 +13,6 @@ import type {
   OrganizationAiOutput,
   OrganizationSuggestionPayload,
 } from "./types";
-import { getUnorganizedProfileId } from "./unorganized";
 
 async function loadAutoOrganizeSettings(
   supabase: SupabaseClient,
@@ -210,29 +209,6 @@ export async function runOrganizationAfterAnalysis(
         suggestion: resolved.suggestion,
         autoApplied: true,
       };
-    }
-  }
-
-  if (match.recommendedAction === "unorganized") {
-    const unorganizedId = await getUnorganizedProfileId(supabase, params.userId);
-    if (unorganizedId && unorganizedId !== params.currentProfileId) {
-      const { moveDocumentToProfile } = await import("./moveDocument");
-      const target = profiles.find((p) => p.id === unorganizedId);
-      if (target) {
-        await moveDocumentToProfile(
-          supabase,
-          params.userId,
-          params.documentId,
-          target
-        );
-        await logOrganizationEvent(supabase, {
-          userId: params.userId,
-          documentId: params.documentId,
-          suggestionId: inserted.id,
-          eventType: "moved_unorganized",
-          payload: { target_profile_id: unorganizedId },
-        });
-      }
     }
   }
 

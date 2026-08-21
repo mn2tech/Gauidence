@@ -153,7 +153,7 @@ describe("matchOrganizationTarget", () => {
     assert.equal(result.suggestedVaultId, "books-1");
   });
 
-  it("sends low-confidence uploads to unorganized", () => {
+  it("keeps low-confidence uploads in the Space the user chose", () => {
     const result = matchOrganizationTarget(
       [family, nolan],
       ai({
@@ -162,6 +162,20 @@ describe("matchOrganizationTarget", () => {
         suggested_vault_name: "Reading",
       }),
       "family-1"
+    );
+    assert.equal(result.recommendedAction, "keep_current");
+    assert.equal(result.suggestedVaultId, "family-1");
+  });
+
+  it("parks low-confidence uploads in unorganized when no current Space", () => {
+    const result = matchOrganizationTarget(
+      [family, nolan],
+      ai({
+        confidence: 0.2,
+        suggested_profile_name: "Nolan",
+        suggested_vault_name: "Reading",
+      }),
+      null
     );
     assert.equal(result.recommendedAction, "unorganized");
   });

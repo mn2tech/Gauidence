@@ -702,8 +702,8 @@ export default function AddAnythingScreen() {
           <p className="text-sm text-ink-muted">
             {websiteImportCount != null
               ? websiteImportCount === 1
-                ? "Imported 1 website page into this Space. Ask Gideon can use it once analysis finishes."
-                : `Imported ${websiteImportCount} website pages into this Space. Ask Gideon can use them once analysis finishes.`
+                ? "Imported 1 website page into this Space. Ask Gideon can use it once indexing finishes (after analysis)."
+                : `Imported ${websiteImportCount} website pages into this Space. Ask Gideon can use them once indexing finishes (after analysis).`
               : "Guardian saved your content. Search indexing may finish in the background."}
           </p>
           <div className="flex flex-wrap justify-center gap-2">

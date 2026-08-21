@@ -142,6 +142,23 @@ export function matchOrganizationTarget(
     ai.suggested_vault_name.trim() || profileName || ai.topics[0]?.trim() || "";
 
   if (confidence < LOW_CONFIDENCE_THRESHOLD) {
+    // Respect an intentional placement (e.g. website import into an Event Space).
+    // Only park in Unorganized when there is no current Space to keep.
+    if (currentProfileId) {
+      const current = profiles.find((p) => p.id === currentProfileId);
+      return {
+        recommendedAction: "keep_current",
+        suggestedProfileId: current?.id ?? currentProfileId,
+        suggestedProfileName: current?.display_name ?? profileName,
+        suggestedVaultId: current?.id ?? currentProfileId,
+        suggestedVaultName: current?.display_name ?? vaultName,
+        confidence,
+        reason:
+          ai.reason ||
+          "Guardian isn't sure where else this belongs, so it stays in the Space you chose.",
+        containerProfileId: current?.parent_profile_id ?? null,
+      };
+    }
     return {
       recommendedAction: "unorganized",
       suggestedProfileId: null,
