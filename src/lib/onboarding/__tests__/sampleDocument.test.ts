@@ -45,7 +45,7 @@ describe("sample document onboarding", () => {
     const picks = pickFirstWinHighlights(facts, 3);
     assert.equal(picks.length, 2);
     assert.ok(picks.every((p) => p.date));
-    assert.match(firstWinHeadline(picks), /2 dates/i);
+    assert.match(firstWinHeadline(picks), /2 important dates/i);
   });
 
   it("falls back to any facts when no dates", () => {
@@ -59,6 +59,6 @@ describe("sample document onboarding", () => {
     ];
     const picks = pickFirstWinHighlights(facts);
     assert.equal(picks.length, 1);
-    assert.match(firstWinHeadline(picks), /key fact/i);
+    assert.match(firstWinHeadline(picks), /useful information/i);
   });
 });

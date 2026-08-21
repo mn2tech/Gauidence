@@ -21,6 +21,7 @@ import { getUserTimeZoneRow } from "@/lib/timezone/server";
 import { guardianTimeZoneLabel } from "@/lib/timezone";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { refreshUserAwards } from "@/lib/awards/grant";
+import { assertSpaceCreationAllowed } from "@/lib/billing/entitlements";
 
 export const runtime = "nodejs";
 
@@ -248,6 +249,13 @@ export async function POST(request: Request) {
   const existing = await listGuardianProfiles(supabase, user.id);
   if (existing.length === 0 && !parentId) {
     row.is_default = true;
+  }
+
+  if (!parentId) {
+    const spaceQuota = await assertSpaceCreationAllowed(supabase, user.id, {
+      userEmail: user.email,
+    });
+    if (!spaceQuota.ok) return spaceQuota.response;
   }
 
   const profileSelect = GUARDIAN_PROFILE_SELECT;

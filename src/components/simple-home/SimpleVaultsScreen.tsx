@@ -195,6 +195,15 @@ export default function SimpleVaultsScreen() {
   if (profiles.length === 0) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-8">
+        <div className="mb-6 text-center">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+            Create your first Space.
+          </h1>
+          <p className="mt-2 text-sm text-ink-muted">
+            A Space gives Guardian a place to understand one part of your life
+            or work.
+          </p>
+        </div>
         <ProfileSetupHub returnTo="/vaults" />
       </div>
     );

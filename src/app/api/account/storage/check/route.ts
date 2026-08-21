@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { assertStorageQuota } from "@/lib/billing/storage";
+import { assertDocumentCreationAllowed } from "@/lib/billing/entitlements";
 
 export const runtime = "nodejs";
 
@@ -34,6 +35,13 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
+
+  const docs = await assertDocumentCreationAllowed(
+    supabase,
+    user.id,
+    user.email
+  );
+  if (!docs.ok) return docs.response;
 
   const accountId = storageOwnerId ?? user.id;
   const quota = await assertStorageQuota(supabase, {

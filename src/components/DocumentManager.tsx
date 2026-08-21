@@ -1094,11 +1094,18 @@ export default function DocumentManager({
           Loading your documents…
         </div>
       ) : documents.length === 0 ? (
-        <p className="mt-6 py-4 text-center text-sm text-ink-muted">
-          {readOnly
-            ? "Nothing shared yet. Your provider hasn't shared documents with you — use Requests to ask."
-            : "Nothing here yet. Your uploads are private to you."}
-        </p>
+        <div className="mt-6 space-y-1 py-4 text-center">
+          <p className="text-sm font-semibold text-foreground">
+            {readOnly
+              ? "Nothing shared yet"
+              : "Guardian doesn't know anything about this Space yet."}
+          </p>
+          <p className="text-sm text-ink-muted">
+            {readOnly
+              ? "Your provider hasn't shared documents with you — use Requests to ask."
+              : "Add your first document, note, or business card and Guardian will start building its knowledge."}
+          </p>
+        </div>
       ) : visibleDocuments.length === 0 ? (
         <p className="mt-6 py-4 text-center text-sm text-ink-muted">
           No documents match your search.
@@ -1404,16 +1411,29 @@ export default function DocumentManager({
                         />
                       </p>
                     )}
-                    <p className="mt-1 text-sm leading-relaxed">
-                      <SearchHighlight
-                        text={analysis.summary}
-                        term={
-                          highlightDocumentId === doc.id ? searchTerm : null
-                        }
-                      />
-                    </p>
+                    {analysis.summary ? (
+                      <div className="mt-2">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
+                          AI-generated summary
+                        </p>
+                        <p className="mt-1 text-sm leading-relaxed text-ink-muted">
+                          <SearchHighlight
+                            text={analysis.summary}
+                            term={
+                              highlightDocumentId === doc.id
+                                ? searchTerm
+                                : null
+                            }
+                          />
+                        </p>
+                      </div>
+                    ) : null}
                     {analysis.facts.length > 0 && (
-                      <ul className="mt-3 space-y-2">
+                      <>
+                        <p className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
+                          Extracted information
+                        </p>
+                      <ul className="mt-2 space-y-2">
                         {analysis.facts.map((fact, i) => (
                           <li
                             key={`${fact.label}-${i}`}
@@ -1448,6 +1468,7 @@ export default function DocumentManager({
                           </li>
                         ))}
                       </ul>
+                      </>
                     )}
                     <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
                       <p className="text-xs text-ink-muted">

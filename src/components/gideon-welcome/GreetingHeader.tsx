@@ -9,8 +9,8 @@ export default function GreetingHeader({ greeting, view }: GreetingHeaderProps) 
   const { greetName, spaceName, isNewUser, isEmptySpace } = view;
 
   const headline = greetName
-    ? `${greeting}, ${greetName} 👋`
-    : `${greeting} 👋`;
+    ? `${greeting}, ${greetName}.`
+    : `${greeting}.`;
 
   return (
     <header className="space-y-2">
@@ -20,20 +20,24 @@ export default function GreetingHeader({ greeting, view }: GreetingHeaderProps) 
 
       {isNewUser && isEmptySpace ? (
         <div className="space-y-1 text-sm text-ink-muted">
-          <p>Welcome to Guardian.</p>
+          <p className="font-medium text-foreground">Welcome to Guardian.</p>
           <p>
-            I&apos;m Gideon. I&apos;ll help you keep track of the information
-            that matters to you.
+            Guardian remembers what matters and helps you act on it. Add
+            something to this Space to get started.
           </p>
-          <p className="pt-0.5">Your Space is empty right now, so let&apos;s get started.</p>
         </div>
-      ) : spaceName ? (
-        <p className="text-sm text-ink-muted">
-          Welcome back to{" "}
-          <span className="font-semibold text-foreground">{spaceName}</span>.
-        </p>
       ) : (
-        <p className="text-sm text-ink-muted">Welcome back to Guardian.</p>
+        <p className="text-sm text-ink-muted">
+          Here&apos;s what&apos;s happening across your Guardian
+          {spaceName ? (
+            <>
+              {" "}
+              — starting with{" "}
+              <span className="font-semibold text-foreground">{spaceName}</span>
+            </>
+          ) : null}
+          .
+        </p>
       )}
     </header>
   );

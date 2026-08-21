@@ -54,6 +54,18 @@ async function applySubscription(
       updated_at: new Date().toISOString(),
     })
     .eq("id", userId);
+
+  try {
+    const { recordProductEvent } = await import("@/lib/analytics/productEvents");
+    if (paid) {
+      await recordProductEvent(admin, userId, "subscription_started", {
+        plan,
+        status: sub.status,
+      });
+    }
+  } catch {
+    /* non-fatal */
+  }
 }
 
 async function resolveUserId(
@@ -157,6 +169,14 @@ export async function POST(request: Request) {
             updated_at: new Date().toISOString(),
           })
           .eq("id", userId);
+        try {
+          const { recordProductEvent } = await import(
+            "@/lib/analytics/productEvents"
+          );
+          await recordProductEvent(admin, userId, "subscription_canceled");
+        } catch {
+          /* non-fatal */
+        }
         break;
       }
       default:

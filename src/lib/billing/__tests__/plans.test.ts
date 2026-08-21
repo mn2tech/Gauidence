@@ -14,7 +14,10 @@ describe("billing plans", () => {
   });
 
   it("exposes Free, Personal, Family, and Business monthly quotas", () => {
-    assert.equal(PLAN_LIMITS.free.analyzePerMonth, 5);
+    assert.equal(PLAN_LIMITS.free.analyzePerMonth, 10);
+    assert.equal(PLAN_LIMITS.free.chatPerMonth, 20);
+    assert.equal(PLAN_LIMITS.free.spacesPerAccount, 1);
+    assert.equal(PLAN_LIMITS.free.documentsPerAccount, 10);
     assert.equal(PLAN_LIMITS.personal.analyzePerMonth, 100);
     assert.equal(PLAN_LIMITS.family.analyzePerMonth, 200);
     assert.equal(PLAN_LIMITS.business.analyzePerMonth, 500);

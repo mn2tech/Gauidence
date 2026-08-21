@@ -8,10 +8,16 @@ type Props = {
   message: string;
   code?: string | null;
   className?: string;
+  onUpgradeClick?: () => void;
 };
 
 /** Quota error with an inline upgrade link when the monthly plan limit is hit. */
-export default function PlanLimitAlert({ message, code, className }: Props) {
+export default function PlanLimitAlert({
+  message,
+  code,
+  className,
+  onUpgradeClick,
+}: Props) {
   const showUpgrade = shouldShowPlanUpgradeLink(message, code);
   const displayMessage = showUpgrade
     ? normalizePlanLimitMessage(message)
@@ -23,12 +29,22 @@ export default function PlanLimitAlert({ message, code, className }: Props) {
       {showUpgrade ? (
         <>
           {" "}
-          <Link
-            href="/settings#billing"
-            className="font-semibold text-brand underline-offset-2 hover:text-brand-dark hover:underline"
-          >
-            Upgrade
-          </Link>
+          {onUpgradeClick ? (
+            <button
+              type="button"
+              onClick={onUpgradeClick}
+              className="font-semibold text-brand underline-offset-2 hover:text-brand-dark hover:underline"
+            >
+              Upgrade
+            </button>
+          ) : (
+            <Link
+              href="/settings#billing"
+              className="font-semibold text-brand underline-offset-2 hover:text-brand-dark hover:underline"
+            >
+              Upgrade
+            </Link>
+          )}
         </>
       ) : null}
     </p>

@@ -6,6 +6,9 @@ export type PlanId = (typeof PLAN_IDS)[number];
 export const PAID_PLAN_IDS = ["personal", "family", "business"] as const;
 export type PaidPlanId = (typeof PAID_PLAN_IDS)[number];
 
+/** Marketing alias: Guardian Pro maps to the personal paid plan. */
+export const PRO_PLAN_ID: PaidPlanId = "personal";
+
 export type PlanLimits = {
   analyzePerMonth: number;
   chatPerMonth: number;
@@ -16,17 +19,23 @@ export type PlanLimits = {
   researchPerHour: number;
   /** Total vault file storage for the account (bytes). */
   storageBytes: number;
+  /** Max owned top-level Spaces (null / Infinity = unlimited). */
+  spacesPerAccount: number;
+  /** Max stored documents/items across the account. */
+  documentsPerAccount: number;
 };
 
 export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
   free: {
-    analyzePerMonth: 5,
-    chatPerMonth: 30,
+    analyzePerMonth: 10,
+    chatPerMonth: 20,
     researchPerMonth: 3,
     analyzePerHour: 5,
     chatPerHour: 10,
     researchPerHour: 3,
     storageBytes: 1 * 1024 * 1024 * 1024,
+    spacesPerAccount: 1,
+    documentsPerAccount: 10,
   },
   personal: {
     analyzePerMonth: 100,
@@ -36,6 +45,8 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
     chatPerHour: 60,
     researchPerHour: 20,
     storageBytes: 10 * 1024 * 1024 * 1024,
+    spacesPerAccount: 25,
+    documentsPerAccount: 2_000,
   },
   family: {
     analyzePerMonth: 200,
@@ -45,6 +56,8 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
     chatPerHour: 80,
     researchPerHour: 30,
     storageBytes: 25 * 1024 * 1024 * 1024,
+    spacesPerAccount: 50,
+    documentsPerAccount: 5_000,
   },
   business: {
     analyzePerMonth: 500,
@@ -54,26 +67,35 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
     chatPerHour: 120,
     researchPerHour: 40,
     storageBytes: 50 * 1024 * 1024 * 1024,
+    spacesPerAccount: 200,
+    documentsPerAccount: 20_000,
   },
 };
 
+/** Central Free-tier limits — change here, not in UI components. */
+export const FREE_PLAN_LIMITS = PLAN_LIMITS.free;
+
+/** Central Pro (personal) limits — change here, not in UI components. */
+export const PRO_PLAN_LIMITS = PLAN_LIMITS.personal;
+
 export const PLAN_LABELS: Record<PlanId, string> = {
-  free: "Free",
-  personal: "Personal",
-  family: "Family",
-  business: "Business",
+  free: "Guardian Free",
+  personal: "Guardian Pro",
+  family: "Guardian Family",
+  business: "Guardian Business",
 };
 
 export const PLAN_PRICE_DISPLAY: Record<PaidPlanId, string> = {
-  personal: "$12/mo",
+  personal: "$9.99/mo",
   family: "$24/mo",
   business: "$49/mo",
 };
 
 /** Short marketing lines for /pricing and Settings. */
 export const PLAN_TAGLINES: Record<PlanId, string> = {
-  free: "Try Guardian with light monthly AI use.",
-  personal: "For one person keeping life’s documents under control.",
+  free: "Try Guardian with one Space and light monthly AI use.",
+  personal:
+    "Keep building knowledge — more Spaces, higher limits, and richer memory.",
   family: "For households with shared people, pets, and homes.",
   business: "For teams, clients, and higher AI volume.",
 };
@@ -84,7 +106,7 @@ export const FREE_PRICE_DISPLAY = "$0";
 export const PERSONAL_PRICE_DISPLAY = PLAN_PRICE_DISPLAY.personal;
 
 export const PLAN_UNIT_AMOUNT_CENTS: Record<PaidPlanId, number> = {
-  personal: 1200,
+  personal: 999,
   family: 2400,
   business: 4900,
 };
@@ -94,9 +116,9 @@ export const PLAN_PRODUCT_COPY: Record<
   { name: string; description: string }
 > = {
   personal: {
-    name: "Guardian Personal",
+    name: "Guardian Pro",
     description:
-      "100 analyses, 500 Ask Gideon turns, and 50 Research briefs per month.",
+      "More Spaces, higher document and Gideon allowances, and advanced knowledge features.",
   },
   family: {
     name: "Guardian Family",
@@ -109,6 +131,49 @@ export const PLAN_PRODUCT_COPY: Record<
       "500 analyses, 3,000 Ask Gideon turns, and 300 Research briefs per month — for teams and client work.",
   },
 };
+
+/** Feature flags gated behind paid plans (enforced server-side where practical). */
+export const PRO_FEATURES = {
+  unlimitedSpaces: true,
+  advancedKnowledgeSearch: true,
+  dailyBriefing: true,
+  importantDateDetection: true,
+  followUpDetection: true,
+  crossDocumentKnowledge: true,
+  enhancedMemory: true,
+} as const;
+
+export type SubscriptionStatus =
+  | "free"
+  | "trialing"
+  | "active"
+  | "past_due"
+  | "canceled"
+  | "incomplete"
+  | "unpaid"
+  | "unknown";
+
+export function normalizeSubscriptionStatus(
+  status: string | null | undefined,
+  plan?: PlanId
+): SubscriptionStatus {
+  if (!status) {
+    return plan && plan !== "free" ? "active" : "free";
+  }
+  const s = status.toLowerCase();
+  if (
+    s === "trialing" ||
+    s === "active" ||
+    s === "past_due" ||
+    s === "canceled" ||
+    s === "incomplete" ||
+    s === "unpaid"
+  ) {
+    return s;
+  }
+  if (s === "cancelled") return "canceled";
+  return "unknown";
+}
 
 export function isPlanId(v: unknown): v is PlanId {
   return typeof v === "string" && (PLAN_IDS as readonly string[]).includes(v);
@@ -123,6 +188,7 @@ export function normalizePlan(v: unknown): PlanId {
 }
 
 export function parseCheckoutPlan(v: unknown): PaidPlanId | null {
+  if (v === "pro") return PRO_PLAN_ID;
   return isPaidPlanId(v) ? v : null;
 }
 
@@ -143,4 +209,8 @@ export function planRank(plan: PlanId): number {
     default:
       return 0;
   }
+}
+
+export function isProPlan(plan: PlanId): boolean {
+  return plan !== "free";
 }

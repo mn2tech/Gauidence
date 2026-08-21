@@ -296,7 +296,7 @@ function VaultList({ onPicked }: { onPicked?: () => void }) {
           href="/settings/profiles?add=1&return=%2Fask"
           className="font-medium text-brand hover:text-brand-dark"
         >
-          Create one
+          Create your first Space
         </Link>
       </p>
     );

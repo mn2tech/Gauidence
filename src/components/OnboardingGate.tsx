@@ -11,8 +11,8 @@ import {
 import { SIMPLE_HOME_PATH } from "@/lib/simple-home/routing";
 import type { GuardianProfile } from "@/lib/profiles/types";
 
-const GuardianCoachScreen = dynamic(
-  () => import("@/components/GuardianCoachScreen"),
+const ActivationFlow = dynamic(
+  () => import("@/components/ActivationFlow"),
   {
     loading: () => (
       <div className="flex min-h-[40vh] items-center justify-center p-6 text-sm text-ink-muted">
@@ -31,6 +31,9 @@ const SKIP_PATH_PREFIXES = [
   "/invite",
   "/pricing",
   "/security",
+  "/privacy",
+  "/terms",
+  "/ai-disclaimer",
 ];
 
 function shouldSkipPath(pathname: string | null): boolean {
@@ -108,7 +111,7 @@ export default function OnboardingGate({
 
   if (signedIn && needsOnboarding) {
     return (
-      <GuardianCoachScreen
+      <ActivationFlow
         onComplete={async ({ activeProfileId }) => {
           setNeedsOnboarding(false);
           await refresh();

@@ -18,12 +18,14 @@ import {
 } from "@/lib/profiles/types";
 import GradeLevelSelect from "@/components/GradeLevelSelect";
 import { dispatchAwardsFromResponse } from "@/lib/awards/client";
+import { useUpgradeModal, isPlanLimitPayload } from "@/components/UpgradeProvider";
 
 export default function ProfilesManager() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { profiles, active, accountName, refresh, switchProfile } =
     useActiveProfile();
+  const { openUpgrade } = useUpgradeModal();
   const [adding, setAdding] = useState(searchParams.get("add") === "1");
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [groupId, setGroupId] = useState<ProfileCreateGroupId | null>(null);
@@ -141,8 +143,19 @@ export default function ProfilesManager() {
           switchTo: true,
         }),
       });
-      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        code?: string;
+      };
       if (!res.ok) {
+        if (isPlanLimitPayload(body) || res.status === 429) {
+          openUpgrade({
+            reason:
+              body.error ??
+              "You've used your Free Space. Upgrade to create more — your existing knowledge stays available.",
+          });
+          return;
+        }
         setError(body.error ?? "Couldn't create profile.");
         return;
       }

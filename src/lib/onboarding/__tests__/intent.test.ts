@@ -14,10 +14,18 @@ describe("onboarding intent", () => {
   it("validates intent and school intent", () => {
     assert.equal(isOnboardingIntent("personal"), true);
     assert.equal(isOnboardingIntent("school"), true);
+    assert.equal(isOnboardingIntent("organization"), true);
     assert.equal(isOnboardingIntent("hobby"), false);
     assert.equal(isSchoolIntent("teacher"), true);
     assert.equal(isSchoolIntent("parent"), true);
     assert.equal(isSchoolIntent("family"), false);
+  });
+
+  it("maps organization to nonprofit vault", () => {
+    const org = vaultActionForIntent("organization");
+    assert.equal(org.optionId, "nonprofit");
+    assert.equal(org.profileType, "non_profit");
+    assert.equal(suggestionKindForIntent("organization"), "business");
   });
 
   it("keeps personal and other on the auto vault", () => {

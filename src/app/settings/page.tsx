@@ -57,6 +57,14 @@ export default async function SettingsPage() {
           </p>
           <p className="mt-2">
             <a
+              href="/settings/privacy"
+              className="text-sm font-semibold text-brand hover:text-brand-dark"
+            >
+              Privacy &amp; Data →
+            </a>
+          </p>
+          <p className="mt-2">
+            <a
               href="/settings/connections"
               className="text-sm font-semibold text-brand hover:text-brand-dark"
             >
@@ -89,6 +97,14 @@ export default async function SettingsPage() {
                   className="text-sm font-semibold text-brand hover:text-brand-dark"
                 >
                   AI usage (admin) →
+                </a>
+              </p>
+              <p className="mt-2">
+                <a
+                  href="/settings/funnel"
+                  className="text-sm font-semibold text-brand hover:text-brand-dark"
+                >
+                  Subscription funnel (admin) →
                 </a>
               </p>
               <p className="mt-2">

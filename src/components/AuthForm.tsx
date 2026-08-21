@@ -9,6 +9,8 @@ import GoogleIcon from "@/components/GoogleIcon";
 import GuardianLogo from "@/components/brand/GuardianLogo";
 import { campaignSignupWelcome } from "@/lib/campaigns/olney-nno";
 import { GUARDIAN_BRAND_TAGLINE } from "@/lib/branding";
+import { trackFunnelEvent } from "@/lib/onboarding/events";
+import { LEGAL_VERSIONS } from "@/lib/legal/versions";
 
 const ERROR_MESSAGES: Record<string, string> = {
   access_denied:
@@ -21,11 +23,15 @@ const ERROR_MESSAGES: Record<string, string> = {
     "Sign-in isn't set up on this deployment yet. The site owner needs to configure Supabase first.",
   google_not_enabled:
     "Google sign-in isn't available yet on this site. You can create an account with email and password instead.",
+  legal_required:
+    "Please agree to the Terms of Use and acknowledge the Privacy Policy to create an account.",
 };
 
 const NOTICE_MESSAGES: Record<string, string> = {
   password_updated:
     "Your password was updated. Sign in with your new password.",
+  account_deleted:
+    "Your Guardian account was deleted. We're sorry to see you go.",
 };
 
 type Mode = "login" | "signup";
@@ -48,6 +54,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [legalAgreed, setLegalAgreed] = useState(false);
 
   const configured = supabase !== null;
   const isSignup = mode === "signup";
@@ -64,9 +71,28 @@ export default function AuthForm({ mode }: { mode: Mode }) {
     return authQuery ? `${path}?${authQuery}` : path;
   }
 
+  async function persistLegalAcceptance() {
+    try {
+      await fetch("/api/account/legal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          termsAccepted: true,
+          privacyAcknowledged: true,
+        }),
+      });
+    } catch {
+      /* non-fatal — user can still use the product */
+    }
+  }
+
   async function handleGoogle() {
     if (!supabase) {
       setError(ERROR_MESSAGES.not_configured);
+      return;
+    }
+    if (isSignup && !legalAgreed) {
+      setError(ERROR_MESSAGES.legal_required);
       return;
     }
     setError(null);
@@ -86,6 +112,11 @@ export default function AuthForm({ mode }: { mode: Mode }) {
 
       const callbackParams = new URLSearchParams({ next: safeNext });
       if (signupRef) callbackParams.set("ref", signupRef);
+      if (isSignup && legalAgreed) {
+        callbackParams.set("legal", "1");
+        callbackParams.set("tv", LEGAL_VERSIONS.terms);
+        callbackParams.set("pv", LEGAL_VERSIONS.privacy);
+      }
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
@@ -112,6 +143,10 @@ export default function AuthForm({ mode }: { mode: Mode }) {
       setError(ERROR_MESSAGES.not_configured);
       return;
     }
+    if (isSignup && !legalAgreed) {
+      setError(ERROR_MESSAGES.legal_required);
+      return;
+    }
     setError(null);
     setNotice(null);
     setEmailLoading(true);
@@ -124,18 +159,24 @@ export default function AuthForm({ mode }: { mode: Mode }) {
             data: {
               full_name: fullName,
               ...(signupRef ? { signup_ref: signupRef } : {}),
+              terms_version: LEGAL_VERSIONS.terms,
+              privacy_version: LEGAL_VERSIONS.privacy,
+              legal_accepted_at: new Date().toISOString(),
             },
-            emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(safeNext)}${signupRef ? `&ref=${encodeURIComponent(signupRef)}` : ""}`,
+            emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(safeNext)}&legal=1&tv=${encodeURIComponent(LEGAL_VERSIONS.terms)}&pv=${encodeURIComponent(LEGAL_VERSIONS.privacy)}${signupRef ? `&ref=${encodeURIComponent(signupRef)}` : ""}`,
           },
         });
         if (error) {
           setError(error.message);
         } else if (data.session) {
+          trackFunnelEvent("user_signed_up", { source: "email" });
           await fetch("/api/profiles").catch(() => undefined);
+          await persistLegalAcceptance();
           router.push(safeNext);
           router.refresh();
           return;
         } else {
+          trackFunnelEvent("user_signed_up", { source: "email_confirm" });
           setNotice(
             "Almost there — check your email for a confirmation link to finish creating your account."
           );
@@ -219,11 +260,45 @@ export default function AuthForm({ mode }: { mode: Mode }) {
         </p>
       )}
 
+      {isSignup ? (
+        <label className="mt-6 flex cursor-pointer items-start gap-3 rounded-xl border border-stone-200 bg-stone-50/80 px-3 py-3 text-sm leading-relaxed text-ink-muted">
+          <input
+            type="checkbox"
+            checked={legalAgreed}
+            onChange={(e) => setLegalAgreed(e.target.checked)}
+            className="mt-1 h-4 w-4 shrink-0 rounded border-stone-300 text-brand focus:ring-brand"
+          />
+          <span>
+            I agree to the{" "}
+            <Link
+              href="/terms"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-brand hover:text-brand-dark"
+            >
+              Terms of Use
+            </Link>{" "}
+            and acknowledge the{" "}
+            <Link
+              href="/privacy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-brand hover:text-brand-dark"
+            >
+              Privacy Policy
+            </Link>
+            .
+          </span>
+        </label>
+      ) : null}
+
       <button
         type="button"
         onClick={handleGoogle}
-        disabled={!configured || googleLoading}
-        className="mt-6 flex w-full items-center justify-center gap-3 rounded-full border border-stone-300 bg-white px-6 py-3 text-sm font-semibold text-foreground transition hover:border-stone-400 hover:bg-stone-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-50"
+        disabled={
+          !configured || googleLoading || (isSignup && !legalAgreed)
+        }
+        className="mt-4 flex w-full items-center justify-center gap-3 rounded-full border border-stone-300 bg-white px-6 py-3 text-sm font-semibold text-foreground transition hover:border-stone-400 hover:bg-stone-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-50"
       >
         {googleLoading ? (
           <Loader2 className="h-5 w-5 animate-spin" />
@@ -307,7 +382,9 @@ export default function AuthForm({ mode }: { mode: Mode }) {
         </div>
         <button
           type="submit"
-          disabled={!configured || emailLoading}
+          disabled={
+            !configured || emailLoading || (isSignup && !legalAgreed)
+          }
           className="flex w-full items-center justify-center gap-2 rounded-full bg-brand px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand-dark focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-50"
         >
           {emailLoading && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -337,6 +414,20 @@ export default function AuthForm({ mode }: { mode: Mode }) {
             </Link>
           </>
         )}
+      </p>
+
+      <p className="mt-6 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center text-xs text-ink-muted">
+        <Link href="/privacy" className="hover:text-foreground">
+          Privacy
+        </Link>
+        <span aria-hidden>•</span>
+        <Link href="/terms" className="hover:text-foreground">
+          Terms
+        </Link>
+        <span aria-hidden>•</span>
+        <Link href="/ai-disclaimer" className="hover:text-foreground">
+          AI Disclaimer
+        </Link>
       </p>
     </div>
   );

@@ -104,14 +104,14 @@ export default function FirstWinCard({
               onClick={onAskAnother}
               className="inline-flex rounded-full bg-brand px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-dark"
             >
-              Ask Gideon another question
+              Ask Gideon about this
             </button>
             <button
               type="button"
               onClick={onAddOwn}
               className="inline-flex rounded-full border border-stone-300 bg-white px-4 py-2 text-xs font-semibold text-foreground transition hover:bg-stone-50"
             >
-              Add your own document
+              Add another item
             </button>
             <button
               type="button"
@@ -131,6 +131,9 @@ export default function FirstWinCard({
               )}
             </button>
           </div>
+          <p className="mt-3 text-xs text-ink-muted">
+            Gideon answers using knowledge from your Space.
+          </p>
         </div>
         <button
           type="button"

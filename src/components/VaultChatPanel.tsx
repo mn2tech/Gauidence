@@ -2695,6 +2695,15 @@ export default function VaultChatPanel({
     const question = questionRaw.trim();
     if (!question || sending || vaultBusy) return;
 
+    if (!onboardingProgress.hasAskedGideon) {
+      trackOnboardingEvent("first_gideon_ask", {
+        profileKind: active?.profile_type ?? null,
+      });
+      trackOnboardingEvent("first_gideon_question", {
+        profileKind: active?.profile_type ?? null,
+      });
+    }
+
     markGideonWelcomeSeen();
     stopAssistantSpeech();
     setSending(true);
@@ -4911,6 +4920,17 @@ export default function VaultChatPanel({
             if (file) stageVaultFile(file);
           }}
         />
+        <p className="mt-2 px-1 text-center text-[11px] leading-snug text-ink-muted">
+          Gideon uses AI and can make mistakes. Verify important information.{" "}
+          <Link
+            href="/ai-disclaimer"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-brand underline-offset-2 hover:underline"
+          >
+            AI Disclaimer
+          </Link>
+        </p>
       </div>
     </form>
   );

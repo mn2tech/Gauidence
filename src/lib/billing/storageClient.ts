@@ -44,8 +44,19 @@ export async function checkVaultStorageQuota(args: {
 export function isStorageLimitError(err: unknown): boolean {
   if (!err || typeof err !== "object") return false;
   const code = "code" in err ? String((err as { code?: string }).code ?? "") : "";
-  if (code === "storage_limit") return true;
+  if (code === "storage_limit" || code === "plan_limit") return true;
   const message =
     err instanceof Error ? err.message : typeof err === "string" ? err : "";
-  return /vault storage/i.test(message) || /storage limit/i.test(message);
+  return (
+    /vault storage/i.test(message) ||
+    /storage limit/i.test(message) ||
+    /item limit/i.test(message) ||
+    /upgrade to keep adding/i.test(message)
+  );
+}
+
+export function isPlanLimitError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const code = "code" in err ? String((err as { code?: string }).code ?? "") : "";
+  return code === "plan_limit";
 }

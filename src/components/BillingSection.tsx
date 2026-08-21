@@ -137,7 +137,11 @@ export default function BillingSection() {
         setError(body.error ?? "Couldn't start checkout.");
         return;
       }
-      if (body.url) window.location.href = body.url as string;
+      if (body.url) {
+        const { trackFunnelEvent } = await import("@/lib/onboarding/events");
+        trackFunnelEvent("checkout_started", { plan });
+        window.location.href = body.url as string;
+      }
     } catch {
       setError("Couldn't start checkout.");
     } finally {
@@ -179,9 +183,22 @@ export default function BillingSection() {
             <h2 className="text-base font-semibold">Plan & billing</h2>
           </div>
           <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-            Free for light use. Personal {PLAN_PRICE_DISPLAY.personal}, Family{" "}
+            Free includes one Space and light monthly AI use. Upgrade to{" "}
+            {PLAN_LABELS.personal} ({PLAN_PRICE_DISPLAY.personal}), Family{" "}
             {PLAN_PRICE_DISPLAY.family}, or Business {PLAN_PRICE_DISPLAY.business}{" "}
-            for higher analyses, Ask Gideon, and Research limits.
+            for more Spaces, documents, and Gideon questions. Your Free knowledge
+            always stays available.
+          </p>
+          <p className="mt-2 text-xs text-ink-muted">
+            See{" "}
+            <a href="/terms" className="text-brand hover:underline">
+              Terms of Use
+            </a>{" "}
+            and{" "}
+            <a href="/privacy" className="text-brand hover:underline">
+              Privacy Policy
+            </a>
+            .
           </p>
         </div>
         {status ? (

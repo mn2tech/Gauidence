@@ -34,6 +34,9 @@ export async function GET(request: Request) {
   const code = searchParams.get("code");
   const explicitNext = searchParams.get("next");
   const signupRef = searchParams.get("ref")?.trim() || null;
+  const legalAccepted = searchParams.get("legal") === "1";
+  const termsVersion = searchParams.get("tv")?.trim() || null;
+  const privacyVersion = searchParams.get("pv")?.trim() || null;
   const safeNext =
     explicitNext &&
     explicitNext.startsWith("/") &&
@@ -103,6 +106,20 @@ export async function GET(request: Request) {
       { onConflict: "id", ignoreDuplicates: true }
     );
     await ensureDefaultGuardianProfile(supabase, user);
+    if (legalAccepted) {
+      const { LEGAL_VERSIONS } = await import("@/lib/legal/versions");
+      const now = new Date().toISOString();
+      await supabase
+        .from("profiles")
+        .update({
+          terms_accepted_at: now,
+          terms_version: termsVersion || LEGAL_VERSIONS.terms,
+          privacy_acknowledged_at: now,
+          privacy_version: privacyVersion || LEGAL_VERSIONS.privacy,
+          updated_at: now,
+        })
+        .eq("id", user.id);
+    }
     if (
       signupRef &&
       typeof user.user_metadata?.signup_ref !== "string"

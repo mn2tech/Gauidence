@@ -6,10 +6,11 @@ import type { GuardianProfileType } from "@/lib/profiles/types";
 import type { SuggestionProfileKind } from "@/lib/vault/gideon";
 
 export const ONBOARDING_INTENTS = [
+  "business",
   "personal",
   "family",
-  "business",
   "school",
+  "organization",
   "other",
 ] as const;
 
@@ -41,22 +42,22 @@ export type IntentOption = {
 
 export const INTENT_OPTIONS: IntentOption[] = [
   {
+    id: "business",
+    label: "Business",
+    description: "Contracts, clients, invoices, and company knowledge",
+    emoji: "💼",
+  },
+  {
     id: "personal",
-    label: "Personal life",
-    description: "Everyday documents, notes, receipts, and plans for yourself",
+    label: "Personal",
+    description: "Everyday documents, notes, receipts, and plans",
     emoji: "👤",
   },
   {
     id: "family",
     label: "Family",
-    description: "School flyers, activities, and household paperwork",
+    description: "Household paperwork, activities, and shared life",
     emoji: "👨‍👩‍👧",
-  },
-  {
-    id: "business",
-    label: "Business",
-    description: "Invoices, contracts, clients, and company files",
-    emoji: "💼",
   },
   {
     id: "school",
@@ -65,10 +66,10 @@ export const INTENT_OPTIONS: IntentOption[] = [
     emoji: "🎓",
   },
   {
-    id: "other",
-    label: "Something else",
-    description: "Explore Guardian and organize as you go",
-    emoji: "✨",
+    id: "organization",
+    label: "Organization",
+    description: "Nonprofit, team, church, or community knowledge",
+    emoji: "🏛️",
   },
 ];
 
@@ -121,7 +122,7 @@ export function vaultActionForIntent(
       return {
         optionId: null,
         profileType: "personal",
-        displayName: "Me",
+        displayName: "My Personal",
         relationship: "Myself",
         switchToNew: false,
       };
@@ -129,14 +130,21 @@ export function vaultActionForIntent(
       return {
         optionId: "my_family",
         profileType: "family",
-        displayName: "My family",
+        displayName: "My Family",
         switchToNew: true,
       };
     case "business":
       return {
         optionId: "business",
         profileType: "business",
-        displayName: "My business",
+        displayName: "My Business",
+        switchToNew: true,
+      };
+    case "organization":
+      return {
+        optionId: "nonprofit",
+        profileType: "non_profit",
+        displayName: "My Organization",
         switchToNew: true,
       };
     case "school": {
@@ -182,6 +190,7 @@ export function suggestionKindForIntent(
     case "family":
       return "family";
     case "business":
+    case "organization":
       return "business";
     case "school": {
       const school = schoolIntent ?? "student";
@@ -197,6 +206,8 @@ export type OnboardingStatus = {
   intent: OnboardingIntent | null;
   completedAt: string | null;
   skipped: boolean;
+  step?: string | null;
+  firstValueReachedAt?: string | null;
 };
 
 export function computeNeedsOnboarding(row: {

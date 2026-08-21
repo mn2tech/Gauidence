@@ -20,7 +20,7 @@ import { formatStorageBytes } from "@/lib/billing/storageFormat";
 export const metadata: Metadata = {
   title: "Pricing — Guardian",
   description:
-    "Free, Personal, Family, and Business plans for Guardian document vaults, Ask Gideon, and Research.",
+    "Free and Guardian Pro plans for Spaces, knowledge memory, Ask Gideon, and Research.",
 };
 
 function priceFor(plan: PlanId): string {
@@ -77,12 +77,16 @@ export default async function PricingPage() {
               const limits = PLAN_LIMITS[plan];
               const featured = plan === "personal";
               const features = [
+                plan === "free"
+                  ? `${limits.spacesPerAccount} Space`
+                  : `Up to ${limits.spacesPerAccount.toLocaleString("en-US")} Spaces`,
+                `Up to ${limits.documentsPerAccount.toLocaleString("en-US")} stored items`,
                 `${formatStorageBytes(limits.storageBytes)} vault storage`,
                 `${limits.analyzePerMonth} document analyses / month`,
-                `${limits.chatPerMonth.toLocaleString("en-US")} Ask Gideon / chat turns`,
+                `${limits.chatPerMonth.toLocaleString("en-US")} Ask Gideon questions / month`,
                 `${limits.researchPerMonth} Research briefs / month`,
-                "Private vaults & deadline alerts",
-                "Ask Gideon grounded in your documents",
+                "Private Spaces & deadline alerts",
+                "Ask Gideon grounded in your knowledge",
               ];
               return (
                 <div

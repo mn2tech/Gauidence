@@ -105,12 +105,12 @@ export function pickFirstWinHighlights(
 export function firstWinHeadline(highlights: FirstWinHighlight[]): string {
   const dateCount = highlights.filter((h) => h.date).length;
   if (dateCount > 0) {
-    return `Guardian found ${dateCount} date${dateCount === 1 ? "" : "s"} in your document`;
+    return `Guardian found ${dateCount} important date${dateCount === 1 ? "" : "s"}`;
   }
   if (highlights.length > 0) {
-    return `Guardian found ${highlights.length} key fact${highlights.length === 1 ? "" : "s"}`;
+    return `Guardian found useful information`;
   }
-  return "Guardian read your document";
+  return "Guardian now knows more about this Space";
 }
 
 export const FIRST_WIN_SEEN_KEY = "guardian:first-win-seen";
