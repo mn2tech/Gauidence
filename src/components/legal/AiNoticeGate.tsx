@@ -3,12 +3,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import AiNoticeModal from "@/components/legal/AiNoticeModal";
-
-const ASK_PATH_PREFIXES = ["/ask", "/home"];
+import {
+  readAiNoticeAcknowledged,
+  writeAiNoticeAcknowledged,
+} from "@/lib/legal/aiNoticeAck";
 
 /**
- * Soft first-use AI notice before Gideon-heavy surfaces.
- * Existing users without a stored ack see it once; not shown on every answer.
+ * Soft first-use AI notice on Ask Gideon.
+ * Persists via localStorage + profiles when migration 0092 is applied.
+ * Does not re-prompt on every visit once acknowledged for the current version.
  */
 export default function AiNoticeGate({
   children,
@@ -19,18 +22,23 @@ export default function AiNoticeGate({
   const [needsNotice, setNeedsNotice] = useState(false);
   const [checked, setChecked] = useState(false);
 
-  const relevant =
-    pathname === "/ask" ||
-    pathname?.startsWith("/ask/") ||
-    pathname === "/home" ||
-    ASK_PATH_PREFIXES.some((p) => pathname === p);
+  const onAsk =
+    pathname === "/ask" || Boolean(pathname?.startsWith("/ask/"));
 
   useEffect(() => {
-    if (!relevant) {
+    if (!onAsk) {
       setChecked(true);
       setNeedsNotice(false);
       return;
     }
+
+    // Instant client short-circuit — avoid flash / repeat prompts.
+    if (readAiNoticeAcknowledged()) {
+      setNeedsNotice(false);
+      setChecked(true);
+      return;
+    }
+
     let cancelled = false;
     void (async () => {
       try {
@@ -44,31 +52,55 @@ export default function AiNoticeGate({
         }
         const body = (await res.json().catch(() => ({}))) as {
           needsAiNotice?: boolean;
+          migrationPending?: boolean;
         };
+
+        // If DB already has ack, mirror into localStorage for faster next loads.
+        if (!body.needsAiNotice) {
+          writeAiNoticeAcknowledged();
+          if (!cancelled) {
+            setNeedsNotice(false);
+            setChecked(true);
+          }
+          return;
+        }
+
+        // Migration missing or no server ack — still respect localStorage
+        // (user may have continued before columns existed).
+        if (readAiNoticeAcknowledged()) {
+          if (!cancelled) {
+            setNeedsNotice(false);
+            setChecked(true);
+          }
+          return;
+        }
+
         if (!cancelled) {
-          setNeedsNotice(Boolean(body.needsAiNotice));
+          setNeedsNotice(true);
           setChecked(true);
         }
       } catch {
         if (!cancelled) {
-          setNeedsNotice(false);
+          setNeedsNotice(!readAiNoticeAcknowledged());
           setChecked(true);
         }
       }
     })();
+
     return () => {
       cancelled = true;
     };
-  }, [relevant, pathname]);
+  }, [onAsk, pathname]);
 
   const onAcknowledged = useCallback(() => {
+    writeAiNoticeAcknowledged();
     setNeedsNotice(false);
   }, []);
 
   return (
     <>
       {children}
-      {checked && relevant ? (
+      {checked && onAsk ? (
         <AiNoticeModal open={needsNotice} onAcknowledged={onAcknowledged} />
       ) : null}
     </>

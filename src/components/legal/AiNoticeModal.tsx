@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Loader2, Sparkles } from "lucide-react";
 import { LEGAL_PATHS } from "@/lib/legal/versions";
+import { writeAiNoticeAcknowledged } from "@/lib/legal/aiNoticeAck";
 
 /**
  * One-time (per version) acknowledgment before first Gideon use.
@@ -22,6 +23,9 @@ export default function AiNoticeModal({
   const acknowledge = useCallback(async () => {
     setBusy(true);
     setError(null);
+    // Persist locally first so we never re-prompt on the next Ask visit,
+    // even if the DB migration hasn't been applied yet.
+    writeAiNoticeAcknowledged();
     try {
       const res = await fetch("/api/account/legal", {
         method: "POST",
@@ -30,12 +34,11 @@ export default function AiNoticeModal({
       });
       if (!res.ok && res.status !== 503) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
-        setError(body.error ?? "Couldn't save acknowledgment.");
-        return;
+        // Still dismiss — local ack already saved. Surface non-fatal note only.
+        console.warn("AI notice server save failed:", body.error);
       }
       onAcknowledged();
     } catch {
-      // If offline / migration missing, still allow continue so we don't brick the app.
       onAcknowledged();
     } finally {
       setBusy(false);
