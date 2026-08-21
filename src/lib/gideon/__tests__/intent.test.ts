@@ -155,6 +155,15 @@ describe("Gideon intent router — follow-ups and tools", () => {
     assert.equal(route.intent, "chief_of_staff");
   });
 
+  it("searches Guardian for what-do-we-know-about space questions", () => {
+    const route = classifyGideonIntent({
+      question: "What do we know about CrossRoads Connect?",
+    });
+    assert.equal(route.intent, "knowledge_search");
+    assert.equal(shouldSearchGuardianKnowledge(route), true);
+    assert.ok(route.statusSteps.includes("Searching Guardian..."));
+  });
+
   it("searches Guardian for a named contract", () => {
     const route = classifyGideonIntent({
       question: "What does the TTB contract say about termination?",

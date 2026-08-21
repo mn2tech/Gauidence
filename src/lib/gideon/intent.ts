@@ -70,7 +70,11 @@ const KNOWLEDGE_FIND =
 
 /** Business Pack / organizational intelligence questions (keep narrow — avoid forcing RAG). */
 const KNOWLEDGE_BUSINESS =
-  /\b((what|which|our|my|the) clients?\b|clients? (are|do|we|we'?re)|working with|everything we know about|what proposals?\b|proposals? (are|have|outstanding|need)|what contracts?\b|contracts? (expire|expiring|outstanding)|what projects?\b|projects? (associated|for|with)|who (is|are) working on|what did we promise|what commitments?\b|commitments? (have|did|to)|business relationships?|what relationships?\b|relationships? (do we|with)|show me everything we know|where did you get)\b/i;
+  /\b((what|which|our|my|the) clients?\b|clients? (are|do|we|we'?re)|working with|what do we know about|what else do we know about|everything we know about|what proposals?\b|proposals? (are|have|outstanding|need)|what contracts?\b|contracts? (expire|expiring|outstanding)|what projects?\b|projects? (associated|for|with)|who (is|are) working on|what did we promise|what commitments?\b|commitments? (have|did|to)|business relationships?|what relationships?\b|relationships? (do we|with)|show me everything we know|where did you get)\b/i;
+
+/** Space / event overview questions that must load files and notes. */
+const KNOWLEDGE_SPACE_OVERVIEW =
+  /\b(what(?:'s| is) (uploaded|stored|in (this|my|the) (space|workspace|event))|summarize (this|my|the) (space|workspace|event)|what (files?|documents?|notes?) (are|do i have) (in )?(this|my|the)?\s*(space|workspace|event)?|recap (this|my|the) (space|workspace|event))\b/i;
 
 /** Dental Pack practice operations questions. */
 const KNOWLEDGE_DENTAL =
@@ -187,6 +191,7 @@ function isKnowledgeQuestion(q: string): boolean {
     KNOWLEDGE_MUSIC.test(q) ||
     KNOWLEDGE_CONNECTED.test(q) ||
     KNOWLEDGE_BUSINESS.test(q) ||
+    KNOWLEDGE_SPACE_OVERVIEW.test(q) ||
     KNOWLEDGE_DENTAL.test(q) ||
     KNOWLEDGE_PRACTICE_FACTS.test(q) ||
     looksLikeChartTitleQuery(q)
