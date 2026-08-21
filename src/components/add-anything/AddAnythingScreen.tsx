@@ -33,10 +33,7 @@ import {
   VAULT_PASTE_MAX_CHARS,
 } from "@/lib/vault/clientUpload";
 import type { VaultUploadResult } from "@/lib/documents/clientProcessing";
-import {
-  kickDocumentProcessingJobs,
-  resolveAddAnythingStagingProfileId,
-} from "@/lib/documents/clientProcessing";
+import { kickDocumentProcessingJobs } from "@/lib/documents/clientProcessing";
 import { isAnalysisReadyForFiling } from "@/lib/documents/processingStatus";
 import { useDocumentProcessingPoll, type DocumentStatusSnapshot } from "@/hooks/useDocumentProcessingPoll";
 import { documentsHref } from "@/lib/routes";
@@ -44,7 +41,8 @@ import { ASK_GIDEON_PATH } from "@/lib/simple-home/routing";
 
 type Stage = "input" | "processing" | "recommend" | "done";
 
-function stagingProfile(
+/** Space Add Anything saves into — the user's active Space (Ask searches this by default). */
+function destinationProfile(
   profiles: GuardianProfile[],
   active: GuardianProfile | null
 ): GuardianProfile | null {
@@ -100,7 +98,7 @@ export default function AddAnythingScreen() {
   const [chooseOpen, setChooseOpen] = useState(false);
   const [processingDocId, setProcessingDocId] = useState<string | null>(null);
 
-  const profile = stagingProfile(profiles, active);
+  const profile = destinationProfile(profiles, active);
 
   const { statuses } = useDocumentProcessingPoll(
     processingDocId ? [processingDocId] : [],
@@ -131,9 +129,11 @@ export default function AddAnythingScreen() {
         return;
       }
       setSavedProfileId(
-        result.organizationSuggestion?.suggestedVaultId ??
-          result.organizationSuggestion?.suggestedProfileId ??
-          stagingProfileId
+        result.organizationAutoApplied
+          ? (result.organizationSuggestion?.suggestedVaultId ??
+              result.organizationSuggestion?.suggestedProfileId ??
+              stagingProfileId)
+          : stagingProfileId
       );
       stagingProfileIdRef.current = null;
       setStage("done");
@@ -247,15 +247,19 @@ export default function AddAnythingScreen() {
     }
 
     try {
-      const stagingProfileId = await resolveAddAnythingStagingProfileId();
-      stagingProfileIdRef.current = stagingProfileId;
-      const stagingProfile =
-        profiles.find((p) => p.id === stagingProfileId) ?? profile;
-      const ownerUserId = stagingProfile?.owner_user_id ?? user.id;
+      if (!profile) {
+        setError("Set up a space before uploading.");
+        setStage("input");
+        return;
+      }
+      // Save into the active Space so Ask Gideon (this-space search) can find it.
+      const destinationProfileId = profile.id;
+      stagingProfileIdRef.current = destinationProfileId;
+      const ownerUserId = profile.owner_user_id ?? user.id;
 
       const result = await uploadAndAnalyzeToVault({
         userId: user.id,
-        profileId: stagingProfileId,
+        profileId: destinationProfileId,
         ownerUserId,
         file,
         onStatus: setStatus,
@@ -374,7 +378,9 @@ export default function AddAnythingScreen() {
           Add Anything
         </h1>
         <p className="mt-1.5 text-sm text-ink-muted">
-          Upload, paste, import a website, or capture — Guardian will organize it for you.
+          Upload, paste, import a website, or capture into{" "}
+          {profile ? profileContainerName(profile) : "your Space"} — then Ask
+          Gideon can use it.
         </p>
       </header>
 
@@ -401,7 +407,8 @@ export default function AddAnythingScreen() {
               <span>
                 <span className="block text-sm font-semibold">Upload file</span>
                 <span className="mt-0.5 block text-xs text-ink-muted">
-                  PDF, Word, images, and more
+                  PDF, Word, images into{" "}
+                  {profile?.display_name ?? "this Space"}
                 </span>
               </span>
             </button>
@@ -422,7 +429,8 @@ export default function AddAnythingScreen() {
               <span>
                 <span className="block text-sm font-semibold">Paste text</span>
                 <span className="mt-0.5 block text-xs text-ink-muted">
-                  Notes, receipts, or copied content
+                  Notes or copied content into{" "}
+                  {profile?.display_name ?? "this Space"}
                 </span>
               </span>
             </button>
@@ -684,11 +692,21 @@ export default function AddAnythingScreen() {
             chooseAnotherLabel="Choose another space"
             onChooseAnother={() => setChooseOpen(true)}
             onSaved={({ movedToProfileId }) => {
-              setSavedProfileId(movedToProfileId ?? profile?.id ?? null);
+              setSavedProfileId(
+                movedToProfileId ??
+                  stagingProfileIdRef.current ??
+                  profile?.id ??
+                  null
+              );
+              stagingProfileIdRef.current = null;
               setStage("done");
             }}
             onKeepHere={() => {
-              setSavedProfileId(profile?.id ?? null);
+              // File stays in the Space it was uploaded to (active Space).
+              setSavedProfileId(
+                stagingProfileIdRef.current ?? profile?.id ?? null
+              );
+              stagingProfileIdRef.current = null;
               setStage("done");
             }}
             onError={setError}
@@ -704,7 +722,7 @@ export default function AddAnythingScreen() {
               ? websiteImportCount === 1
                 ? "Imported 1 website page into this Space. Ask Gideon can use it once indexing finishes (after analysis)."
                 : `Imported ${websiteImportCount} website pages into this Space. Ask Gideon can use them once indexing finishes (after analysis).`
-              : "Guardian saved your content. Search indexing may finish in the background."}
+              : `Guardian saved your content in ${profile?.display_name ?? "this Space"}. Ask Gideon can use it once indexing finishes.`}
           </p>
           <div className="flex flex-wrap justify-center gap-2">
             {savedProfileId ? (
