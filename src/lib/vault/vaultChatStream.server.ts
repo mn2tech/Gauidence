@@ -46,7 +46,7 @@ import { refreshUserAwards } from "@/lib/awards/grant";
 import { formatVaultChatError, buildGideonEmptyAnswerFallback } from "@/lib/vault/vaultChatErrors";
 import { buildListAnswerFromChunks } from "@/lib/vault/gideon";
 import { buildOntologyAnswerFallback } from "@/lib/ontology/formatForGideon";
-import { buildSuggestedQuestions, parseSuggestedQuestions } from "@/lib/gideon/suggestedQuestions";
+import { buildSuggestedQuestions, parseSuggestedQuestions, extractPeopleFromAnswer } from "@/lib/gideon/suggestedQuestions";
 import { extractBusinessEntityMentions } from "@/lib/gideon/business/queryPlanner";
 import {
   listActionTimeline,
@@ -301,13 +301,15 @@ export function createVaultChatStreamResponse(
         const suggestedQuestions = buildSuggestedQuestions({
           question: args.question,
           answer,
-          entityNames: extractBusinessEntityMentions(args.question),
+          entityNames: [
+            ...extractBusinessEntityMentions(args.question),
+            ...extractPeopleFromAnswer(answer),
+          ],
           availableDocumentLabels: citations.map((c) => c.fileName),
           evidenceTexts: args.chunks
             .slice(0, 8)
             .map((c) => c.content ?? "")
             .filter(Boolean),
-          preferEvidenceOrGap: true,
         });
 
         const resolvedWriteVault = resolveGideonWriteVault({

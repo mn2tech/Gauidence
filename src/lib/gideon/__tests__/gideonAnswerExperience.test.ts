@@ -54,11 +54,34 @@ describe("buildSuggestedQuestions", () => {
       gaps: ["Form ADV Part 2A is referenced but not available."],
       preferEvidenceOrGap: true,
     });
-    assert.ok(qs.length >= 3 && qs.length <= 4);
+    assert.ok(qs.length >= 2 && qs.length <= 4);
     assert.ok(qs.every((q) => q.split(/\s+/).length <= 10));
     assert.ok(!qs.some((q) => /what do we know about kendall/i.test(q)));
     assert.ok(
-      qs.some((q) => /missing|source|document|fees|services|money|conflict/i.test(q))
+      qs.some((q) => /missing|source|fees|services|money|ADV/i.test(q))
+    );
+    assert.ok(!qs.some((q) => /else is known in this Space|document should I add/i.test(q)));
+  });
+
+  it("suggests roster follow-ups for contact / RSVP answers", () => {
+    const qs = buildSuggestedQuestions({
+      question: "pull up Jeff Hunt from the roster",
+      answer: `• Name: Jeff Hunt
+• Email: jhunt@fca.org
+• Phone: 301-943-1913
+• Company: Fellowship of Christian Athletes
+• Title: Field Director – Montgomery County
+• RSVP'd: August 3, 2026 (confirmed, 0 guests)`,
+      availableDocumentLabels: ["roster.csv"],
+    });
+    assert.ok(qs.length >= 2 && qs.length <= 4);
+    assert.ok(qs.some((q) => /Jeff Hunt|roster|RSVP|guest list/i.test(q)));
+    assert.ok(
+      !qs.some((q) =>
+        /else is known in this Space|Which source supports|information is missing|document should I add/i.test(
+          q
+        )
+      )
     );
   });
 });

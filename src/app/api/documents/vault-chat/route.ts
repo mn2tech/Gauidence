@@ -65,6 +65,7 @@ import { formatVaultChatError } from "@/lib/vault/vaultChatErrors";
 import {
   buildSuggestedQuestions,
   parseSuggestedQuestions,
+  extractPeopleFromAnswer,
 } from "@/lib/gideon/suggestedQuestions";
 import { extractBusinessEntityMentions } from "@/lib/gideon/business/queryPlanner";
 import { isChatLlmConfigured } from "@/lib/analysis/chatProvider";
@@ -1660,10 +1661,12 @@ export async function POST(request: Request) {
   const suggestedQuestions = buildSuggestedQuestions({
     question,
     answer,
-    entityNames: extractBusinessEntityMentions(question),
+    entityNames: [
+      ...extractBusinessEntityMentions(question),
+      ...extractPeopleFromAnswer(answer),
+    ],
     availableDocumentLabels: (citations ?? []).map((c) => c.fileName),
     evidenceTexts: [answer],
-    preferEvidenceOrGap: true,
   });
 
   const baseAssistantInsert = {

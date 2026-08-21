@@ -11,7 +11,7 @@ import {
   isChatLlmConfigured,
 } from "@/lib/analysis/chatProvider";
 import { routeGideonRequest, resolveGideonLoad } from "@/lib/gideon/orchestrator";
-import { buildSuggestedQuestions } from "@/lib/gideon/suggestedQuestions";
+import { buildSuggestedQuestions, extractPeopleFromAnswer } from "@/lib/gideon/suggestedQuestions";
 import { extractBusinessEntityMentions } from "@/lib/gideon/business/queryPlanner";
 import { selectCitationsForAnswer } from "@/lib/vault/retrieve";
 import {
@@ -169,10 +169,12 @@ export async function answerSpaceConversationGideon(args: {
   const suggestedQuestions = buildSuggestedQuestions({
     question,
     answer: finalAnswer,
-    entityNames: extractBusinessEntityMentions(question),
+    entityNames: [
+      ...extractBusinessEntityMentions(question),
+      ...extractPeopleFromAnswer(finalAnswer),
+    ],
     availableDocumentLabels: citations.map((c) => c.fileName),
     evidenceTexts: [finalAnswer],
-    preferEvidenceOrGap: true,
   });
 
   return {
