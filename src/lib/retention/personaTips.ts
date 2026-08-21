@@ -103,6 +103,26 @@ export function tipForIntent(
         ctaLabel: "Ask Gideon",
       },
     },
+    organization: {
+      welcome: {
+        example: "a policy, proposal, or meeting notes",
+        bodyExtra:
+          "Start with a policy, proposal, or team document — Guardian will surface dates, commitments, and follow-ups.",
+        ctaLabel: "Add an organization document",
+      },
+      nudge_no_document: {
+        example: "a policy or proposal",
+        bodyExtra:
+          "Upload a policy, proposal, or meeting notes so Gideon can summarize what your organization needs to remember.",
+        ctaLabel: "Upload a document",
+      },
+      nudge_try_gideon: {
+        example: "commitments and follow-ups",
+        bodyExtra:
+          "Ask Gideon about commitments, upcoming dates, or what needs follow-up.",
+        ctaLabel: "Ask Gideon",
+      },
+    },
     other: {
       welcome: {
         example: "any document you're comfortable storing",
