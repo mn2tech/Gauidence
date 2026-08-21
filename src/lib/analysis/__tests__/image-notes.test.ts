@@ -60,5 +60,8 @@ describe("wantsTranscription", () => {
     assert.equal(wantsTranscription("list all the members on the roster"), true);
     assert.equal(wantsTranscription("who is on the roster"), true);
     assert.equal(wantsTranscription("list all the members"), true);
+    assert.equal(wantsTranscription("yes pull up complete roster"), true);
+    assert.equal(wantsTranscription("pull up the complete roster"), true);
+    assert.equal(wantsTranscription("bring up the full roster"), true);
   });
 });

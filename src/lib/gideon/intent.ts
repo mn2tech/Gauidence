@@ -87,6 +87,14 @@ const KNOWLEDGE_ABOUT =
 const KNOWLEDGE_EVENT_CONTENT =
   /\b(launch event|rsvp|guest list|registration list|attendees?|run[- ]?of[- ]?show|event (details|plan|timeline|budget|vendors?)|(june|august|september|october) .{0,20}\bevent\b)\b/i;
 
+/** Roster / attendance lists in uploaded photos and PDFs. */
+const KNOWLEDGE_ROSTER =
+  /\b((complete|full|entire|whole)\s+)?roster\b|\b(pull\s+up|bring\s+up|show|list|get|display)\b.{0,40}\b(roster|guest list|attendance|participants?|attendees?)\b|\bwho(?:'s| is) on (the |this )?(roster|list)\b/i;
+
+/** Leading “yes/ok” before the real ask (e.g. “yes pull up complete roster”). */
+const LEADING_AFFIRM =
+  /^(yes|yeah|yep|sure|please do|ok|okay|do it|go ahead)[,!.]?\s+/i;
+
 /** Dental Pack practice operations questions. */
 const KNOWLEDGE_DENTAL =
   /\b((what|which|our|my|the) patients?\b|patients? (have|with|need|are)|upcoming appointments?|insurance claims?|claims? (need|pending|denied|follow)|treatment plans?|lab cases?|who is treating|dental (practice|clinic|office|centre|center)|hygienist|dentist|payer|referrals?|office hours|hours of operation|(what|which) services?\b|membership plan|zen suite|practice profile)\b/i;
@@ -190,9 +198,15 @@ function route(
   };
 }
 
+function stripLeadingAffirm(q: string): string {
+  return q.replace(LEADING_AFFIRM, "").trim() || q;
+}
+
 function isKnowledgeQuestion(q: string): boolean {
+  const core = stripLeadingAffirm(q);
   return (
     isDocumentContentQuestion(q) ||
+    isDocumentContentQuestion(core) ||
     KNOWLEDGE_EXPLICIT.test(q) ||
     KNOWLEDGE_SAY.test(q) ||
     KNOWLEDGE_SUMMARIZE.test(q) ||
@@ -205,9 +219,22 @@ function isKnowledgeQuestion(q: string): boolean {
     KNOWLEDGE_SPACE_OVERVIEW.test(q) ||
     KNOWLEDGE_ABOUT.test(q) ||
     KNOWLEDGE_EVENT_CONTENT.test(q) ||
+    KNOWLEDGE_ROSTER.test(q) ||
+    KNOWLEDGE_ROSTER.test(core) ||
     KNOWLEDGE_DENTAL.test(q) ||
     KNOWLEDGE_PRACTICE_FACTS.test(q) ||
-    looksLikeChartTitleQuery(q)
+    looksLikeChartTitleQuery(q) ||
+    (core !== q &&
+      (KNOWLEDGE_EXPLICIT.test(core) ||
+        KNOWLEDGE_FIND.test(core) ||
+        KNOWLEDGE_SOURCE.test(core) ||
+        KNOWLEDGE_MUSIC.test(core) ||
+        KNOWLEDGE_CONNECTED.test(core) ||
+        KNOWLEDGE_BUSINESS.test(core) ||
+        KNOWLEDGE_ABOUT.test(core) ||
+        KNOWLEDGE_EVENT_CONTENT.test(core) ||
+        KNOWLEDGE_SAY.test(core) ||
+        KNOWLEDGE_SUMMARIZE.test(core)))
   );
 }
 

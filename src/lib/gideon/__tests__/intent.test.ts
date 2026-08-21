@@ -172,6 +172,15 @@ describe("Gideon intent router — follow-ups and tools", () => {
     assert.equal(shouldSearchGuardianKnowledge(route), true);
   });
 
+  it("searches Guardian for pull-up complete roster (even after yes)", () => {
+    const route = classifyGideonIntent({
+      question: "yes pull up complete roster",
+    });
+    assert.equal(route.intent, "knowledge_search");
+    assert.equal(shouldSearchGuardianKnowledge(route), true);
+    assert.ok(route.statusSteps.includes("Searching Guardian..."));
+  });
+
   it("searches Guardian for a named contract", () => {
     const route = classifyGideonIntent({
       question: "What does the TTB contract say about termination?",

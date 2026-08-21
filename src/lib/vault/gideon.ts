@@ -205,7 +205,11 @@ export function wantsTranscription(question: string): boolean {
     /\blist (?:(?:the |all |all the |every )+)?(?:items?|books?|names?|participants?|people|attendees?|members?)\b/i.test(
       q
     ) ||
-    /\b(?:list|show|give|read|who(?:'s| is)|what(?:'s| are)).{0,48}\broster\b/i.test(
+    /\b(?:list|show|give|read|pull\s+up|bring\s+up|get|display|who(?:'s| is)|what(?:'s| are)).{0,48}\broster\b/i.test(
+      q
+    ) ||
+    /\b(?:complete|full|entire|whole)\s+roster\b/i.test(q) ||
+    /\bpull\s+up\b.{0,40}\b(?:roster|list|names?|participants?|people|attendees?|members?)\b/i.test(
       q
     ) ||
     /\b(?:members?|names?|people|participants?|attendees?) on (?:the |this )?(?:roster|list)\b/i.test(
