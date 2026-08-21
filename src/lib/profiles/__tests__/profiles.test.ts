@@ -70,6 +70,7 @@ describe("guardian profiles helpers", () => {
     assert.ok(PROFILE_CREATE_OPTIONS.some((o) => o.profileType === "home"));
     assert.ok(PROFILE_CREATE_OPTIONS.some((o) => o.profileType === "pet"));
     assert.ok(PROFILE_CREATE_OPTIONS.some((o) => o.profileType === "hobby"));
+    assert.ok(PROFILE_CREATE_OPTIONS.some((o) => o.profileType === "event"));
     assert.ok(PROFILE_CREATE_OPTIONS.some((o) => o.profileType === "child"));
   });
 

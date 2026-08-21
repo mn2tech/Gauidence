@@ -190,6 +190,7 @@ const SPACE_HINT_TYPES: Record<string, GuardianProfileType[]> = {
   home: ["home"],
   pet: ["pet"],
   hobby: ["hobby"],
+  event: ["event"],
 };
 
 function profileTypesForSpaceHint(hint: string): GuardianProfileType[] | null {

@@ -75,6 +75,7 @@ export const SPACE_CREATE_OPTIONS = [
   { id: "nonprofit", label: "Nonprofit Workspace", emoji: "💚", group: "business" as const, optionId: "nonprofit" },
   { id: "project", label: "Project Space", emoji: "📁", group: "other" as const, optionId: "other" },
   { id: "learning", label: "Learning Space", emoji: "📚", group: "other" as const, optionId: "hobby" },
+  { id: "event", label: "Event Space", emoji: "📅", group: "other" as const, optionId: "event" },
   { id: "other", label: "Other", emoji: "⚙️", group: "other" as const, optionId: "other" },
 ] as const;
 

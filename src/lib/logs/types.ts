@@ -169,6 +169,16 @@ export const LOG_CATEGORIES_BY_PROFILE: Record<
     "Achievement",
     "Important Event",
   ],
+  event: [
+    "Planning",
+    "Vendor",
+    "Guest / RSVP",
+    "Budget",
+    "Timeline",
+    "Day-of",
+    "Follow-up",
+    "Important Event",
+  ],
   other: ["General", "Important Event"],
 };
 

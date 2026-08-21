@@ -19,7 +19,8 @@ export function suggestionKindFrom(
     type === "vehicle" ||
     type === "home" ||
     type === "pet" ||
-    type === "hobby"
+    type === "hobby" ||
+    type === "event"
   ) {
     return type;
   }

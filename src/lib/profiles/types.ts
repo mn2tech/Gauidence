@@ -20,6 +20,7 @@ export const GUARDIAN_PROFILE_TYPES = [
   "home",
   "pet",
   "hobby",
+  "event",
   "other",
 ] as const;
 
@@ -43,6 +44,7 @@ export const PROFILE_TYPE_LABELS: Record<GuardianProfileType, string> = {
   home: "Home",
   pet: "Pet",
   hobby: "Hobby / sport",
+  event: "Event",
   other: "Other",
 };
 
@@ -99,6 +101,7 @@ export const PROFILE_CREATE_OPTIONS: {
   { id: "home", label: "A home / house", profileType: "home" },
   { id: "pet", label: "A pet", profileType: "pet" },
   { id: "hobby", label: "A hobby or sport", profileType: "hobby" },
+  { id: "event", label: "An event", profileType: "event" },
   { id: "other", label: "Something else", profileType: "other" },
 ];
 
@@ -124,6 +127,7 @@ export const PROFILE_CREATE_GROUPS: {
       "family",
       "pet",
       "hobby",
+      "event",
       "home",
       "vehicle",
     ],
@@ -137,6 +141,7 @@ export const PROFILE_CREATE_GROUPS: {
       "nonprofit",
       "employee",
       "client",
+      "event",
       "home",
       "vehicle",
     ],
@@ -145,13 +150,21 @@ export const PROFILE_CREATE_GROUPS: {
     id: "student",
     label: "School",
     description: "Student and teacher vaults for classes, records, and planning",
-    optionIds: ["student", "teacher"],
+    optionIds: ["student", "teacher", "event"],
   },
   {
     id: "other",
     label: "Other",
-    description: "Yourself, hobbies, a garage, or something that doesn’t fit above",
-    optionIds: ["myself", "hobby", "my_vehicles", "vehicle", "home", "other"],
+    description: "Yourself, hobbies, events, a garage, or something that doesn’t fit above",
+    optionIds: [
+      "myself",
+      "hobby",
+      "event",
+      "my_vehicles",
+      "vehicle",
+      "home",
+      "other",
+    ],
   },
 ];
 
@@ -183,6 +196,7 @@ export const VAULT_CREATE_CARDS: VaultCreateCard[] = [
   { id: "nonprofit", label: "Nonprofit Workspace", emoji: "💚", group: "business", optionId: "nonprofit" },
   { id: "client", label: "Client Space", emoji: "🤝", group: "business", optionId: "client" },
   { id: "learning", label: "Learning Space", emoji: "📚", group: "other", optionId: "hobby" },
+  { id: "event", label: "Event Space", emoji: "📅", group: "other", optionId: "event" },
   { id: "custom", label: "Other", emoji: "⚙️", group: "other", optionId: "other" },
 ];
 
@@ -338,6 +352,7 @@ export const SHAREABLE_PROFILE_TYPES = [
   "pet",
   "child",
   "student",
+  "event",
 ] as const;
 
 export type ShareableProfileType = (typeof SHAREABLE_PROFILE_TYPES)[number];

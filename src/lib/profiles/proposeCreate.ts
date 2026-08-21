@@ -153,6 +153,7 @@ function normalizeProfileType(raw: string): GuardianProfileType | null {
     spouse_partner: "spouse_partner",
     family_member: "family_member",
     learning: "hobby",
+    event: "event",
     project: "other",
     workspace: "business",
   };

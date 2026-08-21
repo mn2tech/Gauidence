@@ -358,6 +358,7 @@ export type SuggestionProfileKind =
   | "home"
   | "pet"
   | "hobby"
+  | "event"
   | "other";
 
 /**
@@ -407,6 +408,13 @@ export function buildGideonLogSuggestions(
       "What happened recently in the Daily Log?",
       "Summarize recent practices or games.",
       "Any league, club, or equipment updates?",
+    ];
+  }
+  if (profileKind === "event") {
+    return [
+      "What happened recently in the Daily Log?",
+      "What still needs to be decided for this event?",
+      "Any upcoming deadlines or follow-ups?",
     ];
   }
   if (
@@ -731,6 +739,28 @@ export const VAULT_TEMPLATES: Record<SuggestionProfileKind, VaultTemplate> = {
     personality:
       "You are Gideon Learning — an encouraging assistant for courses, practice notes, schedules, and progress.",
   },
+  event: {
+    label: "Event",
+    badge: "📅 Event",
+    welcomeTitle: "Welcome to your Event Space",
+    description:
+      "I remember timelines, vendors, guest lists, budgets, and run-of-show notes so planning and follow-ups stay askable.",
+    suggestedUploads: [
+      "Timeline / schedule",
+      "Vendor contracts",
+      "Guest list",
+      "Budget",
+      "Run of show",
+      "Notes",
+    ],
+    starterQuestions: [
+      "What are the important dates for this event?",
+      "What still needs follow-up?",
+      "Summarize the latest planning notes.",
+    ],
+    personality:
+      "You are Gideon Event — a calm planning assistant for timelines, vendors, guests, budgets, and day-of details. Surface commitments and follow-ups clearly.",
+  },
   other: {
     label: "Custom",
     badge: "⚙️ Custom",
@@ -772,6 +802,7 @@ export function gideonChatContextLabel(
     profileKind === "home" ||
     profileKind === "pet" ||
     profileKind === "hobby" ||
+    profileKind === "event" ||
     profileKind === "other"
   ) {
     return `You are chatting with Gideon · ${name}`;
@@ -1058,7 +1089,8 @@ export function buildGideonSuggestions(
     profileKind === "vehicle" ||
     profileKind === "home" ||
     profileKind === "pet" ||
-    profileKind === "hobby";
+    profileKind === "hobby" ||
+    profileKind === "event";
 
   if (musicSpace) {
     const board =
@@ -1112,6 +1144,10 @@ export function buildGideonSuggestions(
       push("What hobby or sport documents are in this space?");
       push("Any upcoming games, lessons, or renewals?");
       push("Summarize the latest hobby document.");
+    } else if (profileKind === "event") {
+      push("What are the important dates for this event?");
+      push("What still needs follow-up?");
+      push("Summarize the latest planning document.");
     } else if (profileKind === "business" || profileKind === "non_profit") {
       // Prefer document chips; fill CRM-style prompts only when scarce.
       if (fromDocs.length < 3) {

@@ -95,6 +95,10 @@ describe("shared vault helpers", () => {
       true
     );
     assert.equal(
+      canShareGuardianProfile(sample({ profile_type: "event" })),
+      true
+    );
+    assert.equal(
       canManageProfileAccess(sample({ profile_type: "business" })),
       true
     );

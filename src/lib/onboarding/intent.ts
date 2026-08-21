@@ -242,6 +242,8 @@ export function uploadCtaForProfileKind(
       return "Upload a vet or pet record";
     case "hobby":
       return "Upload a schedule or notes";
+    case "event":
+      return "Upload a timeline, guest list, or vendor contract";
     default:
       return "Upload a document or photo";
   }
