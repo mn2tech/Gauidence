@@ -152,5 +152,69 @@ describe("buildGideonSystemPrompt", () => {
     assert.match(system, /No Guardian document search ran/);
     assert.match(system, /CONVERSATION CONTEXT/);
   });
+
+  it("requires Space sources when Guardian knowledge was loaded", async () => {
+    const { buildGideonSystemPrompt } = await import("../formatSystemPrompt.ts");
+    const { GIDEON_LOAD_FULL } = await import("@/lib/gideon/capabilities");
+    const system = buildGideonSystemPrompt({
+      activeProfile: {
+        id: "p1",
+        display_name: "NM2TECH",
+        profile_type: "business",
+        parent_profile_id: null,
+      },
+      retrievalScopes: [{ id: "p1", display_name: "NM2TECH", profile_type: "business" }],
+      accessibleProfiles: [],
+      profileNames: { p1: "NM2TECH" },
+      searchProfileIds: ["p1"],
+      chatHomeProfileId: "p1",
+      chatScopedProfileId: null,
+      searchScope: "workspace",
+      scopedProfile: null,
+      profileKind: "business",
+      chatContextLabel: "label",
+      vaultScopeNote: "note",
+      blocks: {
+        excerpts: "Fact from roster.pdf",
+        fileInventory: "roster.pdf",
+        attachedDocument: "(none)",
+        dailyLogs: "(none)",
+        clientRequests: "(none)",
+        proposals: "(none)",
+        schedule: "(none)",
+        linkedProfiles: "(none)",
+        vaultMap: "(none)",
+        workMemory: "(none — user has no active work projects)",
+        structuredKnowledge: "(none)",
+        ontology: "(none)",
+        businessIntelligence: "(none)",
+      },
+      promptOptions: {
+        timeZone: "America/New_York",
+        showPictures: false,
+        reminderAgent: false,
+        dailyLogCaptureAgent: false,
+        workMemoryUpdateAgent: false,
+        clientRequestReplyAgent: false,
+        clientRequestCreateAgent: false,
+        spaceCreateAgent: false,
+        transcriptionMode: false,
+        hasAttachedDocument: false,
+        allVaultsNote: "Search this space",
+        vaultEmptyNote: "No document excerpts matched",
+        focusedWorkMemory: false,
+        agentMode: false,
+        fullLogQuote: false,
+        intent: "knowledge_search",
+        loaded: GIDEON_LOAD_FULL,
+        calendarNote: "",
+        focusBlockNote: "",
+        confirmationRequired: false,
+      },
+    });
+    assert.match(system, /SPACE SOURCE MODE/);
+    assert.match(system, /Answer ONLY from the retrieval blocks/);
+    assert.doesNotMatch(system, /No Guardian document search ran/);
+  });
 });
 

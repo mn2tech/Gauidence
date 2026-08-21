@@ -14,7 +14,6 @@ import {
   buildOpenChartAttachmentAnswer,
   extractChartTitlesFromText,
   isPianoOrSongLearnRequest,
-  wantsOpenChartAttachment,
 } from "@/lib/vault/expandRetrievalQuestion";
 import { loadConnectedSuggestionContext } from "@/lib/vault/loadInventory";
 import { enqueueMissingVaultIndexing } from "@/lib/vault/ensureIndexed";
@@ -28,12 +27,10 @@ import {
   isSimpleTodayDateQuestion,
   getVaultTemplate,
   firstNameFrom,
-  wantsTranscription,
   type VaultDocHint,
 } from "@/lib/vault/gideon";
 import { isMusicPracticeChatContext } from "@/lib/connectors/trello/boundSpace";
 import { buildGideonQuickActions } from "@/lib/gideon/chiefOfStaff";
-import { isDocumentContentQuestion } from "@/lib/gideon/documentGrounding";
 import {
   orgsFromSpecialist,
   parseStoredSuggestedQuestions,
@@ -44,12 +41,10 @@ import {
   hydrateVaultChatMessage,
   hydrateVaultChatMessages,
 } from "@/lib/vault/chatAttachments";
-import { wantsShowPictures } from "@/lib/vault/images";
 import {
   resolveGideonImageAttachmentId,
   selectRetrievedImageDocumentIds,
   uniqueImageDocumentIds,
-  wantsVisualUnderstanding,
 } from "@/lib/vision/gideonImages";
 import { loadAuthorizedVisionImages } from "@/lib/vision/loadAuthorized";
 import { enqueueAnalyzePipeline } from "@/lib/documents/processingJobs";
@@ -1474,13 +1469,8 @@ export async function POST(request: Request) {
         question,
         history,
         hasAttachment: Boolean(attachedDoc),
-        forceKnowledge:
-          wantsVaultFileInventory(question) ||
-          wantsTranscription(question) ||
-          wantsShowPictures(question) ||
-          wantsOpenChartAttachment(question) ||
-          wantsVisualUnderstanding(question) ||
-          isDocumentContentQuestion(question),
+        // Ask Gideon in a Space always grounds in Space sources — never chat-only.
+        forceKnowledge: true,
       });
       const loadFlags = resolveGideonLoad(gideonRoute);
       const calendarNote = await loadCalendarPromptNote({

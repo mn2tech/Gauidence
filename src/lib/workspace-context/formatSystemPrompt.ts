@@ -130,7 +130,7 @@ export function buildGideonSystemPrompt(
       ? `\n${FOCUS_BLOCK_SYSTEM_NOTE}\n`
       : "";
   const knowledgeModeNote = searchedKnowledge
-    ? ""
+    ? `\nSPACE SOURCE MODE (strict): Guardian searched this Space for this turn. Answer ONLY from the retrieval blocks below (excerpts, file inventory, daily logs, client requests, ontology, connected files, schedule, and other Space sources). Do not use general knowledge, open-web facts, or chat-only speculation to fill gaps. If the answer is not in those Space sources, say you could not find it in this Space — do not invent details.\n`
     : `\nNo Guardian document search ran for this turn. Do not invent files or quotes from the user's spaces.\n`;
 
   const retrievalBlocks = [
