@@ -503,7 +503,7 @@ type PendingVaultAttachment = {
 };
 
 function isImageUpload(file: File): boolean {
-  return file.type.startsWith("image/");
+  return resolveVaultFileMimeType(file).startsWith("image/");
 }
 
 function attachShortcutLabel(): string {
@@ -1198,7 +1198,7 @@ export default function VaultChatPanel({
 
   const stageVaultFile = useCallback(
     (file: File) => {
-      if (!profileId || vaultBusy || sending) return;
+      if (!profileId || vaultBusy || sending || !canEditVault) return;
       setPlusOpen(false);
       setCameraOpen(false);
       if (!VAULT_ACCEPTED_TYPES[resolveVaultFileMimeType(file)]) {
@@ -1226,7 +1226,7 @@ export default function VaultChatPanel({
         return staged;
       });
     },
-    [profileId, vaultBusy, sending, revokePendingPreview]
+    [profileId, vaultBusy, sending, canEditVault, revokePendingPreview]
   );
 
   const handleComposerPaste = useCallback(
@@ -1872,7 +1872,11 @@ export default function VaultChatPanel({
       );
     }
 
-    if (profileId && shouldPromptSmartUpload(args.result, profileId)) {
+    if (
+      profileId &&
+      active?.profile_type !== "event" &&
+      shouldPromptSmartUpload(args.result, profileId)
+    ) {
       setPendingSmartUpload(args);
       return;
     }
@@ -3075,6 +3079,14 @@ export default function VaultChatPanel({
     const question = input.trim();
     const attachment = pendingAttachment;
     if ((!question && !attachment) || sending || vaultBusy || loadingHistory) return;
+    if (attachment && (!profileId || !canEditVault)) {
+      setError(
+        !profileId
+          ? "Choose a space before uploading."
+          : "You don't have permission to upload to this space."
+      );
+      return;
+    }
 
     if (attachment) {
       const { file, previewUrl: stagedPreviewUrl } = attachment;
@@ -3121,7 +3133,8 @@ export default function VaultChatPanel({
           )
         );
 
-        if (!result.analyzed) {
+        const imageUpload = isImageUpload(file);
+        if (!result.analyzed && !imageUpload) {
           pushLocalNote(
             `I added "${result.fileName}" to your space, but analysis didn't finish${
               result.analysisError ? `: ${result.analysisError}` : "."
@@ -3129,6 +3142,16 @@ export default function VaultChatPanel({
           );
           void refreshOnboarding();
           return;
+        }
+
+        if (!result.analyzed && imageUpload) {
+          pushLocalNote(
+            `I saved "${result.fileName}" to your space${
+              result.analysisError
+                ? ` (background analysis: ${result.analysisError})`
+                : ""
+            }. Reading the photo now…`
+          );
         }
 
         await handleAnalyzedUpload({
