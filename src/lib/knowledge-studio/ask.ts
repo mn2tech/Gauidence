@@ -7,9 +7,19 @@ import {
 } from "@/lib/analysis/llm";
 import type { PublishedOrgKnowledge } from "./retrieve";
 import { formatPublishedKnowledgeForPrompt } from "./retrieve";
+import { formatEasternNow, wantsNextUpcomingEvent } from "./formatTime";
+import {
+  NO_APPROVED_CROSSROADS_ANSWER,
+  NO_UPCOMING_CROSSROADS_EVENT,
+  scopeKnowledgeForQuestion,
+  withEventStatusLabels,
+} from "./eventScope";
 
-export const NO_APPROVED_CROSSROADS_ANSWER =
-  "I don't have approved CrossRoads Connect information about that yet.";
+export {
+  NO_APPROVED_CROSSROADS_ANSWER,
+  NO_UPCOMING_CROSSROADS_EVENT,
+  scopeKnowledgeForQuestion,
+} from "./eventScope";
 
 const ASK_SYSTEM = `You are Gideon answering for the public CrossRoads Connect page in Guardian.
 
@@ -17,6 +27,9 @@ Rules:
 - Answer ONLY from the PUBLISHED knowledge blocks provided.
 - Do not use general world knowledge.
 - Do not invent events, fees, locations, speakers, RSVP links, or contact details.
+- Respect CURRENT TIME (Eastern). Never call a past or finished event the "next" event.
+- Events marked STATUS: PAST are finished — do not present them as upcoming.
+- If the user asks for the next/upcoming event and only PAST events are listed (or none), say there is no published upcoming event.
 - If the published knowledge does not support an answer, reply exactly:
 ${NO_APPROVED_CROSSROADS_ANSWER}
 - Keep answers concise (2–6 sentences) unless listing event details.
@@ -28,16 +41,53 @@ CrossRoads Connect website — /events
 - Do not repeat the Source block.
 - Never mention drafts, review status, RAG, or internal systems.`;
 
+function appendSource(
+  answer: string,
+  knowledge: PublishedOrgKnowledge
+): string {
+  if (/\bSource:\s*/i.test(answer)) return answer;
+  const fallbackSource =
+    knowledge.facts[0]?.source_url ||
+    knowledge.events[0]?.source_url ||
+    "https://www.crossroadsconnect.us/";
+  let path = fallbackSource;
+  try {
+    const u = new URL(fallbackSource);
+    path = u.pathname === "/" ? u.hostname : `${u.hostname}${u.pathname}`;
+  } catch {
+    /* keep */
+  }
+  return `${answer}\n\nSource:\nCrossRoads Connect website — ${path}`;
+}
+
 export async function answerCrossroadsPublicQuestion(args: {
   question: string;
   knowledge: PublishedOrgKnowledge;
+  now?: Date;
 }): Promise<{ answer: string; usedKnowledge: boolean }> {
   const question = args.question.trim().slice(0, 1000);
+  const now = args.now ?? new Date();
+  const nowMs = now.getTime();
+
   if (!question) {
     return { answer: NO_APPROVED_CROSSROADS_ANSWER, usedKnowledge: false };
   }
 
-  const block = formatPublishedKnowledgeForPrompt(args.knowledge);
+  const scoped = scopeKnowledgeForQuestion(args.knowledge, question, nowMs);
+
+  if (
+    wantsNextUpcomingEvent(question) &&
+    scoped.events.length === 0 &&
+    args.knowledge.events.length > 0
+  ) {
+    return {
+      answer: appendSource(NO_UPCOMING_CROSSROADS_EVENT, args.knowledge),
+      usedKnowledge: true,
+    };
+  }
+
+  const labeled = withEventStatusLabels(scoped, nowMs);
+  const block = formatPublishedKnowledgeForPrompt(labeled);
   if (!block) {
     return { answer: NO_APPROVED_CROSSROADS_ANSWER, usedKnowledge: false };
   }
@@ -50,7 +100,7 @@ export async function answerCrossroadsPublicQuestion(args: {
     messages: [
       {
         role: "user",
-        content: `PUBLISHED KNOWLEDGE:\n${block}\n\nQUESTION:\n${question}`,
+        content: `CURRENT TIME (America/New_York): ${formatEasternNow(now)}\n\nPUBLISHED KNOWLEDGE:\n${block}\n\nQUESTION:\n${question}`,
       },
     ],
   });
@@ -67,23 +117,8 @@ export async function answerCrossroadsPublicQuestion(args: {
     return { answer: NO_APPROVED_CROSSROADS_ANSWER, usedKnowledge: false };
   }
 
-  if (!/\bSource:\s*/i.test(cleaned)) {
-    const fallbackSource =
-      args.knowledge.facts[0]?.source_url ||
-      args.knowledge.events[0]?.source_url ||
-      "https://www.crossroadsconnect.us/";
-    let path = fallbackSource;
-    try {
-      const u = new URL(fallbackSource);
-      path = u.pathname === "/" ? u.hostname : `${u.hostname}${u.pathname}`;
-    } catch {
-      /* keep */
-    }
-    return {
-      answer: `${cleaned}\n\nSource:\nCrossRoads Connect website — ${path}`,
-      usedKnowledge: true,
-    };
-  }
-
-  return { answer: cleaned, usedKnowledge: true };
+  return {
+    answer: appendSource(cleaned, scoped.events.length ? scoped : args.knowledge),
+    usedKnowledge: true,
+  };
 }

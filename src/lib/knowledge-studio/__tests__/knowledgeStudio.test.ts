@@ -10,11 +10,17 @@ import {
 } from "@/lib/knowledge-studio/normalize";
 import { stripHtmlToText } from "@/lib/knowledge-studio/website/stripHtml";
 import { CROSSROADS_ALLOWED_HOSTS } from "@/lib/knowledge-studio/constants";
-import { NO_APPROVED_CROSSROADS_ANSWER } from "@/lib/knowledge-studio/ask";
+import {
+  NO_APPROVED_CROSSROADS_ANSWER,
+  NO_UPCOMING_CROSSROADS_EVENT,
+  scopeKnowledgeForQuestion,
+} from "@/lib/knowledge-studio/eventScope";
 import { formatPublishedKnowledgeForPrompt } from "@/lib/knowledge-studio/retrieve";
 import {
   formatEasternDateTime,
   formatEasternTimeRange,
+  isEventStillActive,
+  wantsNextUpcomingEvent,
 } from "@/lib/knowledge-studio/formatTime";
 import type {
   KnowledgeEventRow,
@@ -212,5 +218,79 @@ describe("public knowledge visibility helpers", () => {
     assert.notEqual(draftFact.visibility, "public");
     assert.equal(publishedFact.lifecycle_status, "published");
     assert.equal(publishedFact.visibility, "public");
+  });
+});
+
+describe("upcoming event filtering", () => {
+  // Gathering: Aug 21 2026 8:45–10:15 AM EDT
+  const gathering = {
+    id: "e1",
+    organization_slug: "crossroadsconnect",
+    title: "CrossRoads Connect Gathering",
+    description: "Breakfast",
+    start_at: "2026-08-21T12:45:00.000Z",
+    end_at: "2026-08-21T14:15:00.000Z",
+    location: "Rockville, MD",
+    organizer: null,
+    contact: null,
+    rsvp_url: null,
+    cost: null,
+    audience: null,
+    source_label: "CrossRoads Connect website",
+    source_url: "https://www.crossroadsconnect.us/events",
+    lifecycle_status: "published",
+    visibility: "public",
+    published_at: "2026-01-02T00:00:00Z",
+    created_by: null,
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+  } as KnowledgeEventRow;
+
+  const laterEvent = {
+    ...gathering,
+    id: "e2",
+    title: "September Gathering",
+    start_at: "2026-09-18T12:45:00.000Z",
+    end_at: "2026-09-18T14:15:00.000Z",
+  } as KnowledgeEventRow;
+
+  // Evening after the Aug 21 gathering ended (10:34 PM EDT)
+  const afterGatheringMs = Date.parse("2026-08-22T02:34:00.000Z");
+
+  it("detects next-event questions", () => {
+    assert.equal(wantsNextUpcomingEvent("What is the next event?"), true);
+    assert.equal(wantsNextUpcomingEvent("Where is the next event?"), true);
+    assert.equal(wantsNextUpcomingEvent("How do I RSVP?"), false);
+  });
+
+  it("treats ended gatherings as inactive", () => {
+    assert.equal(isEventStillActive(gathering, afterGatheringMs), false);
+    assert.equal(
+      isEventStillActive(gathering, Date.parse("2026-08-21T13:00:00.000Z")),
+      true
+    );
+  });
+
+  it("drops past events when asking for the next event", () => {
+    const scoped = scopeKnowledgeForQuestion(
+      { facts: [], events: [gathering, laterEvent] },
+      "What is the next event?",
+      afterGatheringMs
+    );
+    assert.equal(scoped.events.length, 1);
+    assert.equal(scoped.events[0]?.title, "September Gathering");
+  });
+
+  it("keeps past events for non-next questions", () => {
+    const scoped = scopeKnowledgeForQuestion(
+      { facts: [], events: [gathering] },
+      "Is there a fee?",
+      afterGatheringMs
+    );
+    assert.equal(scoped.events.length, 1);
+  });
+
+  it("exposes no-upcoming copy", () => {
+    assert.match(NO_UPCOMING_CROSSROADS_EVENT, /upcoming/i);
   });
 });
