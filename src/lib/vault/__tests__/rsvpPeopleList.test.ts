@@ -6,6 +6,7 @@ import {
   wantsPeopleRoster,
   wantsTranscription,
   preferFullerListAnswer,
+  sanitizePeopleRosterAnswer,
 } from "../gideon.ts";
 
 describe("RSVP people list filtering", () => {
@@ -37,6 +38,59 @@ describe("RSVP people list filtering", () => {
       true
     );
     assert.equal(looksLikePersonListItem("Jeff Hunt"), true);
+  });
+
+  it("rejects website nav and job-title junk from RSVP answers", () => {
+    assert.equal(looksLikePersonListItem("CrossRoads Connect"), false);
+    assert.equal(looksLikePersonListItem("Contact"), false);
+    assert.equal(looksLikePersonListItem("Founder"), false);
+    assert.equal(looksLikePersonListItem("Events — CrossRoads Connect Cross Roads"), false);
+    assert.equal(looksLikePersonListItem("Friday — 2026"), false);
+    assert.equal(looksLikePersonListItem("Executive Leader — Power Lifter"), false);
+    assert.equal(
+      looksLikePersonListItem("VP — Commercial Banking · John Marshall Bank"),
+      false
+    );
+    assert.equal(
+      looksLikePersonListItem(
+        "Field Director — Montgomery County · Fellowship OF Christian Athletes"
+      ),
+      false
+    );
+    assert.equal(looksLikePersonListItem("RSVP — CrossRoads connect Cross Roads"), false);
+  });
+
+  it("sanitizes junk model RSVP lists into a clear fallback", () => {
+    const junk = `Launch Event Registration List - June 2026
+
+1. CrossRoads Connect
+2. Contact
+3. Events — CrossRoads Connect Cross Roads
+4. Friday — 2026
+5. Executive Leader — Power Lifter
+6. VP — Commercial Banking · John Marshall Bank
+7. Founder
+8. Field Director — Montgomery County · Fellowship OF Christian Athletes
+9. RSVP — CrossRoads connect Cross Roads`;
+    const out = sanitizePeopleRosterAnswer(junk);
+    assert.match(out, /couldn't find clear attendee names/i);
+    assert.doesNotMatch(out, /CrossRoads Connect/);
+    assert.doesNotMatch(out, /Executive Leader/);
+  });
+
+  it("keeps real people when sanitizing a mixed list", () => {
+    const mixed = `August RSVP list
+
+1. Contact
+2. Joshua Mughogho — Triwell Tech
+3. Events — Home
+4. Jeff Hunt — Fellowship
+5. Founder`;
+    const out = sanitizePeopleRosterAnswer(mixed);
+    assert.match(out, /Joshua Mughogho/);
+    assert.match(out, /Jeff Hunt/);
+    assert.doesNotMatch(out, /^1\. Contact$/m);
+    assert.doesNotMatch(out, /Founder/);
   });
 
   it("builds people-only lists from mixed registration facts", () => {
