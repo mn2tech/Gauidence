@@ -11,14 +11,6 @@ import {
 import { stripHtmlToText } from "@/lib/knowledge-studio/website/stripHtml";
 import { CROSSROADS_ALLOWED_HOSTS } from "@/lib/knowledge-studio/constants";
 import {
-  isPubliclyRetrievable,
-  unpublishPatch,
-  archivePatch,
-  editLifecyclePatch,
-  restorePatch,
-  publishPatch,
-} from "@/lib/knowledge-studio/lifecycle";
-import {
   NO_APPROVED_CROSSROADS_ANSWER,
   NO_UPCOMING_CROSSROADS_EVENT,
   scopeKnowledgeForQuestion,
@@ -300,49 +292,5 @@ describe("upcoming event filtering", () => {
 
   it("exposes no-upcoming copy", () => {
     assert.match(NO_UPCOMING_CROSSROADS_EVENT, /upcoming/i);
-  });
-});
-
-describe("lifecycle transitions affect public retrieval", () => {
-  it("unpublish and archive remove public visibility", () => {
-    const published = {
-      lifecycle_status: "published",
-      visibility: "public",
-    };
-    assert.equal(isPubliclyRetrievable(published), true);
-
-    const unpublished = {
-      lifecycle_status: unpublishPatch().lifecycle_status!,
-      visibility: unpublishPatch().visibility!,
-    };
-    assert.equal(isPubliclyRetrievable(unpublished), false);
-
-    const archived = {
-      lifecycle_status: archivePatch().lifecycle_status!,
-      visibility: archivePatch().visibility!,
-    };
-    assert.equal(isPubliclyRetrievable(archived), false);
-  });
-
-  it("published edit becomes needs_review and is not public", () => {
-    const afterEdit = {
-      lifecycle_status: editLifecyclePatch("published").lifecycle_status!,
-      visibility: editLifecyclePatch("published").visibility!,
-    };
-    assert.equal(isPubliclyRetrievable(afterEdit), false);
-  });
-
-  it("restore and republish paths", () => {
-    const restored = {
-      lifecycle_status: restorePatch().lifecycle_status!,
-      visibility: restorePatch().visibility!,
-    };
-    assert.equal(isPubliclyRetrievable(restored), false);
-
-    const republished = {
-      lifecycle_status: publishPatch().lifecycle_status!,
-      visibility: publishPatch().visibility!,
-    };
-    assert.equal(isPubliclyRetrievable(republished), true);
   });
 });

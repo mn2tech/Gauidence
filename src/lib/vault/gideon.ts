@@ -236,17 +236,10 @@ const PERSON_FACT_LABELS =
   /^(person|name|attendee|guest|member|participant|contact|registrant)$/i;
 
 const JUNK_LIST_ITEM =
-  /^(organization type|registration period|submitted|rsvp\s*[—–-]|seats are limited|name,?\s*email|cross\s*roads?\s*connect|events?\s*[—–-]|contact|founder|friday|saturday|sunday)\b/i;
+  /^(organization type|registration period|submitted|rsvp\s*[—–-]|seats are limited|name,?\s*email)\b/i;
 
 const NON_PERSON_TOKENS =
-  /\b(period|type|status|list|event|events|venue|seats?|materials?|logistics|directory|communications?|arrangements?|headcount|catering|contact|rsvp|connect|crossroads?|banking|networking)\b/i;
-
-/** Job titles / nav labels that are not attendee names (left of "—" or whole line). */
-const ROLE_OR_NAV_LABEL =
-  /^(vp|ceo|cto|cfo|coo|founder|contact|events?|rsvp|director|executive|leader|field director|executive leader|commercial banking|power lifter|friday|saturday|sunday|monday|tuesday|wednesday|thursday|cross\s*roads?(?:\s+connect)?)$/i;
-
-const ROLE_WORDS =
-  /\b(director|executive|leader|founder|president|manager|officer|vp|contact|events?|rsvp|connect|crossroads?|banking|lifter|commercial)\b/i;
+  /\b(period|type|status|list|event|venue|seats?|materials?|logistics|directory|communications?|arrangements?|headcount|catering)\b/i;
 
 const ACTION_OR_MARKETING =
   /\b(send |follow up|prepare |determine |create |coordinate |engage with|seats are limited|rsvps? close|executive networking|purpose-driven|keynote speaker|special guest|networking materials|catering and logistics|pre-event communications)\b/i;
@@ -291,7 +284,6 @@ export function looksLikePersonListItem(value: string): boolean {
   if (/^[a-z0-9]+(?:-[a-z0-9]+){1,}$/i.test(v)) return false; // launch-june-2026
   if (/:\s*$/.test(v)) return false;
   if (JUNK_LIST_ITEM.test(v)) return false;
-  if (ROLE_OR_NAV_LABEL.test(v)) return false;
   if (NON_PERSON_TOKENS.test(v) && !/\s*[—–-]\s+/.test(v)) return false;
   if (ACTION_OR_MARKETING.test(v)) return false;
   if (/\b[A-Z][a-z]+,\s*[A-Z]{2}\s+\d{5}\b/.test(v)) return false; // Rockville, MD 20852
@@ -301,26 +293,13 @@ export function looksLikePersonListItem(value: string): boolean {
   if (
     /^[A-Z][A-Za-z'.-]*(?:\s+[A-Z][A-Za-z'.-]*){0,3}\s*[—–-]\s+\S/.test(v)
   ) {
-    const left = (v.split(/\s*[—–-]\s*/)[0] ?? "").trim();
-    if (ROLE_OR_NAV_LABEL.test(left) || ROLE_WORDS.test(left)) return false;
-    const leftWords = left.split(/\s+/);
-    if (leftWords.length < 1 || leftWords.length > 4) return false;
-    // Require a real personal name on the left (not "VP" / "Events")
-    const nameLike = leftWords.every(
-      (w) =>
-        /^[A-Z][A-Za-z'.-]*$/.test(w) ||
-        /^(von|van|de|la|jr|sr|ii|iii)\.?$/i.test(w)
-    );
-    if (!nameLike) return false;
-    // Single-token left side must look like a given name, not a title acronym
-    if (leftWords.length === 1 && leftWords[0]!.length <= 3) return false;
-    return true;
+    const left = v.split(/\s*[—–-]\s*/)[0] ?? "";
+    return left.split(/\s+/).length >= 1 && left.split(/\s+/).length <= 4;
   }
 
   // Plain "First Last" / "First M Last" / "Jed D"
   const words = v.split(/\s+/);
   if (words.length >= 2 && words.length <= 4) {
-    if (ROLE_WORDS.test(v)) return false;
     const nameLike = words.every(
       (w) =>
         /^[A-Z][A-Za-z'.-]*$/.test(w) ||
@@ -331,53 +310,10 @@ export function looksLikePersonListItem(value: string): boolean {
 
   // Single given name only when very short and capitalized (e.g. Sephora)
   if (words.length === 1 && /^[A-Z][a-z]{2,20}$/.test(words[0]!)) {
-    if (ROLE_OR_NAV_LABEL.test(words[0]!) || ROLE_WORDS.test(words[0]!)) {
-      return false;
-    }
     return true;
   }
 
   return false;
-}
-
-const NO_RSVP_PEOPLE_FOUND =
-  "I couldn't find clear attendee names for that RSVP/registration list in this space. The sources I have look like event pages or titles, not a guest roster. Try attaching the registration CSV or a roster document.";
-
-/**
- * Drop non-person numbered lines from a roster answer.
- * If almost nothing remains, return a clear fallback instead of website junk.
- */
-export function sanitizePeopleRosterAnswer(answer: string): string {
-  const lines = answer.split(/\n/);
-  const header: string[] = [];
-  const people: string[] = [];
-  let seenList = false;
-
-  for (const raw of lines) {
-    const line = raw.trim();
-    if (!line) {
-      if (!seenList && header.length) header.push("");
-      continue;
-    }
-    const numbered = line.match(/^\d+[\.)]\s+(.+)$/);
-    if (numbered?.[1]) {
-      seenList = true;
-      if (looksLikePersonListItem(numbered[1])) {
-        people.push(numbered[1].replace(/\s+/g, " ").trim());
-      }
-      continue;
-    }
-    if (!seenList) header.push(line);
-  }
-
-  if (people.length < 2) {
-    return NO_RSVP_PEOPLE_FOUND;
-  }
-
-  const title =
-    header.find((h) => h && !/^\s*$/.test(h))?.trim() ||
-    "Confirmed attendees";
-  return `${title}\n\n${people.map((p, i) => `${i + 1}. ${p}`).join("\n")}`;
 }
 
 function pushListItem(

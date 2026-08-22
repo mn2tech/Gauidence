@@ -44,7 +44,7 @@ import { withLlmUsage } from "@/lib/usage/record";
 import { recordChatEvent } from "@/lib/billing/quota";
 import { refreshUserAwards } from "@/lib/awards/grant";
 import { formatVaultChatError, buildGideonEmptyAnswerFallback } from "@/lib/vault/vaultChatErrors";
-import { buildListAnswerFromChunks, preferFullerListAnswer, wantsTranscription, wantsPeopleRoster, countNumberedListItems, looksLikePersonListItem, sanitizePeopleRosterAnswer } from "@/lib/vault/gideon";
+import { buildListAnswerFromChunks, preferFullerListAnswer, wantsTranscription, wantsPeopleRoster, countNumberedListItems, looksLikePersonListItem } from "@/lib/vault/gideon";
 import { buildOntologyAnswerFallback } from "@/lib/ontology/formatForGideon";
 import { buildSuggestedQuestions, parseSuggestedQuestions, extractPeopleFromAnswer } from "@/lib/gideon/suggestedQuestions";
 import { extractBusinessEntityMentions } from "@/lib/gideon/business/queryPlanner";
@@ -237,10 +237,6 @@ export function createVaultChatStreamResponse(
           answer = preferFullerListAnswer(answer, args.chunks, {
             peopleOnly: wantsPeopleRoster(args.question),
           });
-        }
-
-        if (wantsPeopleRoster(args.question)) {
-          answer = sanitizePeopleRosterAnswer(answer);
         }
 
         if (args.youtubeUrls?.length) {

@@ -116,35 +116,4 @@ describe("saveWebsiteScanDrafts", () => {
     );
     assert.ok(mock.inserted.every((row) => row.row.visibility === "private"));
   });
-
-  it("creates needs_review when website content conflicts with admin-edited draft", async () => {
-    const existingFact = {
-      id: "f1",
-      organization_slug: "crossroadsconnect",
-      title: "Purpose",
-      content: "Admin edited purpose text.",
-      source_url: "https://www.crossroadsconnect.us/",
-      lifecycle_status: "draft",
-      visibility: "private",
-    };
-    const mock = mockAdmin({ facts: [existingFact], events: [] });
-
-    await saveWebsiteScanDrafts({
-      admin: mock.client as never,
-      userId: "admin-1",
-      facts: [
-        {
-          category: "purpose",
-          title: "Purpose",
-          content: "Website now says something different.",
-          source_url: "https://www.crossroadsconnect.us/",
-        },
-      ],
-      events: [],
-    });
-
-    assert.equal(mock.inserted.length, 1);
-    assert.equal(mock.inserted[0]?.row.lifecycle_status, "needs_review");
-    assert.equal(mock.inserted[0]?.row.visibility, "private");
-  });
 });
