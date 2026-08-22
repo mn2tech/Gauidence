@@ -25,6 +25,7 @@ CRITICAL SAFETY:
 - Do not extract attendee or guest names into facts or events.
 - Ignore cookie banners, navigation chrome, and footer boilerplate when possible.
 - Timezone for CrossRoads Connect event times is America/New_York unless the page explicitly states otherwise.
+- When the page says a local clock time (e.g. 8:45 AM in Rockville / Maryland), emit ISO-8601 WITH Eastern offset, e.g. 2026-08-21T08:45:00-04:00 (or -05:00 in standard time). Do not treat local clock times as UTC.
 - Return STRICT JSON only — no markdown fences, no commentary.
 
 JSON schema:

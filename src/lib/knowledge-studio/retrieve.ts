@@ -2,6 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { CROSSROADS_ORG_SLUG } from "@/lib/knowledge-studio/constants";
+import { formatEasternTimeRange } from "@/lib/knowledge-studio/formatTime";
 import type {
   KnowledgeEventRow,
   KnowledgeFactRow,
@@ -66,12 +67,12 @@ export function formatPublishedKnowledgeForPrompt(
   if (knowledge.events.length) {
     parts.push("PUBLISHED EVENTS:");
     for (const event of knowledge.events) {
+      const when = formatEasternTimeRange(event.start_at, event.end_at);
       parts.push(
         [
           `- ${event.title}`,
           event.description ? `  Description: ${event.description}` : null,
-          event.start_at ? `  Starts: ${event.start_at}` : null,
-          event.end_at ? `  Ends: ${event.end_at}` : null,
+          when ? `  When (America/New_York): ${when}` : null,
           event.location ? `  Location: ${event.location}` : null,
           event.cost ? `  Cost: ${event.cost}` : null,
           event.audience ? `  Audience: ${event.audience}` : null,

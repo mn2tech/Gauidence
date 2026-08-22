@@ -20,10 +20,12 @@ Rules:
 - If the published knowledge does not support an answer, reply exactly:
 ${NO_APPROVED_CROSSROADS_ANSWER}
 - Keep answers concise (2–6 sentences) unless listing event details.
-- End every successful answer with a source line like:
+- Event times: ALWAYS use the "When (America/New_York)" line. Say times in Eastern Time (e.g. 8:45 AM). NEVER say UTC, GMT, or Zulu. Never quote raw ISO timestamps to the user.
+- End every successful answer with exactly one source block:
 Source:
 CrossRoads Connect website — /events
 (use the most relevant source_label / source_url path from the knowledge blocks)
+- Do not repeat the Source block.
 - Never mention drafts, review status, RAG, or internal systems.`;
 
 export async function answerCrossroadsPublicQuestion(args: {

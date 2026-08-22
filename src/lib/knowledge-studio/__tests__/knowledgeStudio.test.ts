@@ -12,6 +12,10 @@ import { stripHtmlToText } from "@/lib/knowledge-studio/website/stripHtml";
 import { CROSSROADS_ALLOWED_HOSTS } from "@/lib/knowledge-studio/constants";
 import { NO_APPROVED_CROSSROADS_ANSWER } from "@/lib/knowledge-studio/ask";
 import { formatPublishedKnowledgeForPrompt } from "@/lib/knowledge-studio/retrieve";
+import {
+  formatEasternDateTime,
+  formatEasternTimeRange,
+} from "@/lib/knowledge-studio/formatTime";
 import type {
   KnowledgeEventRow,
   KnowledgeFactRow,
@@ -118,6 +122,24 @@ describe("HTML strip", () => {
   });
 });
 
+describe("Eastern time display", () => {
+  it("shows CrossRoads gathering times in Eastern, not UTC labels", () => {
+    // 12:45–14:15 UTC on Aug 21 2026 == 8:45–10:15 AM EDT
+    const start = formatEasternDateTime("2026-08-21T12:45:00.000Z");
+    const range = formatEasternTimeRange(
+      "2026-08-21T12:45:00.000Z",
+      "2026-08-21T14:15:00.000Z"
+    );
+    assert.ok(start);
+    assert.match(start!, /8:45\s*AM/i);
+    assert.doesNotMatch(start!, /\bUTC\b/i);
+    assert.ok(range);
+    assert.match(range!, /8:45\s*AM/i);
+    assert.match(range!, /10:15\s*AM/i);
+    assert.match(range!, /Eastern Time/i);
+  });
+});
+
 describe("public knowledge visibility helpers", () => {
   const draftFact = {
     id: "1",
@@ -174,6 +196,7 @@ describe("public knowledge visibility helpers", () => {
     });
     assert.match(prompt, /Helping leaders integrate/);
     assert.match(prompt, /August Gathering/);
+    assert.match(prompt, /When \(America\/New_York\)/);
     assert.doesNotMatch(prompt, /Draft only/);
   });
 

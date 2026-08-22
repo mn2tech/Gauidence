@@ -4,6 +4,9 @@ export const CROSSROADS_ORG_SLUG = "crossroadsconnect";
 
 export const CROSSROADS_WEBSITE_SOURCE_LABEL = "CrossRoads Connect website";
 
+/** Attendee-facing timezone for CrossRoads event times. */
+export const CROSSROADS_TIME_ZONE = "America/New_York";
+
 export const CROSSROADS_ALLOWED_HOSTS = new Set([
   "crossroadsconnect.us",
   "www.crossroadsconnect.us",
