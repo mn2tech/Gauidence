@@ -21,6 +21,18 @@ function isPublished(row: { lifecycle_status: string; visibility: string }): boo
   return row.lifecycle_status === "published" && row.visibility === "public";
 }
 
+function isProtectedFromOverwrite(row: { lifecycle_status: string }): boolean {
+  return row.lifecycle_status !== "archived";
+}
+
+function factTitleKey(title: string): string {
+  return title.trim().toLowerCase();
+}
+
+function eventTitleKey(title: string): string {
+  return title.trim().toLowerCase();
+}
+
 /**
  * Persist website scan candidates as private drafts.
  * Never auto-publishes. Never silently overwrites published rows.
@@ -99,20 +111,20 @@ export async function saveWebsiteScanDrafts(args: {
       continue;
     }
 
-    // Same title+org but different content vs a published row → needs_review candidate.
-    const publishedSameTitle = ((existingFacts ?? []) as KnowledgeFactRow[]).find(
+    // Same title but different content vs any protected row → needs_review candidate.
+    const protectedSameTitle = ((existingFacts ?? []) as KnowledgeFactRow[]).find(
       (row) =>
-        isPublished(row) &&
+        isProtectedFromOverwrite(row) &&
+        factTitleKey(row.title) === factTitleKey(fact.title) &&
         factDuplicateKey({
           organizationSlug: row.organization_slug,
           title: row.title,
           content: row.content,
           sourceUrl: row.source_url,
-        }) !== key &&
-        row.title.trim().toLowerCase() === fact.title.trim().toLowerCase()
+        }) !== key
     );
 
-    const lifecycle_status = publishedSameTitle ? "needs_review" : "draft";
+    const lifecycle_status = protectedSameTitle ? "needs_review" : "draft";
 
     const { error } = await args.admin.from("knowledge_facts").insert({
       organization_slug: organizationSlug,
@@ -145,10 +157,10 @@ export async function saveWebsiteScanDrafts(args: {
       continue;
     }
 
-    const publishedSameKeyConflict = ((existingEvents ?? []) as KnowledgeEventRow[]).find(
+    const protectedSameKeyConflict = ((existingEvents ?? []) as KnowledgeEventRow[]).find(
       (row) =>
-        isPublished(row) &&
-        row.title.trim().toLowerCase() === event.title.trim().toLowerCase() &&
+        isProtectedFromOverwrite(row) &&
+        eventTitleKey(row.title) === eventTitleKey(event.title) &&
         eventDuplicateKey({
           organizationSlug: row.organization_slug,
           title: row.title,
@@ -156,7 +168,7 @@ export async function saveWebsiteScanDrafts(args: {
         }) !== key
     );
 
-    const lifecycle_status = publishedSameKeyConflict ? "needs_review" : "draft";
+    const lifecycle_status = protectedSameKeyConflict ? "needs_review" : "draft";
 
     const { error } = await args.admin.from("knowledge_events").insert({
       organization_slug: organizationSlug,
