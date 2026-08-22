@@ -44,7 +44,7 @@ import { withLlmUsage } from "@/lib/usage/record";
 import { recordChatEvent } from "@/lib/billing/quota";
 import { refreshUserAwards } from "@/lib/awards/grant";
 import { formatVaultChatError, buildGideonEmptyAnswerFallback } from "@/lib/vault/vaultChatErrors";
-import { buildListAnswerFromChunks, preferFullerListAnswer, wantsTranscription, countNumberedListItems } from "@/lib/vault/gideon";
+import { buildListAnswerFromChunks, preferFullerListAnswer, wantsTranscription, wantsPeopleRoster, countNumberedListItems, looksLikePersonListItem } from "@/lib/vault/gideon";
 import { buildOntologyAnswerFallback } from "@/lib/ontology/formatForGideon";
 import { buildSuggestedQuestions, parseSuggestedQuestions, extractPeopleFromAnswer } from "@/lib/gideon/suggestedQuestions";
 import { extractBusinessEntityMentions } from "@/lib/gideon/business/queryPlanner";
@@ -174,19 +174,26 @@ export function createVaultChatStreamResponse(
                 ]
               : [];
 
-        const prebuiltRoster =
-          wantsTranscription(args.question)
-            ? buildListAnswerFromChunks(args.chunks)
-            : null;
+        const peopleOnly = wantsPeopleRoster(args.question);
+        const prebuiltRoster = wantsTranscription(args.question)
+          ? buildListAnswerFromChunks(args.chunks, { peopleOnly })
+          : null;
+        const prebuiltPeople =
+          prebuiltRoster
+            ?.split(/\n/)
+            .map((l) => l.replace(/^\s*\d+[\.)]\s+/, "").trim())
+            .filter((l) => looksLikePersonListItem(l)) ?? [];
         const prebuiltCount = prebuiltRoster
           ? countNumberedListItems(prebuiltRoster)
           : 0;
+        // Only skip the model when we truly have a clean people list.
+        const usePrebuiltPeople =
+          peopleOnly && prebuiltPeople.length >= 8 && prebuiltCount >= 8;
 
         await withLlmUsage(
           { userId: args.userId, feature: "vault_chat" },
           async () => {
-            // Long rosters: prefer the full list from Space sources over a truncated model sample.
-            if (prebuiltRoster && prebuiltCount >= 10) {
+            if (usePrebuiltPeople && prebuiltRoster) {
               answer = prebuiltRoster;
               write({ type: "delta", text: answer });
               return;
@@ -218,14 +225,18 @@ export function createVaultChatStreamResponse(
 
         if (!answer.trim()) {
           answer =
-            buildListAnswerFromChunks(args.chunks) ??
+            buildListAnswerFromChunks(args.chunks, {
+              peopleOnly: wantsPeopleRoster(args.question),
+            }) ??
             buildOntologyAnswerFallback(args.ontologyBlock ?? "") ??
             buildGideonEmptyAnswerFallback({
               chunks: args.chunks,
               explicitSpaceName: args.explicitSpaceName,
             });
         } else if (wantsTranscription(args.question)) {
-          answer = preferFullerListAnswer(answer, args.chunks);
+          answer = preferFullerListAnswer(answer, args.chunks, {
+            peopleOnly: wantsPeopleRoster(args.question),
+          });
         }
 
         if (args.youtubeUrls?.length) {

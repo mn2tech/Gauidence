@@ -224,12 +224,25 @@ export function wantsTranscription(question: string): boolean {
     /\bwho(?:'s| is) (?:presiding|leading)\b/i.test(q) ||
     /\b(?:who|what) are (?:the )?(?:participants?|people|names?|attendees?|members?)\b/i.test(
       q
-    )
+    ) ||
+    /\bwho\b.{0,48}\b(rsvp|registered|attending|confirmed)\b/i.test(q)
   );
 }
 
 const SKIP_LIST_LABELS =
   /^(document|title|type|summary|warnings?|specialist fields|facts)$/i;
+
+const PERSON_FACT_LABELS =
+  /^(person|name|attendee|guest|member|participant|contact|registrant)$/i;
+
+const JUNK_LIST_ITEM =
+  /^(organization type|registration period|submitted|rsvp\s*[—–-]|seats are limited|name,?\s*email)\b/i;
+
+const NON_PERSON_TOKENS =
+  /\b(period|type|status|list|event|venue|seats?|materials?|logistics|directory|communications?|arrangements?|headcount|catering)\b/i;
+
+const ACTION_OR_MARKETING =
+  /\b(send |follow up|prepare |determine |create |coordinate |engage with|seats are limited|rsvps? close|executive networking|purpose-driven|keynote speaker|special guest|networking materials|catering and logistics|pre-event communications)\b/i;
 
 /** Count numbered list lines like "1. Name — Org". */
 export function countNumberedListItems(text: string): number {
@@ -248,24 +261,91 @@ export function statedListCount(text: string): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+/** True when the ask is for people on a roster / RSVP / guest list. */
+export function wantsPeopleRoster(question: string): boolean {
+  const q = question.trim();
+  if (!q) return false;
+  return (
+    /\b(rsvp|roster|guest list|registration list|attendees?|registrants?)\b/i.test(
+      q
+    ) ||
+    /\bwho\b.{0,40}\b(rsvp|registered|attending|confirmed)\b/i.test(q) ||
+    /\b(list|show|pull\s+up|give me)\b.{0,40}\b(names?|people|participants?|members?|attendees?)\b/i.test(
+      q
+    )
+  );
+}
+
+/** Person-shaped list rows — not slugs, counts, marketing, or action items. */
+export function looksLikePersonListItem(value: string): boolean {
+  const v = value.replace(/\s+/g, " ").trim();
+  if (!v || v.length > 160) return false;
+  if (/^\d+$/.test(v)) return false;
+  if (/^[a-z0-9]+(?:-[a-z0-9]+){1,}$/i.test(v)) return false; // launch-june-2026
+  if (/:\s*$/.test(v)) return false;
+  if (JUNK_LIST_ITEM.test(v)) return false;
+  if (NON_PERSON_TOKENS.test(v) && !/\s*[—–-]\s+/.test(v)) return false;
+  if (ACTION_OR_MARKETING.test(v)) return false;
+  if (/\b[A-Z][a-z]+,\s*[A-Z]{2}\s+\d{5}\b/.test(v)) return false; // Rockville, MD 20852
+  if (/^[^@\n]+@[^@\n]+\.[^@\n]+$/.test(v)) return false; // bare email
+
+  // "Jeff Hunt — Fellowship…" / "Jed D — Vizual Intel"
+  if (
+    /^[A-Z][A-Za-z'.-]*(?:\s+[A-Z][A-Za-z'.-]*){0,3}\s*[—–-]\s+\S/.test(v)
+  ) {
+    const left = v.split(/\s*[—–-]\s*/)[0] ?? "";
+    return left.split(/\s+/).length >= 1 && left.split(/\s+/).length <= 4;
+  }
+
+  // Plain "First Last" / "First M Last" / "Jed D"
+  const words = v.split(/\s+/);
+  if (words.length >= 2 && words.length <= 4) {
+    const nameLike = words.every(
+      (w) =>
+        /^[A-Z][A-Za-z'.-]*$/.test(w) ||
+        /^(von|van|de|la|jr|sr|ii|iii)\.?$/i.test(w)
+    );
+    if (nameLike && v.length <= 60) return true;
+  }
+
+  // Single given name only when very short and capitalized (e.g. Sephora)
+  if (words.length === 1 && /^[A-Z][a-z]{2,20}$/.test(words[0]!)) {
+    return true;
+  }
+
+  return false;
+}
+
 function pushListItem(
   items: string[],
   seen: Set<string>,
-  value: string
+  value: string,
+  peopleOnly: boolean
 ): void {
   const cleaned = value.replace(/\s+/g, " ").trim();
   if (!cleaned || cleaned.length > 220) return;
   if (SKIP_LIST_LABELS.test(cleaned)) return;
+  if (peopleOnly && !looksLikePersonListItem(cleaned)) return;
+  if (!peopleOnly && (ACTION_OR_MARKETING.test(cleaned) || /^\d+$/.test(cleaned))) {
+    return;
+  }
   const key = cleaned.toLowerCase();
   if (seen.has(key)) return;
   seen.add(key);
   items.push(cleaned);
 }
 
+export type BuildListAnswerOptions = {
+  /** When true, only keep person / attendee shaped rows. */
+  peopleOnly?: boolean;
+};
+
 /** Numbered list from retrieved fact / roster lines when the model returns a blank or short reply. */
 export function buildListAnswerFromChunks(
-  chunks: { content: string; file_name?: string }[]
+  chunks: { content: string; file_name?: string }[],
+  options: BuildListAnswerOptions = {}
 ): string | null {
+  const peopleOnly = options.peopleOnly === true;
   const items: string[] = [];
   const seen = new Set<string>();
   let title = "";
@@ -279,35 +359,53 @@ export function buildListAnswerFromChunks(
         title = titleMatch[1].trim();
         continue;
       }
-      const numbered = line.match(/^\d+[\.)]\s+(.+)$/);
-      if (numbered?.[1]) {
-        pushListItem(items, seen, numbered[1]);
-        continue;
-      }
-      const dashName = line.match(
-        /^([A-Z][A-Za-z'.-]+(?:\s+[A-Z][A-Za-z'.-]+){0,3})\s*[—–-]\s+(.+)$/
-      );
-      if (dashName?.[1] && dashName[2]) {
-        pushListItem(items, seen, `${dashName[1]} — ${dashName[2].trim()}`);
-        continue;
-      }
+
       const fact = line.match(/^[-*•]\s+(?:([^:]{1,40}):\s*)?(.+)$/);
       if (fact) {
         const label = (fact[1] ?? "").trim();
         const value = (fact[2] ?? "").trim();
-        if (!SKIP_LIST_LABELS.test(label) && !SKIP_LIST_LABELS.test(value)) {
-          pushListItem(items, seen, value);
+        if (SKIP_LIST_LABELS.test(label) || SKIP_LIST_LABELS.test(value)) {
+          continue;
         }
+        if (peopleOnly && label && !PERSON_FACT_LABELS.test(label)) {
+          // Still allow unlabeled person values; skip non-person labels.
+          if (!looksLikePersonListItem(value)) continue;
+        }
+        pushListItem(items, seen, value, peopleOnly);
         continue;
       }
+
+      const numbered = line.match(/^\d+[\.)]\s+(.+)$/);
+      if (numbered?.[1]) {
+        pushListItem(items, seen, numbered[1], peopleOnly);
+        continue;
+      }
+
+      const dashName = line.match(
+        /^([A-Z][A-Za-z'.-]*(?:\s+[A-Z][A-Za-z'.-]*){0,3})\s*[—–-]\s+(.+)$/
+      );
+      if (dashName?.[1] && dashName[2]) {
+        pushListItem(
+          items,
+          seen,
+          `${dashName[1]} — ${dashName[2].trim()}`,
+          peopleOnly
+        );
+        continue;
+      }
+
       // CSV-style roster rows: Name,email,company,...
       const csv = line.match(
         /^"?([A-Z][A-Za-z'.-]+(?:\s+[A-Z][A-Za-z'.-]+){0,3})"?\s*,\s*([^,\n]+)/
       );
       if (csv?.[1] && !/^name$/i.test(csv[1])) {
-        const org = line.split(",").slice(2, 4).map((s) => s.trim().replace(/^"|"$/g, "")).filter(Boolean);
+        const org = line
+          .split(",")
+          .slice(2, 4)
+          .map((s) => s.trim().replace(/^"|"$/g, ""))
+          .filter(Boolean);
         const suffix = org.length ? ` — ${org.join(", ")}` : "";
-        pushListItem(items, seen, `${csv[1]}${suffix}`);
+        pushListItem(items, seen, `${csv[1]}${suffix}`, peopleOnly);
       }
     }
   }
@@ -323,14 +421,37 @@ export function buildListAnswerFromChunks(
  */
 export function preferFullerListAnswer(
   modelAnswer: string,
-  chunks: { content: string; file_name?: string }[]
+  chunks: { content: string; file_name?: string }[],
+  options: BuildListAnswerOptions = {}
 ): string {
-  const fromChunks = buildListAnswerFromChunks(chunks);
+  const usePeople =
+    options.peopleOnly ??
+    (statedListCount(modelAnswer) != null ||
+      /\b(confirmed|rsvp|attendee|roster)/i.test(modelAnswer));
+
+  const fromChunks = buildListAnswerFromChunks(chunks, {
+    peopleOnly: usePeople,
+  });
   if (!fromChunks) return modelAnswer;
 
   const modelCount = countNumberedListItems(modelAnswer);
   const chunkCount = countNumberedListItems(fromChunks);
   const stated = statedListCount(modelAnswer);
+
+  // Never replace a decent model answer with junk metadata lists.
+  if (usePeople) {
+    const personLines = fromChunks
+      .split(/\n/)
+      .map((l) => l.replace(/^\s*\d+[\.)]\s+/, "").trim())
+      .filter((l) => looksLikePersonListItem(l));
+    if (personLines.length < 2) return modelAnswer;
+    if (
+      personLines.length <= modelCount &&
+      !(stated != null && modelCount > 0 && modelCount < stated)
+    ) {
+      return modelAnswer;
+    }
+  }
 
   const modelIncomplete =
     (stated != null && modelCount > 0 && modelCount < stated) ||
@@ -375,7 +496,8 @@ export const GIDEON_TRANSCRIPTION_NOTE = `Transcription mode:
 - The user wants a readable transcription or list from their space (often a photo, scan, CSV, or roster file).
 - Lead with a short friendly title if helpful (e.g. "August 2026 event · 27 confirmed"), then a clean numbered list.
 - Prefer the attached image and "Document text" / vision transcription excerpts / RETRIEVED EXCERPTS.
-- Include EVERY name, title, and line item present in the retrieval blocks (rosters, RSVP lists, program sheets, attendance lists). Never stop early, summarize, or show only a sample.
+- Include EVERY person name present in the retrieval blocks for roster / RSVP / guest-list questions. Prefer "Name — Organization (Role)" lines.
+- Do NOT list document metadata, marketing blurbs, venue addresses, seat counts alone, registration period labels, or follow-up action items as if they were attendees.
 - If you state a count (e.g. "27 confirmed"), the numbered list must include that many people when those names appear in the excerpts. If excerpts are incomplete, say how many names you can list from available sources — do not invent the rest.
 - Preserve non-English text in its original script (Telugu, Hindi, Tamil, etc.); do not romanize, translate, or skip names because of language.
 - Fix obvious spelling and title capitalization in English when confident; do not invent items.
