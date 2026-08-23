@@ -82,11 +82,8 @@ export async function discoverPackSourceItems(
   let sourceQuery = supabase
     .from("connected_sources")
     .select("id, source_type, profile_id, status")
-    .eq("user_id", args.userId)
-    .eq("status", "connected");
-
-  // Bound to this business Space or its children.
-  sourceQuery = sourceQuery.in("profile_id", args.spaceIds);
+    .eq("status", "connected")
+    .in("profile_id", args.spaceIds);
 
   const { data: sources } = await sourceQuery;
   const sourceRows = sources ?? [];

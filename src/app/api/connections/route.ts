@@ -120,7 +120,24 @@ export async function POST(req: Request) {
 
     try {
       const existing = await listConnectedSources(supabase, user.id);
-      const prior = existing.find((s) => s.sourceType === "trello");
+      const sharedTrello = existing.find(
+        (s) =>
+          s.sourceType === "trello" &&
+          s.access === "shared" &&
+          s.status !== "disconnected"
+      );
+      if (sharedTrello) {
+        return NextResponse.json(
+          {
+            error:
+              "Trello is already connected for this space by the owner. Open Connections to use the shared board — you do not need your own API token.",
+          },
+          { status: 409 }
+        );
+      }
+      const prior = existing.find(
+        (s) => s.sourceType === "trello" && s.userId === user.id
+      );
       if (prior) {
         // Need secrets on update — updateConnectedSource stores settings as given.
         const source = await updateConnectedSource(supabase, user.id, prior.id, {

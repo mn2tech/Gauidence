@@ -49,6 +49,12 @@ export async function POST(req: Request, ctx: Ctx) {
       { status: 400 }
     );
   }
+  if (sourcePublic.canUseSecrets === false) {
+    return NextResponse.json(
+      { error: "You have view-only access to this connection." },
+      { status: 403 }
+    );
+  }
 
   if (sourcePublic.sourceType === "google_drive") {
     const source = await getConnectedSourceWithSecrets(supabase, user.id, id);
@@ -84,8 +90,7 @@ export async function POST(req: Request, ctx: Ctx) {
         await supabase
           .from("connected_sources")
           .update({ status: "permission_revoked" })
-          .eq("id", id)
-          .eq("user_id", user.id);
+          .eq("id", id);
         return NextResponse.json(
           {
             error: "permission_revoked",
@@ -143,8 +148,7 @@ export async function POST(req: Request, ctx: Ctx) {
         await supabase
           .from("connected_sources")
           .update({ status: "permission_revoked" })
-          .eq("id", id)
-          .eq("user_id", user.id);
+          .eq("id", id);
         return NextResponse.json(
           {
             error: "permission_revoked",
@@ -171,8 +175,7 @@ export async function POST(req: Request, ctx: Ctx) {
     await supabase
       .from("connected_sources")
       .update({ status: "permission_revoked" })
-      .eq("id", id)
-      .eq("user_id", user.id);
+      .eq("id", id);
     return NextResponse.json({
       error: "permission_revoked",
       message: "Guardian no longer has access to this folder.",

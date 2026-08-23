@@ -28,7 +28,8 @@ describe("connection mapping and errors", () => {
   });
 
   it("redacts Google Drive OAuth tokens for the client", () => {
-    const source = mapConnectedSourceForClient({
+    const source = mapConnectedSourceForClient(
+      {
       id: "11111111-1111-1111-1111-111111111111",
       user_id: "22222222-2222-2222-2222-222222222222",
       profile_id: "33333333-3333-3333-3333-333333333333",
@@ -46,7 +47,9 @@ describe("connection mapping and errors", () => {
       last_scan_at: null,
       created_at: "2026-08-17T00:00:00.000Z",
       updated_at: "2026-08-17T00:00:00.000Z",
-    });
+    },
+      "22222222-2222-2222-2222-222222222222"
+    );
     assert.equal(source.sourceType, "google_drive");
     assert.equal(source.settings.email, "a@b.com");
     assert.equal(source.settings.folderName, "Invoices");
@@ -70,17 +73,17 @@ describe("connection mapping and errors", () => {
 });
 
 /**
- * RLS security contract (documented for migration 0077):
- * - connected_sources: auth.uid() = user_id for select/insert/update/delete
- * - source_items: EXISTS parent connected_sources where user_id = auth.uid()
- * User A cannot query User B rows when using the anon/authenticated client.
+ * RLS security contract (migrations 0077 + 0097):
+ * - connected_sources: auth.uid() = user_id OR shared trello/google_drive on accessible space
+ * - source_items: owner parent OR shared profile-bound parent
  */
 describe("RLS security contract", () => {
   it("documents ownership predicates for connected_sources and source_items", () => {
-    const connectedSourcesPolicy = "auth.uid() = user_id";
+    const connectedSourcesPolicy =
+      "auth.uid() = user_id OR shared profile-bound trello/google_drive";
     const sourceItemsPolicy =
-      "exists (select 1 from connected_sources cs where cs.id = source_items.source_id and cs.user_id = auth.uid())";
+      "owner parent OR shared profile-bound trello/google_drive parent";
     assert.match(connectedSourcesPolicy, /auth\.uid\(\) = user_id/);
-    assert.match(sourceItemsPolicy, /cs\.user_id = auth\.uid\(\)/);
+    assert.match(sourceItemsPolicy, /shared profile-bound/);
   });
 });

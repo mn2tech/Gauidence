@@ -53,15 +53,13 @@ export async function loadConnectedSuggestionContext(
   const { data: sources } = await supabase
     .from("connected_sources")
     .select("id, source_type, display_name, profile_id, settings")
-    .eq("user_id", userId)
+    .eq("profile_id", profileId)
     .neq("status", "disconnected")
     .limit(20);
   if (!sources?.length) return empty;
 
   // Only sources explicitly bound to this space (not every unbound connector).
-  const relevant = sources.filter(
-    (source) => (source.profile_id as string | null) === profileId
-  );
+  const relevant = sources;
   if (!relevant.length) return empty;
 
   const sourceIds = relevant.map((s) => s.id as string);
@@ -235,15 +233,12 @@ async function loadBoundConnectedFilesForGideon(
   const { data: sources } = await supabase
     .from("connected_sources")
     .select("id, source_type, display_name, profile_id, settings")
-    .eq("user_id", userId)
+    .in("profile_id", spaceIds)
     .neq("status", "disconnected")
     .limit(20);
   if (!sources?.length) return "";
 
-  const relevant = sources.filter((source) => {
-    const bound = source.profile_id as string | null;
-    return Boolean(bound && spaceIds.includes(bound));
-  });
+  const relevant = sources;
   if (!relevant.length) return "";
 
   const sourceIds = relevant.map((s) => s.id as string);

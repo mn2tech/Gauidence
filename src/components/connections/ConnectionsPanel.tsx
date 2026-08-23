@@ -170,14 +170,22 @@ export default function ConnectionsPanel() {
     () => sources.find((s) => s.sourceType === "android_storage") ?? null,
     [sources]
   );
-  const trelloSource = useMemo(
-    () => sources.find((s) => s.sourceType === "trello") ?? null,
-    [sources]
-  );
-  const driveSource = useMemo(
-    () => sources.find((s) => s.sourceType === "google_drive") ?? null,
-    [sources]
-  );
+  const trelloSource = useMemo(() => {
+    const trello = sources.filter(
+      (s) => s.sourceType === "trello" && s.status !== "disconnected"
+    );
+    if (!trello.length) return null;
+    const forActive = trello.find((s) => s.profileId === active?.id);
+    return forActive ?? trello[0] ?? null;
+  }, [sources, active?.id]);
+  const driveSource = useMemo(() => {
+    const drive = sources.filter(
+      (s) => s.sourceType === "google_drive" && s.status !== "disconnected"
+    );
+    if (!drive.length) return null;
+    const forActive = drive.find((s) => s.profileId === active?.id);
+    return forActive ?? drive[0] ?? null;
+  }, [sources, active?.id]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1219,6 +1227,12 @@ export default function ConnectionsPanel() {
     ? profiles.find((p) => p.id === driveSource.profileId)?.display_name ??
       "Another space"
     : "Not bound to a space";
+  const trelloCanManage = trelloSource?.canManage ?? true;
+  const trelloCanUseSecrets = trelloSource?.canUseSecrets ?? true;
+  const trelloIsShared = trelloSource?.access === "shared";
+  const driveCanManage = driveSource?.canManage ?? true;
+  const driveCanUseSecrets = driveSource?.canUseSecrets ?? true;
+  const driveIsShared = driveSource?.access === "shared";
   return (
     <div className="space-y-6">
       <section className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
@@ -1487,26 +1501,29 @@ export default function ConnectionsPanel() {
                       Access Required
                     </p>
                     <p className="mt-2 text-sm text-ink-muted">
-                      Trello rejected the saved token. Connect again with a fresh
-                      token.
+                      {trelloCanManage
+                        ? "Trello rejected the saved token. Connect again with a fresh token."
+                        : "Trello access for this space needs to be refreshed by the connection owner."}
                     </p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setTrelloModalStep("creds");
-                        setTrelloModalOpen(true);
-                      }}
-                      disabled={busy !== null}
-                      className="mt-4 inline-flex items-center justify-center rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-60"
-                    >
-                      Reconnect Trello
-                    </button>
+                    {trelloCanManage ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTrelloModalStep("creds");
+                          setTrelloModalOpen(true);
+                        }}
+                        disabled={busy !== null}
+                        className="mt-4 inline-flex items-center justify-center rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-60"
+                      >
+                        Reconnect Trello
+                      </button>
+                    ) : null}
                   </>
                 ) : trelloConnected && trelloSource ? (
                   <>
                     <p className="mt-1 flex items-center gap-2 text-sm text-ink-muted">
                       <StatusDot tone="ok" />
-                      Connected
+                      {trelloIsShared ? "Connected (shared space)" : "Connected"}
                     </p>
                     <dl className="mt-4 grid gap-2 text-sm">
                       <div className="flex justify-between gap-4">
@@ -1554,16 +1571,31 @@ export default function ConnectionsPanel() {
                     </dl>
                     {trelloSource.profileId ? (
                       <p className="mt-3 text-sm text-ink-muted">
-                        Charts from{" "}
-                        <span className="font-medium text-foreground">
-                          {trelloBoardName ?? "the selected board"}
-                        </span>{" "}
-                        analyze into{" "}
-                        <span className="font-medium text-foreground">
-                          {profiles.find((p) => p.id === trelloSource.profileId)
-                            ?.display_name ?? "the bound space"}
-                        </span>
-                        . Ask Gideon there — not from Connections.
+                        {trelloIsShared ? (
+                          <>
+                            This Trello board is connected by the space owner.
+                            Charts are available in{" "}
+                            <span className="font-medium text-foreground">
+                              {profiles.find((p) => p.id === trelloSource.profileId)
+                                ?.display_name ?? "the bound space"}
+                            </span>
+                            . Ask Gideon there — you do not need your own API
+                            token.
+                          </>
+                        ) : (
+                          <>
+                            Charts from{" "}
+                            <span className="font-medium text-foreground">
+                              {trelloBoardName ?? "the selected board"}
+                            </span>{" "}
+                            analyze into{" "}
+                            <span className="font-medium text-foreground">
+                              {profiles.find((p) => p.id === trelloSource.profileId)
+                                ?.display_name ?? "the bound space"}
+                            </span>
+                            . Ask Gideon there — not from Connections.
+                          </>
+                        )}
                       </p>
                     ) : (
                       <p className="mt-3 text-sm text-amber-800">
@@ -1572,7 +1604,8 @@ export default function ConnectionsPanel() {
                       </p>
                     )}
                     <div className="mt-5 flex flex-wrap gap-2">
-                      {trelloBoundProfile &&
+                      {trelloCanManage &&
+                      trelloBoundProfile &&
                       trelloSource.profileId !== trelloBoundProfile.id ? (
                         <button
                           type="button"
@@ -1596,60 +1629,66 @@ export default function ConnectionsPanel() {
                       >
                         Browse Boards & Charts
                       </Link>
-                      <button
-                        type="button"
-                        onClick={() => void scanTrelloAgain()}
-                        disabled={busy !== null}
-                        className="inline-flex items-center justify-center rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-foreground hover:bg-stone-50 disabled:opacity-60"
-                      >
-                        {busy === "trello-scan" || busy === "trello-analyze" ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            {busy === "trello-analyze"
-                              ? "Reading charts…"
-                              : "Scanning…"}
-                          </>
-                        ) : (
-                          <>
-                            <RefreshCw className="mr-2 h-4 w-4" aria-hidden />
-                            Scan Again
-                          </>
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void openTrelloBoardPicker()}
-                        disabled={busy !== null}
-                        className="inline-flex items-center justify-center rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-foreground hover:bg-stone-50 disabled:opacity-60"
-                      >
-                        {busy === "trello-boards" ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Loading boards…
-                          </>
-                        ) : (
-                          "Change board"
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setTrelloModalStep("creds");
-                          setTrelloModalOpen(true);
-                        }}
-                        disabled={busy !== null}
-                        className="inline-flex items-center justify-center rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-foreground hover:bg-stone-50 disabled:opacity-60"
-                      >
-                        Update credentials
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setConfirmTrelloDisconnect(true)}
-                        disabled={busy !== null}
-                        className="inline-flex items-center justify-center rounded-full border border-stone-200 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-60"
-                      >
-                        Disconnect
-                      </button>
+                      {trelloCanUseSecrets ? (
+                        <button
+                          type="button"
+                          onClick={() => void scanTrelloAgain()}
+                          disabled={busy !== null}
+                          className="inline-flex items-center justify-center rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-foreground hover:bg-stone-50 disabled:opacity-60"
+                        >
+                          {busy === "trello-scan" || busy === "trello-analyze" ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              {busy === "trello-analyze"
+                                ? "Reading charts…"
+                                : "Scanning…"}
+                            </>
+                          ) : (
+                            <>
+                              <RefreshCw className="mr-2 h-4 w-4" aria-hidden />
+                              Scan Again
+                            </>
+                          )}
+                        </button>
+                      ) : null}
+                      {trelloCanManage ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => void openTrelloBoardPicker()}
+                            disabled={busy !== null}
+                            className="inline-flex items-center justify-center rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-foreground hover:bg-stone-50 disabled:opacity-60"
+                          >
+                            {busy === "trello-boards" ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Loading boards…
+                              </>
+                            ) : (
+                              "Change board"
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTrelloModalStep("creds");
+                              setTrelloModalOpen(true);
+                            }}
+                            disabled={busy !== null}
+                            className="inline-flex items-center justify-center rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-foreground hover:bg-stone-50 disabled:opacity-60"
+                          >
+                            Update credentials
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmTrelloDisconnect(true)}
+                            disabled={busy !== null}
+                            className="inline-flex items-center justify-center rounded-full border border-stone-200 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-60"
+                          >
+                            Disconnect
+                          </button>
+                        </>
+                      ) : null}
                     </div>
                     {analyzeProgress ? (
                       <p className="mt-3 text-sm text-ink-muted">
@@ -1738,7 +1777,7 @@ export default function ConnectionsPanel() {
                   <>
                     <p className="mt-1 flex items-center gap-2 text-sm text-ink-muted">
                       <StatusDot tone="ok" />
-                      Connected
+                      {driveIsShared ? "Connected (shared space)" : "Connected"}
                     </p>
                     <dl className="mt-4 grid gap-2 text-sm">
                       <div className="flex justify-between gap-4">

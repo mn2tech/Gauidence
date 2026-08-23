@@ -83,6 +83,12 @@ export async function PATCH(req: Request, ctx: Ctx) {
     if (!existing) {
       return NextResponse.json({ error: "Connection not found." }, { status: 404 });
     }
+    if (!existing.canManage) {
+      return NextResponse.json(
+        { error: "Only the connection owner can change these settings." },
+        { status: 403 }
+      );
+    }
 
     let settings = body.settings;
     if (body.trelloBoardId !== undefined) {
@@ -171,6 +177,12 @@ export async function DELETE(_req: Request, ctx: Ctx) {
     const existing = await getConnectedSource(supabase, user.id, id);
     if (!existing) {
       return NextResponse.json({ error: "Connection not found." }, { status: 404 });
+    }
+    if (!existing.canManage) {
+      return NextResponse.json(
+        { error: "Only the connection owner can change these settings." },
+        { status: 403 }
+      );
     }
     if (existing.sourceType === "trello") {
       const source = await updateConnectedSource(supabase, user.id, id, {

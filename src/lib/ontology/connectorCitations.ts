@@ -125,7 +125,6 @@ export async function resolveConnectorSourceCitations(
   const { data: sources } = await supabase
     .from("connected_sources")
     .select("id, source_type, user_id, status")
-    .eq("user_id", userId)
     .in("id", sourceIds);
 
   const sourceById = new Map(

@@ -30,6 +30,8 @@ export type FileTypeCategory =
   | "Text"
   | "Other";
 
+export type ConnectedSourceAccess = "owner" | "shared";
+
 export interface ConnectedSource {
   id: string;
   userId: string;
@@ -42,6 +44,12 @@ export interface ConnectedSource {
   lastScanAt: string | null;
   createdAt: string;
   updatedAt: string;
+  /** owner = your account; shared = space member using the owner's connector */
+  access?: ConnectedSourceAccess;
+  /** Connect, disconnect, and credential changes */
+  canManage?: boolean;
+  /** Scan, analyze, and preview using stored credentials */
+  canUseSecrets?: boolean;
 }
 
 export interface SourceItem {

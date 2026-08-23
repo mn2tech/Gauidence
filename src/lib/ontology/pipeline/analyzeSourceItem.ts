@@ -56,7 +56,6 @@ export async function analyzeSourceItem(
     .from("connected_sources")
     .select("id, user_id, profile_id, status, source_type")
     .eq("id", args.sourceId)
-    .eq("user_id", args.user.id)
     .maybeSingle();
 
   if (!source) {
@@ -137,7 +136,7 @@ export async function analyzeSourceItem(
     profileId = profile.id;
   }
 
-  if (source.profile_id !== profileId) {
+  if (source.profile_id !== profileId && source.user_id === args.user.id) {
     await supabase
       .from("connected_sources")
       .update({ profile_id: profileId })

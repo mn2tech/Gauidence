@@ -1,9 +1,16 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   ConnectedSource,
+  ConnectedSourceAccess,
   ConnectedSourceStatus,
   ConnectedSourceType,
 } from "../types";
+import {
+  canManageConnectedSource,
+  canUseConnectedSourceSecrets,
+  connectedSourceAccessForUser,
+  isProfileSharedSourceType,
+} from "./connectionAccess";
 
 type ConnectedSourceRow = {
   id: string;
@@ -35,11 +42,31 @@ export function mapConnectedSource(row: ConnectedSourceRow): ConnectedSource {
   };
 }
 
+function withAccessFlags(
+  source: ConnectedSource,
+  viewerUserId: string,
+  canUseSecrets: boolean
+): ConnectedSource {
+  const access: ConnectedSourceAccess = connectedSourceAccessForUser(
+    source.userId,
+    viewerUserId
+  );
+  return {
+    ...source,
+    access,
+    canManage: canManageConnectedSource(source.userId, viewerUserId),
+    canUseSecrets,
+  };
+}
+
 /** Public mapping — never send Trello or Google Drive secrets to the browser. */
 export function mapConnectedSourceForClient(
-  row: ConnectedSourceRow
+  row: ConnectedSourceRow,
+  viewerUserId: string,
+  canUseSecrets = true
 ): ConnectedSource {
   const source = mapConnectedSource(row);
+  let mapped: ConnectedSource;
   if (source.sourceType === "trello") {
     const {
       apiKey: _k,
@@ -47,7 +74,7 @@ export function mapConnectedSourceForClient(
       secret: _s,
       ...safe
     } = source.settings;
-    return {
+    mapped = {
       ...source,
       settings: {
         ...safe,
@@ -57,8 +84,7 @@ export function mapConnectedSourceForClient(
         ),
       },
     };
-  }
-  if (source.sourceType === "google_drive") {
+  } else if (source.sourceType === "google_drive") {
     const {
       accessToken: _a,
       refreshToken: _r,
@@ -67,7 +93,7 @@ export function mapConnectedSourceForClient(
       expiresAt: _e,
       ...safe
     } = source.settings;
-    return {
+    mapped = {
       ...source,
       settings: {
         ...safe,
@@ -77,8 +103,32 @@ export function mapConnectedSourceForClient(
         ),
       },
     };
+  } else {
+    mapped = source;
   }
-  return source;
+  return withAccessFlags(mapped, viewerUserId, canUseSecrets);
+}
+
+async function mapRowForViewer(
+  supabase: SupabaseClient,
+  viewerUserId: string,
+  row: ConnectedSourceRow,
+  options?: { withSecrets?: boolean }
+): Promise<ConnectedSource | null> {
+  const canUseSecrets = await canUseConnectedSourceSecrets(supabase, viewerUserId, {
+    ownerUserId: row.user_id,
+    profileId: row.profile_id,
+    sourceType: row.source_type,
+  });
+  if (options?.withSecrets && !canUseSecrets) return null;
+  if (options?.withSecrets) {
+    return withAccessFlags(
+      mapConnectedSource(row),
+      viewerUserId,
+      canUseSecrets
+    );
+  }
+  return mapConnectedSourceForClient(row, viewerUserId, canUseSecrets);
 }
 
 export async function listConnectedSources(
@@ -88,13 +138,11 @@ export async function listConnectedSources(
   const { data, error } = await supabase
     .from("connected_sources")
     .select("*")
-    .eq("user_id", userId)
     .order("updated_at", { ascending: false });
 
   if (error) throw error;
-  return (
-    (data as ConnectedSourceRow[] | null)?.map(mapConnectedSourceForClient) ?? []
-  );
+  const rows = (data as ConnectedSourceRow[] | null) ?? [];
+  return Promise.all(rows.map((row) => mapRowForViewer(supabase, userId, row)));
 }
 
 export async function getConnectedSource(
@@ -105,12 +153,19 @@ export async function getConnectedSource(
   const { data, error } = await supabase
     .from("connected_sources")
     .select("*")
-    .eq("user_id", userId)
     .eq("id", sourceId)
     .maybeSingle();
 
   if (error) throw error;
-  return data ? mapConnectedSourceForClient(data as ConnectedSourceRow) : null;
+  if (!data) return null;
+  const row = data as ConnectedSourceRow;
+  if (
+    row.user_id !== userId &&
+    (!row.profile_id || !isProfileSharedSourceType(row.source_type))
+  ) {
+    return null;
+  }
+  return mapRowForViewer(supabase, userId, row);
 }
 
 /** Internal: includes secrets for server-side Trello / Google Drive API calls. */
@@ -122,12 +177,19 @@ export async function getConnectedSourceWithSecrets(
   const { data, error } = await supabase
     .from("connected_sources")
     .select("*")
-    .eq("user_id", userId)
     .eq("id", sourceId)
     .maybeSingle();
 
   if (error) throw error;
-  return data ? mapConnectedSource(data as ConnectedSourceRow) : null;
+  if (!data) return null;
+  const row = data as ConnectedSourceRow;
+  if (
+    row.user_id !== userId &&
+    (!row.profile_id || !isProfileSharedSourceType(row.source_type))
+  ) {
+    return null;
+  }
+  return mapRowForViewer(supabase, userId, row, { withSecrets: true });
 }
 
 export async function createConnectedSource(
@@ -156,7 +218,11 @@ export async function createConnectedSource(
     .single();
 
   if (error) throw error;
-  return mapConnectedSourceForClient(data as ConnectedSourceRow);
+  return mapConnectedSourceForClient(
+    data as ConnectedSourceRow,
+    input.userId,
+    true
+  );
 }
 
 export async function updateConnectedSource(
@@ -172,6 +238,11 @@ export async function updateConnectedSource(
     profileId?: string | null;
   }
 ): Promise<ConnectedSource> {
+  const existing = await getConnectedSource(supabase, userId, sourceId);
+  if (!existing?.canManage) {
+    throw new Error("Only the connection owner can change these settings.");
+  }
+
   const payload: Record<string, unknown> = {};
   if (patch.status !== undefined) payload.status = patch.status;
   if (patch.displayName !== undefined) payload.display_name = patch.displayName;
@@ -183,13 +254,13 @@ export async function updateConnectedSource(
   const { data, error } = await supabase
     .from("connected_sources")
     .update(payload)
-    .eq("user_id", userId)
     .eq("id", sourceId)
+    .eq("user_id", userId)
     .select("*")
     .single();
 
   if (error) throw error;
-  return mapConnectedSourceForClient(data as ConnectedSourceRow);
+  return mapConnectedSourceForClient(data as ConnectedSourceRow, userId, true);
 }
 
 export async function disconnectConnectedSource(

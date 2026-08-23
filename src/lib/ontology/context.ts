@@ -254,7 +254,7 @@ async function findConnectorEntitiesForQuery(
   const { data: sources } = await supabase
     .from("connected_sources")
     .select("id, profile_id")
-    .eq("user_id", args.userId)
+    .eq("profile_id", args.preferSpaceId)
     .neq("status", "disconnected")
     .limit(20);
 
