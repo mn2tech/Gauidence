@@ -109,26 +109,31 @@ export function mapConnectedSourceForClient(
   return withAccessFlags(mapped, viewerUserId, canUseSecrets);
 }
 
-async function mapRowForViewer(
+async function mapRowForClient(
   supabase: SupabaseClient,
   viewerUserId: string,
-  row: ConnectedSourceRow,
-  options?: { withSecrets?: boolean }
+  row: ConnectedSourceRow
+): Promise<ConnectedSource> {
+  const canUseSecrets = await canUseConnectedSourceSecrets(supabase, viewerUserId, {
+    ownerUserId: row.user_id,
+    profileId: row.profile_id,
+    sourceType: row.source_type,
+  });
+  return mapConnectedSourceForClient(row, viewerUserId, canUseSecrets);
+}
+
+async function mapRowForClientWithSecrets(
+  supabase: SupabaseClient,
+  viewerUserId: string,
+  row: ConnectedSourceRow
 ): Promise<ConnectedSource | null> {
   const canUseSecrets = await canUseConnectedSourceSecrets(supabase, viewerUserId, {
     ownerUserId: row.user_id,
     profileId: row.profile_id,
     sourceType: row.source_type,
   });
-  if (options?.withSecrets && !canUseSecrets) return null;
-  if (options?.withSecrets) {
-    return withAccessFlags(
-      mapConnectedSource(row),
-      viewerUserId,
-      canUseSecrets
-    );
-  }
-  return mapConnectedSourceForClient(row, viewerUserId, canUseSecrets);
+  if (!canUseSecrets) return null;
+  return withAccessFlags(mapConnectedSource(row), viewerUserId, canUseSecrets);
 }
 
 export async function listConnectedSources(
@@ -142,7 +147,7 @@ export async function listConnectedSources(
 
   if (error) throw error;
   const rows = (data as ConnectedSourceRow[] | null) ?? [];
-  return Promise.all(rows.map((row) => mapRowForViewer(supabase, userId, row)));
+  return Promise.all(rows.map((row) => mapRowForClient(supabase, userId, row)));
 }
 
 export async function getConnectedSource(
@@ -165,7 +170,7 @@ export async function getConnectedSource(
   ) {
     return null;
   }
-  return mapRowForViewer(supabase, userId, row);
+  return mapRowForClient(supabase, userId, row);
 }
 
 /** Internal: includes secrets for server-side Trello / Google Drive API calls. */
@@ -189,7 +194,7 @@ export async function getConnectedSourceWithSecrets(
   ) {
     return null;
   }
-  return mapRowForViewer(supabase, userId, row, { withSecrets: true });
+  return mapRowForClientWithSecrets(supabase, userId, row);
 }
 
 export async function createConnectedSource(
