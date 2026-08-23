@@ -11,7 +11,7 @@ import {
   type MouseEvent,
 } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import PlanLimitAlert from "@/components/PlanLimitAlert";
 import {
   Brain,
@@ -197,7 +197,7 @@ import {
   formatAssistantMessagePlainText,
   formatAssistantMessageSpeechText,
 } from "@/lib/vault/assistantMessageText";
-import { documentsHref, VAULT_NAV_LABEL } from "@/lib/routes";
+import { askSpaceHref, documentsHref, VAULT_NAV_LABEL } from "@/lib/routes";
 import { practiceStatsListPrompt } from "@/lib/vault/askInventory";
 import type { WorkProject } from "@/lib/work-memory/types";
 import OnboardingProgressChip from "@/components/OnboardingProgressChip";
@@ -833,6 +833,7 @@ export default function VaultChatPanel({
   const isPage = variant === "page";
   const isDrawer = variant === "drawer";
   const isScopedPanel = Boolean(scopedProfileId) || isDrawer;
+  const router = useRouter();
   const searchParams = useSearchParams();
   const requestedChatId = isScopedPanel ? null : searchParams.get("chatId");
   const requestedProfileId = isScopedPanel ? null : searchParams.get("profileId");
@@ -984,6 +985,7 @@ export default function VaultChatPanel({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pendingAttachmentRef = useRef<PendingVaultAttachment | null>(null);
   const profileSwitchRef = useRef(false);
+  const ignoreUrlProfileRef = useRef(false);
   const skipResumeOnBootstrapRef = useRef(false);
   const deepLinkChatConsumed = useRef<string | null>(null);
   const requestedChatIdRef = useRef<string | null>(requestedChatId);
@@ -1093,6 +1095,17 @@ export default function VaultChatPanel({
   const reminderSaveProfileId = reminderTargetProfileId ?? profileId;
   const vaultProfileId =
     scopedProfileId ?? active?.id ?? meta?.profileId ?? null;
+
+  const syncAskProfileUrl = useCallback(
+    (profileId: string, options?: { clearChat?: boolean }) => {
+      if (isScopedPanel || isDrawer) return;
+      ignoreUrlProfileRef.current = true;
+      router.replace(askSpaceHref(profileId, searchParams, options), {
+        scroll: false,
+      });
+    },
+    [isScopedPanel, isDrawer, router, searchParams]
+  );
 
   const syncAskUrl = useCallback(
     (chatId: string | null) => {
@@ -1461,14 +1474,18 @@ export default function VaultChatPanel({
   useEffect(() => {
     if (profilesLoading || needsSetup || profileSwitchRef.current) return;
     if (scopedProfileId) return;
-    // Read the live URL, not useSearchParams. history.replaceState can clear
-    // profileId before Next.js catches up — the stale param would snap back.
-    const liveProfileId = readUrlProfileId();
-    if (!liveProfileId) return;
-    if (active?.id === liveProfileId) return;
-    if (!profiles.some((p) => p.id === liveProfileId)) return;
+    if (ignoreUrlProfileRef.current) {
+      if (!requestedProfileId || active?.id === requestedProfileId) {
+        ignoreUrlProfileRef.current = false;
+      }
+      return;
+    }
+    // Honor profileId deep links — skip while the user is switching spaces manually.
+    if (!requestedProfileId) return;
+    if (active?.id === requestedProfileId) return;
+    if (!profiles.some((p) => p.id === requestedProfileId)) return;
     profileSwitchRef.current = true;
-    void switchProfile(liveProfileId).finally(() => {
+    void switchProfile(requestedProfileId).finally(() => {
       profileSwitchRef.current = false;
     });
   }, [
@@ -1476,7 +1493,7 @@ export default function VaultChatPanel({
     active?.id,
     profilesLoading,
     needsSetup,
-    profiles,
+    profiles.length,
     switchProfile,
     scopedProfileId,
   ]);
@@ -1541,7 +1558,13 @@ export default function VaultChatPanel({
 
   useEffect(() => {
     if (needsSetup || scopedProfileId) return;
-    const onProfile = () => {
+    const onProfile = (event: Event) => {
+      const nextProfileId = (
+        event as CustomEvent<{ profileId?: string }>
+      ).detail?.profileId;
+      if (nextProfileId && !isScopedPanel && !isDrawer) {
+        syncAskProfileUrl(nextProfileId, { clearChat: true });
+      }
       bootstrapGeneration.current += 1;
       bootstrappedVaultRef.current = null;
       deepLinkChatConsumed.current = null;
@@ -1557,7 +1580,7 @@ export default function VaultChatPanel({
     window.addEventListener("guardian:profile-changed", onProfile);
     return () =>
       window.removeEventListener("guardian:profile-changed", onProfile);
-  }, [needsSetup, scopedProfileId]);
+  }, [needsSetup, scopedProfileId, isScopedPanel, isDrawer, syncAskProfileUrl]);
 
   useEffect(() => {
     setConfirmedDailyLogIds(readConfirmedDailyLogIds(activeChatId));
@@ -4681,6 +4704,7 @@ export default function VaultChatPanel({
         }
         return;
       }
+      syncAskProfileUrl(id, { clearChat: true });
       setMeta((prev) =>
         prev
           ? {
@@ -4691,7 +4715,7 @@ export default function VaultChatPanel({
           : prev
       );
     },
-    [effectiveProfile?.id, switchProfile, isDrawer, scopedProfileId]
+    [effectiveProfile?.id, switchProfile, isDrawer, scopedProfileId, syncAskProfileUrl]
   );
 
   const workspaceContextBar = workingInDisplay ? (

@@ -22,6 +22,25 @@ export function documentsHref(profileId?: string | null): string {
   return `${DOCUMENTS_PATH}#documents-${profileId}`;
 }
 
+/** Ask Gideon — primary chat surface. */
+export const ASK_GIDEON_PATH = "/ask";
+
+/** Ask Gideon URL after switching spaces. */
+export function askSpaceHref(
+  profileId: string,
+  searchParams: URLSearchParams,
+  options?: { clearChat?: boolean }
+): string {
+  const params = new URLSearchParams(searchParams.toString());
+  params.set("profileId", profileId);
+  if (options?.clearChat) {
+    params.delete("chatId");
+    params.delete("draft");
+  }
+  const qs = params.toString();
+  return `${ASK_GIDEON_PATH}${qs ? `?${qs}` : ""}`;
+}
+
 /** Dashboard URL after switching spaces — always points at the new space. */
 export function vaultSwitchHref(
   profileId: string,
