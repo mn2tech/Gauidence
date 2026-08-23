@@ -148,6 +148,11 @@ html.guardian-splash-seen .guardian-splash-boot-cover {
   display: none;
 }
 
-html:not(.guardian-splash-seen) body {
-  overflow: hidden;
+/* Lock scroll for the whole splash (boot + animation + dissolve) */
+html.guardian-splash-active,
+html.guardian-splash-active body {
+  overflow: hidden !important;
+  overscroll-behavior: none;
+  height: 100%;
+  touch-action: none;
 }

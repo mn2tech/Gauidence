@@ -18,6 +18,7 @@ import { GUARDIAN_BRAND_TAGLINE } from "@/lib/branding";
 import {
   clearStartSplashBoot,
   readStartSplashSeen,
+  setStartSplashScrollLock,
   writeStartSplashSeen,
 } from "@/lib/branding/startSplash";
 
@@ -32,7 +33,8 @@ export default function GuardianStartSplash() {
   const [brandVisible, setBrandVisible] = useState(false);
   const [mounted, setMounted] = useState(false);
   const dismissed = useRef(false);
-  const timers = useRef<number[]>([]);
+  const drawTimers = useRef<number[]>([]);
+  const exitTimer = useRef<number | null>(null);
   const started = useRef(false);
 
   const rows = useMemo(() => buildGuardianStarRows(), []);
@@ -42,45 +44,73 @@ export default function GuardianStartSplash() {
     [rows, revealed],
   );
 
+  const clearDrawTimers = useCallback(() => {
+    for (const id of drawTimers.current) window.clearTimeout(id);
+    drawTimers.current = [];
+  }, []);
+
+  const clearExitTimer = useCallback(() => {
+    if (exitTimer.current !== null) {
+      window.clearTimeout(exitTimer.current);
+      exitTimer.current = null;
+    }
+  }, []);
+
+  const unlock = useCallback(() => {
+    setStartSplashScrollLock(false);
+    document.documentElement.style.overflow = "";
+    document.body.style.overflow = "";
+  }, []);
+
   useLayoutEffect(() => {
     setMounted(true);
     if (readStartSplashSeen()) {
       clearStartSplashBoot();
+      unlock();
       setPhase("gone");
       return;
     }
+    setStartSplashScrollLock(true);
     setPhase("draw");
-  }, []);
+  }, [unlock]);
 
-  // Hide the SSR cover only after the real splash is committed to the DOM.
   useLayoutEffect(() => {
     if (phase === "draw" || phase === "fade") {
       clearStartSplashBoot();
     }
-  }, [phase]);
+    if (phase === "gone") {
+      unlock();
+    }
+  }, [phase, unlock]);
 
-  const clearTimers = useCallback(() => {
-    for (const id of timers.current) window.clearTimeout(id);
-    timers.current = [];
-  }, []);
+  useEffect(() => {
+    return () => {
+      clearDrawTimers();
+      clearExitTimer();
+      unlock();
+    };
+  }, [clearDrawTimers, clearExitTimer, unlock]);
 
-  const schedule = useCallback((fn: () => void, ms: number) => {
+  const scheduleDraw = useCallback((fn: () => void, ms: number) => {
     const id = window.setTimeout(fn, ms);
-    timers.current.push(id);
+    drawTimers.current.push(id);
     return id;
   }, []);
 
   const finish = useCallback(() => {
     if (dismissed.current) return;
     dismissed.current = true;
-    clearTimers();
+    clearDrawTimers();
     writeStartSplashSeen();
     setPhase("fade");
-    schedule(() => {
+    clearExitTimer();
+    exitTimer.current = window.setTimeout(() => {
+      exitTimer.current = null;
       setPhase("gone");
       clearStartSplashBoot();
+      unlock();
     }, FADE_MS);
-  }, [clearTimers, schedule]);
+  }, [clearDrawTimers, clearExitTimer, unlock]);
 
   const skip = useCallback(() => {
     if (phase === "pending" || phase === "gone" || phase === "fade") return;
@@ -100,8 +130,8 @@ export default function GuardianStartSplash() {
     if (reduced) {
       setRevealed(totalStars);
       setBrandVisible(true);
-      schedule(finish, 200);
-      return () => clearTimers();
+      scheduleDraw(finish, 200);
+      return;
     }
 
     const brandAt = Math.max(1, totalStars - 40);
@@ -112,16 +142,48 @@ export default function GuardianStartSplash() {
       setRevealed(i);
       if (i >= brandAt) setBrandVisible(true);
       if (i >= totalStars) {
-        // Dissolve immediately — no hold on the finished frame.
         finish();
         return;
       }
-      schedule(tick, STAR_MS);
+      scheduleDraw(tick, STAR_MS);
     };
-    schedule(tick, 80);
+    scheduleDraw(tick, 80);
+    // Do not clear exitTimer here — finish() owns that separately.
+  }, [finish, phase, scheduleDraw, totalStars]);
 
-    return () => clearTimers();
-  }, [clearTimers, finish, phase, schedule, totalStars]);
+  useEffect(() => {
+    if (phase === "pending" || phase === "gone") return;
+
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    const prevBodyOverflow = document.body.style.overflow;
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+
+    const blockScroll = (event: Event) => {
+      event.preventDefault();
+    };
+    const blockKeys = (event: KeyboardEvent) => {
+      if (
+        ["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "].includes(
+          event.key,
+        )
+      ) {
+        event.preventDefault();
+      }
+    };
+
+    window.addEventListener("wheel", blockScroll, { passive: false });
+    window.addEventListener("touchmove", blockScroll, { passive: false });
+    window.addEventListener("keydown", blockKeys, { passive: false });
+
+    return () => {
+      document.documentElement.style.overflow = prevHtmlOverflow;
+      document.body.style.overflow = prevBodyOverflow;
+      window.removeEventListener("wheel", blockScroll);
+      window.removeEventListener("touchmove", blockScroll);
+      window.removeEventListener("keydown", blockKeys);
+    };
+  }, [phase]);
 
   useEffect(() => {
     if (phase !== "draw") return;
@@ -135,15 +197,6 @@ export default function GuardianStartSplash() {
     return () => window.removeEventListener("keydown", onKey);
   }, [phase, skip]);
 
-  useEffect(() => {
-    if (phase === "pending" || phase === "gone") return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [phase]);
-
   if (!mounted || phase === "pending" || phase === "gone") return null;
 
   const fading = phase === "fade";
@@ -154,7 +207,7 @@ export default function GuardianStartSplash() {
       role="dialog"
       aria-label="Guardian starting"
       aria-modal="true"
-      className={`fixed inset-0 z-[100] flex flex-col items-center justify-center px-4 ${
+      className={`fixed inset-0 z-[100] flex flex-col items-center justify-center overflow-hidden px-4 ${
         fading ? "pointer-events-none" : ""
       }`}
       style={{
