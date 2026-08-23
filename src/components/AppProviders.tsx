@@ -8,6 +8,7 @@ import AwardToast from "@/components/AwardToast";
 import RetentionWelcomeTrigger from "@/components/RetentionWelcomeTrigger";
 import OnboardingGate from "@/components/OnboardingGate";
 import AiNoticeGate from "@/components/legal/AiNoticeGate";
+import GuardianStartSplash from "@/components/brand/GuardianStartSplash";
 
 export default function AppProviders({
   children,
@@ -21,6 +22,7 @@ export default function AppProviders({
           <OnboardingGate>
             <AiNoticeGate>
               {children}
+              <GuardianStartSplash />
               <GideonNudge />
               <AwardToast />
               <RetentionWelcomeTrigger />
