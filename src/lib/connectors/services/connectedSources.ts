@@ -10,6 +10,7 @@ import {
   canUseConnectedSourceSecrets,
   connectedSourceAccessForUser,
   isProfileSharedSourceType,
+  PROFILE_SHARED_SOURCE_TYPES,
 } from "./connectionAccess";
 
 type ConnectedSourceRow = {
@@ -140,13 +141,54 @@ export async function listConnectedSources(
   supabase: SupabaseClient,
   userId: string
 ): Promise<ConnectedSource[]> {
-  const { data, error } = await supabase
-    .from("connected_sources")
-    .select("*")
-    .order("updated_at", { ascending: false });
+  const { data: memberships, error: memberError } = await supabase
+    .from("guardian_profile_members")
+    .select("profile_id")
+    .eq("user_id", userId);
+  if (memberError) throw memberError;
 
-  if (error) throw error;
-  const rows = (data as ConnectedSourceRow[] | null) ?? [];
+  const profileIds = [
+    ...new Set(
+      (memberships ?? [])
+        .map((row) => String(row.profile_id ?? "").trim())
+        .filter(Boolean)
+    ),
+  ];
+
+  const [ownResult, sharedResult] = await Promise.all([
+    supabase
+      .from("connected_sources")
+      .select("*")
+      .eq("user_id", userId)
+      .order("updated_at", { ascending: false }),
+    profileIds.length
+      ? supabase
+          .from("connected_sources")
+          .select("*")
+          .in("profile_id", profileIds)
+          .in("source_type", PROFILE_SHARED_SOURCE_TYPES)
+          .neq("user_id", userId)
+          .neq("status", "disconnected")
+          .order("updated_at", { ascending: false })
+      : Promise.resolve({ data: [] as ConnectedSourceRow[], error: null }),
+  ]);
+
+  if (ownResult.error) throw ownResult.error;
+  if (sharedResult.error) throw sharedResult.error;
+
+  const byId = new Map<string, ConnectedSourceRow>();
+  for (const row of [
+    ...((ownResult.data as ConnectedSourceRow[] | null) ?? []),
+    ...((sharedResult.data as ConnectedSourceRow[] | null) ?? []),
+  ]) {
+    byId.set(row.id, row);
+  }
+
+  const rows = [...byId.values()].sort(
+    (a, b) =>
+      new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+  );
+
   return Promise.all(rows.map((row) => mapRowForClient(supabase, userId, row)));
 }
 

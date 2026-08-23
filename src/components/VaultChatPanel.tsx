@@ -4670,6 +4670,30 @@ export default function VaultChatPanel({
       })
     : null;
 
+  const handleSwitchWorkspace = useCallback(
+    async (id: string) => {
+      if (!id || id === effectiveProfile?.id) return;
+      const ok = await switchProfile(id);
+      if (!ok) return;
+      if (isDrawer || scopedProfileId) {
+        if (typeof window !== "undefined") {
+          window.location.href = `/ask?profileId=${encodeURIComponent(id)}`;
+        }
+        return;
+      }
+      setMeta((prev) =>
+        prev
+          ? {
+              ...prev,
+              chatScopedProfile: null,
+              searchScope: "workspace",
+            }
+          : prev
+      );
+    },
+    [effectiveProfile?.id, switchProfile, isDrawer, scopedProfileId]
+  );
+
   const workspaceContextBar = workingInDisplay ? (
     <div
       className={
@@ -4683,7 +4707,7 @@ export default function VaultChatPanel({
           display={workingInDisplay}
           profiles={profiles}
           activeProfileId={effectiveProfile?.id ?? profileId ?? ""}
-          onSwitchWorkspace={(id) => void switchProfile(id)}
+          onSwitchWorkspace={(id) => void handleSwitchWorkspace(id)}
           onReturnToWorkspace={
             workingInDisplay.mode === "searching"
               ? () => void clearChatScopedProfile()

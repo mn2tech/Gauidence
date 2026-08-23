@@ -115,8 +115,21 @@ function StatusDot({
   );
 }
 
+function connectionForSpace(
+  sources: ConnectedSource[],
+  sourceType: ConnectedSource["sourceType"],
+  spaceId?: string | null
+): ConnectedSource | null {
+  const matches = sources.filter(
+    (s) => s.sourceType === sourceType && s.status !== "disconnected"
+  );
+  if (!matches.length) return null;
+  if (!spaceId) return matches[0] ?? null;
+  return matches.find((s) => s.profileId === spaceId) ?? null;
+}
+
 export default function ConnectionsPanel() {
-  const { profiles, active } = useActiveProfile();
+  const { profiles, active, switchProfile } = useActiveProfile();
   const trelloBoundProfile = useMemo(
     () => findTrelloBoundProfile(profiles, active),
     [profiles, active]
@@ -170,22 +183,26 @@ export default function ConnectionsPanel() {
     () => sources.find((s) => s.sourceType === "android_storage") ?? null,
     [sources]
   );
-  const trelloSource = useMemo(() => {
-    const trello = sources.filter(
-      (s) => s.sourceType === "trello" && s.status !== "disconnected"
+  const trelloSource = useMemo(
+    () => connectionForSpace(sources, "trello", active?.id),
+    [sources, active?.id]
+  );
+  const trelloOnOtherSpace = useMemo(() => {
+    if (trelloSource || !active?.id) return null;
+    return (
+      sources.find(
+        (s) =>
+          s.sourceType === "trello" &&
+          s.status !== "disconnected" &&
+          s.profileId &&
+          s.profileId !== active.id
+      ) ?? null
     );
-    if (!trello.length) return null;
-    const forActive = trello.find((s) => s.profileId === active?.id);
-    return forActive ?? trello[0] ?? null;
-  }, [sources, active?.id]);
-  const driveSource = useMemo(() => {
-    const drive = sources.filter(
-      (s) => s.sourceType === "google_drive" && s.status !== "disconnected"
-    );
-    if (!drive.length) return null;
-    const forActive = drive.find((s) => s.profileId === active?.id);
-    return forActive ?? drive[0] ?? null;
-  }, [sources, active?.id]);
+  }, [sources, active?.id, trelloSource]);
+  const driveSource = useMemo(
+    () => connectionForSpace(sources, "google_drive", active?.id),
+    [sources, active?.id]
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -203,6 +220,7 @@ export default function ConnectionsPanel() {
       }
       const list = body.sources ?? [];
       setSources(list);
+      const spaceId = active?.id ?? null;
       const phone = list.find((s) => s.sourceType === "android_storage");
       if (phone && phone.status !== "disconnected") {
         const sumRes = await fetch(
@@ -219,8 +237,8 @@ export default function ConnectionsPanel() {
       } else {
         setSummary(null);
       }
-      const trello = list.find((s) => s.sourceType === "trello");
-      if (trello && trello.status !== "disconnected") {
+      const trello = connectionForSpace(list, "trello", spaceId);
+      if (trello) {
         const sumRes = await fetch(
           `/api/connections/${trello.id}/items?summary=1`
         );
@@ -235,8 +253,8 @@ export default function ConnectionsPanel() {
       } else {
         setTrelloSummary(null);
       }
-      const drive = list.find((s) => s.sourceType === "google_drive");
-      if (drive && drive.status !== "disconnected") {
+      const drive = connectionForSpace(list, "google_drive", spaceId);
+      if (drive) {
         const sumRes = await fetch(
           `/api/connections/${drive.id}/items?summary=1`
         );
@@ -257,10 +275,19 @@ export default function ConnectionsPanel() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [active?.id]);
 
   useEffect(() => {
     void load();
+  }, [load]);
+
+  useEffect(() => {
+    const onProfileChanged = () => {
+      void load();
+    };
+    window.addEventListener("guardian:profile-changed", onProfileChanged);
+    return () =>
+      window.removeEventListener("guardian:profile-changed", onProfileChanged);
   }, [load]);
 
   useEffect(() => {
@@ -1697,6 +1724,38 @@ export default function ConnectionsPanel() {
                     ) : null}
                     {trelloNote ? (
                       <p className="mt-3 text-sm text-ink-muted">{trelloNote}</p>
+                    ) : null}
+                  </>
+                ) : trelloOnOtherSpace ? (
+                  <>
+                    <p className="mt-1 flex items-center gap-2 text-sm text-ink-muted">
+                      <StatusDot tone="ok" />
+                      Connected in another space
+                    </p>
+                    <p className="mt-2 text-sm text-ink-muted">
+                      Trello is set up for{" "}
+                      <span className="font-medium text-foreground">
+                        {profiles.find(
+                          (p) => p.id === trelloOnOtherSpace.profileId
+                        )?.display_name ?? "another space"}
+                      </span>
+                      . Switch to that space to use the shared board — you do
+                      not need your own API token.
+                    </p>
+                    {trelloOnOtherSpace.profileId ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void switchProfile(trelloOnOtherSpace.profileId!)
+                        }
+                        disabled={busy !== null}
+                        className="mt-4 inline-flex items-center justify-center rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-60"
+                      >
+                        Switch to{" "}
+                        {profiles.find(
+                          (p) => p.id === trelloOnOtherSpace.profileId
+                        )?.display_name ?? "that space"}
+                      </button>
                     ) : null}
                   </>
                 ) : (
