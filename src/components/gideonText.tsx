@@ -7,16 +7,22 @@
 
 import type { ReactNode } from "react";
 
-const URL_SPLIT_RE = /(https?:\/\/[^\s<>"')\]]+)/g;
+const URL_SPLIT_RE = /(https?:\/\/[^\s<>"')\]]+|www\.[^\s<>"')\]]+)/gi;
+
+function toHref(raw: string): { href: string; display: string; trailing: string } {
+  const display = raw.replace(/[.,;:!?)]+$/, "");
+  const trailing = raw.slice(display.length);
+  const href = /^www\./i.test(display) ? `https://${display}` : display;
+  return { href, display, trailing };
+}
 
 function linkifyPlainText(text: string, keyPrefix: string): ReactNode[] {
   const parts = text.split(URL_SPLIT_RE);
   const nodes: ReactNode[] = [];
   for (let j = 0; j < parts.length; j++) {
     const part = parts[j] ?? "";
-    if (/^https?:\/\//i.test(part)) {
-      const href = part.replace(/[.,;:!?)]+$/, "");
-      const trailing = part.slice(href.length);
+    if (/^(https?:\/\/|www\.)/i.test(part)) {
+      const { href, display, trailing } = toHref(part);
       nodes.push(
         <span key={`${keyPrefix}-${j}`}>
           <a
@@ -25,7 +31,7 @@ function linkifyPlainText(text: string, keyPrefix: string): ReactNode[] {
             rel="noopener noreferrer"
             className="font-medium text-brand underline underline-offset-2 break-all"
           >
-            {href}
+            {display}
           </a>
           {trailing}
         </span>

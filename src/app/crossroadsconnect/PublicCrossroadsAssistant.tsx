@@ -1,9 +1,11 @@
 "use client";
 import { FormEvent, useState } from "react";
+import { renderGideonText } from "@/components/gideonText";
 
 const starters = [
   "What is the next event?",
-  "Where is the next event?",
+  "When does the event start?",
+  "Do they have breakfast?",
   "How do I RSVP?",
   "Is there a fee?",
 ];
@@ -80,10 +82,12 @@ export default function PublicCrossroadsAssistant() {
         </form>
         {answer ? (
           <div className="mt-6 rounded-2xl bg-black/[.04] p-5">
-            <div className="whitespace-pre-wrap leading-7">{answer}</div>
+            <div className="whitespace-pre-wrap leading-7">
+              {renderGideonText(answer)}
+            </div>
             {sources.length > 0 && !answerHasSource ? (
               <div className="mt-4 border-t pt-3 text-xs text-ink-muted">
-                Source: {sources.join(", ")}
+                Source: {renderGideonText(sources.join(", "))}
               </div>
             ) : null}
           </div>

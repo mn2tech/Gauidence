@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { renderGideonText } from "@/components/gideonText";
 
 const STARTERS = [
   "What is CrossRoads Connect?",
@@ -95,7 +96,7 @@ export default function CrossroadsPublicAskClient() {
 
       {answer ? (
         <div className="rounded-xl border border-stone-200 bg-white p-4 text-sm whitespace-pre-wrap text-foreground shadow-sm">
-          {answer}
+          {renderGideonText(answer)}
         </div>
       ) : null}
     </div>

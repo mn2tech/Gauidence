@@ -36,28 +36,42 @@ ${NO_APPROVED_CROSSROADS_ANSWER}
 - Event times: ALWAYS use the "When (America/New_York)" line. Say times in Eastern Time (e.g. 8:45 AM). NEVER say UTC, GMT, or Zulu. Never quote raw ISO timestamps to the user.
 - End every successful answer with exactly one source block:
 Source:
-CrossRoads Connect website — /events
-(use the most relevant source_label / source_url path from the knowledge blocks)
+CrossRoads Connect website — https://www.crossroadsconnect.us/events
+(use the most relevant full https source_url from the knowledge blocks — never a bare path like /events)
 - Do not repeat the Source block.
 - Never mention drafts, review status, RAG, or internal systems.`;
+
+/** Expand relative / bare CrossRoads source paths to absolute https URLs. */
+function withAbsoluteSourceUrls(answer: string): string {
+  return answer
+    .replace(
+      /(CrossRoads Connect website\s*[—\-–]\s*)(\/[^\s]*)/gi,
+      "CrossRoads Connect website — https://www.crossroadsconnect.us$2"
+    )
+    .replace(
+      /(CrossRoads Connect website\s*[—\-–]\s*)(?!https?:\/\/)(www\.[^\s]+|crossroadsconnect\.us[^\s]*)/gi,
+      (_m, label: string, host: string) => `${label}https://${host}`
+    );
+}
 
 function appendSource(
   answer: string,
   knowledge: PublishedOrgKnowledge
 ): string {
-  if (/\bSource:\s*/i.test(answer)) return answer;
   const fallbackSource =
     knowledge.facts[0]?.source_url ||
     knowledge.events[0]?.source_url ||
     "https://www.crossroadsconnect.us/";
-  let path = fallbackSource;
+  let url = fallbackSource;
   try {
-    const u = new URL(fallbackSource);
-    path = u.pathname === "/" ? u.hostname : `${u.hostname}${u.pathname}`;
+    url = new URL(fallbackSource).href;
   } catch {
     /* keep */
   }
-  return `${answer}\n\nSource:\nCrossRoads Connect website — ${path}`;
+  const withSource = /\bSource:\s*/i.test(answer)
+    ? answer
+    : `${answer}\n\nSource:\nCrossRoads Connect website — ${url}`;
+  return withAbsoluteSourceUrls(withSource);
 }
 
 export async function answerCrossroadsPublicQuestion(args: {
