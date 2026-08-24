@@ -74,6 +74,10 @@ export type WorkspacePromptOptions = {
   confirmationRequired: boolean;
   /** Pack skill prompt addons (e.g. Business Chief of Staff). */
   packSkillsNote?: string;
+  /** Knowledge-first orchestration notes (intent/depth/boundaries). Not user-visible. */
+  orchestrationNotes?: string;
+  /** When false, SPACE SOURCE MODE forbids general-knowledge fill-in. */
+  generalKnowledgeAllowed?: boolean;
 };
 
 export type WorkspaceContextData = WorkspaceContextMeta & {

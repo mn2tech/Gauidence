@@ -5,18 +5,66 @@ import {
   type GideonRoute,
 } from "./intent";
 import {
+  routeGideonOrchestration,
+  type GideonOrchestrationRoute,
+  type RouteGideonOrchestrationArgs,
+} from "./request-router";
+import {
   formatCalendarToolNote,
   getCalendarEvents,
 } from "./tools/calendar/service";
 
-export type { GideonLoadFlags, GideonRoute };
+export type { GideonLoadFlags, GideonRoute, GideonOrchestrationRoute };
 
 export function routeGideonRequest(args: ClassifyGideonIntentArgs): GideonRoute {
   return classifyGideonIntent(args);
 }
 
+/** Knowledge-first orchestration route (intent + depth + knowledge modes). */
+export function routeGideonKnowledgeRequest(
+  args: RouteGideonOrchestrationArgs
+): GideonOrchestrationRoute {
+  return routeGideonOrchestration(args);
+}
+
 export function resolveGideonLoad(route: GideonRoute): GideonLoadFlags {
   return loadFlagsForRoute(route);
+}
+
+/**
+ * Merge capability routing with knowledge orchestration.
+ * When orchestration does not require Guardian knowledge, document search
+ * is skipped unless attachments force knowledge.
+ */
+export function resolveGideonLoadWithOrchestration(args: {
+  capabilityRoute: GideonRoute;
+  orchestration: GideonOrchestrationRoute;
+  hasAttachment?: boolean;
+}): GideonLoadFlags {
+  const base = loadFlagsForRoute(args.capabilityRoute);
+  if (args.hasAttachment || args.orchestration.guardianKnowledgeRequired) {
+    return {
+      ...base,
+      documents: true,
+      logs: true,
+      vaultMap: true,
+      clientRequests: true,
+      proposals: true,
+      linkedProfiles: true,
+    };
+  }
+  if (!args.orchestration.guardianKnowledgeRequired) {
+    return {
+      ...base,
+      documents: false,
+      logs: false,
+      clientRequests: false,
+      proposals: false,
+      vaultMap: false,
+      linkedProfiles: false,
+    };
+  }
+  return base;
 }
 
 /** Start/end of the user's local calendar day (for read-only calendar peek). */

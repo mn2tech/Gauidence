@@ -79,6 +79,16 @@ export default async function SettingsPage() {
               Knowledge Engine →
             </a>
           </p>
+          {isPlatformAdmin(user.email) ? (
+            <p className="mt-2">
+              <a
+                href="/settings/knowledge-test-lab"
+                className="text-sm font-semibold text-brand hover:text-brand-dark"
+              >
+                Guardian Knowledge Test Lab (admin) →
+              </a>
+            </p>
+          ) : null}
           {isGuardianPackEngineEnabled({ email: user.email }) ? (
             <p className="mt-2">
               <a

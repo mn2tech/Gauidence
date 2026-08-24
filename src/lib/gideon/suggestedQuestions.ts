@@ -23,7 +23,8 @@ export type SuggestedQuestionContext = {
   preferEvidenceOrGap?: boolean;
 };
 
-const MAX_SUGGESTIONS = 4;
+/** Max contextual follow-ups after a Guardian knowledge answer. */
+const MAX_SUGGESTIONS = 3;
 const MAX_WORDS = 10;
 
 const GENERIC_FILLER =

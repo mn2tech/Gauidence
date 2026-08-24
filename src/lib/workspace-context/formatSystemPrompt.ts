@@ -26,6 +26,12 @@ import {
   GIDEON_CONVERSATION_CONTEXT_NOTE,
 } from "@/lib/gideon/chiefOfStaff";
 import { FOCUS_BLOCK_SYSTEM_NOTE } from "@/lib/gideon/focusBlock";
+import {
+  classifyResponseDepth,
+  maxTokensForDepth,
+  responseDepthSystemNote,
+} from "@/lib/personal-space/responseDepth";
+import { personalRetrievalSystemNote } from "@/lib/personal-space/retrievalPriority";
 import type { WorkspaceContextData } from "./types";
 
 function blockIsPresent(text: string | undefined): boolean {
@@ -47,7 +53,8 @@ function namedBlock(
 /** Assemble Gideon's full system prompt from workspace context. */
 export function buildGideonSystemPrompt(
   context: WorkspaceContextData,
-  actionContext?: ActionContext
+  actionContext?: ActionContext,
+  options?: { question?: string }
 ): string {
   const { activeProfile, blocks, promptOptions, profileKind } = context;
   const {
@@ -66,6 +73,13 @@ export function buildGideonSystemPrompt(
     focusBlockNote,
     confirmationRequired,
   } = promptOptions;
+
+  const responseDepth = classifyResponseDepth(options?.question ?? "");
+  const depthNote = `\n${responseDepthSystemNote(responseDepth)}\n`;
+  const personalNote =
+    activeProfile.profile_type === "personal"
+      ? `\n${personalRetrievalSystemNote()}\n`
+      : "";
 
   const searchedKnowledge = loaded.documents;
   const pictureNote =
@@ -130,9 +144,16 @@ export function buildGideonSystemPrompt(
       ? `\n${FOCUS_BLOCK_SYSTEM_NOTE}\n`
       : "";
   const knowledgeModeNote = searchedKnowledge
-    ? `\nSPACE SOURCE MODE (strict): Guardian searched this Space for this turn. Answer ONLY from the retrieval blocks below (excerpts, file inventory, daily logs, client requests, ontology, connected files, schedule, and other Space sources). Do not use general knowledge, open-web facts, or chat-only speculation to fill gaps. If the answer is not in those Space sources, say you could not find it in this Space — do not invent details.\n`
+    ? activeProfile.profile_type === "personal"
+      ? `\nPERSONAL SPACE SOURCE MODE: Prefer Guardian Personal Space knowledge (structured facts, then documents). If the question is personal and the answer is not in Guardian, say you don't have it yet — never invent personal details. For clearly general questions (definitions, how-tos not about the user's records), you may use general model knowledge.\n`
+      : promptOptions.generalKnowledgeAllowed
+        ? `\nSPACE SOURCE MODE (guardian + general): Prefer Guardian Space evidence first. You may use brief general knowledge only to add requested context — clearly label it. Never invent missing Space facts from industry norms.\n`
+        : `\nSPACE SOURCE MODE (strict): Guardian searched this Space for this turn. Answer ONLY from the retrieval blocks below (excerpts, file inventory, daily logs, client requests, ontology, connected files, schedule, and other Space sources). Do not use general knowledge, open-web facts, or chat-only speculation to fill gaps. If the answer is not in those Space sources, say you could not find it in this Space — do not invent details.\n`
     : `\nNo Guardian document search ran for this turn. Do not invent files or quotes from the user's spaces.\n`;
 
+  const orchestrationNote = (promptOptions.orchestrationNotes ?? "").trim()
+    ? `\n${promptOptions.orchestrationNotes!.trim()}\n`
+    : "";
   const retrievalBlocks = [
     namedBlock("RETRIEVED EXCERPTS", blocks.excerpts, searchedKnowledge),
     namedBlock(
@@ -205,6 +226,9 @@ ${buildGideonTodayNote(new Date(), timeZone)}
 ${GIDEON_CONVERSATION_CONTEXT_NOTE}
 ${chiefOfStaffNote}
 ${packSkillsNote}
+${personalNote}
+${depthNote}
+${orchestrationNote}
 ${knowledgeModeNote}
 ${confirmationNote}
 ${focusNote}
@@ -226,7 +250,9 @@ ${retrievalBlocks}`;
 }
 
 /** Suggested max tokens based on prompt options. */
-export function gideonMaxTokens(context: WorkspaceContextData): number {
+export function gideonMaxTokens(context: WorkspaceContextData, question?: string): number {
+  const depth = classifyResponseDepth(question ?? "");
+  const depthCap = maxTokensForDepth(depth);
   const {
     reminderAgent,
     dailyLogCaptureAgent,
@@ -239,9 +265,9 @@ export function gideonMaxTokens(context: WorkspaceContextData): number {
     fullLogQuote,
     intent,
   } = context.promptOptions;
-  if (intent === "chief_of_staff" || intent === "combined") return 1400;
-  if (intent === "conversation") return 700;
-  if (agentMode || fullLogQuote) return 1400;
+  if (intent === "chief_of_staff" || intent === "combined") return Math.max(1400, depthCap);
+  if (intent === "conversation") return Math.max(700, depthCap);
+  if (agentMode || fullLogQuote) return Math.max(1400, depthCap);
   if (
     reminderAgent ||
     dailyLogCaptureAgent ||
@@ -250,8 +276,8 @@ export function gideonMaxTokens(context: WorkspaceContextData): number {
     clientRequestCreateAgent ||
     spaceCreateAgent
   ) {
-    return 1100;
+    return Math.max(1100, depthCap);
   }
   if (transcriptionMode) return 4000;
-  return 900;
+  return Math.max(900, depthCap);
 }

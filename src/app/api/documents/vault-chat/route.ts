@@ -94,11 +94,26 @@ import {
   suggestionKindFrom,
   type SearchScopeMode,
 } from "@/lib/workspace-context";
+import { answerFromPersonalKnowledge } from "@/lib/personal-space/answers";
+import { classifyResponseDepth } from "@/lib/personal-space/responseDepth";
+import { loadPersonalKnowledgeStore } from "@/lib/personal-space/loadStore";
+import { persistConversationKnowledge } from "@/lib/personal-space/persistConversation";
+import { isPersonalFactQuestion } from "@/lib/personal-space/retrievalPriority";
 import {
   loadCalendarPromptNote,
-  resolveGideonLoad,
+  resolveGideonLoadWithOrchestration,
+  routeGideonKnowledgeRequest,
   routeGideonRequest,
 } from "@/lib/gideon/orchestrator";
+import { composeGideonResponse } from "@/lib/gideon/response-composer";
+import { resolveGuardianKnowledge } from "@/lib/gideon/knowledge-resolver";
+import type { RetrievalEvidence } from "@/lib/gideon/orchestration-types";
+import {
+  buildGlobalBriefing,
+  formatGlobalBriefingForPrompt,
+  isGlobalBriefingQuestion,
+} from "@/lib/gideon/global-briefing";
+import { budgetRetrievalEvidence } from "@/lib/gideon/evidence-budget";
 import {
   buildFocusRemainingAnswer,
   formatFocusBlockPromptNote,
@@ -1407,6 +1422,35 @@ export async function POST(request: Request) {
     }
   }
 
+  // Personal Space: prefer structured knowledge for personal fact questions.
+  if (
+    !answer &&
+    !attachmentDocumentId &&
+    active.profile_type === "personal" &&
+    isPersonalFactQuestion(question)
+  ) {
+    try {
+      const store = await loadPersonalKnowledgeStore(supabase, active.id);
+      const personal = answerFromPersonalKnowledge(question, store, {
+        depth: classifyResponseDepth(question),
+      });
+      if (personal.known && personal.text.trim()) {
+        answer = personal.text;
+        if (personal.sources.length) {
+          citations = personal.sources.map((s, i) => ({
+            documentId: s.documentId ?? `personal-source-${i}`,
+            fileName: s.label,
+          }));
+        }
+      } else if (!personal.known && personal.text.trim()) {
+        // Honest "I don't have that" for personal unknowns — avoid hallucination.
+        answer = personal.text;
+      }
+    } catch (err) {
+      console.warn("Personal knowledge answer skipped:", err);
+    }
+  }
+
   if (!answer) {
     try {
       const workProjectId =
@@ -1466,14 +1510,32 @@ export async function POST(request: Request) {
         });
       }
 
+      const orchestrationRoute = routeGideonKnowledgeRequest({
+        question,
+        userId: user.id,
+        spaceId: active.id,
+        spaceName: active.display_name,
+        spaceType: active.profile_type,
+        conversationId: chatId,
+        history,
+        hasAttachment: Boolean(attachedDoc),
+        globalView: workspaceMeta.searchScope === "global",
+        knownEntityNames: [active.display_name].filter(Boolean),
+      });
+
       const gideonRoute = routeGideonRequest({
         question,
         history,
         hasAttachment: Boolean(attachedDoc),
-        // Ask Gideon in a Space always grounds in Space sources — never chat-only.
-        forceKnowledge: true,
+        // Knowledge search only when orchestration says the user's world is involved.
+        forceKnowledge:
+          orchestrationRoute.guardianKnowledgeRequired || Boolean(attachedDoc),
       });
-      const loadFlags = resolveGideonLoad(gideonRoute);
+      const loadFlags = resolveGideonLoadWithOrchestration({
+        capabilityRoute: gideonRoute,
+        orchestration: orchestrationRoute,
+        hasAttachment: Boolean(attachedDoc),
+      });
       const calendarNote = await loadCalendarPromptNote({
         route: gideonRoute,
         timeZone: userTz,
@@ -1505,6 +1567,92 @@ export async function POST(request: Request) {
 
       workspaceContext.promptOptions.agentMode = agentMode;
 
+      const retrievalEvidence: RetrievalEvidence[] = budgetRetrievalEvidence(
+        (chunks ?? []).map((c, i) => ({
+          id: c.id || `chunk-${i}`,
+          text: c.content,
+          score: c.fusion_score ?? c.similarity ?? 0,
+          documentId: c.document_id,
+          fileName: c.file_name,
+          spaceId: c.profile_id ?? active.id,
+          spaceName: c.profile_name ?? active.display_name,
+        }))
+      );
+
+      const guardianKnowledge = resolveGuardianKnowledge({
+        query: question,
+        userId: user.id,
+        spaceId: active.id,
+        conversationId: chatId,
+        layers: {
+          retrievalEvidence,
+          spaceName: active.display_name,
+        },
+      });
+
+      let globalBriefingNote = "";
+      if (isGlobalBriefingQuestion(question)) {
+        const briefing = await buildGlobalBriefing({
+          userId: user.id,
+          date: new Date().toISOString().slice(0, 10),
+          timeZone: userTz,
+        });
+        globalBriefingNote = formatGlobalBriefingForPrompt(briefing);
+      }
+
+      const spaceBlocksHaveSignal = [
+        workspaceContext.blocks.excerpts,
+        workspaceContext.blocks.ontology,
+        workspaceContext.blocks.structuredKnowledge,
+        workspaceContext.blocks.businessIntelligence,
+        workspaceContext.blocks.dailyLogs,
+        workspaceContext.blocks.fileInventory,
+      ].some((b) => {
+        const t = (b ?? "").trim();
+        return Boolean(t) && t !== "(none)" && !t.startsWith("(none");
+      });
+
+      const composed = composeGideonResponse({
+        question,
+        route: orchestrationRoute,
+        knowledge: {
+          ...guardianKnowledge,
+          status: spaceBlocksHaveSignal
+            ? guardianKnowledge.status === "unknown"
+              ? "partially_known"
+              : guardianKnowledge.status
+            : guardianKnowledge.status,
+        },
+      });
+
+      // Only short-circuit "unknown" when Space blocks are also empty —
+      // otherwise let the LLM reason over ontology / inventory / BI.
+      const orchestrationAnswerText =
+        composed.text &&
+        !(
+          guardianKnowledge.status === "unknown" &&
+          spaceBlocksHaveSignal &&
+          /don'?t have/i.test(composed.text)
+        )
+          ? composed.text
+          : composed.text &&
+              guardianKnowledge.status === "unknown" &&
+              !spaceBlocksHaveSignal
+            ? composed.text
+            : composed.text &&
+                !/don'?t have/i.test(composed.text)
+              ? composed.text
+              : null;
+
+      workspaceContext.promptOptions.orchestrationNotes = [
+        composed.systemNotes,
+        globalBriefingNote,
+      ]
+        .filter(Boolean)
+        .join("\n");
+      workspaceContext.promptOptions.generalKnowledgeAllowed =
+        orchestrationRoute.generalKnowledgeAllowed;
+
       const retrievedImageIds = selectRetrievedImageDocumentIds({
         chunks,
         excludeIds: attachedDoc ? [attachedDoc.documentId] : [],
@@ -1529,7 +1677,9 @@ export async function POST(request: Request) {
           Boolean(attachedDoc);
       }
 
-      const system = buildGideonSystemPrompt(workspaceContext, actionCtx);
+      const system = buildGideonSystemPrompt(workspaceContext, actionCtx, {
+        question,
+      });
       const showPictures = workspaceContext.promptOptions.showPictures;
       const thinkingSteps = buildGideonThinkingSteps({
         actionCtx,
@@ -1597,6 +1747,15 @@ export async function POST(request: Request) {
           ? businessAnswerDraft.trim()
           : null;
 
+      const orchestrationAnswer =
+        !inventoryAnswer &&
+        !openChartAnswer &&
+        !pianoClarify &&
+        !biAnswer &&
+        orchestrationAnswerText
+          ? orchestrationAnswerText
+          : null;
+
       if (inventoryAnswer) {
         answer = inventoryAnswer;
         // Roster answers (songs / JPG / PNG / PDF lists) are inventory-only —
@@ -1619,7 +1778,15 @@ export async function POST(request: Request) {
           : Array.isArray(workspaceContext.businessClaims)
             ? workspaceContext.businessClaims
             : [];
+      } else if (orchestrationAnswer) {
+        answer = orchestrationAnswer;
       } else {
+        // Prefer budgeted evidence for the stream path when chunks were loaded.
+        const budgetedChunkIds = new Set(retrievalEvidence.map((e) => e.id));
+        const budgetedChunks =
+          budgetedChunkIds.size > 0
+            ? (chunks ?? []).filter((c) => budgetedChunkIds.has(c.id))
+            : chunks;
         return createVaultChatStreamResponse({
           supabase,
           userId: user.id,
@@ -1631,8 +1798,8 @@ export async function POST(request: Request) {
           question,
           history,
           system,
-          maxTokens: gideonMaxTokens(workspaceContext),
-          chunks,
+          maxTokens: gideonMaxTokens(workspaceContext, question),
+          chunks: budgetedChunks?.length ? budgetedChunks : chunks,
           attachedDoc,
           visionImages,
           showPictures,
@@ -1668,6 +1835,15 @@ export async function POST(request: Request) {
     availableDocumentLabels: (citations ?? []).map((c) => c.fileName),
     evidenceTexts: [answer],
   });
+
+  // Persist high-confidence personal facts from this turn (non-blocking).
+  if (active.profile_type === "personal" && question.trim()) {
+    void persistConversationKnowledge(supabase, {
+      userId: user.id,
+      profileId: active.id,
+      text: question,
+    }).catch(() => null);
+  }
 
   const baseAssistantInsert = {
     chat_id: chatId,
