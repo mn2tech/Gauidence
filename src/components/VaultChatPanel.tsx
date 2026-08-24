@@ -3926,7 +3926,7 @@ export default function VaultChatPanel({
               You might also ask
             </p>
             <div className="flex flex-wrap gap-2">
-              {m.suggestedQuestions.slice(0, 4).map((q) => (
+              {m.suggestedQuestions.slice(0, 3).map((q) => (
                 <button
                   key={q}
                   type="button"

@@ -54,7 +54,7 @@ describe("buildSuggestedQuestions", () => {
       gaps: ["Form ADV Part 2A is referenced but not available."],
       preferEvidenceOrGap: true,
     });
-    assert.ok(qs.length >= 2 && qs.length <= 4);
+    assert.ok(qs.length >= 2 && qs.length <= 3);
     assert.ok(qs.every((q) => q.split(/\s+/).length <= 10));
     assert.ok(!qs.some((q) => /what do we know about kendall/i.test(q)));
     assert.ok(
@@ -74,7 +74,7 @@ describe("buildSuggestedQuestions", () => {
 • RSVP'd: August 3, 2026 (confirmed, 0 guests)`,
       availableDocumentLabels: ["roster.csv"],
     });
-    assert.ok(qs.length >= 2 && qs.length <= 4);
+    assert.ok(qs.length >= 2 && qs.length <= 3);
     assert.ok(qs.some((q) => /Jeff Hunt|roster|RSVP|guest list/i.test(q)));
     assert.ok(
       !qs.some((q) =>
@@ -83,6 +83,25 @@ describe("buildSuggestedQuestions", () => {
         )
       )
     );
+  });
+
+  it("does not suggest business chips for unrelated personal answers", () => {
+    const qs = buildSuggestedQuestions({
+      question: "When is the next school closure?",
+      answer:
+        "School is closed Monday, September 7 for Labor Day. Want me to show the next three closures?",
+      entityNames: ["Personal"],
+    });
+    assert.deepEqual(qs, []);
+  });
+
+  it("does not suggest chips for general definition answers", () => {
+    const qs = buildSuggestedQuestions({
+      question: "What is an RIA?",
+      answer:
+        "An RIA is a Registered Investment Adviser regulated under the Investment Advisers Act.",
+    });
+    assert.deepEqual(qs, []);
   });
 });
 

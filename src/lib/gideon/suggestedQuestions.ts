@@ -1,6 +1,12 @@
 /**
  * Contextual follow-up questions for Ask Gideon answers.
  * Pure helpers — safe for unit tests. No Space-specific hardcoding.
+ *
+ * Policy (knowledge-first):
+ * - Max 3
+ * - Do NOT show after every answer
+ * - Only when a follow-up naturally continues this turn
+ * - Prefer Guardian context over generic AI chips
  */
 
 import {
@@ -30,7 +36,7 @@ const MAX_WORDS = 10;
 const GENERIC_FILLER =
   /^(what else is known in this space|tell me more about the key details|what can'?t guardian answer yet|what document should i add next)\??$/i;
 
-function wordCount(q: string): number {
+function countWords(q: string): number {
   return q.trim().split(/\s+/).filter(Boolean).length;
 }
 
@@ -52,7 +58,7 @@ function pushUnique(
   originalQuestion: string
 ): void {
   const q = normalizeQuestion(candidate);
-  if (!q || wordCount(q) > MAX_WORDS) return;
+  if (!q || countWords(q) > MAX_WORDS) return;
   if (GENERIC_FILLER.test(q)) return;
   if (sameQuestion(q, originalQuestion)) return;
   const key = q.toLowerCase();
@@ -95,9 +101,9 @@ export function extractPeopleFromAnswer(answer: string): string[] {
 
 function looksLikePersonAnswer(answer: string): boolean {
   return (
-    /\b(email|phone|title|company|rsvp)\b\s*:/i.test(answer) ||
-    /\bRSVP'?d\b/i.test(answer) ||
-    extractPeopleFromAnswer(answer).length > 0
+    (/\b(email|phone|title|company|rsvp)\b\s*:/i.test(answer) &&
+      extractPeopleFromAnswer(answer).length > 0) ||
+    /\bRSVP'?d\b/i.test(answer)
   );
 }
 
@@ -113,28 +119,74 @@ function looksLikeRosterContext(question: string, answer: string): boolean {
 }
 
 function looksLikeOrgEntity(name: string, answer: string): boolean {
-  if (looksLikePersonAnswer(answer) && extractPeopleFromAnswer(answer).some((p) =>
-    p.toLowerCase().includes(name.toLowerCase().split(/\s+/)[0] ?? "")
-  )) {
+  if (
+    looksLikePersonAnswer(answer) &&
+    extractPeopleFromAnswer(answer).some((p) =>
+      p.toLowerCase().includes(name.toLowerCase().split(/\s+/)[0] ?? "")
+    )
+  ) {
     return false;
   }
-  return (
-    /\b(Inc|LLC|Ltd|Corp|Capital|Management|Associates|Partners|Church|Ministry)\b/i.test(
-      name
-    ) || /\b(fee|advisory|portfolio|services?)\b/i.test(answer)
+  return /\b(Inc|LLC|Ltd|Corp|Capital|Management|Associates|Partners|Church|Ministry)\b/i.test(
+    name
+  );
+}
+
+function isBusinessDisclosureTurn(question: string, answer: string): boolean {
+  const blob = `${question}\n${answer}`;
+  return /\b(form crs|form adv|fee|fees|compensation|conflict of interest|advisory|ria|minimum investment|item 5)\b/i.test(
+    blob
+  );
+}
+
+function isEntityOverviewQuestion(question: string): boolean {
+  return /\b(what do (we|you|i) know about|tell me about|everything .{0,20}know|who is|what is)\b/i.test(
+    question
+  );
+}
+
+function isUnknownOrRefusal(answer: string): boolean {
+  return /\b(I don't have|could not find|not in (this |its )?Space yet|don't currently have)\b/i.test(
+    answer
   );
 }
 
 /**
- * Build up to 4 contextual follow-up questions from the current turn.
- * Prefer answer-specific chips (people, roster, fees) over generic meta prompts.
+ * True only when follow-up chips are likely useful for this turn.
+ * Keeps the bottom of the chat free of noise.
+ */
+export function shouldAttachSuggestedQuestions(ctx: {
+  question: string;
+  answer: string;
+}): boolean {
+  const question = ctx.question.trim();
+  const answer = ctx.answer.trim();
+  if (!question || !answer) return false;
+  if (countWords(answer) < 6) return false;
+  if (isUnknownOrRefusal(answer)) return false;
+  if (/^(hi|hey|hello|thanks|thank you)\b/i.test(question)) return false;
+  // Pure general definitions rarely need Guardian follow-ups.
+  if (/^what is (a|an)\b/i.test(question) && !/\b(my|our|space|document)\b/i.test(question)) {
+    return false;
+  }
+  return (
+    looksLikeRosterContext(question, answer) ||
+    isBusinessDisclosureTurn(question, answer) ||
+    isEntityOverviewQuestion(question) ||
+    /\b(missing|not (currently )?available|Form ADV|gap)\b/i.test(answer)
+  );
+}
+
+/**
+ * Build up to 3 contextual follow-up questions from the current turn.
+ * Returns [] when nothing relevant — callers should not force chips.
  */
 export function buildSuggestedQuestions(
   ctx: SuggestedQuestionContext
 ): string[] {
   const question = ctx.question.trim();
   const answer = ctx.answer.trim();
-  if (!question || !answer) return [];
+  if (!shouldAttachSuggestedQuestions({ question, answer })) return [];
 
   const out: string[] = [];
   const seen = new Set<string>();
@@ -154,12 +206,13 @@ export function buildSuggestedQuestions(
   const hasExplicitGaps =
     (ctx.gaps?.length ?? 0) > 0 || unavailable.length > 0;
   const hasAnswerGaps =
-    /\b(missing|not (currently )?available|could not (find|determine)|I don't have)\b/i.test(
+    /\b(missing|not (currently )?available|could not (find|determine))\b/i.test(
       answer
     );
   const hasGaps = hasExplicitGaps || hasAnswerGaps;
-  const hasSources = available.length > 0;
   const rosterContext = looksLikeRosterContext(question, answer);
+  const businessTurn = isBusinessDisclosureTurn(question, answer);
+  const overview = isEntityOverviewQuestion(question);
 
   // --- Roster / RSVP / contact cards ---
   if (rosterContext) {
@@ -182,41 +235,48 @@ export function buildSuggestedQuestions(
       pushUnique(out, seen, "Who has RSVP'd so far?", question);
     }
     pushUnique(out, seen, "Summarize the guest list", question);
+    return out.slice(0, MAX_SUGGESTIONS);
   }
 
-  // --- Fee / disclosure drill-down (business docs) ---
-  if (/\bfee|compensation|how .{0,12}make money|asset-based\b/i.test(answer)) {
-    pushUnique(out, seen, "How are fees described?", question);
-  }
-  if (/\bconflict/i.test(answer)) {
-    pushUnique(out, seen, "What conflicts are disclosed?", question);
-  }
-  if (
-    /\b(service|planning|portfolio|advisory)\b/i.test(answer) &&
-    !rosterContext
-  ) {
-    pushUnique(
-      out,
-      seen,
-      shortName && looksLikeOrgEntity(shortName, answer)
-        ? `What services does ${shortName} offer?`
-        : "What services are described?",
-      question
-    );
-  }
-  if (/\bdiscretionary|manage(s|d)? investments\b/i.test(answer)) {
-    pushUnique(out, seen, "How is investment management described?", question);
-  }
-
-  // --- Org entity context (not person contact cards) ---
-  if (
-    shortName &&
-    !rosterContext &&
-    looksLikeOrgEntity(shortName, answer)
-  ) {
-    pushUnique(out, seen, `What else do we know about ${shortName}?`, question);
-    if (!/\bmake money|fee|compensat/i.test(question)) {
+  // --- Business / disclosure follow-ups (only on business turns) ---
+  if (businessTurn) {
+    if (
+      /\bfee|compensation|how .{0,12}make money|asset-based\b/i.test(answer) &&
+      !/\bfee|compensation|make money\b/i.test(question)
+    ) {
+      pushUnique(out, seen, "How are fees described?", question);
+    }
+    if (/\bconflict/i.test(answer) && !/\bconflict/i.test(question)) {
+      pushUnique(out, seen, "What conflicts are disclosed?", question);
+    }
+    if (
+      (overview || /\bservices?\b/i.test(question) || /\bservices?\b/i.test(answer)) &&
+      shortName &&
+      looksLikeOrgEntity(shortName, answer)
+    ) {
+      if (!/\bservices?\b/i.test(question)) {
+        pushUnique(
+          out,
+          seen,
+          `What services does ${shortName} offer?`,
+          question
+        );
+      }
+    }
+    if (
+      overview &&
+      shortName &&
+      looksLikeOrgEntity(shortName, answer) &&
+      !/\bmake money|fee|compensat/i.test(question)
+    ) {
       pushUnique(out, seen, `How does ${shortName} make money?`, question);
+    }
+    if (
+      overview &&
+      shortName &&
+      looksLikeOrgEntity(shortName, answer)
+    ) {
+      pushUnique(out, seen, `What else do we know about ${shortName}?`, question);
     }
   }
 
@@ -225,15 +285,15 @@ export function buildSuggestedQuestions(
     pushUnique(out, seen, "What information is missing?", question);
     if (unavailable[0] && !isDocumentAvailable(unavailable[0], available)) {
       const ref = unavailable[0].replace(/\s+/g, " ").trim();
-      if (wordCount(`What would ${ref} tell us?`) <= MAX_WORDS) {
+      if (countWords(`What would ${ref} tell us?`) <= MAX_WORDS) {
         pushUnique(out, seen, `What would ${ref} tell us?`, question);
       }
     }
   } else if (
     ctx.preferEvidenceOrGap &&
-    hasSources &&
+    available.length > 0 &&
     out.length < 2 &&
-    !rosterContext
+    businessTurn
   ) {
     pushUnique(out, seen, "Which source supports this?", question);
   }
@@ -249,7 +309,7 @@ export function parseSuggestedQuestions(raw: unknown): string[] {
     return raw
       .filter((item): item is string => typeof item === "string")
       .map((s) => normalizeQuestion(s))
-      .filter((s) => s.length > 0 && wordCount(s) <= 16)
+      .filter((s) => s.length > 0 && countWords(s) <= 16)
       .filter((s) => !GENERIC_FILLER.test(s))
       .slice(0, MAX_SUGGESTIONS);
   }
