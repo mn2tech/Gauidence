@@ -172,6 +172,27 @@ describe("Gideon orchestration — acceptance", () => {
     assert.equal(route.generalKnowledgeAllowed, true);
   });
 
+  it("song list questions require Guardian inventory", () => {
+    for (const q of [
+      "list the songs",
+      "What songs are on The Living Waters?",
+      "give me the list of songs",
+      "List the JPG chord charts in this space",
+    ]) {
+      const route = routeGideonOrchestration({
+        question: q,
+        spaceId: "wednesday-practice",
+        spaceName: "Wednesday Practice",
+      });
+      assert.equal(
+        route.guardianKnowledgeRequired,
+        true,
+        `expected knowledge for: ${q}`
+      );
+      assert.equal(route.knowledgeSource, "guardian");
+    }
+  });
+
   it("Test 9 — Give me everything about Kendall", () => {
     const q = "Give me everything Guardian knows about Kendall.";
     const route = routeGideonOrchestration({

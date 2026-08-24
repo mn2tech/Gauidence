@@ -8,6 +8,11 @@ import type { ChatTurn } from "@/lib/vault/expandRetrievalQuestion";
 import { looksLikeChartTitleQuery } from "@/lib/vault/expandRetrievalQuestion";
 import { isDocumentContentQuestion } from "@/lib/gideon/documentGrounding";
 import {
+  chartFileTypeListFilter,
+  wantsSongOrChartList,
+  wantsVaultFileInventory,
+} from "@/lib/vault/askInventory";
+import {
   DEFAULT_RESPONSE_DEPTH,
   type GideonKnowledgeIntent,
   type KnowledgeSource,
@@ -129,6 +134,14 @@ function looksLikeGuardianWorldQuestion(
   if (args.hasAttachment) return true;
   if (isDocumentContentQuestion(q)) return true;
   if (looksLikeChartTitleQuery(q)) return true;
+  // Song / chord-chart / vault file inventory — needs SPACE FILE INVENTORY.
+  if (
+    wantsSongOrChartList(q) ||
+    chartFileTypeListFilter(q) != null ||
+    wantsVaultFileInventory(q)
+  ) {
+    return true;
+  }
   if (GLOBAL_TODAY.test(q)) return true;
   if (GUARDIAN_WORLD.test(q) && GUARDIAN_ENTITY_ASK.test(q)) return true;
   // Possessive / ownership cues with concrete personal/business knowledge nouns.

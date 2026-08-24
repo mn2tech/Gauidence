@@ -325,7 +325,7 @@ function parseInventoryFileNames(inventoryText: string): {
     }
     // Connected Trello/device rows: "- file.jpg · Card Name (Trello in this space, analyzed)"
     const connected = line.match(
-      /^-\s+(.+?)(?:\s+·\s+(.+?))?\s+\((?:Trello|Device Storage)\b/i
+      /^-\s+(.+?)(?:\s+·\s+(.+?))?\s+\((?:Trello|Google Drive|Device Storage)\b/i
     );
     if (connected) {
       const label = (connected[2] || connected[1] || "").trim();
@@ -365,7 +365,7 @@ function parseConnectedChartEntries(inventoryText: string): ConnectedChartEntry[
   const seen = new Set<string>();
   for (const line of inventoryText.split(/\n/)) {
     const connected = line.match(
-      /^-\s+(.+?)(?:\s+·\s+(.+?))?\s+\((?:Trello|Device Storage)\b/i
+      /^-\s+(.+?)(?:\s+·\s+(.+?))?\s+\((?:Trello|Google Drive|Device Storage)\b/i
     );
     if (!connected) continue;
     const fileName = connected[1]!.trim();
@@ -617,7 +617,13 @@ export function buildInventoryQuestionAnswer(args: {
   const songList = wantsSongOrChartList(args.question);
   const fileTypeFilter = chartFileTypeListFilter(args.question);
 
-  if (args.fileInventoryText.startsWith("(no documents")) {
+  if (
+    args.fileInventoryText.startsWith("(no documents") ||
+    args.fileInventoryText.trim() === "(none)"
+  ) {
+    if (songList) {
+      return `I don't see chord-chart songs in your ${space} space yet. Scan Living Waters on Connections, then ask again.`;
+    }
     if (logsRelevant) {
       return `I found Daily Log notes in your ${space} space that mention ${topic}. Open Daily Logs for the full text, or ask me to quote a specific entry.`;
     }

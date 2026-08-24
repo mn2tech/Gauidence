@@ -230,12 +230,27 @@ async function loadBoundConnectedFilesForGideon(
   profileNames: Record<string, string>,
   options?: { songList?: boolean }
 ): Promise<string> {
-  const { data: sources } = await supabase
+  const songList = Boolean(options?.songList);
+
+  let { data: sources } = await supabase
     .from("connected_sources")
     .select("id, source_type, display_name, profile_id, settings")
     .in("profile_id", spaceIds)
     .neq("status", "disconnected")
     .limit(20);
+
+  // Song lists: if Trello was scanned but bound to another space, still surface
+  // Living Waters charts (RLS still limits to sources the viewer can access).
+  if (songList && !sources?.length) {
+    const { data: fallback } = await supabase
+      .from("connected_sources")
+      .select("id, source_type, display_name, profile_id, settings")
+      .in("source_type", ["trello", "google_drive"])
+      .neq("status", "disconnected")
+      .limit(20);
+    sources = fallback;
+  }
+
   if (!sources?.length) return "";
 
   const relevant = sources;
@@ -257,7 +272,6 @@ async function loadBoundConnectedFilesForGideon(
     })
   );
 
-  const songList = Boolean(options?.songList);
   let query = supabase
     .from("source_items")
     .select(

@@ -505,7 +505,7 @@ export async function loadWorkspaceContext(
             )
           )
       : Promise.resolve("(none)"),
-    load.documents
+    load.documents || songListOnly
       ? loadVaultFileInventoryContext(
           supabase,
           effectiveSearchIds,

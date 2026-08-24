@@ -33,8 +33,8 @@ export function resolveGideonLoad(route: GideonRoute): GideonLoadFlags {
 
 /**
  * Merge capability routing with knowledge orchestration.
- * When orchestration does not require Guardian knowledge, document search
- * is skipped unless attachments force knowledge.
+ * Skip document search for pure conversation — but never strip knowledge
+ * when intent already flagged music/songs, vault inventory, or attachments.
  */
 export function resolveGideonLoadWithOrchestration(args: {
   capabilityRoute: GideonRoute;
@@ -42,7 +42,11 @@ export function resolveGideonLoadWithOrchestration(args: {
   hasAttachment?: boolean;
 }): GideonLoadFlags {
   const base = loadFlagsForRoute(args.capabilityRoute);
-  if (args.hasAttachment || args.orchestration.guardianKnowledgeRequired) {
+  const needsKnowledge =
+    args.hasAttachment ||
+    args.orchestration.guardianKnowledgeRequired ||
+    base.documents;
+  if (needsKnowledge) {
     return {
       ...base,
       documents: true,
@@ -53,18 +57,15 @@ export function resolveGideonLoadWithOrchestration(args: {
       linkedProfiles: true,
     };
   }
-  if (!args.orchestration.guardianKnowledgeRequired) {
-    return {
-      ...base,
-      documents: false,
-      logs: false,
-      clientRequests: false,
-      proposals: false,
-      vaultMap: false,
-      linkedProfiles: false,
-    };
-  }
-  return base;
+  return {
+    ...base,
+    documents: false,
+    logs: false,
+    clientRequests: false,
+    proposals: false,
+    vaultMap: false,
+    linkedProfiles: false,
+  };
 }
 
 /** Start/end of the user's local calendar day (for read-only calendar peek). */
