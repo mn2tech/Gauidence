@@ -256,7 +256,7 @@ export function autoQuestionForUpload(args: {
   isImage: boolean;
 }): string {
   if (args.isImage) {
-    return "What do you see in this image? Transcribe any lists, dates, or notes clearly.";
+    return "What do you see in this image? Describe the scene and call out any readable text, dates, or lists.";
   }
   const name = args.fileName || "this document";
   switch (args.kind) {

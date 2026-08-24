@@ -107,7 +107,7 @@ describe("onboarding intent", () => {
         fileName: "note.png",
         isImage: true,
       }),
-      /image|transcribe/i
+      /image|describe/i
     );
   });
 });

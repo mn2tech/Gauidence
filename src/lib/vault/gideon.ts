@@ -207,6 +207,15 @@ export function buildCurrentTimeAnswer(
 export function wantsTranscription(question: string): boolean {
   const q = question.trim();
   if (!q) return false;
+  // General scene-description uploads are not roster/document transcription.
+  if (
+    /^what do you see\b/i.test(q) &&
+    !/\b(?:roster|guest|attendee|names?|participants?|members?|rsvp|worksheet|receipt|invoice|scan)\b/i.test(
+      q
+    )
+  ) {
+    return false;
+  }
   return (
     /\btranscri(?:be|ption)\b/i.test(q) ||
     /\bwhat(?:'s| is) (?:written|on (?:this|the)(?: photo| image| picture| note)?)\b/i.test(
@@ -495,7 +504,8 @@ export const GIDEON_ATTACHED_DOCUMENT_NOTE = `Attached document:
 - RETRIEVED EXCERPTS may include other similar files (for example an old summer calendar). Do not lead with those when the user attached a different file. Mention them only if they still answer the question and label the other file's name and year.
 - Do not say the image or file is missing.
 - Never ask the user to re-upload a file Guardian already has.
-- For photos: describe what you see; read printed text, receipts, screenshots, handwritten notes, and vehicle documents when asked.
+- For photos: describe what you see first (setting, people, objects). Read printed text, receipts, screenshots, handwritten notes, and vehicle documents when asked.
+- For event photos, booth shots, or general scenes: give a short natural description. Do not force a verbatim numbered transcription of partial signage or banner text obscured by people or angle.
 - If some handwriting or a number is hard to read, say so and give your best reading with uncertainty — do not invent text.
 - Do not mention OCR, embeddings, or vision jobs.`;
 
@@ -508,6 +518,7 @@ export const GIDEON_CROSS_VAULT_NOTE = `All-spaces search:
 
 export const GIDEON_TRANSCRIPTION_NOTE = `Transcription mode:
 - The user wants a readable transcription or list from their space (often a photo, scan, CSV, or roster file).
+- If the image is a general scene (event booth, room, outdoor shot) rather than a flat document, describe the scene briefly first; only transcribe text that is clearly readable — do not list every partial banner fragment as numbered items.
 - Lead with a short friendly title if helpful (e.g. "August 2026 event · 27 confirmed"), then a clean numbered list.
 - Prefer the attached image and "Document text" / vision transcription excerpts / RETRIEVED EXCERPTS.
 - Include EVERY person name present in the retrieval blocks for roster / RSVP / guest-list questions. Prefer "Name — Organization (Role)" lines.

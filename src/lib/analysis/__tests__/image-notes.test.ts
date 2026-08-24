@@ -49,6 +49,12 @@ describe("wantsTranscription", () => {
     assert.equal(wantsTranscription("Transcribe my book list photo"), true);
     assert.equal(wantsTranscription("What does this note say?"), true);
     assert.equal(wantsTranscription("When is my passport due?"), false);
+    assert.equal(
+      wantsTranscription(
+        "What do you see in this image? Describe the scene and call out any readable text."
+      ),
+      false
+    );
   });
 
   it("matches name and participant roster requests", () => {
