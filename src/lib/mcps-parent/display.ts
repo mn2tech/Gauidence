@@ -99,3 +99,39 @@ export function humanizeSummary(content: string, max = 220): string {
   if (cleaned.length <= max) return cleaned;
   return `${cleaned.slice(0, max).trimEnd()}…`;
 }
+
+/** Parent-facing date: "Tue, Aug 25" (no year clutter for near-term). */
+export function formatParentDate(ymd: string | null | undefined): string {
+  if (!ymd) return "";
+  const m = ymd.trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return ymd;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  if (Number.isNaN(d.getTime())) return ymd;
+  return d.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+/**
+ * Only calendar (and clearly dated event/deadline) content should mine
+ * opportunistic dates from body text. Evergreen pages like ParentVUE often
+ * mention months/years that are not "coming up" events.
+ */
+export function allowsOpportunisticEventDates(
+  category: string,
+  tags: string[]
+): boolean {
+  const cat = category.trim().toLowerCase();
+  if (cat === "calendar") return true;
+  return tags.some((t) =>
+    [
+      "early_release",
+      "no_school",
+      "school_closure",
+      "deadline",
+      "school_event",
+    ].includes(t)
+  );
+}

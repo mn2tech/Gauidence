@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { formatParentDate } from "@/lib/mcps-parent/display";
 import type { ParentDashboardPayload } from "@/lib/mcps-parent/types";
 import MySchoolSetup from "./MySchoolSetup";
 import WhatMattersCard from "./WhatMattersCard";
@@ -138,7 +139,9 @@ export default function ParentHomeClient() {
                     >
                       <span className="font-medium">{item.title}</span>
                       <span className="text-xs text-ink-muted">
-                        {item.event_date ?? item.reasons[0] ?? ""}
+                        {item.event_date
+                          ? formatParentDate(item.event_date)
+                          : (item.reasons[0] ?? "")}
                       </span>
                     </li>
                   ))}

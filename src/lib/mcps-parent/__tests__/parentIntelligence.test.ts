@@ -7,6 +7,7 @@ import {
   buildIcs,
   buildSuggestedQuestions,
   daysBetween,
+  formatParentDate,
   gradesMatch,
   humanizeKnowledgeTitle,
   isExpired,
@@ -271,6 +272,26 @@ describe("evergreen demotion + title cleanup", () => {
       tags: ["early_release"],
     });
     assert.equal(title, "Early release");
+  });
+
+  it("does not treat ParentVUE evergreen pages as dated Coming Up events", () => {
+    const scored = scoreKnowledgeItem(
+      item({
+        id: "pv",
+        title: "ParentVUE",
+        content:
+          "Activate ParentVUE by September 1 using the activation letter. ParentVUE lets parents view grades and attendance.",
+        category: "parent-resources",
+      }),
+      { schoolName: "Sherwood High School", gradeLevel: "9", asOf }
+    );
+    // May be null (evergreen drop) or unscored without event_date — never a Coming Up date.
+    assert.ok(!scored || !scored.event_date);
+  });
+
+  it("formats parent dates for display", () => {
+    assert.match(formatParentDate("2026-08-25"), /Aug/);
+    assert.doesNotMatch(formatParentDate("2026-08-25"), /2026-08-25/);
   });
 });
 

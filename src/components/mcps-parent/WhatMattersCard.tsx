@@ -1,21 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { formatParentDate } from "@/lib/mcps-parent/display";
 import type { ScoredParentItem } from "@/lib/mcps-parent/types";
-
-function formatEventDate(ymd: string | null): string {
-  if (!ymd) return "";
-  try {
-    const [y, m, d] = ymd.split("-").map(Number);
-    return new Date(y!, m! - 1, d!).toLocaleDateString(undefined, {
-      weekday: "long",
-      month: "short",
-      day: "numeric",
-    });
-  } catch {
-    return ymd;
-  }
-}
 
 export default function WhatMattersCard({
   item,
@@ -98,7 +85,7 @@ export default function WhatMattersCard({
     <article className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
       {item.event_date ? (
         <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
-          {formatEventDate(item.event_date)}
+          {formatParentDate(item.event_date)}
         </p>
       ) : null}
       <h3 className="mt-1 text-lg font-semibold text-foreground">{item.title}</h3>

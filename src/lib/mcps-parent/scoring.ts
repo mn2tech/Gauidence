@@ -13,7 +13,7 @@ import {
   schoolsMatch,
   toYmd,
 } from "./dates";
-import { humanizeKnowledgeTitle, humanizeSummary } from "./display";
+import { humanizeKnowledgeTitle, humanizeSummary, allowsOpportunisticEventDates } from "./display";
 import type { RelevanceReason, ScoredParentItem } from "./types";
 
 export type ScoreableKnowledge = {
@@ -218,12 +218,23 @@ export function scoreKnowledgeItem(
 
   const blob = `${item.title}\n${item.content}`;
   const tags = detectImportanceTags(blob);
-  const eventDate = extractEventDate({
-    title: item.title,
-    content: item.content,
-    effectiveDate: item.effective_date,
-    asOf: ctx.asOf,
-  });
+
+  // Avoid false dates on evergreen parent-resources / schools / transportation pages.
+  let eventDate: string | null = null;
+  if (allowsOpportunisticEventDates(item.category, tags)) {
+    eventDate = extractEventDate({
+      title: item.title,
+      content: item.content,
+      effectiveDate: item.effective_date,
+      asOf: ctx.asOf,
+    });
+  } else if (item.effective_date) {
+    // Respect an explicitly set effective date only when still upcoming.
+    const e = parseYmd(item.effective_date);
+    if (e && daysBetween(ctx.asOf, e) >= 0) {
+      eventDate = toYmd(e);
+    }
+  }
 
   // Past dated events should not surface.
   if (eventDate) {
