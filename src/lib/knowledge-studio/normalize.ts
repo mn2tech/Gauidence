@@ -22,14 +22,7 @@ export function isLocalHostname(hostname: string): boolean {
   );
 }
 
-/**
- * Validate that a URL is HTTPS and on an exact allowlisted host.
- * Rejects localhost, IPs, and non-HTTPS schemes.
- */
-export function assertAllowedWebsiteUrl(
-  rawUrl: string,
-  allowedHosts: ReadonlySet<string>
-): URL {
+function parseHttpsPublicUrl(rawUrl: string): URL {
   let parsed: URL;
   try {
     parsed = new URL(rawUrl);
@@ -46,7 +39,55 @@ export function assertAllowedWebsiteUrl(
   if (isIpHostname(host)) {
     throw new Error("IP address URLs are not allowed.");
   }
+  return parsed;
+}
+
+/**
+ * Validate that a URL is HTTPS and on an exact allowlisted host.
+ * Rejects localhost, IPs, and non-HTTPS schemes.
+ */
+export function assertAllowedWebsiteUrl(
+  rawUrl: string,
+  allowedHosts: ReadonlySet<string>
+): URL {
+  const parsed = parseHttpsPublicUrl(rawUrl);
+  const host = parsed.hostname.trim().toLowerCase();
   if (!allowedHosts.has(host)) {
+    throw new Error("Domain is not on the allowlist.");
+  }
+  return parsed;
+}
+
+/**
+ * True when host equals an allowed domain or is a subdomain of it.
+ * Example: montgomeryschoolsmd.org allows www.montgomeryschoolsmd.org.
+ */
+export function hostMatchesAllowedDomains(
+  hostname: string,
+  allowedDomains: ReadonlyArray<string> | ReadonlySet<string>
+): boolean {
+  const host = hostname.trim().toLowerCase().replace(/\.$/, "");
+  const domains = Array.isArray(allowedDomains)
+    ? allowedDomains
+    : [...allowedDomains];
+  for (const domain of domains) {
+    const d = domain.trim().toLowerCase().replace(/^\*\./, "");
+    if (!d) continue;
+    if (host === d || host.endsWith(`.${d}`)) return true;
+  }
+  return false;
+}
+
+/**
+ * Validate HTTPS public URL against allowlisted base domains (incl. subdomains).
+ */
+export function assertAllowedDomainUrl(
+  rawUrl: string,
+  allowedDomains: ReadonlyArray<string> | ReadonlySet<string>
+): URL {
+  const parsed = parseHttpsPublicUrl(rawUrl);
+  const host = parsed.hostname.trim().toLowerCase();
+  if (!hostMatchesAllowedDomains(host, allowedDomains)) {
     throw new Error("Domain is not on the allowlist.");
   }
   return parsed;

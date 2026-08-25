@@ -30,6 +30,17 @@ export default async function KnowledgeStudioPage() {
         </p>
         <div className="mt-8 grid gap-4 md:grid-cols-2">
           <Link
+            href="/knowledge-studio/mcps-parent"
+            className="rounded-2xl border border-black/10 bg-white p-6 shadow-sm transition hover:shadow-md"
+          >
+            <div className="text-sm text-ink-muted">School district</div>
+            <h2 className="mt-1 text-xl font-semibold">MCPS Parent Knowledge</h2>
+            <p className="mt-2 text-sm text-ink-muted">
+              Public sources, review, publish, refresh, and Test Gideon with
+              citations.
+            </p>
+          </Link>
+          <Link
             href="/knowledge-studio/crossroadsconnect"
             className="rounded-2xl border border-black/10 bg-white p-6 shadow-sm transition hover:shadow-md"
           >
