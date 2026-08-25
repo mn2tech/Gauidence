@@ -22,8 +22,10 @@ export const RELEVANCE_WEIGHTS = {
   parentActionRequired: 60,
   schoolEvent: 40,
 
-  // Freshness
+  // Freshness / evergreen
   recentlyRefreshed: 10,
+  /** Penalty for undated generic pages so they don't crowd the dashboard. */
+  evergreenPenalty: -50,
 } as const;
 
 export type RelevanceWeightKey = keyof typeof RELEVANCE_WEIGHTS;

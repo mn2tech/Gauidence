@@ -23,9 +23,11 @@ export {
 export {
   buildSuggestedQuestions,
   groupComingUp,
+  isDashboardWorthy,
   rankWhatMatters,
   scoreKnowledgeItem,
 } from "./scoring";
 export type { ScoreableKnowledge, ScoreContext } from "./scoring";
 export { buildGoogleCalendarUrl, buildIcs } from "./calendar";
+export { humanizeKnowledgeTitle, humanizeSummary } from "./display";
 export type * from "./types";

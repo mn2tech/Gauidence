@@ -13,6 +13,7 @@ import {
   schoolsMatch,
   toYmd,
 } from "./dates";
+import { humanizeKnowledgeTitle, humanizeSummary } from "./display";
 import type { RelevanceReason, ScoredParentItem } from "./types";
 
 export type ScoreableKnowledge = {
@@ -36,6 +37,15 @@ export type ScoreContext = {
   gradeLevel: string;
   asOf: Date;
 };
+
+const ACTIONABLE_TAGS = new Set([
+  "school_closure",
+  "no_school",
+  "early_release",
+  "deadline",
+  "parent_action",
+  "transportation",
+]);
 
 function timeScore(
   eventDate: string | null,
@@ -160,6 +170,45 @@ function freshnessScore(
   return { score: 0, stale: false };
 }
 
+/** True when the item has a near-term date or an actionable importance tag. */
+export function isDashboardWorthy(item: ScoredParentItem, asOf: Date): boolean {
+  if (item.importance_tags.some((t) => ACTIONABLE_TAGS.has(t))) {
+    if (item.event_date) {
+      const d = parseYmd(item.event_date);
+      if (d) {
+        const delta = daysBetween(asOf, d);
+        return delta >= 0 && delta <= 30;
+      }
+    }
+    // Actionable undated alerts (e.g. active bus delay copy) can still show.
+    return (
+      item.importance_tags.includes("transportation") ||
+      item.importance_tags.includes("parent_action") ||
+      item.importance_tags.includes("deadline")
+    );
+  }
+  if (item.event_date) {
+    const d = parseYmd(item.event_date);
+    if (!d) return false;
+    const delta = daysBetween(asOf, d);
+    return delta >= 0 && delta <= 30;
+  }
+  return false;
+}
+
+function isEvergreen(args: {
+  eventDate: string | null;
+  tags: string[];
+  asOf: Date;
+}): boolean {
+  if (args.tags.some((t) => ACTIONABLE_TAGS.has(t))) return false;
+  if (!args.eventDate) return true;
+  const d = parseYmd(args.eventDate);
+  if (!d) return true;
+  const delta = daysBetween(args.asOf, d);
+  return delta < 0 || delta > 30;
+}
+
 export function scoreKnowledgeItem(
   item: ScoreableKnowledge,
   ctx: ScoreContext
@@ -197,34 +246,46 @@ export function scoreKnowledgeItem(
       ["school_closure", "no_school", "early_release", "transportation"].includes(
         t
       )
-    ) || Boolean(eventDate);
+    ) || Boolean(eventDate && time.score > 0);
   const fresh = freshnessScore(item.last_checked_at, ctx.asOf, timeSensitive);
+  const evergreen = isEvergreen({ eventDate, tags, asOf: ctx.asOf });
 
-  const score =
-    time.score +
-    sg.score +
-    importance.score +
-    (gradesMatch(ctx.gradeLevel, item.grade_level)
-      ? 0
-      : 0) +
-    fresh.score;
+  let score =
+    time.score + sg.score + importance.score + fresh.score;
+  if (evergreen) {
+    score += RELEVANCE_WEIGHTS.evergreenPenalty;
+  }
 
-  // Drop low-signal evergreen noise unless it has some relevance.
-  if (score < 30 && !eventDate && importance.score === 0) return null;
+  // Drop low-signal evergreen noise from ranking entirely.
+  if (evergreen && importance.score === 0 && time.score === 0) {
+    return null;
+  }
+  if (score < 25) return null;
 
-  const reasons = [...new Set([...sg.reasons, ...time.reasons, ...importance.reasons])];
+  const reasons = [
+    ...new Set([...sg.reasons, ...time.reasons, ...importance.reasons]),
+  ];
+
+  const displayTitle = humanizeKnowledgeTitle({
+    title: item.title,
+    content: item.content,
+    tags,
+  });
+
+  // Only attach event_date when it contributes near-term relevance.
+  const displayEventDate = time.score > 0 ? eventDate : null;
 
   return {
     id: item.id,
-    title: item.title,
-    summary: item.content.slice(0, 280),
+    title: displayTitle,
+    summary: humanizeSummary(item.content),
     category: item.category,
     school: item.school,
     grade_level: item.grade_level,
     authority: item.authority,
     source_url: item.source_url,
     source_name: item.source_name ?? item.authority ?? "MCPS",
-    event_date: eventDate,
+    event_date: displayEventDate,
     effective_date: item.effective_date,
     expires_at: item.expires_at,
     last_checked_at: item.last_checked_at ?? null,
@@ -245,8 +306,16 @@ export function rankWhatMatters(
     const s = scoreKnowledgeItem(item, ctx);
     if (s) scored.push(s);
   }
-  scored.sort((a, b) => b.score - a.score || (a.event_date ?? "").localeCompare(b.event_date ?? ""));
-  return scored.slice(0, limit);
+  scored.sort(
+    (a, b) =>
+      b.score - a.score ||
+      (a.event_date ?? "").localeCompare(b.event_date ?? "")
+  );
+
+  // Prefer actionable / dated cards for the parent dashboard.
+  const worthy = scored.filter((s) => isDashboardWorthy(s, ctx.asOf));
+  const pool = worthy.length > 0 ? worthy : scored.slice(0, Math.min(2, scored.length));
+  return pool.slice(0, limit);
 }
 
 export function groupComingUp(
@@ -258,19 +327,15 @@ export function groupComingUp(
   const later: ScoredParentItem[] = [];
 
   for (const item of items) {
-    if (!item.event_date) {
-      later.push(item);
-      continue;
-    }
+    // Coming Up is for dated items only — no evergreen dump.
+    if (!item.event_date) continue;
     const d = parseYmd(item.event_date);
-    if (!d) {
-      later.push(item);
-      continue;
-    }
+    if (!d) continue;
     const delta = daysBetween(asOf, d);
+    if (delta < 0) continue;
     if (delta <= 7) thisWeek.push(item);
     else if (delta <= 14) nextWeek.push(item);
-    else later.push(item);
+    else if (delta <= 30) later.push(item);
   }
 
   return [
@@ -292,7 +357,6 @@ export function buildSuggestedQuestions(args: {
     "Is there anything I need to do?",
     "Who do I contact about transportation?",
   ];
-  // Prefer dynamic lead questions from top items without hard-coding school names.
   const dynamic: string[] = [];
   for (const item of args.topItems.slice(0, 2)) {
     if (item.importance_tags.includes("early_release")) {

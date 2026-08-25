@@ -8,6 +8,7 @@ import {
   buildSuggestedQuestions,
   daysBetween,
   gradesMatch,
+  humanizeKnowledgeTitle,
   isExpired,
   rankWhatMatters,
   schoolsMatch,
@@ -226,6 +227,50 @@ describe("calendar ics", () => {
     assert.match(ics, /BEGIN:VEVENT/);
     assert.match(ics, /DTSTART;VALUE=DATE:20260916/);
     assert.match(ics, /Early Release/);
+  });
+});
+
+describe("evergreen demotion + title cleanup", () => {
+  it("keeps dated calendar cards and drops undated transport how-to pages from top ranks", () => {
+    const ranked = rankWhatMatters(
+      [
+        item({
+          id: "cal",
+          title:
+            "2026–2027 School Calendar+ Montgomery County Public Schools 2026 July 3 Independence Day—Schools and offices closed Augu",
+          content:
+            "September 7 Labor Day—Schools and offices closed. Early release day for students on September 18.",
+          category: "calendar",
+        }),
+        item({
+          id: "bus1",
+          title: "Transportation (Buses) - Montgomery County Public Schools",
+          content:
+            "Division of Transportation Services provides bus routes. Contact your depot for questions about your student's bus route.",
+          category: "transportation",
+        }),
+        item({
+          id: "bus2",
+          title: "About Riding the School Bus",
+          content:
+            "Parents are responsible for children at the bus stop. Elementary students living more than one mile may ride the bus.",
+          category: "transportation",
+        }),
+      ],
+      { schoolName: "Sherwood High School", gradeLevel: "9", asOf }
+    );
+    assert.ok(ranked.every((r) => r.id === "cal" || r.event_date));
+    assert.ok(!ranked.some((r) => r.id === "bus1" || r.id === "bus2"));
+  });
+
+  it("humanizes dump titles into short parent-facing labels", () => {
+    const title = humanizeKnowledgeTitle({
+      title:
+        "2026–2027 School Calendar+ Montgomery County Public Schools 2026 July 3 Independence Day",
+      content: "September 18 Early release day for students",
+      tags: ["early_release"],
+    });
+    assert.equal(title, "Early release");
   });
 });
 

@@ -56,8 +56,8 @@ export function daysBetween(from: Date, to: Date): number {
 }
 
 /**
- * Extract a calendar date from knowledge title/content when structured dates
- * are missing. Uses year from "as of" date for month/day mentions.
+ * Extract the next upcoming calendar date from knowledge title/content.
+ * Prefers structured effective_date when it is still upcoming.
  */
 export function extractEventDate(args: {
   title: string;
@@ -65,53 +65,53 @@ export function extractEventDate(args: {
   effectiveDate?: string | null;
   asOf: Date;
 }): string | null {
-  if (args.effectiveDate) {
-    const e = parseYmd(args.effectiveDate);
-    if (e) return toYmd(e);
-  }
+  const candidates: Date[] = [];
+
+  const pushIfValid = (d: Date | null) => {
+    if (!d || Number.isNaN(d.getTime())) return;
+    if (daysBetween(args.asOf, d) >= 0) candidates.push(d);
+  };
+
+  pushIfValid(parseYmd(args.effectiveDate ?? null));
 
   const text = `${args.title}\n${args.content}`;
-  const iso = text.match(/\b(20\d{2})-(\d{2})-(\d{2})\b/);
-  if (iso) {
-    return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  for (const m of text.matchAll(/\b(20\d{2})-(\d{2})-(\d{2})\b/g)) {
+    pushIfValid(new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
   }
 
-  const mdY = text.match(
-    /\b(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(20\d{2})\b/i
-  );
-  if (mdY) {
-    const month = MONTHS[mdY[1]!.toLowerCase()];
+  for (const m of text.matchAll(
+    /\b(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(20\d{2})\b/gi
+  )) {
+    const month = MONTHS[m[1]!.toLowerCase()];
     if (month) {
-      return toYmd(
-        new Date(Number(mdY[3]), month - 1, Number(mdY[2]))
-      );
+      pushIfValid(new Date(Number(m[3]), month - 1, Number(m[2])));
     }
   }
 
-  const md = text.match(
-    /\b(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\.?\s+(\d{1,2})(?:st|nd|rd|th)?\b/i
-  );
-  if (md) {
-    const month = MONTHS[md[1]!.toLowerCase()];
-    if (month) {
-      let year = args.asOf.getFullYear();
-      const candidate = new Date(year, month - 1, Number(md[2]));
-      // If the date already passed by >60 days, assume next year.
-      if (daysBetween(args.asOf, candidate) < -60) {
-        year += 1;
-      }
-      return toYmd(new Date(year, month - 1, Number(md[2])));
+  for (const m of text.matchAll(
+    /\b(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\.?\s+(\d{1,2})(?:st|nd|rd|th)?\b/gi
+  )) {
+    const month = MONTHS[m[1]!.toLowerCase()];
+    if (!month) continue;
+    let year = args.asOf.getFullYear();
+    let candidate = new Date(year, month - 1, Number(m[2]));
+    if (daysBetween(args.asOf, candidate) < -60) {
+      year += 1;
+      candidate = new Date(year, month - 1, Number(m[2]));
     }
+    pushIfValid(candidate);
   }
 
-  return null;
+  if (!candidates.length) return null;
+  candidates.sort((a, b) => a.getTime() - b.getTime());
+  return toYmd(candidates[0]!);
 }
 
 export function detectImportanceTags(text: string): string[] {
   const t = text.toLowerCase();
   const tags: string[] = [];
   if (
-    /\b(schools? and offices closed|systemwide closure|school closure|closed)\b/.test(
+    /\b(schools? and offices closed|systemwide closure|school(?:s)? closed|offices closed)\b/.test(
       t
     )
   ) {
@@ -128,9 +128,12 @@ export function detectImportanceTags(text: string): string[] {
   if (/\b(deadline|due date|last day to|register by|registration closes)\b/.test(t)) {
     tags.push("deadline");
   }
+  // Only tag true transportation *alerts*, not evergreen how-to pages.
   if (
-    /\b(bus|transportation|depot|delayed|route)\b/.test(t) &&
-    /\b(delay|change|alert|cancel|contact)\b/.test(t)
+    /\b(bus|transportation|route)\b/.test(t) &&
+    /\b(delay|delayed|cancel|cancelled|canceled|suspension|suspended|running late|alert)\b/.test(
+      t
+    )
   ) {
     tags.push("transportation");
   }
