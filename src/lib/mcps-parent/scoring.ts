@@ -170,30 +170,17 @@ function freshnessScore(
   return { score: 0, stale: false };
 }
 
-/** True when the item has a near-term date or an actionable importance tag. */
+/** True when the item has a near-term date or a true undated operational alert. */
 export function isDashboardWorthy(item: ScoredParentItem, asOf: Date): boolean {
-  if (item.importance_tags.some((t) => ACTIONABLE_TAGS.has(t))) {
-    if (item.event_date) {
-      const d = parseYmd(item.event_date);
-      if (d) {
-        const delta = daysBetween(asOf, d);
-        return delta >= 0 && delta <= 30;
-      }
-    }
-    // Actionable undated alerts (e.g. active bus delay copy) can still show.
-    return (
-      item.importance_tags.includes("transportation") ||
-      item.importance_tags.includes("parent_action") ||
-      item.importance_tags.includes("deadline")
-    );
-  }
   if (item.event_date) {
     const d = parseYmd(item.event_date);
     if (!d) return false;
     const delta = daysBetween(asOf, d);
     return delta >= 0 && delta <= 30;
   }
-  return false;
+
+  // Undated: only live operational alerts (e.g. bus delay copy), never evergreen how-tos.
+  return item.importance_tags.includes("transportation");
 }
 
 function isEvergreen(args: {
@@ -325,8 +312,19 @@ export function rankWhatMatters(
 
   // Prefer actionable / dated cards for the parent dashboard.
   const worthy = scored.filter((s) => isDashboardWorthy(s, ctx.asOf));
-  const pool = worthy.length > 0 ? worthy : scored.slice(0, Math.min(2, scored.length));
-  return pool.slice(0, limit);
+
+  // Dedupe near-identical display titles (e.g. two ParentVUE extracts).
+  const seenTitles = new Set<string>();
+  const deduped: ScoredParentItem[] = [];
+  for (const row of worthy) {
+    const key = row.title.trim().toLowerCase();
+    if (seenTitles.has(key)) continue;
+    seenTitles.add(key);
+    deduped.push(row);
+  }
+
+  // Never fall back to evergreen filler — caught-up is better than noise.
+  return deduped.slice(0, limit);
 }
 
 export function groupComingUp(

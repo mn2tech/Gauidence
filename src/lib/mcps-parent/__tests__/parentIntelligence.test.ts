@@ -257,11 +257,25 @@ describe("evergreen demotion + title cleanup", () => {
             "Parents are responsible for children at the bus stop. Elementary students living more than one mile may ride the bus.",
           category: "transportation",
         }),
+        item({
+          id: "pv1",
+          title: "ParentVUE tech support",
+          content:
+            "Parents must activate ParentVUE to view grades. Parents must provide proof of residency when registering.",
+          category: "parent-resources",
+        }),
+        item({
+          id: "pv2",
+          title: "How to enroll",
+          content:
+            "Parents must complete online registration through ParentVUE.",
+          category: "parent-resources",
+        }),
       ],
       { schoolName: "Sherwood High School", gradeLevel: "9", asOf }
     );
-    assert.ok(ranked.every((r) => r.id === "cal" || r.event_date));
-    assert.ok(!ranked.some((r) => r.id === "bus1" || r.id === "bus2"));
+    assert.ok(ranked.every((r) => r.event_date));
+    assert.ok(!ranked.some((r) => /parentvue|bus routes|riding/i.test(r.title)));
   });
 
   it("humanizes dump titles into short parent-facing labels", () => {
