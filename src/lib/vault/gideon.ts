@@ -501,6 +501,7 @@ export const GIDEON_ATTACHED_DOCUMENT_NOTE = `Attached document:
 - The original image is available to you in this request. Look at it directly.
 - That attachment is the primary source for this turn. Answer from it first.
 - Put facts from the attachment under ## FROM YOUR DOCUMENTS (an attached photo or scan of a worksheet is still a document). Never put those facts under ## FROM YOUR DAILY LOG.
+- When the user attached one image, describe ONLY that attachment. Do not invent a multi-image review (Image 1 / Image 2 / Image 3) from other Space files or RETRIEVED EXCERPTS.
 - RETRIEVED EXCERPTS may include other similar files (for example an old summer calendar). Do not lead with those when the user attached a different file. Mention them only if they still answer the question and label the other file's name and year.
 - Do not say the image or file is missing.
 - Never ask the user to re-upload a file Guardian already has.

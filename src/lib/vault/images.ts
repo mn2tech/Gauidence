@@ -14,8 +14,23 @@ export function isImageMimeType(mime: string | null | undefined): boolean {
 
 /** User asked to see / show pictures rather than only describe. */
 export function wantsShowPictures(question: string): boolean {
-  return /\b(show|see|view|display|look at|open)\b.{0,40}\b(pic(ture)?s?|photos?|images?|scans?|flyers?)\b|\b(pic(ture)?s?|photos?|images?|flyers?)\b.{0,20}\b(show|see|view|display)\b/i.test(
-    question
+  const q = question.trim();
+  // "What do you see in this image?" is describing one photo, not a gallery.
+  if (/\bwhat do you see\b/i.test(q)) return false;
+  if (
+    /\bdescribe\b.{0,48}\b(this|the)\s+(image|photo|picture|pic|scene)\b/i.test(q)
+  ) {
+    return false;
+  }
+  // Bare "see" + singular "image" falsely matches describe-this-photo prompts.
+  return (
+    /\b(show|view|display|look at|open)\b.{0,40}\b(pic(ture)?s?|photos?|images?|scans?|flyers?)\b/i.test(
+      q
+    ) ||
+    /\bsee\b.{0,40}\b(pics|pictures|photos|images)\b/i.test(q) ||
+    /\b(pic(ture)?s?|photos?|images?|flyers?)\b.{0,20}\b(show|see|view|display)\b/i.test(
+      q
+    )
   );
 }
 

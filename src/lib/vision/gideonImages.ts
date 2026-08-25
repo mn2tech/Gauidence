@@ -108,8 +108,11 @@ export function mentionsReupload(text: string): boolean {
 export function shouldAttachRetrievedImages(args: {
   hasAttachedImage: boolean;
   showPictures: boolean;
+  /** e.g. "this image" / "this photo" — never expand to a gallery. */
+  singleImageFocus?: boolean;
 }): boolean {
   if (!args.hasAttachedImage) return true;
+  if (args.singleImageFocus) return false;
   return args.showPictures;
 }
 

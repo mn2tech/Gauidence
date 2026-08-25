@@ -18,6 +18,13 @@ describe("vault image helpers", () => {
     assert.equal(wantsShowPictures("Can you show the photos?"), true);
     assert.equal(wantsShowPictures("show Nolans summer camp flyer"), true);
     assert.equal(wantsShowPictures("What does the invoice say?"), false);
+    assert.equal(
+      wantsShowPictures(
+        "What do you see in this image? Describe the scene and call out any readable text."
+      ),
+      false
+    );
+    assert.equal(wantsShowPictures("Can I see the photos from the event?"), true);
   });
 
   it("detects single-image focus", () => {

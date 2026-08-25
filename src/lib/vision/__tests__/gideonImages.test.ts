@@ -126,6 +126,14 @@ describe("Gideon vision image selection", () => {
     );
     assert.equal(
       shouldAttachRetrievedImages({
+        hasAttachedImage: true,
+        showPictures: true,
+        singleImageFocus: true,
+      }),
+      false
+    );
+    assert.equal(
+      shouldAttachRetrievedImages({
         hasAttachedImage: false,
         showPictures: false,
       }),

@@ -48,6 +48,7 @@ import {
   uniqueImageDocumentIds,
 } from "@/lib/vision/gideonImages";
 import { loadAuthorizedVisionImages } from "@/lib/vision/loadAuthorized";
+import { wantsSingleImageFocus } from "@/lib/vault/images";
 import { enqueueAnalyzePipeline } from "@/lib/documents/processingJobs";
 import { chatScopedProfilePayload } from "@/lib/vault/detectVaultScope";
 import {
@@ -1657,9 +1658,11 @@ export async function POST(request: Request) {
       // Explicit image uploads/follow-ups should review only that photo unless
       // the user asked to see/show pictures (gallery). Otherwise RAG can pull
       // unrelated past Space images into vision.
+      const singleImageFocus = wantsSingleImageFocus(question);
       const retrievedImageIds = shouldAttachRetrievedImages({
         hasAttachedImage: Boolean(attachedDoc?.isImage),
         showPictures: workspaceContext.promptOptions.showPictures,
+        singleImageFocus,
       })
         ? selectRetrievedImageDocumentIds({
             chunks,
@@ -1672,12 +1675,17 @@ export async function POST(request: Request) {
           attachedDoc?.isImage ? attachedDoc.documentId : null,
           ...retrievedImageIds,
         ],
-        3
+        attachedDoc?.isImage && !workspaceContext.promptOptions.showPictures
+          ? 1
+          : 3
       );
       const visionImages = await loadAuthorizedVisionImages(supabase, {
         documentIds: visionImageIds,
         allowedProfileIds: accessibleProfileIds,
-        limit: 3,
+        limit:
+          attachedDoc?.isImage && !workspaceContext.promptOptions.showPictures
+            ? 1
+            : 3,
       });
       if (visionImages.length) {
         workspaceContext.promptOptions.hasVisionImages = true;
