@@ -15,6 +15,7 @@ For official or time-sensitive decisions, verify information directly with MCPS.
 /** Allowed public MCPS domains (host or subdomain). */
 export const MCPS_ALLOWED_DOMAINS = [
   "montgomeryschoolsmd.org",
+  "mcpsmd.org", // e.g. gis.mcpsmd.org School Assignment Tool
 ] as const;
 
 export const MCPS_CATEGORY_DEFS = [
