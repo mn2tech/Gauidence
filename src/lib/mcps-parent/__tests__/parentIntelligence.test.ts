@@ -11,6 +11,7 @@ import {
   gradesMatch,
   humanizeKnowledgeTitle,
   humanizeSummary,
+  labelForEventDate,
   isExpired,
   rankWhatMatters,
   schoolsMatch,
@@ -312,10 +313,41 @@ describe("evergreen demotion + title cleanup", () => {
   it("summarizes early release without PDF dump prefix", () => {
     const summary = humanizeSummary(
       "2026–2027 School Calendar+ Montgomery County Public Schools 2026 July 3 Independence Day—Schools and offices closed. September 18 Early release day for students.",
-      { title: "Early release", tags: ["early_release"] }
+      { title: "Early release", tags: ["early_release"], eventDate: "2026-09-18" }
     );
     assert.match(summary, /early release/i);
     assert.doesNotMatch(summary, /School Calendar\+/i);
+  });
+
+  it("labels Aug 25 as first day of school, not early release", () => {
+    const content =
+      "August 24 Student Transition Day. August 25 First day of school for students. September 18 Early release day for students.";
+    assert.equal(
+      labelForEventDate({
+        title: "MCPS Calendar",
+        content,
+        eventDate: "2026-08-25",
+      }),
+      "First day of school for students"
+    );
+    assert.equal(
+      humanizeKnowledgeTitle({
+        title: "MCPS Calendar dump with early release somewhere",
+        content,
+        category: "calendar",
+        tags: ["early_release"],
+        eventDate: "2026-08-25",
+      }),
+      "First day of school for students"
+    );
+    assert.equal(
+      humanizeSummary(content, {
+        title: "MCPS Calendar",
+        tags: ["early_release"],
+        eventDate: "2026-08-25",
+      }),
+      "First day of school for students."
+    );
   });
 });
 

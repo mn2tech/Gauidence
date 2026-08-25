@@ -29,5 +29,5 @@ export {
 } from "./scoring";
 export type { ScoreableKnowledge, ScoreContext } from "./scoring";
 export { buildGoogleCalendarUrl, buildIcs } from "./calendar";
-export { humanizeKnowledgeTitle, humanizeSummary, formatParentDate, allowsOpportunisticEventDates } from "./display";
+export { humanizeKnowledgeTitle, humanizeSummary, formatParentDate, allowsOpportunisticEventDates, labelForEventDate } from "./display";
 export type * from "./types";

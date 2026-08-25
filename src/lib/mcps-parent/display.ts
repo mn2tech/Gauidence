@@ -1,8 +1,38 @@
 /** Display helpers for parent-facing knowledge cards. */
 
-const CALENDAR_LABELS: Array<{ re: RegExp; label: string }> = [
-  { re: /\bearly release\b/i, label: "Early release" },
-  { re: /\bfirst day of school\b/i, label: "First day of school" },
+const MONTH_FULL = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+] as const;
+
+const MONTH_SHORT = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+] as const;
+
+/** Labels checked only near a specific calendar date mention. */
+const DATE_LOCAL_LABELS: Array<{ re: RegExp; label: string }> = [
+  { re: /\bfirst day of school\b/i, label: "First day of school for students" },
   { re: /\blast day of school\b/i, label: "Last day of school" },
   { re: /\bstudent transition day\b/i, label: "Student Transition Day" },
   { re: /\blabor day\b/i, label: "Labor Day — no school" },
@@ -10,14 +40,61 @@ const CALENDAR_LABELS: Array<{ re: RegExp; label: string }> = [
   { re: /\bwinter break\b/i, label: "Winter break" },
   { re: /\bspring break\b/i, label: "Spring break" },
   { re: /\bmemorial day\b/i, label: "Memorial Day — no school" },
-  { re: /\bmlk|martin luther king\b/i, label: "MLK Day — no school" },
-  { re: /\bpresidents['’]? day\b/i, label: "Presidents' Day — no school" },
+  { re: /\bearly release\b/i, label: "Early release" },
   {
     re: /\b(schools? and offices closed|systemwide closure)\b/i,
     label: "Schools and offices closed",
   },
   { re: /\bno school for students\b/i, label: "No school for students" },
   { re: /\bprofessional (development )?day\b/i, label: "Professional day — no school" },
+];
+
+/**
+ * Title the card from text near the chosen event date so we don't label
+ * "Aug 25 First day of school" as "Early release" just because early release
+ * appears elsewhere in the same calendar PDF.
+ */
+export function labelForEventDate(args: {
+  title: string;
+  content: string;
+  eventDate: string;
+}): string | null {
+  const m = args.eventDate.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  const monthIdx = Number(m[2]) - 1;
+  const day = Number(m[3]);
+  if (monthIdx < 0 || monthIdx > 11 || day < 1 || day > 31) return null;
+
+  const full = MONTH_FULL[monthIdx]!;
+  const short = MONTH_SHORT[monthIdx]!;
+  const iso = `${m[1]}-${m[2]}-${m[3]}`;
+  const dateRe = new RegExp(
+    `${full}\\.?\\s+${day}(?:st|nd|rd|th)?\\b|${short}\\.?\\s+${day}(?:st|nd|rd|th)?\\b|${iso}`,
+    "gi"
+  );
+
+  const text = `${args.title}\n${args.content}`;
+  const windows: string[] = [];
+  for (const match of text.matchAll(dateRe)) {
+    const idx = match.index ?? 0;
+    windows.push(
+      text.slice(Math.max(0, idx - 50), Math.min(text.length, idx + match[0].length + 180))
+    );
+  }
+  if (!windows.length) return null;
+
+  for (const win of windows) {
+    for (const rule of DATE_LOCAL_LABELS) {
+      if (rule.re.test(win)) return rule.label;
+    }
+  }
+  return null;
+}
+
+const CALENDAR_LABELS: Array<{ re: RegExp; label: string }> = [
+  ...DATE_LOCAL_LABELS,
+  { re: /\bmlk|martin luther king\b/i, label: "MLK Day — no school" },
+  { re: /\bpresidents['’]? day\b/i, label: "Presidents' Day — no school" },
 ];
 
 const TRANSPORT_LABELS: Array<{ re: RegExp; label: string }> = [
@@ -114,14 +191,31 @@ export function humanizeKnowledgeTitle(args: {
   content: string;
   category?: string;
   tags?: string[];
+  eventDate?: string | null;
 }): string {
+  if (args.eventDate) {
+    const dated = labelForEventDate({
+      title: args.title,
+      content: args.content,
+      eventDate: args.eventDate,
+    });
+    if (dated) return dated;
+  }
+
   const blob = `${args.title}\n${args.content}`;
   const category = args.category ?? "";
 
-  if (args.tags?.includes("early_release") && /\bearly release\b/i.test(blob)) {
+  // Do not globally prefer "early release" when a specific event date exists
+  // but failed local matching — fall through to category labels carefully.
+  if (
+    !args.eventDate &&
+    args.tags?.includes("early_release") &&
+    /\bearly release\b/i.test(blob)
+  ) {
     return "Early release";
   }
   if (
+    !args.eventDate &&
     (args.tags?.includes("no_school") || args.tags?.includes("school_closure")) &&
     /\blabor day\b/i.test(blob)
   ) {
@@ -155,10 +249,44 @@ export function humanizeKnowledgeTitle(args: {
  */
 export function humanizeSummary(
   content: string,
-  opts?: { title?: string; tags?: string[]; max?: number }
+  opts?: {
+    title?: string;
+    tags?: string[];
+    max?: number;
+    eventDate?: string | null;
+  }
 ): string {
   const max = opts?.max ?? 180;
   const title = (opts?.title ?? "").toLowerCase();
+
+  if (opts?.eventDate) {
+    const dated = labelForEventDate({
+      title: opts.title ?? "",
+      content,
+      eventDate: opts.eventDate,
+    });
+    if (dated === "First day of school for students") {
+      return "First day of school for students.";
+    }
+    if (dated === "Student Transition Day") {
+      return "Student Transition Day for students entering Grades K, 6, and 9, and students new to a school.";
+    }
+    if (dated === "Early release") {
+      return (
+        sentenceMatching(content, /\bearly release\b/i, max) ??
+        "Early release day for students. Check the official MCPS calendar for dismissal times."
+      );
+    }
+    if (dated) {
+      const near = sentenceMatching(
+        content,
+        new RegExp(dated.split("—")[0]!.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"),
+        max
+      );
+      if (near) return near;
+      return `${dated}.`;
+    }
+  }
 
   if (opts?.tags?.includes("early_release") || /\bearly release\b/i.test(title)) {
     const hit =

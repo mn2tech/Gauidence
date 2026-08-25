@@ -260,15 +260,16 @@ export function scoreKnowledgeItem(
     ...new Set([...sg.reasons, ...time.reasons, ...importance.reasons]),
   ];
 
+  // Only attach event_date when it contributes near-term relevance.
+  const displayEventDate = time.score > 0 ? eventDate : null;
+
   const displayTitle = humanizeKnowledgeTitle({
     title: item.title,
     content: item.content,
     category: item.category,
     tags,
+    eventDate: displayEventDate,
   });
-
-  // Only attach event_date when it contributes near-term relevance.
-  const displayEventDate = time.score > 0 ? eventDate : null;
 
   return {
     id: item.id,
@@ -276,6 +277,7 @@ export function scoreKnowledgeItem(
     summary: humanizeSummary(item.content, {
       title: displayTitle,
       tags,
+      eventDate: displayEventDate,
     }),
     category: item.category,
     school: item.school,
