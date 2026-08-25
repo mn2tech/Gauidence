@@ -170,17 +170,13 @@ function freshnessScore(
   return { score: 0, stale: false };
 }
 
-/** True when the item has a near-term date or a true undated operational alert. */
+/** Dashboard cards require a near-term event date. No evergreen filler. */
 export function isDashboardWorthy(item: ScoredParentItem, asOf: Date): boolean {
-  if (item.event_date) {
-    const d = parseYmd(item.event_date);
-    if (!d) return false;
-    const delta = daysBetween(asOf, d);
-    return delta >= 0 && delta <= 30;
-  }
-
-  // Undated: only live operational alerts (e.g. bus delay copy), never evergreen how-tos.
-  return item.importance_tags.includes("transportation");
+  if (!item.event_date) return false;
+  const d = parseYmd(item.event_date);
+  if (!d) return false;
+  const delta = daysBetween(asOf, d);
+  return delta >= 0 && delta <= 30;
 }
 
 function isEvergreen(args: {
@@ -215,8 +211,8 @@ export function scoreKnowledgeItem(
       effectiveDate: item.effective_date,
       asOf: ctx.asOf,
     });
-  } else if (item.effective_date) {
-    // Respect an explicitly set effective date only when still upcoming.
+  } else if (item.effective_date && item.category.trim().toLowerCase() === "calendar") {
+    // Only calendar items may use bare effective_date without content mining.
     const e = parseYmd(item.effective_date);
     if (e && daysBetween(ctx.asOf, e) >= 0) {
       eventDate = toYmd(e);
@@ -267,6 +263,7 @@ export function scoreKnowledgeItem(
   const displayTitle = humanizeKnowledgeTitle({
     title: item.title,
     content: item.content,
+    category: item.category,
     tags,
   });
 
@@ -276,7 +273,10 @@ export function scoreKnowledgeItem(
   return {
     id: item.id,
     title: displayTitle,
-    summary: humanizeSummary(item.content),
+    summary: humanizeSummary(item.content, {
+      title: displayTitle,
+      tags,
+    }),
     category: item.category,
     school: item.school,
     grade_level: item.grade_level,
