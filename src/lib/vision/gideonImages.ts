@@ -100,6 +100,19 @@ export function mentionsReupload(text: string): boolean {
   return REUPLOAD_REQUEST.test(text);
 }
 
+/**
+ * When the user already attached an image, only pull extra Space photos into
+ * vision if they asked to see/show pictures. Otherwise one upload would also
+ * send unrelated past images to the model.
+ */
+export function shouldAttachRetrievedImages(args: {
+  hasAttachedImage: boolean;
+  showPictures: boolean;
+}): boolean {
+  if (!args.hasAttachedImage) return true;
+  return args.showPictures;
+}
+
 /** Retrieved image docs to attach (exclude the already-attached current chat image). */
 export function selectRetrievedImageDocumentIds(args: {
   chunks: Array<{

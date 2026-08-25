@@ -6,6 +6,7 @@ import {
   resolveGideonImageAttachmentId,
   selectRetrievedImageDocumentIds,
   shouldAskForUpload,
+  shouldAttachRetrievedImages,
   uniqueImageDocumentIds,
   wantsVisualUnderstanding,
 } from "../gideonImages.ts";
@@ -106,6 +107,30 @@ describe("Gideon vision image selection", () => {
       limit: 2,
     });
     assert.deepEqual(ids, ["other"]);
+  });
+
+  it("does not pull past Space images when one image is already attached", () => {
+    assert.equal(
+      shouldAttachRetrievedImages({
+        hasAttachedImage: true,
+        showPictures: false,
+      }),
+      false
+    );
+    assert.equal(
+      shouldAttachRetrievedImages({
+        hasAttachedImage: true,
+        showPictures: true,
+      }),
+      true
+    );
+    assert.equal(
+      shouldAttachRetrievedImages({
+        hasAttachedImage: false,
+        showPictures: false,
+      }),
+      true
+    );
   });
 
   it("Test 8: lastImageAttachmentId returns nothing without citations", () => {

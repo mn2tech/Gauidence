@@ -10,6 +10,7 @@ export {
 export {
   resolveGideonImageAttachmentId,
   selectRetrievedImageDocumentIds,
+  shouldAttachRetrievedImages,
   uniqueImageDocumentIds,
   shouldAskForUpload,
 } from "./gideonImages";

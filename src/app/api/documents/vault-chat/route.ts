@@ -44,6 +44,7 @@ import {
 import {
   resolveGideonImageAttachmentId,
   selectRetrievedImageDocumentIds,
+  shouldAttachRetrievedImages,
   uniqueImageDocumentIds,
 } from "@/lib/vision/gideonImages";
 import { loadAuthorizedVisionImages } from "@/lib/vision/loadAuthorized";
@@ -1653,11 +1654,19 @@ export async function POST(request: Request) {
       workspaceContext.promptOptions.generalKnowledgeAllowed =
         orchestrationRoute.generalKnowledgeAllowed;
 
-      const retrievedImageIds = selectRetrievedImageDocumentIds({
-        chunks,
-        excludeIds: attachedDoc ? [attachedDoc.documentId] : [],
-        limit: attachedDoc?.isImage ? 2 : 3,
-      });
+      // Explicit image uploads/follow-ups should review only that photo unless
+      // the user asked to see/show pictures (gallery). Otherwise RAG can pull
+      // unrelated past Space images into vision.
+      const retrievedImageIds = shouldAttachRetrievedImages({
+        hasAttachedImage: Boolean(attachedDoc?.isImage),
+        showPictures: workspaceContext.promptOptions.showPictures,
+      })
+        ? selectRetrievedImageDocumentIds({
+            chunks,
+            excludeIds: attachedDoc ? [attachedDoc.documentId] : [],
+            limit: attachedDoc?.isImage ? 2 : 3,
+          })
+        : [];
       const visionImageIds = uniqueImageDocumentIds(
         [
           attachedDoc?.isImage ? attachedDoc.documentId : null,
