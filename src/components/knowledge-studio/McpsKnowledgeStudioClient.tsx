@@ -11,6 +11,7 @@ import type {
 } from "@/lib/knowledge-studio/projects/types";
 import { MCPS_PROJECT_SLUG } from "@/lib/knowledge-studio/projects/constants";
 import TestGideonPanel from "@/components/knowledge-studio/TestGideonPanel";
+import ParentIntelligenceTestPanel from "@/components/knowledge-studio/ParentIntelligenceTestPanel";
 
 function formatWhen(iso: string | null | undefined): string {
   if (!iso) return "—";
@@ -193,13 +194,16 @@ export default function McpsKnowledgeStudioClient({
             onClick={() => setShowTest((v) => !v)}
             className="rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-foreground hover:bg-stone-50"
           >
-            {showTest ? "Hide Test Gideon" : "Test Gideon"}
+            {showTest ? "Hide tests" : "Test Gideon"}
           </button>
         </div>
       </section>
 
       {showTest ? (
-        <TestGideonPanel projectSlug={projectSlug} />
+        <div className="space-y-6">
+          <TestGideonPanel projectSlug={projectSlug} />
+          <ParentIntelligenceTestPanel projectSlug={projectSlug} />
+        </div>
       ) : null}
 
       <section className="space-y-3">

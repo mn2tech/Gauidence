@@ -36,6 +36,11 @@ export default async function McpsParentKnowledgeStudioPage() {
             Curate public MCPS parent knowledge: add sources, review extracted
             items, publish intentionally, then test Gideon with citations.
           </p>
+          <p className="mt-2 text-sm">
+            <Link href="/parent" className="font-medium text-brand hover:underline">
+              Open parent experience →
+            </Link>
+          </p>
         </div>
         <McpsKnowledgeStudioClient projectSlug={MCPS_PROJECT_SLUG} />
       </main>
