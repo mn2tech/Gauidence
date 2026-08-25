@@ -3,8 +3,10 @@
 export { contentHashFromText, sha256Hex } from "./hash";
 export { parseHttpsUrl, validateAddSourceInput } from "./validate";
 export {
+  expandAskTokens,
   fallbackItemsFromText,
   filterPublishedOnly,
+  preferredCategoriesForQuestion,
   scoreKnowledgeRelevance,
 } from "./pure";
 export {

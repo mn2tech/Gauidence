@@ -7,6 +7,7 @@ import {
 } from "@/lib/knowledge-studio/normalize";
 import {
   contentHashFromText,
+  expandAskTokens,
   fallbackItemsFromText,
   filterPublishedOnly,
   MCPS_ALLOWED_DOMAINS,
@@ -15,6 +16,7 @@ import {
   MCPS_PROJECT_SLUG,
   NO_VERIFIED_MCPS_ANSWER,
   parseHttpsUrl,
+  preferredCategoriesForQuestion,
   scoreKnowledgeRelevance,
   validateAddSourceInput,
 } from "@/lib/knowledge-studio/projects";
@@ -234,6 +236,31 @@ describe("knowledge lifecycle retrieval rules", () => {
         `expected relevance for ${sample.category}, got ${score}`
       );
     }
+  });
+
+  it("maps principal typos and prefers schools directory hits", () => {
+    assert.ok(expandAskTokens("Whats the prinicpal's name").includes("principal"));
+    assert.deepEqual(preferredCategoriesForQuestion("Whats the prinicpal's name"), [
+      "schools",
+    ]);
+
+    const directory = scoreKnowledgeRelevance({
+      title: "Springbrook High School",
+      content: "Principal: Jane Doe. Phone: 240-555-0100.",
+      category: "schools",
+      school: "Springbrook High School",
+      question: "Whats the prinicpal's name",
+      schoolHint: "Springbrook High School",
+    });
+    const calendarNoise = scoreKnowledgeRelevance({
+      title: "School calendar",
+      content: "August 25 First day of school for students. Early release days listed.",
+      category: "calendar",
+      question: "Whats the prinicpal's name",
+      schoolHint: "Springbrook High School",
+    });
+    assert.ok(directory > calendarNoise);
+    assert.ok(directory > 0);
   });
 });
 

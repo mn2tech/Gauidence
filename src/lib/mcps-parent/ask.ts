@@ -13,6 +13,7 @@ import {
 } from "@/lib/knowledge-studio/projects/constants";
 import { loadKnowledgeProject } from "@/lib/knowledge-studio/projects/loadProject";
 import { retrievePublishedKnowledge } from "@/lib/knowledge-studio/projects/retrieve";
+import { schoolsMatch } from "./dates";
 import type { ParentSchoolContext } from "./types";
 
 const ASK_SYSTEM = `You are Gideon helping an MCPS parent in Guardian.
@@ -95,13 +96,11 @@ export async function answerParentSchoolQuestion(args: {
     limit: 10,
   });
 
-  // Soft filter: drop other-school-only hits.
+  // Soft filter: drop other-school-only hits (fuzzy school name match).
   const filtered = hits.filter((h) => {
     const school = h.item.school?.trim();
     if (!school) return true;
-    const a = school.toLowerCase();
-    const b = args.context.school_name.toLowerCase();
-    return a.includes(b) || b.includes(a);
+    return schoolsMatch(args.context.school_name, school);
   });
 
   const sources_used = filtered.map((h) => ({

@@ -52,6 +52,71 @@ export function filterPublishedOnly(
   return items.filter((i) => i.status === "published");
 }
 
+/** Common parent/ask typos → canonical tokens used in MCPS pages. */
+const ASK_TYPO_MAP: Record<string, string> = {
+  prinicpal: "principal",
+  pricipal: "principal",
+  princpal: "principal",
+  principals: "principal",
+  prinicipal: "principal",
+  adress: "address",
+  addres: "address",
+  phonenumber: "phone",
+};
+
+const CONTACT_SYNONYMS = ["principal", "contact", "directory", "phone", "address"] as const;
+
+/**
+ * Tokenize an ask question with light typo correction and contact synonyms
+ * so "prinicpal's name" still retrieves school directory items.
+ */
+export function expandAskTokens(question: string): string[] {
+  const raw = question
+    .toLowerCase()
+    .replace(/[^\w\s]/g, " ")
+    .split(/\s+/)
+    .filter((t) => t.length > 2);
+
+  const out = new Set<string>();
+  for (const t of raw) {
+    out.add(t);
+    const fixed = ASK_TYPO_MAP[t];
+    if (fixed) out.add(fixed);
+  }
+
+  const joined = [...out].join(" ");
+  const isContactIntent =
+    /\b(principal|who\s+is|contact|directory|phone|address|staff)\b/.test(joined) ||
+    raw.some((t) => ASK_TYPO_MAP[t] === "principal");
+
+  if (isContactIntent) {
+    for (const s of CONTACT_SYNONYMS) out.add(s);
+  }
+
+  return [...out];
+}
+
+/** Prefer these knowledge categories for common parent intents. */
+export function preferredCategoriesForQuestion(question: string): string[] {
+  const tokens = expandAskTokens(question).join(" ");
+  if (
+    /\b(principal|contact|directory|phone|address|staff)\b/.test(tokens) ||
+    /\bwho\s+is\b/.test(question.toLowerCase())
+  ) {
+    return ["schools"];
+  }
+  if (/\b(bus|transport|route|depot)\b/.test(tokens)) {
+    return ["transportation"];
+  }
+  if (/\b(calendar|early\s+release|no\s+school|holiday|day\s+off)\b/.test(tokens)) {
+    return ["calendar"];
+  }
+  if (/\b(assign|boundary|which\s+school)\b/.test(tokens)) {
+    return ["school-assignment"];
+  }
+  return [];
+}
+
 export function scoreKnowledgeRelevance(args: {
   title: string;
   content: string;
@@ -59,12 +124,9 @@ export function scoreKnowledgeRelevance(args: {
   school?: string | null;
   question: string;
   schoolHint?: string | null;
+  preferredCategories?: string[];
 }): number {
-  const tokens = args.question
-    .toLowerCase()
-    .replace(/[^\w\s]/g, " ")
-    .split(/\s+/)
-    .filter((t) => t.length > 2);
+  const tokens = expandAskTokens(args.question);
   const hay = [args.title, args.content, args.category, args.school ?? ""]
     .join(" ")
     .toLowerCase();
@@ -73,11 +135,17 @@ export function scoreKnowledgeRelevance(args: {
     if (hay.includes(token)) score += 1;
   }
   if (args.schoolHint && args.school) {
-    if (args.school.toLowerCase().includes(args.schoolHint.toLowerCase())) {
+    const hint = args.schoolHint.toLowerCase();
+    const school = args.school.toLowerCase();
+    if (school.includes(hint) || hint.includes(school)) {
       score += 5;
     }
   } else if (!args.school) {
     score += 2;
+  }
+  const preferred = args.preferredCategories ?? preferredCategoriesForQuestion(args.question);
+  if (preferred.includes(args.category.trim().toLowerCase())) {
+    score += 4;
   }
   return score;
 }

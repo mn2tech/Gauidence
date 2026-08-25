@@ -1,18 +1,15 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { filterPublishedOnly, scoreKnowledgeRelevance } from "./pure";
+import {
+  expandAskTokens,
+  filterPublishedOnly,
+  preferredCategoriesForQuestion,
+  scoreKnowledgeRelevance,
+} from "./pure";
 import type { KnowledgeItemRow, RetrievalHit } from "./types";
 
 export { filterPublishedOnly } from "./pure";
-
-function tokenize(text: string): string[] {
-  return text
-    .toLowerCase()
-    .replace(/[^\w\s]/g, " ")
-    .split(/\s+/)
-    .filter((t) => t.length > 2);
-}
 
 function detectSchoolHint(question: string): string | null {
   // Lightweight: look for "at <Name> School" patterns; callers can pass school later.
@@ -60,8 +57,9 @@ export async function retrievePublishedKnowledge(
     sourceNameById.set(s.id as string, s.source_name as string);
   }
 
-  const tokens = tokenize(args.question);
+  const tokens = expandAskTokens(args.question);
   const schoolHint = args.schoolHint ?? detectSchoolHint(args.question);
+  const preferredCategories = preferredCategoriesForQuestion(args.question);
 
   // Defense in depth — never surface non-published rows even if the query drifts.
   const onlyPublished = filterPublishedOnly(published) as KnowledgeItemRow[];
@@ -81,6 +79,7 @@ export async function retrievePublishedKnowledge(
           school: item.school,
           question: args.question,
           schoolHint,
+          preferredCategories,
         }) + boost;
       if (relevance <= 0 && tokens.length > 0) continue;
       scored.push({
