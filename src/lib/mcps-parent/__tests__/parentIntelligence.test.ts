@@ -10,6 +10,7 @@ import {
   formatParentDate,
   gradesMatch,
   humanizeKnowledgeTitle,
+  humanizeSummary,
   isExpired,
   rankWhatMatters,
   schoolsMatch,
@@ -306,6 +307,15 @@ describe("evergreen demotion + title cleanup", () => {
   it("formats parent dates for display", () => {
     assert.match(formatParentDate("2026-08-25"), /Aug/);
     assert.doesNotMatch(formatParentDate("2026-08-25"), /2026-08-25/);
+  });
+
+  it("summarizes early release without PDF dump prefix", () => {
+    const summary = humanizeSummary(
+      "2026–2027 School Calendar+ Montgomery County Public Schools 2026 July 3 Independence Day—Schools and offices closed. September 18 Early release day for students.",
+      { title: "Early release", tags: ["early_release"] }
+    );
+    assert.match(summary, /early release/i);
+    assert.doesNotMatch(summary, /School Calendar\+/i);
   });
 });
 

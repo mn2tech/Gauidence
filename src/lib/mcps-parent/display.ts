@@ -96,6 +96,13 @@ function sentenceMatching(content: string, re: RegExp, max = 220): string | null
       return part.length <= max ? part : `${part.slice(0, max).trimEnd()}…`;
     }
   }
+  // Also try line-based matches for PDF text without periods.
+  for (const line of content.split(/\n+/).map((l) => l.trim())) {
+    if (re.test(line) && line.length >= 12) {
+      const cleaned = line.replace(/\s+/g, " ");
+      return cleaned.length <= max ? cleaned : `${cleaned.slice(0, max).trimEnd()}…`;
+    }
+  }
   return null;
 }
 
@@ -143,25 +150,43 @@ export function humanizeKnowledgeTitle(args: {
   return `${cut.trimEnd()}…`;
 }
 
+/**
+ * Build a short parent-facing blurb for a dated calendar-style card.
+ */
 export function humanizeSummary(
   content: string,
   opts?: { title?: string; tags?: string[]; max?: number }
 ): string {
-  const max = opts?.max ?? 220;
-  if (opts?.tags?.includes("early_release")) {
-    const hit = sentenceMatching(content, /\bearly release\b/i, max);
-    if (hit) return hit;
+  const max = opts?.max ?? 180;
+  const title = (opts?.title ?? "").toLowerCase();
+
+  if (opts?.tags?.includes("early_release") || /\bearly release\b/i.test(title)) {
+    const hit =
+      sentenceMatching(content, /\bearly release\b/i, max) ??
+      "MCPS has an early release day. Check the official calendar for dismissal times.";
+    return hit;
   }
-  if (opts?.tags?.includes("no_school") || opts?.tags?.includes("school_closure")) {
-    const hit = sentenceMatching(
-      content,
-      /\b(no school|closed|holiday|professional)\b/i,
-      max
-    );
-    if (hit) return hit;
+  if (
+    opts?.tags?.includes("no_school") ||
+    opts?.tags?.includes("school_closure") ||
+    /no school|closed|holiday/i.test(title)
+  ) {
+    const hit =
+      sentenceMatching(
+        content,
+        /\b(no school|schools? and offices closed|holiday|professional)\b/i,
+        max
+      ) ?? "MCPS schools are closed or have no school for students on this date.";
+    return hit;
   }
-  const cleaned = content.replace(/\s+/g, " ").trim();
-  if (cleaned.length <= max) return cleaned;
+
+  // Avoid leading with glued PDF title dumps.
+  let cleaned = content.replace(/\s+/g, " ").trim();
+  cleaned = cleaned
+    .replace(/^202\d[-–].*?Public Schools\s*/i, "")
+    .replace(/^School Calendar\+?\s*/i, "")
+    .trim();
+  if (cleaned.length <= max) return cleaned || content.slice(0, max);
   return `${cleaned.slice(0, max).trimEnd()}…`;
 }
 
