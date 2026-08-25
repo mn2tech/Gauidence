@@ -6,6 +6,7 @@ import {
   upsertPrimarySchoolContext,
 } from "@/lib/mcps-parent/dashboard";
 import { GRADE_OPTIONS } from "@/lib/mcps-parent/constants";
+import { MCPS_SCHOOL_OPTIONS } from "@/lib/mcps-parent/schools";
 
 export const runtime = "nodejs";
 
@@ -29,7 +30,11 @@ export async function GET() {
   const auth = await requireUser();
   if (auth instanceof NextResponse) return auth;
   const context = await getPrimarySchoolContext(auth.supabase, auth.user.id);
-  return NextResponse.json({ context, grade_options: GRADE_OPTIONS });
+  return NextResponse.json({
+    context,
+    grade_options: GRADE_OPTIONS,
+    school_options: MCPS_SCHOOL_OPTIONS,
+  });
 }
 
 export async function PUT(request: Request) {

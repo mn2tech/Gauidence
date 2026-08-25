@@ -2,6 +2,8 @@
 
 import { useState, type FormEvent } from "react";
 import { GRADE_OPTIONS } from "@/lib/mcps-parent/constants";
+import { resolveMcpsSchoolName } from "@/lib/mcps-parent/schools";
+import SchoolSelect from "./SchoolSelect";
 
 export default function MySchoolSetup({
   initialSchool = "",
@@ -26,7 +28,7 @@ export default function MySchoolSetup({
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          school_name: school,
+          school_name: resolveMcpsSchoolName(school) ?? school.trim(),
           grade_level: grade,
         }),
       });
@@ -64,13 +66,11 @@ export default function MySchoolSetup({
         <label className="text-sm font-medium" htmlFor="school">
           School
         </label>
-        <input
+        <SchoolSelect
           id="school"
           required
           value={school}
-          onChange={(e) => setSchool(e.target.value)}
-          placeholder="Sherwood High School"
-          className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm"
+          onChange={setSchool}
         />
       </div>
 

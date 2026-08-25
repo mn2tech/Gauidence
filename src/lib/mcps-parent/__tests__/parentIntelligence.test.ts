@@ -11,9 +11,11 @@ import {
   gradesMatch,
   humanizeKnowledgeTitle,
   humanizeSummary,
+  isKnownMcpsSchool,
   labelForEventDate,
   isExpired,
   rankWhatMatters,
+  resolveMcpsSchoolName,
   schoolsMatch,
   scoreKnowledgeItem,
   toYmd,
@@ -348,6 +350,17 @@ describe("evergreen demotion + title cleanup", () => {
       }),
       "First day of school for students."
     );
+  });
+});
+
+describe("MCPS school picker", () => {
+  it("resolves official school names case-insensitively", () => {
+    assert.equal(
+      resolveMcpsSchoolName("sherwood high school"),
+      "Sherwood High School"
+    );
+    assert.ok(isKnownMcpsSchool("Sherwood High School"));
+    assert.equal(resolveMcpsSchoolName("Not A Real School"), null);
   });
 });
 

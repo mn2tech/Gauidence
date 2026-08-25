@@ -8,6 +8,13 @@ export {
   MCPS_PARENT_PATH,
 } from "./constants";
 export {
+  MCPS_SCHOOL_GROUPS,
+  MCPS_SCHOOL_OPTIONS,
+  isKnownMcpsSchool,
+  resolveMcpsSchoolName,
+} from "./schools";
+export type { McpsSchoolGroup } from "./schools";
+export {
   addDays,
   daysBetween,
   detectImportanceTags,

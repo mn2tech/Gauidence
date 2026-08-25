@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { GRADE_OPTIONS } from "@/lib/mcps-parent/constants";
 import type { ParentIntelligenceDebugItem } from "@/lib/mcps-parent/types";
+import SchoolSelect from "@/components/mcps-parent/SchoolSelect";
 
 export default function ParentIntelligenceTestPanel({
   projectSlug = "mcps-parent",
@@ -61,12 +62,7 @@ export default function ParentIntelligenceTestPanel({
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <input
-          value={school}
-          onChange={(e) => setSchool(e.target.value)}
-          placeholder="School"
-          className="rounded-md border border-stone-300 px-3 py-2 text-sm"
-        />
+        <SchoolSelect value={school} onChange={setSchool} />
         <select
           value={grade}
           onChange={(e) => setGrade(e.target.value)}
