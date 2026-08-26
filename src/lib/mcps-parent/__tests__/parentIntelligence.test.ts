@@ -360,6 +360,29 @@ describe("evergreen demotion + title cleanup", () => {
       "First day of school for students."
     );
   });
+
+  it("labels Sep 7 as Labor Day, not first day of school", () => {
+    const content =
+      "August 25 First day of school for students. September 7 Labor Day—Schools and offices closed. September 18 Early release day for students.";
+    assert.equal(
+      labelForEventDate({
+        title: "MCPS Calendar",
+        content,
+        eventDate: "2026-09-07",
+      }),
+      "Labor Day — no school"
+    );
+    assert.equal(
+      humanizeKnowledgeTitle({
+        title: "2026–2027 School Calendar+ Montgomery County Public Schools",
+        content,
+        category: "calendar",
+        tags: ["no_school", "school_closure"],
+        eventDate: "2026-09-07",
+      }),
+      "Labor Day — no school"
+    );
+  });
 });
 
 describe("MCPS school picker", () => {

@@ -50,9 +50,9 @@ const DATE_LOCAL_LABELS: Array<{ re: RegExp; label: string }> = [
 ];
 
 /**
- * Title the card from text near the chosen event date so we don't label
- * "Aug 25 First day of school" as "Early release" just because early release
- * appears elsewhere in the same calendar PDF.
+ * Title the card from text nearest the chosen event date so we don't label
+ * "Sep 7 Labor Day" as "First day of school" just because Aug 25 appears
+ * a few dozen characters earlier in the same calendar PDF.
  */
 export function labelForEventDate(args: {
   title: string;
@@ -68,27 +68,46 @@ export function labelForEventDate(args: {
   const full = MONTH_FULL[monthIdx]!;
   const short = MONTH_SHORT[monthIdx]!;
   const iso = `${m[1]}-${m[2]}-${m[3]}`;
+  const septPart =
+    monthIdx === 8 ? `|Sept\\.?\\s+${day}(?:st|nd|rd|th)?\\b` : "";
   const dateRe = new RegExp(
-    `${full}\\.?\\s+${day}(?:st|nd|rd|th)?\\b|${short}\\.?\\s+${day}(?:st|nd|rd|th)?\\b|${iso}`,
+    `${full}\\.?\\s+${day}(?:st|nd|rd|th)?\\b|${short}\\.?\\s+${day}(?:st|nd|rd|th)?\\b${septPart}|${iso}`,
     "gi"
   );
 
   const text = `${args.title}\n${args.content}`;
-  const windows: string[] = [];
-  for (const match of text.matchAll(dateRe)) {
-    const idx = match.index ?? 0;
-    windows.push(
-      text.slice(Math.max(0, idx - 50), Math.min(text.length, idx + match[0].length + 180))
-    );
-  }
-  if (!windows.length) return null;
+  type Candidate = { label: string; distance: number; after: boolean };
+  const candidates: Candidate[] = [];
 
-  for (const win of windows) {
+  for (const match of text.matchAll(dateRe)) {
+    const dateStart = match.index ?? 0;
+    const dateEnd = dateStart + match[0].length;
+    // Prefer labels that follow the date; allow a short lookbehind only.
+    const winStart = Math.max(0, dateStart - 24);
+    const winEnd = Math.min(text.length, dateEnd + 160);
+    const win = text.slice(winStart, winEnd);
+
     for (const rule of DATE_LOCAL_LABELS) {
-      if (rule.re.test(win)) return rule.label;
+      const local = new RegExp(rule.re.source, rule.re.flags.includes("g") ? rule.re.flags : `${rule.re.flags}g`);
+      for (const lm of win.matchAll(local)) {
+        const abs = winStart + (lm.index ?? 0);
+        const after = abs >= dateStart;
+        const distance = after
+          ? abs - dateEnd
+          : dateStart - (abs + lm[0].length);
+        // Ignore labels that end well before this date (belong to a prior date).
+        if (!after && distance > 12) continue;
+        candidates.push({ label: rule.label, distance: Math.max(0, distance), after });
+      }
     }
   }
-  return null;
+
+  if (!candidates.length) return null;
+  candidates.sort((a, b) => {
+    if (a.after !== b.after) return a.after ? -1 : 1;
+    return a.distance - b.distance;
+  });
+  return candidates[0]!.label;
 }
 
 const CALENDAR_LABELS: Array<{ re: RegExp; label: string }> = [
@@ -200,22 +219,28 @@ export function humanizeKnowledgeTitle(args: {
       eventDate: args.eventDate,
     });
     if (dated) return dated;
+
+    // Dated card with no local label: never scan the whole calendar PDF for
+    // "first day of school" / "early release" — that causes Sep 7 → first day.
+    if (args.tags?.includes("no_school") || args.tags?.includes("school_closure")) {
+      return "No school / schools closed";
+    }
+    if (args.tags?.includes("early_release")) {
+      return "Early release";
+    }
+    return "Upcoming school date";
   }
 
   const blob = `${args.title}\n${args.content}`;
   const category = args.category ?? "";
 
-  // Do not globally prefer "early release" when a specific event date exists
-  // but failed local matching — fall through to category labels carefully.
   if (
-    !args.eventDate &&
     args.tags?.includes("early_release") &&
     /\bearly release\b/i.test(blob)
   ) {
     return "Early release";
   }
   if (
-    !args.eventDate &&
     (args.tags?.includes("no_school") || args.tags?.includes("school_closure")) &&
     /\blabor day\b/i.test(blob)
   ) {
@@ -265,6 +290,9 @@ export function humanizeSummary(
       content,
       eventDate: opts.eventDate,
     });
+    if (dated === "Labor Day — no school") {
+      return "Labor Day — schools and offices closed. No school for students.";
+    }
     if (dated === "First day of school for students") {
       return "First day of school for students.";
     }
