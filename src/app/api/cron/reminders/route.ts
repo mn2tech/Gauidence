@@ -5,6 +5,7 @@ import { sendPushToUser } from "@/lib/push/send";
 import { sendSms } from "@/lib/sms/send";
 import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
 import { appBaseUrl } from "@/lib/profiles/invitations";
+import { hrefForResult } from "@/lib/search";
 
 export const dynamic = "force-dynamic";
 
@@ -13,9 +14,29 @@ type AlertRow = {
   user_id: string;
   title: string;
   due_date: string;
+  document_id: string | null;
+  profile_id: string | null;
   reminder_7d_sent_at: string | null;
   reminder_1d_sent_at: string | null;
 };
+
+function reminderOpenPath(alert: AlertRow): string {
+  if (alert.document_id && alert.profile_id) {
+    return hrefForResult({
+      kind: "document",
+      id: alert.document_id,
+      profileId: alert.profile_id,
+    });
+  }
+  if (alert.profile_id) {
+    return hrefForResult({
+      kind: "profile",
+      id: alert.profile_id,
+      profileId: alert.profile_id,
+    });
+  }
+  return "/dashboard";
+}
 
 /** Calendar "today" in Eastern Time for reminder windows. */
 function todayEasternMs() {
@@ -64,7 +85,9 @@ export async function GET(request: Request) {
 
   const { data: alerts, error: alertsError } = await admin
     .from("alerts")
-    .select("id, user_id, title, due_date, reminder_7d_sent_at, reminder_1d_sent_at")
+    .select(
+      "id, user_id, title, due_date, document_id, profile_id, reminder_7d_sent_at, reminder_1d_sent_at"
+    )
     .is("dismissed_at", null)
     .gte("due_date", todayIso)
     .lte("due_date", windowEndIso)
@@ -72,6 +95,8 @@ export async function GET(request: Request) {
   if (alertsError) {
     return NextResponse.json({ error: "Failed to load alerts." }, { status: 502 });
   }
+
+  const base = appBaseUrl();
 
   // Keep only alerts that still owe a reminder at their current stage.
   const pending = (alerts as AlertRow[]).filter((a) => {
@@ -121,11 +146,15 @@ export async function GET(request: Request) {
     const profile = recipients.get(userId);
     if (!profile?.email) continue;
 
-    const items: ReminderItem[] = userAlerts.map((a) => ({
-      title: a.title,
-      dueDate: a.due_date,
-      daysLeft: daysUntil(a.due_date, todayMs),
-    }));
+    const items: ReminderItem[] = userAlerts.map((a) => {
+      const path = reminderOpenPath(a);
+      return {
+        title: a.title,
+        dueDate: a.due_date,
+        daysLeft: daysUntil(a.due_date, todayMs),
+        url: `${base}${path}`,
+      };
+    });
 
     const sent = await sendReminderEmail(profile.email, items);
     if (!sent) continue;
@@ -146,7 +175,10 @@ export async function GET(request: Request) {
       void sendPushToUser(userId, {
         title,
         body,
-        url: "/dashboard",
+        url:
+          items.length === 1
+            ? reminderOpenPath(userAlerts[0]!)
+            : "/dashboard",
       });
 
       const fullProfile = profileById.get(userId);
@@ -154,9 +186,11 @@ export async function GET(request: Request) {
         fullProfile?.sms_notifications_enabled &&
         fullProfile.phone_e164
       ) {
+        const smsUrl =
+          items.length === 1 ? items[0]!.url : `${base}/dashboard`;
         void sendSms(
           fullProfile.phone_e164,
-          `Guardian: ${title}. ${appBaseUrl()}/dashboard`
+          `Guardian: ${title}. ${smsUrl}`
         );
       }
     }

@@ -8,6 +8,8 @@ export type ReminderItem = {
   title: string;
   dueDate: string; // ISO date (yyyy-mm-dd)
   daysLeft: number;
+  /** Deep link into Guardian (document or dashboard). */
+  url: string;
 };
 
 function brandHeaderHtml() {
@@ -47,7 +49,7 @@ export function renderReminderEmail(items: ReminderItem[]) {
       return `
         <tr>
           <td style="padding:12px 16px;border-bottom:1px solid #e7e5e4;">
-            <div style="font-weight:600;color:#1c1917;">${escapeHtml(item.title)}</div>
+            <a href="${escapeHtml(item.url)}" style="font-weight:600;color:#0f766e;text-decoration:underline;">${escapeHtml(item.title)}</a>
             <div style="margin-top:2px;font-size:13px;color:#57534e;">${formatDueDate(item.dueDate)}</div>
           </td>
           <td style="padding:12px 16px;border-bottom:1px solid #e7e5e4;text-align:right;white-space:nowrap;">
@@ -66,6 +68,8 @@ export function renderReminderEmail(items: ReminderItem[]) {
     count === 1
       ? `Reminder: ${items[0].title}`
       : `Reminder: ${count} upcoming deadlines`;
+  const openUrl =
+    count === 1 ? items[0]!.url : `${getAppBaseUrl()}/dashboard`;
 
   const html = `
   <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#fafaf9;padding:32px 16px;">
@@ -80,7 +84,11 @@ export function renderReminderEmail(items: ReminderItem[]) {
         ${rows}
       </table>
       <div style="padding:16px 24px 24px;">
-        <p style="margin:0;font-size:13px;color:#57534e;line-height:1.6;">
+        <a href="${escapeHtml(openUrl)}"
+          style="display:inline-block;padding:12px 20px;border-radius:999px;background:#0f766e;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;">
+          Open in Guardian
+        </a>
+        <p style="margin:16px 0 0;font-size:13px;color:#57534e;line-height:1.6;">
           These dates were extracted from documents you uploaded. Always verify
           deadlines against the original document. You can dismiss alerts on your
           dashboard, or turn off reminder emails in Settings.
@@ -96,8 +104,10 @@ export function renderReminderEmail(items: ReminderItem[]) {
     "",
     ...items.map(
       (item) =>
-        `- ${item.title} — ${formatDueDate(item.dueDate)} (${daysLeftLabel(item.daysLeft)})`
+        `- ${item.title} — ${formatDueDate(item.dueDate)} (${daysLeftLabel(item.daysLeft)})\n  ${item.url}`
     ),
+    "",
+    `Open in Guardian: ${openUrl}`,
     "",
     "These dates were extracted from documents you uploaded. Always verify deadlines against the original document.",
     "You can dismiss alerts on your dashboard, or turn off reminder emails in Settings.",
