@@ -6,6 +6,8 @@ export {
   RELEVANCE_WEIGHTS,
   GRADE_OPTIONS,
   MCPS_PARENT_PATH,
+  MAX_PARENT_SCHOOL_CONTEXTS,
+  PARENT_VIEW_STORAGE_KEY,
 } from "./constants";
 export {
   MCPS_SCHOOL_GROUPS,
@@ -35,6 +37,18 @@ export {
   scoreKnowledgeItem,
 } from "./scoring";
 export type { ScoreableKnowledge, ScoreContext } from "./scoring";
+export {
+  buildFamilySuggestedQuestions,
+  canAddParentContext,
+  displayContextLabel,
+  displayContextSwitcherOption,
+  formatAppliesTo,
+  isDuplicateSchoolGrade,
+  mergeFamilyItems,
+  pickPrimaryAfterDelete,
+  resolveQuestionContexts,
+  validateContextInput,
+} from "./family";
 export { buildGoogleCalendarUrl, buildIcs } from "./calendar";
 export { humanizeKnowledgeTitle, humanizeSummary, formatParentDate, allowsOpportunisticEventDates, labelForEventDate } from "./display";
 export type * from "./types";

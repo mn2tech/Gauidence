@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireKnowledgeStudioAdmin } from "@/lib/knowledge-studio/auth";
-import { runParentIntelligenceTest } from "@/lib/mcps-parent/dashboard";
+import {
+  runFamilyIntelligenceTest,
+  runParentIntelligenceTest,
+} from "@/lib/mcps-parent/dashboard";
 import { parseYmd } from "@/lib/mcps-parent/dates";
 
 export const runtime = "nodejs";
@@ -9,7 +12,8 @@ type RouteContext = { params: Promise<{ slug: string }> };
 
 /**
  * Admin-only Parent Intelligence Test.
- * Body: { school_name, grade_level, as_of?: YYYY-MM-DD }
+ * Body single: { school_name, grade_level, as_of? }
+ * Body family: { mode: "family", children: [{ label?, school_name, grade_level }], as_of? }
  */
 export async function POST(request: Request, context: RouteContext) {
   const { slug } = await context.params;
@@ -24,10 +28,49 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   const body = (await request.json().catch(() => ({}))) as {
+    mode?: string;
     school_name?: string;
     grade_level?: string;
     as_of?: string;
+    children?: Array<{
+      label?: string | null;
+      school_name?: string;
+      grade_level?: string;
+    }>;
   };
+
+  const asOf =
+    typeof body.as_of === "string" && body.as_of
+      ? parseYmd(body.as_of) ?? new Date()
+      : new Date();
+
+  if (body.mode === "family") {
+    const children = (body.children ?? [])
+      .filter(
+        (c) =>
+          typeof c.school_name === "string" &&
+          c.school_name.trim() &&
+          typeof c.grade_level === "string" &&
+          c.grade_level.trim()
+      )
+      .map((c) => ({
+        label: c.label ?? null,
+        school_name: c.school_name!.trim(),
+        grade_level: c.grade_level!.trim(),
+      }));
+    if (!children.length) {
+      return NextResponse.json(
+        { error: "At least one child school_name and grade_level required." },
+        { status: 400 }
+      );
+    }
+    const result = await runFamilyIntelligenceTest({
+      admin: ctx.admin,
+      children,
+      asOf,
+    });
+    return NextResponse.json({ ok: true, ...result });
+  }
 
   const schoolName =
     typeof body.school_name === "string" ? body.school_name.trim() : "";
@@ -39,11 +82,6 @@ export async function POST(request: Request, context: RouteContext) {
       { status: 400 }
     );
   }
-
-  const asOf =
-    typeof body.as_of === "string" && body.as_of
-      ? parseYmd(body.as_of) ?? new Date()
-      : new Date();
 
   const result = await runParentIntelligenceTest({
     admin: ctx.admin,

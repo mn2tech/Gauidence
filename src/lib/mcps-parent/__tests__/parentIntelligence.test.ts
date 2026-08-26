@@ -14,6 +14,15 @@ import {
   isKnownMcpsSchool,
   labelForEventDate,
   isExpired,
+  MAX_PARENT_SCHOOL_CONTEXTS,
+  mergeFamilyItems,
+  canAddParentContext,
+  displayContextLabel,
+  formatAppliesTo,
+  isDuplicateSchoolGrade,
+  pickPrimaryAfterDelete,
+  resolveQuestionContexts,
+  buildFamilySuggestedQuestions,
   rankWhatMatters,
   resolveMcpsSchoolName,
   schoolsMatch,
@@ -361,6 +370,228 @@ describe("MCPS school picker", () => {
     );
     assert.ok(isKnownMcpsSchool("Sherwood High School"));
     assert.equal(resolveMcpsSchoolName("Not A Real School"), null);
+  });
+});
+
+describe("multi-child context rules", () => {
+  it("caps at MAX_PARENT_SCHOOL_CONTEXTS", () => {
+    assert.equal(MAX_PARENT_SCHOOL_CONTEXTS, 3);
+    assert.ok(canAddParentContext(0));
+    assert.ok(canAddParentContext(2));
+    assert.equal(canAddParentContext(3), false);
+  });
+
+  it("treats same school+grade as duplicate unless labels differ", () => {
+    const existing = [
+      {
+        id: "1",
+        school_name: "Sherwood High School",
+        grade_level: "9",
+        label: "Matthew",
+      },
+    ];
+    assert.ok(
+      isDuplicateSchoolGrade({
+        existing,
+        schoolName: "Sherwood High School",
+        gradeLevel: "9",
+        label: "Matthew",
+      })
+    );
+    assert.equal(
+      isDuplicateSchoolGrade({
+        existing,
+        schoolName: "Sherwood High School",
+        gradeLevel: "9",
+        label: "Nolan",
+      }),
+      false
+    );
+  });
+
+  it("promotes another context when primary is deleted", () => {
+    const remaining = [
+      {
+        id: "b",
+        user_id: "u",
+        label: null,
+        school_name: "Rosa M. Parks Middle School",
+        school_id: null,
+        grade_level: "6",
+        is_primary: false,
+        created_at: "",
+        updated_at: "",
+      },
+    ];
+    assert.equal(pickPrimaryAfterDelete(remaining, true), "b");
+  });
+
+  it("formats display labels without requiring a name", () => {
+    assert.equal(
+      displayContextLabel({
+        label: "Matthew",
+        school_name: "Sherwood High School",
+        grade_level: "9",
+      }),
+      "Matthew"
+    );
+    assert.equal(
+      displayContextLabel({
+        label: null,
+        school_name: "Sherwood High School",
+        grade_level: "9",
+      }),
+      "Sherwood High School — Grade 9"
+    );
+  });
+});
+
+describe("family merge / Ask scoping", () => {
+  it("merges two schools and shows district events once", () => {
+    const district = {
+      id: "d1",
+      title: "No school Monday",
+      summary: "Closed",
+      category: "calendar",
+      school: null,
+      grade_level: null,
+      authority: "MCPS",
+      source_url: null,
+      source_name: "Calendar",
+      event_date: "2026-09-07",
+      effective_date: null,
+      expires_at: null,
+      last_checked_at: null,
+      score: 100,
+      reasons: ["No school / closure" as const],
+      importance_tags: ["no_school"],
+      stale: false,
+    };
+    const sherwood = {
+      ...district,
+      id: "s1",
+      title: "Early release Wednesday",
+      school: "Sherwood High School",
+      score: 90,
+      district_wide: false,
+    };
+    const rosa = {
+      ...district,
+      id: "r1",
+      title: "Parent meeting Thursday",
+      school: "Rosa M. Parks Middle School",
+      score: 80,
+    };
+
+    const ctx1 = {
+      id: "c1",
+      label: "Matthew",
+      school_name: "Sherwood High School",
+      grade_level: "9",
+    };
+    const ctx2 = {
+      id: "c2",
+      label: "Child 2",
+      school_name: "Rosa M. Parks Middle School",
+      grade_level: "6",
+    };
+
+    const merged = mergeFamilyItems({
+      perContext: [
+        { context: ctx1, items: [district, sherwood] },
+        { context: ctx2, items: [{ ...district }, rosa] },
+      ],
+      limit: 10,
+    });
+
+    const closures = merged.filter((m) => m.id === "d1");
+    assert.equal(closures.length, 1);
+    assert.ok(closures[0]!.district_wide);
+    assert.ok(merged.some((m) => m.id === "s1"));
+    assert.ok(merged.some((m) => m.id === "r1"));
+    assert.equal(
+      formatAppliesTo({
+        districtWide: true,
+        labels: ["Matthew", "Child 2"],
+        totalContexts: 2,
+      }),
+      "All MCPS schools"
+    );
+  });
+
+  it("does not surface unrelated school events in single-context ranking", () => {
+    const scored = scoreKnowledgeItem(
+      item({
+        id: "x",
+        title: "Churchill only",
+        content: "Event at Winston Churchill High School",
+        school: "Winston Churchill High School",
+        effective_date: "2026-09-11",
+      }),
+      { schoolName: "Sherwood High School", gradeLevel: "9", asOf }
+    );
+    assert.equal(scored, null);
+  });
+
+  it("resolves friendly labels and explicit school overrides", () => {
+    const contexts = [
+      {
+        id: "c1",
+        user_id: "u",
+        label: "Matthew",
+        school_name: "Sherwood High School",
+        school_id: null,
+        grade_level: "9",
+        is_primary: true,
+        created_at: "",
+        updated_at: "",
+      },
+      {
+        id: "c2",
+        user_id: "u",
+        label: "Child 2",
+        school_name: "Rosa M. Parks Middle School",
+        school_id: null,
+        grade_level: "6",
+        is_primary: false,
+        created_at: "",
+        updated_at: "",
+      },
+    ];
+
+    const byLabel = resolveQuestionContexts({
+      question: "What does Matthew need to know this week?",
+      contexts,
+      activeView: "all",
+      primaryId: "c1",
+    });
+    assert.equal(byLabel.mode, "single");
+    assert.equal(byLabel.contexts[0]!.id, "c1");
+    assert.equal(byLabel.reason, "explicit_label");
+
+    const override = resolveQuestionContexts({
+      question: "Anything happening at Rosa Parks tomorrow?",
+      contexts,
+      activeView: "c1",
+      primaryId: "c1",
+    });
+    assert.equal(override.mode, "single");
+    assert.equal(override.contexts[0]!.id, "c2");
+    assert.equal(override.reason, "explicit_school");
+
+    const family = resolveQuestionContexts({
+      question: "What does my family need to know this week?",
+      contexts,
+      activeView: "c1",
+      primaryId: "c1",
+    });
+    assert.equal(family.mode, "all");
+    assert.equal(family.contexts.length, 2);
+  });
+
+  it("suggests family questions in All Children mode", () => {
+    const qs = buildFamilySuggestedQuestions({ view: "all", topItems: [] });
+    assert.ok(qs.some((q) => /family/i.test(q)));
   });
 });
 

@@ -4,17 +4,27 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { MCPS_PROJECT_SLUG } from "@/lib/knowledge-studio/projects/constants";
 import { loadKnowledgeProject } from "@/lib/knowledge-studio/projects/loadProject";
 import {
+  MAX_PARENT_SCHOOL_CONTEXTS,
   PARENT_COMING_UP_MAX_ITEMS,
   PARENT_DASHBOARD_MAX_ITEMS,
 } from "./constants";
+import {
+  getPrimarySchoolContext,
+  listParentSchoolContexts,
+} from "./contexts";
 import { greetingForNow } from "./dates";
 import {
-  buildSuggestedQuestions,
+  buildFamilySuggestedQuestions,
+  displayContextLabel,
+  mergeFamilyItems,
+} from "./family";
+import {
   groupComingUp,
   rankWhatMatters,
   type ScoreableKnowledge,
 } from "./scoring";
 import type {
+  ParentActiveView,
   ParentDashboardPayload,
   ParentIntelligenceDebugItem,
   ParentSchoolContext,
@@ -79,54 +89,40 @@ async function loadPublishedScoreableItems(
   });
 }
 
-export async function getPrimarySchoolContext(
-  supabase: SupabaseClient,
-  userId: string
-): Promise<ParentSchoolContext | null> {
-  const { data } = await supabase
-    .from("parent_school_contexts")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("is_primary", true)
-    .maybeSingle();
-  return (data as ParentSchoolContext | null) ?? null;
+export {
+  getPrimarySchoolContext,
+  listParentSchoolContexts,
+  upsertPrimarySchoolContext,
+  createParentSchoolContext,
+  updateParentSchoolContext,
+  deleteParentSchoolContext,
+  setPrimaryParentSchoolContext,
+  getParentSchoolContextById,
+} from "./contexts";
+
+function resolveActiveView(
+  view: string | null | undefined,
+  contexts: ParentSchoolContext[]
+): ParentActiveView {
+  if (!view || view === "all") return "all";
+  if (contexts.some((c) => c.id === view)) return view;
+  return "all";
 }
 
-export async function upsertPrimarySchoolContext(args: {
-  supabase: SupabaseClient;
-  userId: string;
-  schoolName: string;
-  gradeLevel: string;
-}): Promise<ParentSchoolContext> {
-  const school_name = args.schoolName.trim().slice(0, 200);
-  const grade_level = args.gradeLevel.trim().slice(0, 40);
-  if (!school_name) throw new Error("School is required.");
-  if (!grade_level) throw new Error("Grade is required.");
-
-  const existing = await getPrimarySchoolContext(args.supabase, args.userId);
-  if (existing) {
-    const { data, error } = await args.supabase
-      .from("parent_school_contexts")
-      .update({ school_name, grade_level, is_primary: true })
-      .eq("id", existing.id)
-      .select("*")
-      .single();
-    if (error || !data) throw new Error(error?.message ?? "Could not save.");
-    return data as ParentSchoolContext;
-  }
-
-  const { data, error } = await args.supabase
-    .from("parent_school_contexts")
-    .insert({
-      user_id: args.userId,
-      school_name,
-      grade_level,
-      is_primary: true,
-    })
-    .select("*")
-    .single();
-  if (error || !data) throw new Error(error?.message ?? "Could not save.");
-  return data as ParentSchoolContext;
+function annotateSingleContext(
+  items: ScoredParentItem[],
+  context: ParentSchoolContext
+): ScoredParentItem[] {
+  const label = displayContextLabel(context);
+  return items.map((item) => {
+    const districtWide = !item.school?.trim();
+    return {
+      ...item,
+      applies_to_context_ids: [context.id],
+      district_wide: districtWide,
+      applies_to_labels: districtWide ? ["All MCPS schools"] : [label],
+    };
+  });
 }
 
 export async function buildParentDashboard(args: {
@@ -134,37 +130,51 @@ export async function buildParentDashboard(args: {
   supabase: SupabaseClient;
   userId: string;
   asOf?: Date;
+  /** Temporary UI view: "all" or a context id. */
+  activeView?: string | null;
 }): Promise<ParentDashboardPayload> {
   const asOf = args.asOf ?? new Date();
-  const context = await getPrimarySchoolContext(args.supabase, args.userId);
+  const contexts = await listParentSchoolContexts(args.supabase, args.userId);
+  const primary =
+    contexts.find((c) => c.is_primary) ??
+    (await getPrimarySchoolContext(args.supabase, args.userId));
   const greeting = greetingForNow(asOf);
+  const active_view = resolveActiveView(args.activeView, contexts);
 
-  if (!context) {
+  if (!contexts.length) {
     return {
       context: null,
+      primary_context: null,
+      contexts: [],
+      active_view: "all",
       greeting,
       state: "needs_setup",
       what_you_need: [],
       coming_up: [],
-      suggested_questions: buildSuggestedQuestions({
-        hasSchool: false,
+      suggested_questions: buildFamilySuggestedQuestions({
+        view: "all",
         topItems: [],
       }),
+      max_contexts: MAX_PARENT_SCHOOL_CONTEXTS,
     };
   }
 
   const loaded = await loadKnowledgeProject(args.admin, MCPS_PROJECT_SLUG);
   if (!loaded) {
     return {
-      context,
+      context: primary,
+      primary_context: primary,
+      contexts,
+      active_view,
       greeting,
       state: "caught_up",
       what_you_need: [],
       coming_up: [],
-      suggested_questions: buildSuggestedQuestions({
-        hasSchool: true,
+      suggested_questions: buildFamilySuggestedQuestions({
+        view: active_view === "all" ? "all" : "single",
         topItems: [],
       }),
+      max_contexts: MAX_PARENT_SCHOOL_CONTEXTS,
     };
   }
 
@@ -172,29 +182,62 @@ export async function buildParentDashboard(args: {
     args.admin,
     loaded.project.id
   );
-  const ranked = rankWhatMatters(
-    published,
-    {
-      schoolName: context.school_name,
-      gradeLevel: context.grade_level,
-      asOf,
-    },
-    PARENT_COMING_UP_MAX_ITEMS
-  );
 
-  const what_you_need = ranked.slice(0, PARENT_DASHBOARD_MAX_ITEMS);
-  const coming_up = groupComingUp(ranked, asOf);
+  let what_you_need: ScoredParentItem[] = [];
+  let comingPool: ScoredParentItem[] = [];
+
+  if (active_view === "all") {
+    const perContext = contexts.map((context) => ({
+      context,
+      items: rankWhatMatters(
+        published,
+        {
+          schoolName: context.school_name,
+          gradeLevel: context.grade_level,
+          asOf,
+        },
+        PARENT_COMING_UP_MAX_ITEMS
+      ),
+    }));
+    const merged = mergeFamilyItems({
+      perContext,
+      limit: Math.max(PARENT_COMING_UP_MAX_ITEMS, PARENT_DASHBOARD_MAX_ITEMS),
+    });
+    what_you_need = merged.slice(0, PARENT_DASHBOARD_MAX_ITEMS);
+    comingPool = merged;
+  } else {
+    const context =
+      contexts.find((c) => c.id === active_view) ?? primary ?? contexts[0]!;
+    const ranked = rankWhatMatters(
+      published,
+      {
+        schoolName: context.school_name,
+        gradeLevel: context.grade_level,
+        asOf,
+      },
+      PARENT_COMING_UP_MAX_ITEMS
+    );
+    const annotated = annotateSingleContext(ranked, context);
+    what_you_need = annotated.slice(0, PARENT_DASHBOARD_MAX_ITEMS);
+    comingPool = annotated;
+  }
+
+  const coming_up = groupComingUp(comingPool, asOf);
 
   return {
-    context,
+    context: primary,
+    primary_context: primary,
+    contexts,
+    active_view,
     greeting,
     state: what_you_need.length ? "has_items" : "caught_up",
     what_you_need,
     coming_up,
-    suggested_questions: buildSuggestedQuestions({
-      hasSchool: true,
+    suggested_questions: buildFamilySuggestedQuestions({
+      view: active_view === "all" ? "all" : "single",
       topItems: what_you_need,
     }),
+    max_contexts: MAX_PARENT_SCHOOL_CONTEXTS,
   };
 }
 
@@ -240,6 +283,106 @@ export async function runParentIntelligenceTest(args: {
     items: ranked.map((item) => ({
       ...item,
       publication_status: "published",
+    })),
+  };
+}
+
+export async function runFamilyIntelligenceTest(args: {
+  admin: SupabaseClient;
+  children: Array<{
+    label?: string | null;
+    school_name: string;
+    grade_level: string;
+  }>;
+  asOf?: Date;
+}): Promise<{
+  as_of: string;
+  children: Array<{
+    id: string;
+    label: string | null;
+    school_name: string;
+    grade_level: string;
+  }>;
+  items: Array<
+    ParentIntelligenceDebugItem & {
+      applies_to: string[];
+      district_wide: boolean;
+      merged_score: number;
+      original_scores: number[];
+    }
+  >;
+}> {
+  const asOf = args.asOf ?? new Date();
+  const children = args.children
+    .filter((c) => c.school_name.trim() && c.grade_level.trim())
+    .slice(0, MAX_PARENT_SCHOOL_CONTEXTS)
+    .map((c, i) => ({
+      id: `child-${i + 1}`,
+      label: c.label?.trim() || null,
+      school_name: c.school_name.trim(),
+      grade_level: c.grade_level.trim(),
+      is_primary: i === 0,
+      user_id: "admin-test",
+      school_id: null,
+      created_at: asOf.toISOString(),
+      updated_at: asOf.toISOString(),
+    }));
+
+  const loaded = await loadKnowledgeProject(args.admin, MCPS_PROJECT_SLUG);
+  if (!loaded || !children.length) {
+    return {
+      as_of: asOf.toISOString(),
+      children: children.map((c) => ({
+        id: c.id,
+        label: c.label,
+        school_name: c.school_name,
+        grade_level: c.grade_level,
+      })),
+      items: [],
+    };
+  }
+
+  const published = await loadPublishedScoreableItems(
+    args.admin,
+    loaded.project.id
+  );
+
+  const originalScores = new Map<string, number[]>();
+  const perContext = children.map((context) => {
+    const items = rankWhatMatters(
+      published,
+      {
+        schoolName: context.school_name,
+        gradeLevel: context.grade_level,
+        asOf,
+      },
+      12
+    );
+    for (const item of items) {
+      const prev = originalScores.get(item.id) ?? [];
+      prev.push(item.score);
+      originalScores.set(item.id, prev);
+    }
+    return { context, items };
+  });
+
+  const merged = mergeFamilyItems({ perContext, limit: 12 });
+
+  return {
+    as_of: asOf.toISOString(),
+    children: children.map((c) => ({
+      id: c.id,
+      label: c.label,
+      school_name: c.school_name,
+      grade_level: c.grade_level,
+    })),
+    items: merged.map((item) => ({
+      ...item,
+      publication_status: "published",
+      applies_to: item.applies_to_labels ?? [],
+      district_wide: Boolean(item.district_wide),
+      merged_score: item.score,
+      original_scores: originalScores.get(item.id) ?? [item.score],
     })),
   };
 }

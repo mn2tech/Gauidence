@@ -41,6 +41,12 @@ export const TIME_SENSITIVE_STALE_DAYS = 14;
 
 export const MCPS_PARENT_PATH = "/parent";
 
+/** Max school/grade profiles a parent may configure (MVP). */
+export const MAX_PARENT_SCHOOL_CONTEXTS = 3;
+
+/** Client/session key for temporary All Children vs single-child view. */
+export const PARENT_VIEW_STORAGE_KEY = "mcps-parent-active-view";
+
 export const GRADE_OPTIONS = [
   "Pre-K",
   "K",

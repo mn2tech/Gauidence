@@ -37,6 +37,7 @@ export async function POST(request: Request) {
     knowledge_item_id?: string;
     event_date?: string;
     offset?: string;
+    parent_school_context_id?: string | null;
   };
 
   const title = typeof body.title === "string" ? body.title.trim() : "";
@@ -71,6 +72,10 @@ export async function POST(request: Request) {
       knowledge_item_id:
         typeof body.knowledge_item_id === "string"
           ? body.knowledge_item_id
+          : null,
+      parent_school_context_id:
+        typeof body.parent_school_context_id === "string"
+          ? body.parent_school_context_id
           : null,
       title: title.slice(0, 200),
       reminder_date: toYmd(reminderDate),

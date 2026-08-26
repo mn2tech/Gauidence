@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { User, SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getPrimarySchoolContext } from "@/lib/mcps-parent/dashboard";
+import { listParentSchoolContexts } from "@/lib/mcps-parent/contexts";
 import { answerParentSchoolQuestion } from "@/lib/mcps-parent/ask";
 
 export const runtime = "nodejs";
@@ -28,10 +28,10 @@ export async function POST(request: Request) {
   const auth = await requireUser();
   if (auth instanceof NextResponse) return auth;
 
-  const context = await getPrimarySchoolContext(auth.supabase, auth.user.id);
-  if (!context) {
+  const contexts = await listParentSchoolContexts(auth.supabase, auth.user.id);
+  if (!contexts.length) {
     return NextResponse.json(
-      { error: "Set up My School first." },
+      { error: "Add a child / school first." },
       { status: 400 }
     );
   }
@@ -46,17 +46,24 @@ export async function POST(request: Request) {
 
   const body = (await request.json().catch(() => ({}))) as {
     question?: string;
+    view?: string;
   };
   const question = typeof body.question === "string" ? body.question : "";
   if (!question.trim()) {
     return NextResponse.json({ error: "question is required." }, { status: 400 });
   }
 
+  const activeView =
+    typeof body.view === "string" && body.view.trim()
+      ? body.view.trim()
+      : "all";
+
   try {
     const result = await answerParentSchoolQuestion({
       admin,
       question,
-      context,
+      contexts,
+      activeView,
     });
     return NextResponse.json({ ok: true, ...result });
   } catch (err) {

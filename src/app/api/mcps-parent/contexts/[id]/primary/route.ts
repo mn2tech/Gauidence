@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
 import type { User, SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { buildParentDashboard } from "@/lib/mcps-parent/dashboard";
-import { parseYmd } from "@/lib/mcps-parent/dates";
+import { setPrimaryParentSchoolContext } from "@/lib/mcps-parent/contexts";
 
 export const runtime = "nodejs";
 
 type Authed = { supabase: SupabaseClient; user: User };
+type RouteContext = { params: Promise<{ id: string }> };
 
 async function requireUser(): Promise<Authed | NextResponse> {
   const supabase = await createClient();
@@ -23,30 +22,22 @@ async function requireUser(): Promise<Authed | NextResponse> {
   return { supabase, user };
 }
 
-export async function GET(request: Request) {
+export async function POST(_request: Request, context: RouteContext) {
   const auth = await requireUser();
   if (auth instanceof NextResponse) return auth;
+  const { id } = await context.params;
 
-  const admin = createAdminClient();
-  if (!admin) {
+  try {
+    const updated = await setPrimaryParentSchoolContext({
+      supabase: auth.supabase,
+      userId: auth.user.id,
+      id,
+    });
+    return NextResponse.json({ ok: true, context: updated });
+  } catch (err) {
     return NextResponse.json(
-      { error: "Admin database client is not configured." },
-      { status: 503 }
+      { error: err instanceof Error ? err.message : "Could not set primary." },
+      { status: 400 }
     );
   }
-
-  const url = new URL(request.url);
-  const asOfRaw = url.searchParams.get("as_of");
-  const asOf = asOfRaw ? parseYmd(asOfRaw) ?? new Date() : new Date();
-  const activeView = url.searchParams.get("view");
-
-  const dashboard = await buildParentDashboard({
-    admin,
-    supabase: auth.supabase,
-    userId: auth.user.id,
-    asOf,
-    activeView,
-  });
-
-  return NextResponse.json(dashboard);
 }

@@ -14,8 +14,12 @@ type AskResult = {
 
 export default function AskMySchoolPanel({
   suggestedQuestions,
+  activeView = "all",
+  familyMode = false,
 }: {
   suggestedQuestions: string[];
+  activeView?: string;
+  familyMode?: boolean;
 }) {
   const [question, setQuestion] = useState("");
   const [busy, setBusy] = useState(false);
@@ -30,7 +34,7 @@ export default function AskMySchoolPanel({
       const res = await fetch("/api/mcps-parent/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: q }),
+        body: JSON.stringify({ question: q, view: activeView }),
       });
       const body = (await res.json().catch(() => ({}))) as AskResult & {
         error?: string;
@@ -57,9 +61,13 @@ export default function AskMySchoolPanel({
       className="space-y-4 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm"
     >
       <div>
-        <h2 className="text-lg font-semibold">Ask Gideon — My School</h2>
+        <h2 className="text-lg font-semibold">
+          {familyMode ? "Ask Gideon — My Family" : "Ask Gideon — My School"}
+        </h2>
         <p className="mt-1 text-sm text-ink-muted">
-          Gideon already knows your school and grade.
+          {familyMode
+            ? "Gideon can answer across all of your children’s schools."
+            : "Gideon already knows this school and grade."}
         </p>
       </div>
 
@@ -84,7 +92,11 @@ export default function AskMySchoolPanel({
         <input
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
-          placeholder="What do I need to know this week?"
+          placeholder={
+            familyMode
+              ? "What does my family need to know this week?"
+              : "What do I need to know this week?"
+          }
           className="min-w-0 flex-1 rounded-md border border-stone-300 px-3 py-2 text-sm"
         />
         <button

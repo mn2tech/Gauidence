@@ -6,10 +6,12 @@ import type { ScoredParentItem } from "@/lib/mcps-parent/types";
 
 export default function WhatMattersCard({
   item,
-  schoolName,
+  appliesTo,
+  contextId,
 }: {
   item: ScoredParentItem;
-  schoolName: string;
+  appliesTo: string;
+  contextId?: string | null;
 }) {
   const [showDetails, setShowDetails] = useState(false);
   const [remindOpen, setRemindOpen] = useState(false);
@@ -30,6 +32,7 @@ export default function WhatMattersCard({
           knowledge_item_id: item.id,
           event_date: item.event_date,
           offset,
+          parent_school_context_id: contextId ?? null,
         }),
       });
       const body = (await res.json().catch(() => ({}))) as { error?: string };
@@ -77,9 +80,7 @@ export default function WhatMattersCard({
     }
   }
 
-  const why =
-    item.reasons[0] ??
-    (item.school ? `Applies to ${schoolName}` : "District-wide");
+  const forLabel = item.district_wide ? "Applies to" : "For";
 
   return (
     <article className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
@@ -89,12 +90,20 @@ export default function WhatMattersCard({
         </p>
       ) : null}
       <h3 className="mt-1 text-lg font-semibold text-foreground">{item.title}</h3>
+      {item.school ? (
+        <p className="mt-1 text-sm text-ink-muted">{item.school}</p>
+      ) : null}
       <p className="mt-2 text-sm leading-relaxed text-foreground/90">
         {item.summary}
       </p>
       <p className="mt-3 text-xs text-ink-muted">
-        Why you&apos;re seeing this: {why}
+        {forLabel}: {appliesTo}
       </p>
+      {item.reasons[0] ? (
+        <p className="mt-1 text-xs text-ink-muted">
+          Why you&apos;re seeing this: {item.reasons[0]}
+        </p>
+      ) : null}
       {item.stale ? (
         <p className="mt-2 text-xs text-amber-800">
           Please verify with MCPS — this source may need a refresh.
@@ -164,9 +173,12 @@ export default function WhatMattersCard({
           <p>
             Source: {item.authority ?? "Montgomery County Public Schools"}
           </p>
-          <p>Last checked: {item.last_checked_at
-            ? new Date(item.last_checked_at).toLocaleDateString()
-            : "—"}</p>
+          <p>
+            Last checked:{" "}
+            {item.last_checked_at
+              ? new Date(item.last_checked_at).toLocaleDateString()
+              : "—"}
+          </p>
           {item.source_url ? (
             <a
               href={item.source_url}
