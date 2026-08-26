@@ -44,6 +44,10 @@ import {
   formatAlertsForGideon,
   retrieveUpcomingAlertsForGideon,
 } from "@/lib/reminders/retrieve";
+import {
+  formatGuardianItemsForGideon,
+  retrieveGuardianItemsForGideon,
+} from "@/lib/guardian-items/retrieveForGideon";
 import { formatWorkMemoryForGideon } from "@/lib/work-memory/context";
 import {
   loadWorkMemoryForGideon,
@@ -406,7 +410,7 @@ export async function loadWorkspaceContext(
     activeRequests,
     proposalsBundle,
     fileInventoryContext,
-    upcomingAlerts,
+    scheduleBundle,
     linkedContext,
     workMemoryBundleRaw,
     businessIntelligenceBundle,
@@ -515,14 +519,23 @@ export async function loadWorkspaceContext(
         )
       : Promise.resolve("(none)"),
     load.schedule
-      ? retrieveUpcomingAlertsForGideon(supabase, {
-          profileIds: effectiveSearchIds,
-          profileNames,
-          question: retrievalQuestion,
-          timeZone,
-          limit: effectiveRetrievalScopes.length > 1 ? 12 : 10,
-        })
-      : Promise.resolve([]),
+      ? Promise.all([
+          retrieveGuardianItemsForGideon(supabase, {
+            spaceIds: effectiveSearchIds,
+            profileNames,
+            question: retrievalQuestion,
+            timeZone,
+            limit: effectiveRetrievalScopes.length > 1 ? 12 : 10,
+          }),
+          retrieveUpcomingAlertsForGideon(supabase, {
+            profileIds: effectiveSearchIds,
+            profileNames,
+            question: retrievalQuestion,
+            timeZone,
+            limit: effectiveRetrievalScopes.length > 1 ? 12 : 10,
+          }),
+        ]).then(([items, alerts]) => ({ items, alerts }))
+      : Promise.resolve({ items: [], alerts: [] }),
     load.linkedProfiles
       ? loadLinkedOrgContext(supabase, user.id, activeProfile)
       : Promise.resolve("(none)"),
@@ -652,10 +665,22 @@ export async function loadWorkspaceContext(
   );
 
   const proposalsContext = proposalsBundle;
-  const scheduleContext = formatAlertsForGideon(upcomingAlerts, {
+  const guardianSchedule = formatGuardianItemsForGideon(scheduleBundle.items);
+  const alertsSchedule = formatAlertsForGideon(scheduleBundle.alerts, {
     profileNames,
     timeZone,
   });
+  const scheduleContext =
+    scheduleBundle.items.length > 0
+      ? [
+          guardianSchedule,
+          alertsSchedule
+            ? `Also saved reminders:\n${alertsSchedule}`
+            : "",
+        ]
+          .filter(Boolean)
+          .join("\n\n")
+      : alertsSchedule;
 
   const vaultMapOwnerLabel =
     firstNameFrom(

@@ -182,7 +182,7 @@ export function buildGideonSystemPrompt(
       searchedKnowledge
     ),
     namedBlock(
-      "UPCOMING SCHEDULE (saved reminders and document deadlines; space owner labeled when linked)",
+      "WHAT MATTERS (saved items Guardian is watching — events, deadlines, reminders; prefer these before re-reading documents for schedule questions; space/child labeled when known)",
       blocks.schedule,
       searchedKnowledge
     ),

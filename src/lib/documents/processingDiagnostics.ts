@@ -11,6 +11,7 @@ export type ProcessingTimingKey =
   | "chunking_ms"
   | "embedding_ms"
   | "ontology_extraction_ms"
+  | "guardian_items_extraction_ms"
   | "knowledge_extraction_ms"
   | "total_to_searchable_ms"
   | "total_to_knowledge_ready_ms";

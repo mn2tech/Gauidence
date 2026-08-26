@@ -27,6 +27,7 @@ export type ProcessingJobType =
   | "analyze_document"
   | "index_document"
   | "extract_ontology"
+  | "extract_guardian_items"
   | "extract_knowledge";
 
 export type ProcessingJobStatus =
@@ -41,6 +42,7 @@ const STAGE_TIMEOUT_MS: Record<ProcessingJobType, number> = {
   analyze_document: 6 * 60 * 1000,
   index_document: 5 * 60 * 1000,
   extract_ontology: 5 * 60 * 1000,
+  extract_guardian_items: 5 * 60 * 1000,
   extract_knowledge: 5 * 60 * 1000,
 };
 
@@ -212,7 +214,7 @@ async function enqueueNextStage(
       });
       return;
     }
-    await enqueueKnowledgeOrReady(supabase, args);
+    await enqueueGuardianItemsOrKnowledge(supabase, args);
     return;
   }
 
@@ -232,13 +234,40 @@ async function enqueueNextStage(
       });
       return;
     }
-    await enqueueKnowledgeOrReady(supabase, args);
+    await enqueueGuardianItemsOrKnowledge(supabase, args);
     return;
   }
 
   if (completedStage === "extract_ontology") {
+    await enqueueGuardianItemsOrKnowledge(supabase, args);
+    return;
+  }
+
+  if (completedStage === "extract_guardian_items") {
     await enqueueKnowledgeOrReady(supabase, args);
   }
+}
+
+async function enqueueGuardianItemsOrKnowledge(
+  supabase: SupabaseClient,
+  args: {
+    documentId: string;
+    profileId: string;
+    userId: string;
+  }
+): Promise<void> {
+  await supabase
+    .from("documents")
+    .update({
+      guardian_items_status: "pending",
+      processing_step: "guardian_items",
+    })
+    .eq("id", args.documentId);
+  await enqueueDocumentProcessingJob(supabase, {
+    ...args,
+    jobType: "extract_guardian_items",
+    force: true,
+  });
 }
 
 async function enqueueKnowledgeOrReady(
@@ -326,6 +355,14 @@ async function markJobFailed(
       .from("documents")
       .update({
         ontology_status: retryable ? "retryable" : "failed",
+        last_processing_error: message.slice(0, 500),
+      })
+      .eq("id", job.document_id);
+  } else if (job.job_type === "extract_guardian_items") {
+    await supabase
+      .from("documents")
+      .update({
+        guardian_items_status: retryable ? "retryable" : "failed",
         last_processing_error: message.slice(0, 500),
       })
       .eq("id", job.document_id);
@@ -610,6 +647,58 @@ async function runOntologyJob(
   };
 }
 
+async function runGuardianItemsJob(
+  supabase: SupabaseClient,
+  userId: string,
+  documentId: string,
+  profileId: string,
+  diagnostics: ProcessingDiagnostics
+): Promise<ProcessingDiagnostics> {
+  const start = Date.now();
+  await supabase
+    .from("documents")
+    .update({
+      guardian_items_status: "processing",
+      processing_step: "guardian_items",
+    })
+    .eq("id", documentId);
+
+  try {
+    const { processGuardianItemExtraction } = await import(
+      "@/lib/guardian-items/processJob"
+    );
+    const result = await processGuardianItemExtraction(
+      supabase,
+      userId,
+      documentId,
+      profileId
+    );
+    await supabase
+      .from("documents")
+      .update({
+        guardian_items_status: result.skipped ? "skipped" : "completed",
+      })
+      .eq("id", documentId);
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Guardian item extraction failed";
+    console.error(
+      "Guardian item extraction failed (non-blocking):",
+      documentId,
+      message
+    );
+    await supabase
+      .from("documents")
+      .update({
+        guardian_items_status: "failed",
+        last_processing_error: message.slice(0, 500),
+      })
+      .eq("id", documentId);
+  }
+
+  return recordDuration(diagnostics, "guardian_items_extraction_ms", start);
+}
+
 async function runKnowledgeJob(
   supabase: SupabaseClient,
   userId: string,
@@ -719,6 +808,14 @@ export async function processDocumentProcessingJob(
       );
       diagnostics = ontologyResult.diagnostics;
       deferredForOcr = ontologyResult.deferredForOcr;
+    } else if (job.job_type === "extract_guardian_items") {
+      diagnostics = await runGuardianItemsJob(
+        supabase,
+        user.id,
+        job.document_id,
+        job.profile_id,
+        diagnostics
+      );
     } else {
       diagnostics = await runKnowledgeJob(
         supabase,
@@ -956,6 +1053,14 @@ export async function retryDocumentProcessing(
     await supabase
       .from("documents")
       .update({ ontology_status: "pending", last_processing_error: null })
+      .eq("id", args.documentId);
+  } else if (stage === "extract_guardian_items") {
+    await supabase
+      .from("documents")
+      .update({
+        guardian_items_status: "pending",
+        last_processing_error: null,
+      })
       .eq("id", args.documentId);
   } else {
     await supabase

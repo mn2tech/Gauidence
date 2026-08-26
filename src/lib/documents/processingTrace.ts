@@ -12,6 +12,7 @@ export type ProcessingJobType =
   | "analyze_document"
   | "index_document"
   | "extract_ontology"
+  | "extract_guardian_items"
   | "extract_knowledge";
 
 export type ProcessingTraceStageStatus =
@@ -47,6 +48,7 @@ export const PROCESSING_TIMING_LABELS: Record<ProcessingTimingKey, string> = {
   chunking_ms: "Chunking",
   embedding_ms: "Search indexing",
   ontology_extraction_ms: "Ontology extraction",
+  guardian_items_extraction_ms: "Finding what matters",
   knowledge_extraction_ms: "Knowledge graph",
   total_to_searchable_ms: "Total to searchable",
   total_to_knowledge_ready_ms: "Total to knowledge ready",
@@ -56,6 +58,7 @@ const STAGE_ORDER: ProcessingJobType[] = [
   "analyze_document",
   "index_document",
   "extract_ontology",
+  "extract_guardian_items",
   "extract_knowledge",
 ];
 
@@ -63,6 +66,7 @@ const STAGE_LABELS: Record<ProcessingJobType, string> = {
   analyze_document: "Reading & analyzing",
   index_document: "Making searchable",
   extract_ontology: "Extracting entities",
+  extract_guardian_items: "Finding what matters",
   extract_knowledge: "Building knowledge",
 };
 
@@ -109,6 +113,13 @@ function mapJobStatus(
         const ontology = doc.ontology_status ?? "pending";
         if (ontology === "skipped") return "skipped";
         if (ontology === "failed") return "failed";
+      }
+      if (stageId === "extract_guardian_items") {
+        const gi =
+          (doc as { guardian_items_status?: string | null })
+            .guardian_items_status ?? "pending";
+        if (gi === "skipped") return "skipped";
+        if (gi === "failed") return "failed";
       }
       if (stageId === "extract_knowledge") {
         const knowledge = doc.knowledge_status ?? "pending";
@@ -165,6 +176,13 @@ export function buildProcessingTrace(args: {
     if (
       id === "extract_ontology" &&
       (args.doc.ontology_status ?? "") === "skipped"
+    ) {
+      status = "skipped";
+    }
+    if (
+      id === "extract_guardian_items" &&
+      ((args.doc as { guardian_items_status?: string | null })
+        .guardian_items_status ?? "") === "skipped"
     ) {
       status = "skipped";
     }

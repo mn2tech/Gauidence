@@ -141,6 +141,7 @@ export async function POST(request: Request) {
           .in("job_type", [
             "index_document",
             "extract_ontology",
+            "extract_guardian_items",
             "extract_knowledge",
           ])
           .order("created_at", { ascending: true })
@@ -155,6 +156,7 @@ export async function POST(request: Request) {
             job_type: next.job_type as
               | "index_document"
               | "extract_ontology"
+              | "extract_guardian_items"
               | "extract_knowledge",
             attempts: next.attempts ?? 0,
           });

@@ -2,30 +2,25 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  ArrowRight,
-  FolderPlus,
-  NotebookPen,
-  Plus,
-  Sparkles,
-} from "lucide-react";
+import { ArrowRight, BookOpen, FolderPlus } from "lucide-react";
 import ProfileAvatar from "@/components/ProfileAvatar";
 import ProfileSetupHub from "@/components/ProfileSetupHub";
-import GuardianLogo from "@/components/brand/GuardianLogo";
-import { GUARDIAN_BRAND_TAGLINE } from "@/lib/branding";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import { useUpgradeModal } from "@/components/UpgradeProvider";
 import { useSimpleHomeData } from "@/hooks/useSimpleHomeData";
+import {
+  GuardianSourcePanel,
+  GuardianWatchList,
+  useGuardianWatchHome,
+} from "@/hooks/useGuardianWatchHome";
+import PersonalSpaceWelcome from "@/components/personal-space/PersonalSpaceWelcome";
 import GideonWelcome from "@/components/gideon-welcome/GideonWelcome";
 import { formatActivityWhen } from "@/lib/simple-home/helpers";
-import {
-  ADD_ANYTHING_PATH,
-  ASK_GIDEON_PATH,
-  REMEMBER_TODAY_PATH,
-  VAULTS_PATH,
-} from "@/lib/simple-home/routing";
+import { VAULTS_PATH } from "@/lib/simple-home/routing";
 import { documentsHref } from "@/lib/routes";
 import { getContainerLabel, topLevelProfiles } from "@/lib/profiles/types";
+import { PERSONAL_SPACE_DISPLAY_NAME } from "@/lib/personal-space/types";
+import { isPersonalSpaceProfile } from "@/lib/personal-space/welcome";
 
 function Section({
   title,
@@ -44,38 +39,30 @@ function Section({
   );
 }
 
-const PRIMARY_ACTIONS = [
-  {
-    href: ADD_ANYTHING_PATH,
-    label: "Add Knowledge",
-    description: "Upload, paste, or capture",
-    icon: Plus,
-    accent: true,
-  },
-  {
-    href: REMEMBER_TODAY_PATH,
-    label: "Remember Today",
-    description: "What happened today?",
-    icon: NotebookPen,
-    accent: false,
-  },
-  {
-    href: ASK_GIDEON_PATH,
-    label: "Ask Gideon",
-    description: "Search everything you know",
-    icon: Sparkles,
-    accent: false,
-  },
-] as const;
-
 export default function SimpleHomeScreen() {
   const router = useRouter();
   const { active, profiles, loading: profilesLoading, switchProfile } =
     useActiveProfile();
   const { data, loading } = useSimpleHomeData();
+  const watch = useGuardianWatchHome();
   const { openUpgrade } = useUpgradeModal();
 
   const spaces = topLevelProfiles(profiles);
+  const personal =
+    profiles.find((p) => isPersonalSpaceProfile(p) && p.is_default) ??
+    profiles.find((p) => isPersonalSpaceProfile(p)) ??
+    null;
+  const isPersonalActive = active
+    ? isPersonalSpaceProfile(active)
+    : Boolean(personal);
+  const knowledgeEmpty =
+    !loading &&
+    !watch.loading &&
+    data.recentActivity.length === 0 &&
+    data.todayAlerts.length === 0 &&
+    watch.data.today.length === 0 &&
+    watch.data.needsAttention.length === 0 &&
+    watch.data.comingUp.length === 0;
 
   async function handleNewSpace() {
     try {
@@ -102,102 +89,46 @@ export default function SimpleHomeScreen() {
     return <p className="p-6 text-sm text-ink-muted">Loading your home…</p>;
   }
 
+  // Personal Space is auto-created — avoid a create-space-first experience.
   if (profiles.length === 0) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-8">
-        <div className="mb-8 text-center">
-          <GuardianLogo variant="lockup" size="md" className="mx-auto" />
-          <p className="mt-3 text-[10px] font-medium uppercase tracking-[0.18em] text-ink-muted">
-            {GUARDIAN_BRAND_TAGLINE}
-          </p>
-          <h1 className="mt-6 text-2xl font-semibold tracking-tight">
-            Create your first Space.
-          </h1>
-          <p className="mt-2 text-sm text-ink-muted">
-            A Space gives Guardian a place to understand one part of your life
-            or work.
-          </p>
+        <PersonalSpaceWelcome spaceName={PERSONAL_SPACE_DISPLAY_NAME} />
+        <p className="mt-6 text-center text-sm text-ink-muted">
+          Setting up your Personal Space…
+        </p>
+        <div className="mt-4">
+          <ProfileSetupHub returnTo="/home" />
         </div>
-        <div className="mb-6 grid gap-3 sm:grid-cols-3">
-          {PRIMARY_ACTIONS.map((action) => {
-            const Icon = action.icon;
-            return (
-              <Link
-                key={action.href}
-                href={action.href}
-                className={`simple-home-card flex flex-col items-center gap-2 p-4 text-center transition hover:shadow-card ${
-                  action.accent ? "border-brand/30 bg-brand-light/20" : ""
-                }`}
-              >
-                <Icon
-                  className={`h-6 w-6 ${action.accent ? "text-brand" : "text-ink-muted"}`}
-                />
-                <span className="text-sm font-semibold">{action.label}</span>
-              </Link>
-            );
-          })}
-        </div>
-        <ProfileSetupHub returnTo="/home" />
       </div>
     );
   }
 
-  const attentionItems: { id: string; text: string; href: string }[] = [];
-  for (const alert of data.todayAlerts.slice(0, 3)) {
-    attentionItems.push({
-      id: `alert-${alert.id}`,
-      text: alert.title,
-      href: active ? documentsHref(active.id) : ADD_ANYTHING_PATH,
-    });
-  }
-  for (const req of data.openRequests.slice(0, 2)) {
-    attentionItems.push({
-      id: `req-${req.id}`,
-      text: req.title,
-      href: `/requests?id=${req.id}`,
-    });
-  }
+  const showPersonalWelcome = isPersonalActive && knowledgeEmpty;
+  const watchLoading = watch.loading;
 
   return (
     <div className="simple-home-page mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-6 sm:gap-7 sm:py-8">
-      <GideonWelcome />
+      {showPersonalWelcome ? (
+        <PersonalSpaceWelcome
+          spaceName={
+            personal?.display_name ||
+            active?.display_name ||
+            PERSONAL_SPACE_DISPLAY_NAME
+          }
+        />
+      ) : (
+        <GideonWelcome />
+      )}
 
-      <div
-        className="grid gap-3 welcome-strip sm:grid-cols-3"
-        style={{ animationDelay: "0.05s" }}
-      >
-        {PRIMARY_ACTIONS.map((action) => {
-          const Icon = action.icon;
-          return (
-            <Link
-              key={action.href}
-              href={action.href}
-              className={`simple-home-card flex flex-col gap-3 p-4 transition hover:shadow-card ${
-                action.accent
-                  ? "border-brand/30 bg-gradient-to-br from-brand-light/50 to-white"
-                  : ""
-              }`}
-            >
-              <span
-                className={`flex h-10 w-10 items-center justify-center rounded-xl ${
-                  action.accent
-                    ? "bg-brand text-white shadow-sm"
-                    : "bg-brand-light text-brand"
-                }`}
-              >
-                <Icon className="h-5 w-5" aria-hidden />
-              </span>
-              <span>
-                <span className="block text-sm font-semibold text-foreground">
-                  {action.label}
-                </span>
-                <span className="mt-0.5 block text-xs text-ink-muted">
-                  {action.description}
-                </span>
-              </span>
-            </Link>
-          );
-        })}
+      <div className="flex flex-wrap gap-2">
+        <Link
+          href="/knowledge"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-border-subtle bg-white px-3 py-2 text-xs font-semibold text-foreground transition hover:border-brand/40"
+        >
+          <BookOpen className="h-3.5 w-3.5 text-brand" />
+          My Knowledge
+        </Link>
       </div>
 
       <Section title="Your Spaces">
@@ -244,26 +175,46 @@ export default function SimpleHomeScreen() {
         </div>
       </Section>
 
-      <Section title="Needs Attention">
-        {loading ? (
+      {!watchLoading && watch.data.today.length > 0 ? (
+        <Section title="Today">
+          <GuardianWatchList
+            items={watch.data.today}
+            onComplete={(id) => void watch.complete(id)}
+            onDismiss={(id) => void watch.dismiss(id)}
+            onViewSource={(id) => void watch.viewSource(id)}
+          />
+        </Section>
+      ) : null}
+
+      <Section title="What You Need">
+        {watchLoading ? (
           <p className="text-sm text-ink-muted">Loading…</p>
-        ) : attentionItems.length > 0 ? (
-          <ul className="space-y-1">
-            {attentionItems.map((item) => (
-              <li key={item.id}>
-                <Link
-                  href={item.href}
-                  className="block rounded-xl px-2 py-2.5 text-sm font-medium text-foreground transition hover:bg-brand-light/35"
-                >
-                  {item.text}
-                </Link>
-              </li>
-            ))}
-          </ul>
+        ) : watch.data.needsAttention.length > 0 ? (
+          <GuardianWatchList
+            items={watch.data.needsAttention}
+            onComplete={(id) => void watch.complete(id)}
+            onDismiss={(id) => void watch.dismiss(id)}
+            onViewSource={(id) => void watch.viewSource(id)}
+          />
         ) : (
           <p className="text-sm text-ink-muted">
             Nothing needs your attention right now.
           </p>
+        )}
+      </Section>
+
+      <Section title="Coming Up">
+        {watchLoading ? (
+          <p className="text-sm text-ink-muted">Loading…</p>
+        ) : watch.data.comingUp.length > 0 ? (
+          <GuardianWatchList
+            items={watch.data.comingUp}
+            onComplete={(id) => void watch.complete(id)}
+            onDismiss={(id) => void watch.dismiss(id)}
+            onViewSource={(id) => void watch.viewSource(id)}
+          />
+        ) : (
+          <p className="text-sm text-ink-muted">Nothing coming up soon.</p>
         )}
       </Section>
 
@@ -311,6 +262,11 @@ export default function SimpleHomeScreen() {
           <ArrowRight className="h-4 w-4 shrink-0 text-brand" aria-hidden />
         </button>
       ) : null}
+
+      <GuardianSourcePanel
+        open={watch.sourceOpen}
+        onClose={watch.closeSource}
+      />
     </div>
   );
 }

@@ -180,6 +180,26 @@ export async function POST(request: Request) {
     );
   }
 
+  // Dual-write into guardian_items so Watch / Gideon share one model.
+  try {
+    const { insertManualGuardianItem } = await import(
+      "@/lib/guardian-items/persist"
+    );
+    await insertManualGuardianItem(writer, {
+      userId: user.id,
+      spaceId: profileId,
+      title,
+      dueAt,
+      eventDate: dueDate,
+      type: "reminder",
+    });
+  } catch (err) {
+    console.warn(
+      "Guardian item dual-write failed (reminder still saved):",
+      err instanceof Error ? err.message : "error"
+    );
+  }
+
   return NextResponse.json({
     reminder: data,
     whenLabel: formatReminderWhen(data.due_at, data.due_date, userTz),

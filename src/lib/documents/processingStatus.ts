@@ -66,6 +66,7 @@ export const PROCESSING_STEP_LABELS: Record<string, string> = {
   validating: "Checking dates and amounts",
   indexing: "Making document searchable",
   ontology: "Extracting business entities",
+  guardian_items: "Finding what matters",
   knowledge: "Building connected knowledge",
   ready: "Ready to ask Gideon",
 };
@@ -198,6 +199,7 @@ const STEP_TO_STAGE: Record<string, DocumentProcessingStage> = {
   validating: "analyzing",
   indexing: "indexing",
   ontology: "knowledge_processing",
+  guardian_items: "knowledge_processing",
   knowledge: "knowledge_processing",
   ready: "ready",
 };

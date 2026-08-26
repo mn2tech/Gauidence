@@ -23,6 +23,7 @@ const ACTIVE_STATUS_STALE_MS = {
   analyze_document: 6 * 60 * 1000,
   index_document: 5 * 60 * 1000,
   extract_ontology: 5 * 60 * 1000,
+  extract_guardian_items: 5 * 60 * 1000,
   extract_knowledge: 5 * 60 * 1000,
 } as const;
 
