@@ -70,6 +70,8 @@ export async function scheduleDocumentAnalysis(
 
     // Sync JSON path finished in this request — treat as successfully scheduled.
     if (body.sync) {
+      // Index/knowledge stages may still be pending after sync analyze.
+      void kickDocumentProcessingJobs(2);
       return {
         queued: true,
         documentId,
@@ -77,6 +79,12 @@ export async function scheduleDocumentAnalysis(
         processingLabel: body.processingLabel ?? "Ready to ask Gideon",
         jobId: body.jobId ?? null,
       };
+    }
+
+    // Analyze only enqueues — drain immediately so Vision/docs don't sit on
+    // "Analyzing…" until cron (every 2 min) or another screen kicks the worker.
+    if (body.queued ?? true) {
+      void kickDocumentProcessingJobs(2);
     }
 
     return {

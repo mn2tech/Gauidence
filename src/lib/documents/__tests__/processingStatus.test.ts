@@ -158,7 +158,7 @@ describe("processingStatus", () => {
         mime_type: "image/png",
         file_name: "shot.png",
       }),
-      "Vision analyzed"
+      "Ready to ask Gideon"
     );
     assert.equal(
       userFacingStatusLabel({

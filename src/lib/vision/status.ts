@@ -12,7 +12,7 @@ export const VISION_STAGE_LABELS = {
   uploaded: "Uploaded",
   queued: "Waiting to analyze image…",
   analyzing: "Analyzing image...",
-  ready: "Vision analyzed",
+  ready: "Ready to ask Gideon",
   failed: "Analysis failed",
   retryable: "Analysis failed",
 } as const;

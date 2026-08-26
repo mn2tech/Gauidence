@@ -191,140 +191,149 @@ async function runImageVisionPipeline(
 ): Promise<PipelineResult> {
   await onProgress?.("analyzing");
   const started = Date.now();
+  // Keep the job lease fresh during long Claude vision calls so status polls
+  // do not mark a live worker as timed out.
+  const heartbeat = setInterval(() => {
+    void onProgress?.("analyzing");
+  }, 45_000);
   logVisionEvent("vision_started", {
     documentId: user.documentId,
     spaceId: user.profileId,
   });
 
-  let prepared;
   try {
-    prepared = await prepareImageForVision({
-      mimeType: file.mimeType,
-      base64: file.base64,
-      fileName: file.fileName,
-    });
-  } catch (err) {
-    const message =
-      err instanceof Error
-        ? err.message
-        : "This image format couldn't be prepared for analysis.";
-    logVisionEvent("vision_failed", {
-      documentId: user.documentId,
-      spaceId: user.profileId,
-      durationMs: Date.now() - started,
-      error: message,
-    });
-    throw err instanceof AnalysisLlmError
-      ? err
-      : new AnalysisLlmError(message, 422, "vision_prepare_failed");
-  }
+    let prepared;
+    try {
+      prepared = await prepareImageForVision({
+        mimeType: file.mimeType,
+        base64: file.base64,
+        fileName: file.fileName,
+      });
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "This image format couldn't be prepared for analysis.";
+      logVisionEvent("vision_failed", {
+        documentId: user.documentId,
+        spaceId: user.profileId,
+        durationMs: Date.now() - started,
+        error: message,
+      });
+      throw err instanceof AnalysisLlmError
+        ? err
+        : new AnalysisLlmError(message, 422, "vision_prepare_failed");
+    }
 
-  const visionFile: FilePayload = {
-    ...file,
-    mimeType: prepared.mimeType,
-    base64: prepared.base64,
-    inputMode: "visual",
-    pageImages: [],
-  };
-
-  try {
-    const { result, model } = await getVisionProvider().analyzeImage({
-      fileName: file.fileName,
+    const visionFile: FilePayload = {
+      ...file,
       mimeType: prepared.mimeType,
       base64: prepared.base64,
-      spaceName: user.spaceName,
-    });
-    let analysis = mapVisionResultToAnalysis(result, file.fileName);
-    analysis = validateAnalysis(analysis);
-    if (analysis.overall_confidence < 0.75) {
-      analysis.guardian_status = "needs_verification";
-    }
-    logVisionEvent("vision_completed", {
-      documentId: user.documentId,
-      spaceId: user.profileId,
-      durationMs: Date.now() - started,
-      model,
-    });
-    return {
-      classification: {
-        document_type: analysis.document_type,
-        document_subtype: result.document_type || "image",
-        classification_confidence: result.confidence,
-        classification_reason: "Guardian Vision image analysis",
-      },
-      routedTo: "vision",
-      analysis,
-      model,
       inputMode: "visual",
-      sourceText: capSourceText(buildVisionSourceText(result, file.fileName)),
-      analysisType: "vision",
-      vision: { status: "analyzed", model, result },
+      pageImages: [],
     };
-  } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Vision analysis failed.";
-    logVisionEvent("vision_failed", {
-      documentId: user.documentId,
-      spaceId: user.profileId,
-      durationMs: Date.now() - started,
-      error: message,
-    });
-    // Fallback: keep the original image on a visual specialist pass.
-    // Never treat empty OCR as success, and never switch this image to text-only.
+
     try {
-      const client = createLlmClient();
-      await onProgress?.("classifying");
-      const classification = await classifyDocument(client, visionFile);
-      const routedTo = resolveAnalyzerType(classification, IMPLEMENTED_SPECIALISTS);
-      await onProgress?.("analyzing");
-      const { analysis: rawAnalysis } = await runSpecialist(
-        client,
-        routedTo,
-        visionFile,
-        user,
-        classification.document_type
-      );
-      let analysis = validateAnalysis(rawAnalysis);
-      const hasDescription =
-        Boolean(analysis.summary?.trim()) ||
-        Boolean(analysis.title?.trim()) ||
-        (analysis.facts ?? []).some((f) => String(f.value ?? "").trim());
-      if (!hasDescription) {
-        throw err;
-      }
+      const { result, model } = await getVisionProvider().analyzeImage({
+        fileName: file.fileName,
+        mimeType: prepared.mimeType,
+        base64: prepared.base64,
+        spaceName: user.spaceName,
+      });
+      let analysis = mapVisionResultToAnalysis(result, file.fileName);
+      analysis = validateAnalysis(analysis);
       if (analysis.overall_confidence < 0.75) {
         analysis.guardian_status = "needs_verification";
       }
+      logVisionEvent("vision_completed", {
+        documentId: user.documentId,
+        spaceId: user.profileId,
+        durationMs: Date.now() - started,
+        model,
+      });
       return {
-        classification,
-        routedTo,
-        analysis,
-        model: VISUAL_ANALYSIS_MODEL,
-        inputMode: "visual",
-        sourceText: capSourceText(analysis.summary || analysis.title || ""),
-        analysisType: "vision",
-        vision: {
-          status: "analyzed",
-          model: VISUAL_ANALYSIS_MODEL,
-          result: {
-            document_type: analysis.document_type,
-            description: analysis.summary || "",
-            transcription: "",
-            summary: analysis.summary || "",
-            entities: [],
-            dates: [],
-            amounts: [],
-            facts: [],
-            tasks: [],
-            confidence: analysis.overall_confidence,
-          },
+        classification: {
+          document_type: analysis.document_type,
+          document_subtype: result.document_type || "image",
+          classification_confidence: result.confidence,
+          classification_reason: "Guardian Vision image analysis",
         },
+        routedTo: "vision",
+        analysis,
+        model,
+        inputMode: "visual",
+        sourceText: capSourceText(buildVisionSourceText(result, file.fileName)),
+        analysisType: "vision",
+        vision: { status: "analyzed", model, result },
       };
-    } catch {
-      throw err instanceof AnalysisLlmError
-        ? err
-        : new AnalysisLlmError(message, 502, "vision_failed");
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Vision analysis failed.";
+      logVisionEvent("vision_failed", {
+        documentId: user.documentId,
+        spaceId: user.profileId,
+        durationMs: Date.now() - started,
+        error: message,
+      });
+      // Fallback: keep the original image on a visual specialist pass.
+      // Never treat empty OCR as success, and never switch this image to text-only.
+      try {
+        const client = createLlmClient();
+        await onProgress?.("classifying");
+        const classification = await classifyDocument(client, visionFile);
+        const routedTo = resolveAnalyzerType(classification, IMPLEMENTED_SPECIALISTS);
+        await onProgress?.("analyzing");
+        const { analysis: rawAnalysis } = await runSpecialist(
+          client,
+          routedTo,
+          visionFile,
+          user,
+          classification.document_type
+        );
+        let analysis = validateAnalysis(rawAnalysis);
+        const hasDescription =
+          Boolean(analysis.summary?.trim()) ||
+          Boolean(analysis.title?.trim()) ||
+          (analysis.facts ?? []).some((f) => String(f.value ?? "").trim());
+        if (!hasDescription) {
+          throw err;
+        }
+        if (analysis.overall_confidence < 0.75) {
+          analysis.guardian_status = "needs_verification";
+        }
+        return {
+          classification,
+          routedTo,
+          analysis,
+          model: VISUAL_ANALYSIS_MODEL,
+          inputMode: "visual",
+          sourceText: capSourceText(analysis.summary || analysis.title || ""),
+          analysisType: "vision",
+          vision: {
+            status: "analyzed",
+            model: VISUAL_ANALYSIS_MODEL,
+            result: {
+              document_type: analysis.document_type,
+              description: analysis.summary || "",
+              transcription: "",
+              summary: analysis.summary || "",
+              entities: [],
+              dates: [],
+              amounts: [],
+              facts: [],
+              tasks: [],
+              confidence: analysis.overall_confidence,
+            },
+          },
+        };
+      } catch {
+        throw err instanceof AnalysisLlmError
+          ? err
+          : new AnalysisLlmError(message, 502, "vision_failed");
+      }
     }
+  } finally {
+    clearInterval(heartbeat);
   }
 }
 

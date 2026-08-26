@@ -211,7 +211,7 @@ export function userFacingStatusLabel(doc: DocumentProcessingFields): string {
   if (isImage) {
     if (stage === "queued" || stage === "analyzing") return "Analyzing image...";
     if (stage === "failed" || stage === "retryable") return "Analysis failed";
-    if (stage === "ready") return "Vision analyzed";
+    if (stage === "ready") return "Ready to ask Gideon";
     if (stage === "uploaded") return "Uploaded";
   }
   const step = doc.processing_step;

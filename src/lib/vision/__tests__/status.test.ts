@@ -22,7 +22,7 @@ describe("Guardian Vision status labels", () => {
     );
   });
 
-  it("shows Vision analyzed when ready", () => {
+  it("shows Ready to ask Gideon when ready", () => {
     assert.equal(
       visionStatusLabel({
         mimeType: "image/jpeg",
@@ -33,7 +33,7 @@ describe("Guardian Vision status labels", () => {
           knowledge_status: "skipped",
         },
       }),
-      "Vision analyzed"
+      "Ready to ask Gideon"
     );
   });
 

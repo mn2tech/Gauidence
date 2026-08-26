@@ -53,4 +53,13 @@ describe("async upload pipeline contracts", () => {
     assert.match(source, /scheduleDocumentAnalysis/);
     assert.doesNotMatch(source, /ANALYZE_CLIENT_TIMEOUT_MS/);
   });
+
+  it("schedules analysis then kicks the background worker", async () => {
+    const source = await readFile(
+      new URL("../clientProcessing.ts", import.meta.url),
+      "utf8"
+    );
+    assert.match(source, /kickDocumentProcessingJobs\(2\)/);
+    assert.match(source, /body\.queued/);
+  });
 });
