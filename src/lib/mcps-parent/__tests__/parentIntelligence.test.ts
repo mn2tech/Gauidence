@@ -9,6 +9,7 @@ import {
   daysBetween,
   formatParentDate,
   gradesMatch,
+  groupComingUp,
   humanizeKnowledgeTitle,
   humanizeSummary,
   isKnownMcpsSchool,
@@ -615,6 +616,41 @@ describe("family merge / Ask scoping", () => {
   it("suggests family questions in All Children mode", () => {
     const qs = buildFamilySuggestedQuestions({ view: "all", topItems: [] });
     assert.ok(qs.some((q) => /family/i.test(q)));
+  });
+
+  it("Coming Up omits items already in What you need", () => {
+    const labor = {
+      id: "d1",
+      title: "Labor Day — no school",
+      summary: "Closed",
+      category: "calendar",
+      school: null,
+      grade_level: null,
+      authority: "MCPS",
+      source_url: null,
+      source_name: "Calendar",
+      event_date: "2026-09-07",
+      effective_date: null,
+      expires_at: null,
+      last_checked_at: null,
+      score: 100,
+      reasons: ["No school / closure" as const],
+      importance_tags: ["no_school"],
+      stale: false,
+    };
+    const later = {
+      ...labor,
+      id: "e1",
+      title: "Early release",
+      event_date: "2026-09-18",
+      score: 80,
+    };
+    const groups = groupComingUp([labor, later], asOf, {
+      excludeIds: [labor.id],
+    });
+    const ids = groups.flatMap((g) => g.items.map((i) => i.id));
+    assert.ok(!ids.includes("d1"));
+    assert.ok(ids.includes("e1"));
   });
 });
 

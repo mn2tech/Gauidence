@@ -331,13 +331,17 @@ export function rankWhatMatters(
 
 export function groupComingUp(
   items: ScoredParentItem[],
-  asOf: Date
+  asOf: Date,
+  opts?: { excludeIds?: Iterable<string> }
 ): Array<{ label: "This Week" | "Next Week" | "Later"; items: ScoredParentItem[] }> {
+  const exclude = new Set(opts?.excludeIds ?? []);
   const thisWeek: ScoredParentItem[] = [];
   const nextWeek: ScoredParentItem[] = [];
   const later: ScoredParentItem[] = [];
 
   for (const item of items) {
+    // Coming Up should not repeat cards already featured above.
+    if (exclude.has(item.id)) continue;
     // Coming Up is for dated items only — no evergreen dump.
     if (!item.event_date) continue;
     const d = parseYmd(item.event_date);

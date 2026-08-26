@@ -222,7 +222,9 @@ export async function buildParentDashboard(args: {
     comingPool = annotated;
   }
 
-  const coming_up = groupComingUp(comingPool, asOf);
+  const coming_up = groupComingUp(comingPool, asOf, {
+    excludeIds: what_you_need.map((i) => i.id),
+  });
 
   return {
     context: primary,
