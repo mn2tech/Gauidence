@@ -74,7 +74,14 @@ const CLARIFICATION =
   /^(which (one|song|file|document|space)|what do you mean|can you clarify|did you mean|which .{0,30}\?)\s*$/i;
 
 const GUARDIAN_WORLD =
-  /\b(my|our|their|his|her|the (space|workspace|practice|firm|client|company)|this (space|workspace|practice|client)|uploaded|document|file|form crs|form adv|daily log|commitment|proposal|invoice|school (calendar|closure|closed)|passport|registration|appointment)\b/i;
+  /\b(my|our|their|his|her|the (space|workspace|practice|firm|client|company)|this (space|workspace|practice|client)|uploaded|document|file|form crs|form adv|daily log|commitment|proposal|invoice|school (calendar|closure|closed|schedule)|passport|registration|appointment)\b/i;
+
+/**
+ * Document-topic noun phrases users type as lookups (often the analysis title).
+ * These must search Guardian even without what/when/who — e.g. "school calendar".
+ */
+const GUARDIAN_TOPIC_LOOKUP =
+  /\b(school (calendar|closure|closed|schedule)|form crs|form adv|daily logs?|passport|vehicle registration|registration (card|form|sticker)|invoice|proposal|commitment)\b/i;
 
 const GUARDIAN_ENTITY_ASK =
   /\b(what (is|are|was|were|does|do|did)|when (is|are|was|were)|who (is|are|was|were)|where (is|are)|how much|how many|minimum (investment|account)|services? (do|does|offered|offer)|insurance|conflicts? of interest|what do we know|everything .{0,20}know)\b/i;
@@ -143,6 +150,8 @@ function looksLikeGuardianWorldQuestion(
     return true;
   }
   if (GLOBAL_TODAY.test(q)) return true;
+  // Bare topic lookups ("school calendar") — no interrogative required.
+  if (GUARDIAN_TOPIC_LOOKUP.test(q)) return true;
   if (GUARDIAN_WORLD.test(q) && GUARDIAN_ENTITY_ASK.test(q)) return true;
   // Possessive / ownership cues with concrete personal/business knowledge nouns.
   if (

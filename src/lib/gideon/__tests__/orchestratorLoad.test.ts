@@ -38,4 +38,21 @@ describe("resolveGideonLoadWithOrchestration", () => {
     });
     assert.equal(load.documents, true);
   });
+
+  it("loads documents for bare school calendar in a space", () => {
+    const question = "school calendar";
+    const capabilityRoute = classifyGideonIntent({ question });
+    const orchestration = routeGideonOrchestration({
+      question,
+      spaceId: "nolan",
+      spaceName: "Nolan Kola",
+    });
+    assert.equal(orchestration.guardianKnowledgeRequired, true);
+    assert.equal(capabilityRoute.capabilities.guardianKnowledge, true);
+    const load = resolveGideonLoadWithOrchestration({
+      capabilityRoute,
+      orchestration,
+    });
+    assert.equal(load.documents, true);
+  });
 });

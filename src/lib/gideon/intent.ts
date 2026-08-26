@@ -47,7 +47,7 @@ const KNOWLEDGE_EXPLICIT =
   /\b(ask guardian|search guardian|from (my|the|our) (files?|documents?|spaces?|guardian)|in (this|my|the|our) (space|workspace|vault|files?|documents?)|what(?:'s| is) (uploaded|stored|in this space)|what (documents?|files?) (are|do i)|space map|what spaces do i have)\b/i;
 
 const KNOWLEDGE_SOURCE =
-  /\b(handbook|contract|invoice|invoices|policy|agreement|nda|lease|receipt|warranty|uploaded|(my|the|our) documents?|(my|the|our) files?|daily logs?|client requests?|trello|google drive|drive files?|chord charts?)\b/i;
+  /\b(handbook|contract|invoice|invoices|policy|agreement|nda|lease|receipt|warranty|uploaded|(my|the|our) documents?|(my|the|our) files?|daily logs?|client requests?|trello|google drive|drive files?|chord charts?|school (calendar|closure|closed|schedule)|passport)\b/i;
 
 /** Song/chart questions must search Guardian even when they start with "what is/are". */
 const KNOWLEDGE_MUSIC =

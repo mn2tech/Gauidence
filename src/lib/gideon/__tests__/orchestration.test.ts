@@ -187,9 +187,21 @@ describe("Gideon orchestration — acceptance", () => {
       assert.equal(
         route.guardianKnowledgeRequired,
         true,
-        `expected knowledge for: ${q}`
+        q
       );
-      assert.equal(route.knowledgeSource, "guardian");
+    }
+  });
+
+  it("bare school calendar lookups require Guardian search", () => {
+    for (const q of ["school calendar", "school calendar dates", "my school calendar"]) {
+      const route = routeGideonOrchestration({
+        question: q,
+        spaceId: "nolan-space",
+        spaceName: "Nolan Kola",
+      });
+      assert.equal(route.intent, "guardian_knowledge", q);
+      assert.equal(route.guardianKnowledgeRequired, true, q);
+      assert.equal(route.knowledgeSource, "guardian", q);
     }
   });
 

@@ -195,6 +195,12 @@ describe("Gideon intent router — follow-ups and tools", () => {
     assert.equal(shouldSearchGuardianKnowledge(route), true);
   });
 
+  it("searches Guardian for bare school calendar lookups", () => {
+    const route = classifyGideonIntent({ question: "school calendar" });
+    assert.equal(route.intent, "knowledge_search");
+    assert.equal(shouldSearchGuardianKnowledge(route), true);
+  });
+
   it("searches Guardian for Trello chord and analyzed-PDF questions", () => {
     const chords = classifyGideonIntent({
       question: "What are the chords for Ibadat Karo?",
