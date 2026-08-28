@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { dismissGuardianItem } from "@/lib/guardian-items/actions";
+import { recordIntelligenceFeedback } from "@/lib/guardian-today/feedback";
 
 export const runtime = "nodejs";
 
@@ -25,5 +26,6 @@ export async function POST(
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }
+  await recordIntelligenceFeedback(supabase, user.id, id, "dismissed");
   return NextResponse.json({ ok: true });
 }

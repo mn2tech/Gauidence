@@ -46,6 +46,7 @@ export default function SimpleNavigation() {
         </Link>
         <Link
           href={ASK_GIDEON_PATH}
+          prefetch={false}
           className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 transition ${
             askActive ? "text-brand" : "text-ink-muted hover:text-foreground"
           }`}

@@ -111,6 +111,23 @@ export async function PATCH(request: Request, ctx: Ctx) {
       { status: 502 }
     );
   }
+
+  void import("@/lib/guardian-items/fromDailyLog").then(
+    ({ syncGuardianItemsFromDailyLog }) =>
+      syncGuardianItemsFromDailyLog(supabase, {
+        userId: user.id,
+        log: {
+          id: data.id,
+          profile_id: data.profile_id,
+          title: data.title,
+          content: data.content,
+          log_date: data.log_date,
+        },
+      }).catch((err) => {
+        console.error("Daily log → guardian items sync failed:", err);
+      })
+  );
+
   return NextResponse.json({ log: data });
 }
 

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { completeGuardianItem } from "@/lib/guardian-items/actions";
+import { snoozeGuardianItem } from "@/lib/guardian-items/actions";
 import { recordIntelligenceFeedback } from "@/lib/guardian-today/feedback";
 
 export const runtime = "nodejs";
@@ -22,10 +22,11 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 
-  const result = await completeGuardianItem(supabase, id);
+  const result = await snoozeGuardianItem(supabase, user.id, id);
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }
-  await recordIntelligenceFeedback(supabase, user.id, id, "completed");
+
+  await recordIntelligenceFeedback(supabase, user.id, id, "snoozed");
   return NextResponse.json({ ok: true });
 }

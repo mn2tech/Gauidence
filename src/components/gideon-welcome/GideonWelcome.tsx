@@ -14,9 +14,11 @@ import { ASK_GIDEON_PATH } from "@/lib/simple-home/routing";
 export default function GideonWelcome({
   showAskForm = true,
   className = "",
+  mode = "default",
 }: {
   showAskForm?: boolean;
   className?: string;
+  mode?: "default" | "today";
 }) {
   const router = useRouter();
   const { active } = useActiveProfile();
@@ -58,9 +60,11 @@ export default function GideonWelcome({
     <section
       className={`gideon-welcome simple-home-card welcome-strip space-y-4 p-4 sm:space-y-5 sm:p-5 ${className}`.trim()}
     >
-      <GreetingHeader greeting={greeting} view={view} />
-      <SpaceStatus view={view} />
-      <SuggestedActions actions={view.actions} showPrompt={showActionPrompt} />
+      <GreetingHeader greeting={greeting} view={view} mode={mode} />
+      {mode === "default" ? <SpaceStatus view={view} /> : null}
+      {mode === "default" ? (
+        <SuggestedActions actions={view.actions} showPrompt={showActionPrompt} />
+      ) : null}
 
       {showAskForm ? (
       <form

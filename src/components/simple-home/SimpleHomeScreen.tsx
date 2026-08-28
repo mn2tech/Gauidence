@@ -2,19 +2,24 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, BookOpen, FolderPlus } from "lucide-react";
+import { ArrowRight, FolderPlus } from "lucide-react";
 import ProfileAvatar from "@/components/ProfileAvatar";
 import ProfileSetupHub from "@/components/ProfileSetupHub";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import { useUpgradeModal } from "@/components/UpgradeProvider";
 import { useSimpleHomeData } from "@/hooks/useSimpleHomeData";
-import {
-  GuardianSourcePanel,
-  GuardianWatchList,
-  useGuardianWatchHome,
-} from "@/hooks/useGuardianWatchHome";
+import { useGuardianToday } from "@/hooks/useGuardianToday";
 import PersonalSpaceWelcome from "@/components/personal-space/PersonalSpaceWelcome";
 import GideonWelcome from "@/components/gideon-welcome/GideonWelcome";
+import { GuardianPriorityCard } from "@/components/guardian-today/GuardianPriorityCard";
+import {
+  GuardianCoverageFooter,
+  GuardianIntelligenceEmptyState,
+  GuardianPartialBanner,
+  GuardianProvenancePanel,
+  GuardianWhatChanged,
+} from "@/components/guardian-today/GuardianTodaySections";
+import { GuardianSourcePanel } from "@/hooks/useGuardianWatchHome";
 import { formatActivityWhen } from "@/lib/simple-home/helpers";
 import { VAULTS_PATH } from "@/lib/simple-home/routing";
 import { documentsHref } from "@/lib/routes";
@@ -43,8 +48,8 @@ export default function SimpleHomeScreen() {
   const router = useRouter();
   const { active, profiles, loading: profilesLoading, switchProfile } =
     useActiveProfile();
-  const { data, loading } = useSimpleHomeData();
-  const watch = useGuardianWatchHome();
+  const { data: homeData, loading: homeLoading } = useSimpleHomeData();
+  const today = useGuardianToday();
   const { openUpgrade } = useUpgradeModal();
 
   const spaces = topLevelProfiles(profiles);
@@ -56,13 +61,13 @@ export default function SimpleHomeScreen() {
     ? isPersonalSpaceProfile(active)
     : Boolean(personal);
   const knowledgeEmpty =
-    !loading &&
-    !watch.loading &&
-    data.recentActivity.length === 0 &&
-    data.todayAlerts.length === 0 &&
-    watch.data.today.length === 0 &&
-    watch.data.needsAttention.length === 0 &&
-    watch.data.comingUp.length === 0;
+    !homeLoading &&
+    !today.loading &&
+    homeData.recentActivity.length === 0 &&
+    today.data.priorities.length === 0 &&
+    today.data.whatChanged.length === 0 &&
+    (today.data.coverage?.status === "no_sources" ||
+      (today.data.coverage?.sourceCount ?? 0) === 0);
 
   async function handleNewSpace() {
     try {
@@ -89,7 +94,6 @@ export default function SimpleHomeScreen() {
     return <p className="p-6 text-sm text-ink-muted">Loading your home…</p>;
   }
 
-  // Personal Space is auto-created — avoid a create-space-first experience.
   if (profiles.length === 0) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-8">
@@ -105,7 +109,6 @@ export default function SimpleHomeScreen() {
   }
 
   const showPersonalWelcome = isPersonalActive && knowledgeEmpty;
-  const watchLoading = watch.loading;
 
   return (
     <div className="simple-home-page mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-6 sm:gap-7 sm:py-8">
@@ -118,18 +121,94 @@ export default function SimpleHomeScreen() {
           }
         />
       ) : (
-        <GideonWelcome />
+        <GideonWelcome mode="today" />
       )}
 
-      <div className="flex flex-wrap gap-2">
-        <Link
-          href="/knowledge"
-          className="inline-flex items-center gap-1.5 rounded-xl border border-border-subtle bg-white px-3 py-2 text-xs font-semibold text-foreground transition hover:border-brand/40"
+      {today.loading ? (
+        <Section title="Today's priorities">
+          <p className="text-sm text-ink-muted">Loading…</p>
+        </Section>
+      ) : today.data.priorities.length > 0 ? (
+        <Section title="Today's priorities">
+          <GuardianPartialBanner
+            coverage={today.data.coverage ?? {
+              spaceCount: 0,
+              sourceCount: 0,
+              processedSourceCount: 0,
+              pendingSourceCount: 0,
+              processingSourceCount: 0,
+              failedSourceCount: 0,
+              activeItemCount: 0,
+              lastExtractionAt: null,
+              lastWatchEvaluationAt: null,
+              status: "never_scanned",
+            }}
+          />
+          <ul className="space-y-3">
+            {today.data.priorities.map((item) => (
+              <GuardianPriorityCard
+                key={item.id}
+                item={item}
+                onComplete={(id) => void today.complete(id)}
+                onDismiss={(id) => void today.dismiss(id)}
+                onSnooze={(id) => void today.snooze(id)}
+                onViewSource={(i) => void today.viewSource(i)}
+                onAskGideon={(i) => today.askGideon(i)}
+                onReview={(i) => today.review(i)}
+                onWhy={(i) => today.setProvenanceOpen(i)}
+              />
+            ))}
+          </ul>
+          {today.data.coverageSummary ? (
+            <div className="mt-4 border-t border-border-subtle pt-3">
+              <GuardianCoverageFooter summary={today.data.coverageSummary} />
+            </div>
+          ) : null}
+        </Section>
+      ) : (
+        <GuardianIntelligenceEmptyState
+          coverage={
+            today.data.coverage ?? {
+              spaceCount: 0,
+              sourceCount: 0,
+              processedSourceCount: 0,
+              pendingSourceCount: 0,
+              processingSourceCount: 0,
+              failedSourceCount: 0,
+              activeItemCount: 0,
+              lastExtractionAt: null,
+              lastWatchEvaluationAt: null,
+              status: "never_scanned",
+            }
+          }
+          coverageSummary={today.data.coverageSummary}
+          onRetry={() => void today.runBackfill()}
+          retrying={today.retrying}
+          showRecentActivity={
+            today.data.caughtUp && homeData.recentActivity.length > 0
+          }
         >
-          <BookOpen className="h-3.5 w-3.5 text-brand" />
-          My Knowledge
-        </Link>
-      </div>
+          <ul className="space-y-1">
+            {homeData.recentActivity.slice(0, 5).map((item) => (
+              <li key={item.id}>
+                <Link
+                  href={item.href}
+                  className="flex items-start justify-between gap-3 rounded-xl px-2 py-2.5 text-sm transition hover:bg-brand-light/35"
+                >
+                  <span className="min-w-0 font-medium text-foreground">
+                    {item.title}
+                  </span>
+                  <span className="shrink-0 text-xs text-ink-muted">
+                    {formatActivityWhen(item.occurredAt)}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </GuardianIntelligenceEmptyState>
+      )}
+
+      <GuardianWhatChanged entries={today.data.whatChanged} />
 
       <Section title="Your Spaces">
         <ul className="space-y-1">
@@ -175,97 +254,13 @@ export default function SimpleHomeScreen() {
         </div>
       </Section>
 
-      {!watchLoading && watch.data.today.length > 0 ? (
-        <Section title="Today">
-          <GuardianWatchList
-            items={watch.data.today}
-            onComplete={(id) => void watch.complete(id)}
-            onDismiss={(id) => void watch.dismiss(id)}
-            onViewSource={(id) => void watch.viewSource(id)}
-          />
-        </Section>
-      ) : null}
-
-      <Section title="What You Need">
-        {watchLoading ? (
-          <p className="text-sm text-ink-muted">Loading…</p>
-        ) : watch.data.needsAttention.length > 0 ? (
-          <GuardianWatchList
-            items={watch.data.needsAttention}
-            onComplete={(id) => void watch.complete(id)}
-            onDismiss={(id) => void watch.dismiss(id)}
-            onViewSource={(id) => void watch.viewSource(id)}
-          />
-        ) : (
-          <p className="text-sm text-ink-muted">
-            Nothing needs your attention right now.
-          </p>
-        )}
-      </Section>
-
-      <Section title="Coming Up">
-        {watchLoading ? (
-          <p className="text-sm text-ink-muted">Loading…</p>
-        ) : watch.data.comingUp.length > 0 ? (
-          <GuardianWatchList
-            items={watch.data.comingUp}
-            onComplete={(id) => void watch.complete(id)}
-            onDismiss={(id) => void watch.dismiss(id)}
-            onViewSource={(id) => void watch.viewSource(id)}
-          />
-        ) : (
-          <p className="text-sm text-ink-muted">Nothing coming up soon.</p>
-        )}
-      </Section>
-
-      {data.recentActivity.length > 0 ? (
-        <Section title="Continue where you left off">
-          <ul className="space-y-1">
-            {data.recentActivity.slice(0, 5).map((item) => (
-              <li key={item.id}>
-                <Link
-                  href={item.href}
-                  className="flex items-start justify-between gap-3 rounded-xl px-2 py-2.5 text-sm transition hover:bg-brand-light/35"
-                >
-                  <span className="min-w-0 font-medium text-foreground">
-                    {item.title}
-                  </span>
-                  <span className="shrink-0 text-xs text-ink-muted">
-                    {formatActivityWhen(item.occurredAt)}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </Section>
-      ) : null}
-
-      {active ? (
-        <button
-          type="button"
-          onClick={() => {
-            void switchProfile(active.id);
-            router.push(documentsHref(active.id));
-          }}
-          className="simple-home-card welcome-strip flex w-full items-center gap-3 p-4 text-left transition hover:shadow-card"
-          style={{ animationDelay: "0.12s" }}
-        >
-          <ProfileAvatar profile={active} size="md" />
-          <span className="min-w-0 flex-1">
-            <span className="block text-sm font-semibold text-foreground">
-              Continue in {active.display_name}
-            </span>
-            <span className="mt-0.5 block text-xs text-ink-muted">
-              {getContainerLabel(active.profile_type)}
-            </span>
-          </span>
-          <ArrowRight className="h-4 w-4 shrink-0 text-brand" aria-hidden />
-        </button>
-      ) : null}
-
+      <GuardianProvenancePanel
+        item={today.provenanceOpen}
+        onClose={() => today.setProvenanceOpen(null)}
+      />
       <GuardianSourcePanel
-        open={watch.sourceOpen}
-        onClose={watch.closeSource}
+        open={today.sourceOpen}
+        onClose={today.closeSource}
       />
     </div>
   );

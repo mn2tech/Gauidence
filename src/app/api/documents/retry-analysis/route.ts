@@ -11,7 +11,14 @@ export const runtime = "nodejs";
 const STUCK_THRESHOLD_MS = 20 * 60 * 1000;
 const MAX_BATCH = 20;
 
-type RetryMode = "failed" | "uploaded" | "stuck" | "all" | "indexing" | "knowledge";
+type RetryMode =
+  | "failed"
+  | "uploaded"
+  | "stuck"
+  | "all"
+  | "indexing"
+  | "knowledge"
+  | "guardian_items";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -39,7 +46,7 @@ export async function POST(request: Request) {
   let query = supabase
     .from("documents")
     .select(
-      "id, file_name, analysis_status, indexing_status, knowledge_status, created_at, profile_id"
+      "id, file_name, analysis_status, indexing_status, knowledge_status, guardian_items_status, created_at, profile_id"
     );
 
   if (body.documentIds?.length) {
@@ -52,6 +59,10 @@ export async function POST(request: Request) {
     query = query.in("indexing_status", ["failed", "retryable"]);
   } else if (mode === "knowledge") {
     query = query.in("knowledge_status", ["failed", "retryable"]);
+  } else if (mode === "guardian_items") {
+    query = query
+      .in("analysis_status", ["completed", "needs_verification"])
+      .in("guardian_items_status", ["pending", "failed", "retryable"]);
   } else if (mode === "stuck") {
     query = query
       .in("analysis_status", [
@@ -76,10 +87,15 @@ export async function POST(request: Request) {
   const results: { id: string; fileName: string; stage: string }[] = [];
 
   for (const doc of docs ?? []) {
-    let stage: "analyze_document" | "index_document" | "extract_knowledge" =
-      "analyze_document";
+    let stage:
+      | "analyze_document"
+      | "index_document"
+      | "extract_knowledge"
+      | "extract_guardian_items" = "analyze_document";
 
-    if (
+    if (mode === "guardian_items") {
+      stage = "extract_guardian_items";
+    } else if (
       doc.analysis_status === "completed" ||
       doc.analysis_status === "needs_verification"
     ) {
@@ -87,6 +103,12 @@ export async function POST(request: Request) {
         stage = "index_document";
       } else if (["failed", "retryable"].includes(doc.knowledge_status ?? "")) {
         stage = "extract_knowledge";
+      } else if (
+        ["pending", "failed", "retryable"].includes(
+          doc.guardian_items_status ?? ""
+        )
+      ) {
+        stage = "extract_guardian_items";
       } else if (doc.analysis_status === "uploaded") {
         stage = "analyze_document";
       } else {

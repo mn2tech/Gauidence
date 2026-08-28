@@ -49,7 +49,7 @@ export function resolveItemPriority(args: {
     if (args.type === "school_closure") {
       priority = maxPriority(priority, "high");
     }
-  } else if (days !== null && days <= 3 && args.requiresAction) {
+  } else if (days !== null && days <= 5 && args.requiresAction) {
     priority = maxPriority(priority, "high");
   } else if (days !== null && days <= 7 && args.requiresAction) {
     priority = maxPriority(priority, "normal");

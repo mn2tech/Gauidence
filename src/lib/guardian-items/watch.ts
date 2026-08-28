@@ -128,7 +128,13 @@ export async function getGuardianWatch(
     later: [],
   };
 
+  const nowIso = now.toISOString();
+
   for (const row of rows) {
+    if (row.remind_at && row.remind_at > nowIso) {
+      continue;
+    }
+
     const effectiveDate = effectiveCalendarDate({
       eventDate: row.event_date,
       dueAt: row.due_at,

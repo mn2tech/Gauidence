@@ -8,8 +8,8 @@ import SimpleAppShell from "@/components/simple-home/SimpleAppShell";
 import SimpleHomeScreen from "@/components/simple-home/SimpleHomeScreen";
 
 export const metadata: Metadata = {
-  title: "Home — Guardian",
-  description: "Your simple Guardian home.",
+  title: "Guardian Today — Guardian",
+  description: "What needs your attention today across all your Spaces.",
 };
 
 export default async function SimpleHomePage() {

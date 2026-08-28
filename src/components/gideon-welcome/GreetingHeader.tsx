@@ -3,9 +3,14 @@ import type { GideonWelcomeViewModel } from "@/lib/gideon-welcome/types";
 type GreetingHeaderProps = {
   greeting: string;
   view: GideonWelcomeViewModel;
+  mode?: "default" | "today";
 };
 
-export default function GreetingHeader({ greeting, view }: GreetingHeaderProps) {
+export default function GreetingHeader({
+  greeting,
+  view,
+  mode = "default",
+}: GreetingHeaderProps) {
   const { greetName, spaceName, isNewUser, isEmptySpace } = view;
 
   const headline = greetName
@@ -18,12 +23,16 @@ export default function GreetingHeader({ greeting, view }: GreetingHeaderProps) 
         {headline}
       </h1>
 
-      {isNewUser && isEmptySpace ? (
+      {mode === "today" ? (
+        <p className="text-sm text-ink-muted">
+          Here&apos;s what needs your attention today.
+        </p>
+      ) : isNewUser && isEmptySpace ? (
         <div className="space-y-1 text-sm text-ink-muted">
-          <p className="font-medium text-foreground">Welcome to Guardian.</p>
+          <p className="font-medium text-foreground">Welcome to Guardian</p>
           <p>
-            Guardian remembers what matters and helps you act on it. Add
-            something to this Space to get started.
+            Your Personal Space is where Guardian learns what matters to you
+            and helps you remember, organize, and act.
           </p>
         </div>
       ) : (

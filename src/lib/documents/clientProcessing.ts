@@ -119,15 +119,27 @@ export async function resolveAddAnythingStagingProfileId(): Promise<string> {
   return body.profileId;
 }
 
-/** Drain pending analyze/index/knowledge jobs after the UI moves on. */
+/** Drain pending analyze/index/knowledge jobs after the UI moves on.
+ * Never hold the browser connection for the full worker duration — a long
+ * /api/documents/process-jobs call (up to 300s) starves navigation and Ask Gideon.
+ */
 export async function kickDocumentProcessingJobs(limit = 3): Promise<void> {
   try {
-    await fetch("/api/documents/process-jobs", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ limit }),
-    });
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 8_000);
+    try {
+      await fetch("/api/documents/process-jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ limit }),
+        signal: controller.signal,
+        // Do not block unload/navigation on this background kick.
+        keepalive: false,
+      });
+    } finally {
+      window.clearTimeout(timer);
+    }
   } catch {
-    // Best-effort background drain.
+    // Best-effort background drain (abort/timeout/network are fine).
   }
 }

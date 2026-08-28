@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
 import {
   Camera,
@@ -164,7 +164,9 @@ export default function SimpleAppShell({
 
       {!needsSetup ? (
         <>
-          <SimpleNavigation />
+          <Suspense fallback={null}>
+            <SimpleNavigation />
+          </Suspense>
           {searchOpen ? (
             <GlobalVaultSearch
               open={searchOpen}

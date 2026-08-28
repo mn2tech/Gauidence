@@ -245,26 +245,6 @@ export default function DocumentManager({
   const [orgNotice, setOrgNotice] = useState<string | null>(null);
   const [uploadToast, setUploadToast] = useState<string | null>(null);
 
-  const activeDocumentIds = useMemo(
-    () =>
-      documents
-        .filter((d) => {
-          if (IN_PROGRESS_ANALYSIS.includes(d.analysis_status)) return true;
-          if (d.analysis_status === "uploaded" || d.analysis_status === "queued") {
-            return true;
-          }
-          if (
-            d.analysis_status === "completed" ||
-            d.analysis_status === "needs_verification"
-          ) {
-            return true;
-          }
-          return false;
-        })
-        .map((d) => d.id),
-    [documents]
-  );
-
   const shouldKickAnalysisQueue = useMemo(
     () =>
       documents.some(
@@ -274,6 +254,36 @@ export default function DocumentManager({
     [documents]
   );
 
+  // Only poll in-flight docs + a small newest completed sample.
+  // Never poll all 100+ files every 2s — that freezes the Files UI.
+  const activeDocumentIds = useMemo(() => {
+    const inFlight: string[] = [];
+    const completedSample: string[] = [];
+
+    for (const d of documents) {
+      if (IN_PROGRESS_ANALYSIS.includes(d.analysis_status)) {
+        inFlight.push(d.id);
+        continue;
+      }
+      if (
+        d.analysis_status === "uploaded" ||
+        d.analysis_status === "queued"
+      ) {
+        inFlight.push(d.id);
+        continue;
+      }
+      if (
+        (d.analysis_status === "completed" ||
+          d.analysis_status === "needs_verification") &&
+        completedSample.length < 8
+      ) {
+        completedSample.push(d.id);
+      }
+    }
+
+    return [...inFlight, ...completedSample];
+  }, [documents]);
+
   const { statuses: processingStatuses, markActive, refreshStatus } =
     useDocumentProcessingPoll(activeDocumentIds, {
       // Never kick while Reading/Analyzing — status polls can mark those stale.
@@ -282,20 +292,12 @@ export default function DocumentManager({
     });
 
   const needsPostAnalysisWorker = useMemo(() => {
-    const stageNeedsWorker = Object.values(processingStatuses).some((snap) =>
+    return Object.values(processingStatuses).some((snap) =>
       ["indexing", "knowledge_processing", "retryable"].includes(
         snap.processingStage
       )
     );
-    if (stageNeedsWorker) return true;
-    // Before the first status poll, keep draining jobs for analyzed docs.
-    return documents.some(
-      (d) =>
-        (d.analysis_status === "completed" ||
-          d.analysis_status === "needs_verification") &&
-        !processingStatuses[d.id]
-    );
-  }, [documents, processingStatuses]);
+  }, [processingStatuses]);
 
   useEffect(() => {
     if (!shouldKickAnalysisQueue && !needsPostAnalysisWorker) return;

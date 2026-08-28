@@ -36,12 +36,14 @@ export async function getGuardianItemSource(
       title: item.title,
       documentId: null,
       documentTitle: null,
-      excerpt: null,
+      excerpt: item.source_type === "daily_log" ? item.source_excerpt : null,
       accessible: true,
       message:
         item.source_type === "user"
           ? "You added this reminder yourself."
-          : "Guardian saved this without a linked document.",
+          : item.source_type === "daily_log"
+            ? "Guardian found this in a Daily Log."
+            : "Guardian saved this without a linked document.",
     };
   }
 

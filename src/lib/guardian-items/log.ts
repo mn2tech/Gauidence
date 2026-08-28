@@ -8,6 +8,7 @@ export type GuardianLogEvent =
   | "guardian_item_low_confidence"
   | "guardian_item_completed"
   | "guardian_item_dismissed"
+  | "guardian_item_snoozed"
   | "guardian_watch_generated";
 
 export function logGuardianEvent(
