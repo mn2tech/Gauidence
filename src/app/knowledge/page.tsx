@@ -3,15 +3,14 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { canAccessSimpleHome } from "@/lib/features/simple-home";
 import SimpleAppShell from "@/components/simple-home/SimpleAppShell";
-import AddAnythingScreen from "@/components/add-anything/AddAnythingScreen";
+import MyKnowledgeScreen from "@/components/personal-space/MyKnowledgeScreen";
 
 export const metadata: Metadata = {
-  title: "Add Something — Guardian",
-  description:
-    "Add documents, photos, notes, receipts, and more — Guardian organizes them for you.",
+  title: "My Knowledge — Guardian",
+  description: "What Guardian remembers about you.",
 };
 
-export default async function AddPage() {
+export default async function MyKnowledgePage() {
   const supabase = await createClient();
   if (!supabase) redirect("/login?error=not_configured");
 
@@ -21,12 +20,12 @@ export default async function AddPage() {
   if (!user) redirect("/login");
 
   if (!canAccessSimpleHome({ email: user.email })) {
-    redirect("/dashboard?camera=1");
+    redirect("/settings/knowledge");
   }
 
   return (
     <SimpleAppShell>
-      <AddAnythingScreen />
+      <MyKnowledgeScreen />
     </SimpleAppShell>
   );
 }

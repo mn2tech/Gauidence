@@ -1,40 +1,56 @@
 import Link from "next/link";
-import { ArrowRight, BellRing, FileText, ShieldCheck } from "lucide-react";
+import Image from "next/image";
+import { redirect } from "next/navigation";
+import { ArrowRight } from "lucide-react";
+import { Outfit } from "next/font/google";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
-import SecuritySection from "@/components/SecuritySection";
-import MeetGideonSection from "@/components/MeetGideonSection";
 import GuardianLogo from "@/components/brand/GuardianLogo";
 import { GUARDIAN_BRAND_TAGLINE } from "@/lib/branding";
+import { GIDEON_BRAND_LINE } from "@/lib/vault/gideon";
 
-const features = [
-  {
-    icon: FileText,
-    title: "Understand every document",
-    body: "Upload insurance policies, IDs, leases, and letters. Guardian extracts the facts that matter and explains them in plain language.",
-  },
-  {
-    icon: BellRing,
-    title: "Never miss a deadline",
-    body: "Guardian tracks renewal dates, expirations, and required actions, and alerts you before they become problems.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Keep it all in one safe place",
-    body: "Your documents live in one private, organized vault — tied to your account and visible only to you.",
-  },
+const outfit = Outfit({
+  subsets: ["latin"],
+  variable: "--font-home",
+  display: "swap",
+});
+
+const documentKinds = [
+  "Insurance policies",
+  "IDs & passports",
+  "Leases & contracts",
+  "Letters & notices",
+];
+
+const askExamples = [
+  "When does my car insurance renew?",
+  "What does my lease say about pets?",
+  "Which documents expire this year?",
 ];
 
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ deleted?: string }>;
+  searchParams: Promise<{
+    deleted?: string;
+    error?: string;
+    error_code?: string;
+  }>;
 }) {
   const params = await searchParams;
+  if (
+    params.error === "access_denied" &&
+    params.error_code === "otp_expired"
+  ) {
+    redirect("/login?error=reset_link_expired");
+  }
+  if (params.error) {
+    redirect(`/login?error=${encodeURIComponent(params.error)}`);
+  }
   const showDeleted = params.deleted === "1";
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className={`${outfit.variable} home-landing flex min-h-screen flex-col`}>
       <SiteHeader />
 
       <main className="flex-1">
@@ -47,77 +63,165 @@ export default async function Home({
           </div>
         ) : null}
 
-        {/* Hero */}
-        <section className="relative overflow-hidden">
-          <div className="absolute inset-0 -z-10 bg-gradient-to-b from-brand-light via-background to-background" />
-          <div className="mx-auto max-w-6xl px-6 pb-20 pt-16 text-center sm:pb-28 sm:pt-20">
-            <GuardianLogo
-              variant="lockup"
-              size="lg"
-              priority
-              className="mx-auto"
-            />
-            <p className="mt-4 text-[11px] font-medium uppercase tracking-[0.18em] text-ink-muted sm:text-xs">
-              {GUARDIAN_BRAND_TAGLINE}
-            </p>
-            <p className="mx-auto mt-8 inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white px-4 py-1.5 text-sm font-medium text-foreground">
-              <ShieldCheck className="h-4 w-4" />
-              Private by default
-            </p>
-            <h1 className="mx-auto mt-6 max-w-3xl text-4xl font-bold tracking-tight text-foreground sm:text-6xl">
-              The documents that run your life, finally under control.
+        {/* Hero — one composition */}
+        <section className="relative isolate min-h-[min(92svh,46rem)] overflow-hidden">
+          <Image
+            src="/branding/guardian-home-hero.jpg"
+            alt=""
+            fill
+            priority
+            sizes="100vw"
+            className="home-hero-image object-cover object-center"
+          />
+          <div className="home-hero-veil absolute inset-0" aria-hidden />
+
+          <div className="relative z-10 mx-auto flex min-h-[min(92svh,46rem)] max-w-4xl flex-col items-center justify-center px-6 pb-16 pt-10 text-center sm:pb-20 sm:pt-14">
+            <div className="home-fade-up">
+              <GuardianLogo
+                variant="lockup"
+                size="xl"
+                priority
+                className="mx-auto"
+              />
+              <p className="mt-3 text-[11px] font-medium uppercase tracking-[0.2em] text-ink-muted sm:mt-4 sm:text-xs">
+                {GUARDIAN_BRAND_TAGLINE}
+              </p>
+            </div>
+
+            <h1 className="home-fade-up home-fade-up-delay-1 home-display mt-8 max-w-2xl text-3xl font-semibold tracking-tight text-foreground sm:mt-10 sm:text-5xl sm:leading-[1.12]">
+              Ask about your documents. We&apos;ll remember the rest.
             </h1>
-            <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-ink-muted">
-              Guardian remembers what matters — documents, notes, deadlines —
-              so you can ask instead of search. Private by default, explained in
-              plain language.
+            <p className="home-fade-up home-fade-up-delay-2 mx-auto mt-4 max-w-lg text-base leading-relaxed text-ink-muted sm:mt-5 sm:text-lg">
+              Policies, IDs, leases, deadlines — private by default, explained
+              in plain language.
             </p>
-            <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
+
+            <div className="home-fade-up home-fade-up-delay-3 mt-8 flex flex-wrap items-center justify-center gap-3 sm:mt-10 sm:gap-4">
               <Link
                 href="/signup"
-                className="inline-flex items-center gap-2 rounded-full bg-brand px-6 py-3 font-semibold text-white transition hover:bg-brand-dark"
+                className="inline-flex items-center gap-2 rounded-xl bg-brand px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand-dark sm:text-base"
               >
                 Get started
                 <ArrowRight className="h-4 w-4" />
               </Link>
               <Link
-                href="/pricing"
-                className="inline-flex items-center gap-2 rounded-full border border-stone-300 bg-white px-6 py-3 font-semibold text-foreground transition hover:border-brand hover:text-brand"
+                href="/demo"
+                className="inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold text-foreground transition hover:text-brand sm:text-base"
               >
-                See pricing
+                Try a demo
               </Link>
             </div>
-            <p className="mt-4 text-sm text-ink-muted">
-              <Link href="/security" className="underline-offset-2 hover:underline">
-                Read our Security Principles
-              </Link>
+          </div>
+        </section>
+
+        {/* What you put in */}
+        <section className="home-section relative overflow-hidden py-20 sm:py-28">
+          <div className="home-section-wash absolute inset-0 -z-10" aria-hidden />
+          <div className="mx-auto max-w-3xl px-6 text-center">
+            <h2 className="home-display text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+              Upload once. Stop digging.
+            </h2>
+            <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-ink-muted sm:text-lg">
+              Put the papers that run your life in one private vault. Guardian
+              keeps the facts — so you don&apos;t have to.
             </p>
+            <ul className="mt-12 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-sm font-medium text-foreground sm:text-base">
+              {documentKinds.map((kind) => (
+                <li key={kind} className="home-doc-kind">
+                  {kind}
+                </li>
+              ))}
+            </ul>
           </div>
         </section>
 
-        {/* Features */}
-        <section className="mx-auto max-w-6xl px-6 pb-20 sm:pb-28">
-          <div className="grid gap-6 sm:grid-cols-3">
-            {features.map(({ icon: Icon, title, body }) => (
-              <div
-                key={title}
-                className="rounded-2xl border border-stone-200 bg-white p-6"
+        {/* Ask Gideon */}
+        <section
+          id="ask-gideon"
+          className="border-y border-border-subtle bg-brand-light/40 py-20 sm:py-28"
+        >
+          <div className="mx-auto max-w-3xl px-6 text-center">
+            <p className="text-sm font-semibold uppercase tracking-[0.16em] text-brand">
+              Ask Gideon
+            </p>
+            <h2 className="home-display mt-3 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+              Ask in plain language.
+            </h2>
+            <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-ink-muted sm:text-lg">
+              {GIDEON_BRAND_LINE}
+            </p>
+
+            <ul className="mx-auto mt-12 max-w-lg space-y-3 text-left">
+              {askExamples.map((question) => (
+                <li key={question}>
+                  <Link
+                    href={`/demo?q=${encodeURIComponent(question)}`}
+                    className="home-ask-row group flex items-center justify-between gap-4 px-1 py-3 text-base text-foreground transition hover:text-brand sm:text-lg"
+                  >
+                    <span>&ldquo;{question}&rdquo;</span>
+                    <ArrowRight className="h-4 w-4 shrink-0 opacity-40 transition group-hover:translate-x-0.5 group-hover:opacity-100" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+
+            <div className="mt-12 flex flex-wrap items-center justify-center gap-3">
+              <Link
+                href="/demo"
+                className="inline-flex items-center gap-2 rounded-xl bg-brand px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand-dark sm:text-base"
               >
-                <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-light text-brand">
-                  <Icon className="h-5 w-5" />
-                </span>
-                <h3 className="mt-4 text-base font-semibold">{title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-                  {body}
-                </p>
-              </div>
-            ))}
+                Try a demo
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+              <Link
+                href="/signup"
+                className="inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold text-foreground transition hover:text-brand sm:text-base"
+              >
+                Create my vault
+              </Link>
+            </div>
           </div>
         </section>
 
-        <MeetGideonSection />
+        {/* Trust — one short block */}
+        <section className="py-20 sm:py-28">
+          <div className="mx-auto max-w-2xl px-6 text-center">
+            <h2 className="home-display text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+              Private by default.
+            </h2>
+            <p className="mt-4 text-base leading-relaxed text-ink-muted sm:text-lg">
+              Your documents stay yours. We don&apos;t sell your information.
+              You decide what to upload, share, or delete — and we explain what
+              came from your files versus what AI suggested.
+            </p>
+            <Link
+              href="/security"
+              className="mt-8 inline-flex items-center gap-2 text-sm font-semibold text-brand underline-offset-4 hover:underline"
+            >
+              Read our Security Principles
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </section>
 
-        <SecuritySection />
+        {/* Closing CTA */}
+        <section className="home-closing relative overflow-hidden py-20 sm:py-24">
+          <div className="mx-auto max-w-2xl px-6 text-center">
+            <h2 className="home-display text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+              Your life&apos;s papers, remembered for you.
+            </h2>
+            <p className="mt-4 text-base text-ink-muted sm:text-lg">
+              Start a private vault in minutes.
+            </p>
+            <Link
+              href="/signup"
+              className="mt-8 inline-flex items-center gap-2 rounded-xl bg-brand px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand-dark sm:text-base"
+            >
+              Get started
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </section>
       </main>
 
       <SiteFooter />

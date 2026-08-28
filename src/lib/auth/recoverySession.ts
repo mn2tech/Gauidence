@@ -2,12 +2,17 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-const RECOVERY_SESSION_ERROR =
+export const RECOVERY_SESSION_ERROR =
   "This reset link is invalid or has expired. Request a new one and try again.";
 
 function readHashParams(): URLSearchParams | null {
   if (typeof window === "undefined" || !window.location.hash) return null;
   return new URLSearchParams(window.location.hash.replace(/^#/, ""));
+}
+
+function readSearchParams(): URLSearchParams {
+  if (typeof window === "undefined") return new URLSearchParams();
+  return new URLSearchParams(window.location.search);
 }
 
 function clearAuthParamsFromUrl() {
@@ -16,6 +21,7 @@ function clearAuthParamsFromUrl() {
   url.hash = "";
   url.searchParams.delete("code");
   url.searchParams.delete("type");
+  url.searchParams.delete("token_hash");
   window.history.replaceState(null, "", `${url.pathname}${url.search}`);
 }
 
@@ -24,11 +30,21 @@ export async function establishRecoverySession(
   supabase: SupabaseClient,
   codeFromQuery?: string | null
 ): Promise<{ ok: boolean; error?: string }> {
-  const code =
-    codeFromQuery ??
-    (typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search).get("code")
-      : null);
+  const search = readSearchParams();
+  const code = codeFromQuery ?? search.get("code");
+
+  const tokenHash = search.get("token_hash");
+  const type = search.get("type");
+  if (tokenHash && type === "recovery") {
+    const { error } = await supabase.auth.verifyOtp({
+      token_hash: tokenHash,
+      type: "recovery",
+    });
+    if (!error) {
+      clearAuthParamsFromUrl();
+      return { ok: true };
+    }
+  }
 
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
@@ -36,13 +52,16 @@ export async function establishRecoverySession(
       clearAuthParamsFromUrl();
       return { ok: true };
     }
+    if (/expired|invalid|otp/i.test(error.message)) {
+      return { ok: false, error: RECOVERY_SESSION_ERROR };
+    }
   }
 
   const hash = readHashParams();
   const accessToken = hash?.get("access_token");
   const refreshToken = hash?.get("refresh_token");
-  const type = hash?.get("type");
-  if (accessToken && refreshToken && type === "recovery") {
+  const hashType = hash?.get("type");
+  if (accessToken && refreshToken && hashType === "recovery") {
     const { error } = await supabase.auth.setSession({
       access_token: accessToken,
       refresh_token: refreshToken,
@@ -60,5 +79,3 @@ export async function establishRecoverySession(
 
   return { ok: false, error: RECOVERY_SESSION_ERROR };
 }
-
-export { RECOVERY_SESSION_ERROR };

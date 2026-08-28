@@ -21,22 +21,26 @@ const GlobalVaultSearch = dynamic(() => import("@/components/GlobalVaultSearch")
 import SimpleNavigation from "@/components/simple-home/SimpleNavigation";
 import SimpleSecondaryNavLinks from "@/components/simple-home/SimpleSecondaryNavLinks";
 import { useActiveProfile } from "@/components/ProfileProvider";
-import { SIMPLE_HOME_PATH } from "@/lib/simple-home/routing";
+import {
+  ADD_ANYTHING_PATH,
+  ASK_GIDEON_PATH,
+} from "@/lib/simple-home/routing";
 
 export default function SimpleAppShell({
   children,
+  layout = "page",
 }: {
   children: React.ReactNode;
+  /** Chat fills the viewport under the header; composer clears the bottom nav. */
+  layout?: "page" | "chat";
 }) {
   const router = useRouter();
-  const { active, profiles, loading: profilesLoading } = useActiveProfile();
+  const { profiles, loading: profilesLoading } = useActiveProfile();
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
 
   const needsSetup = !profilesLoading && profiles.length === 0;
-  const cameraHref = active
-    ? `/dashboard?camera=1#documents-${active.id}`
-    : "/dashboard?camera=1";
+  const cameraHref = ADD_ANYTHING_PATH;
 
   async function handleSignOut() {
     const supabase = createClient();
@@ -58,9 +62,9 @@ export default function SimpleAppShell({
       >
         <div className="mx-auto flex h-14 max-w-2xl items-center justify-between gap-3 px-4">
           <Link
-            href={SIMPLE_HOME_PATH}
+            href={ASK_GIDEON_PATH}
             className="flex shrink-0 items-center"
-            aria-label="Guardian home"
+            aria-label="Ask Gideon"
           >
             <GuardianLogo variant="horizontal" size="sm" priority />
           </Link>
@@ -158,7 +162,13 @@ export default function SimpleAppShell({
         ) : null}
       </header>
 
-      <main className="min-h-[calc(100dvh-3.5rem)] pb-simple-nav-page">
+      <main
+        className={
+          layout === "chat"
+            ? "flex h-[calc(100dvh-3.5rem)] flex-col overflow-hidden"
+            : "min-h-[calc(100dvh-3.5rem)] pb-simple-nav-page"
+        }
+      >
         {children}
       </main>
 

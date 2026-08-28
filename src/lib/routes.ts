@@ -1,5 +1,4 @@
 import { EMPLOYEE_HUB_PATH } from "@/lib/employee-hub/routing";
-import { SIMPLE_HOME_PATH } from "@/lib/simple-home/routing";
 
 /** Full vault workspace (sections for files, logs, linked people, etc.). */
 export const DOCUMENTS_PATH = "/dashboard?docs=1";
@@ -96,8 +95,8 @@ export function inviteAcceptLandingPath(args: {
     return EMPLOYEE_HUB_PATH;
   }
   if (args.profileType === "client" && args.role === "viewer") {
-    return args.simpleHome ? SIMPLE_HOME_PATH : documentsHref(args.profileId);
+    return args.simpleHome ? ASK_GIDEON_PATH : documentsHref(args.profileId);
   }
-  if (args.simpleHome) return SIMPLE_HOME_PATH;
+  if (args.simpleHome) return ASK_GIDEON_PATH;
   return documentsHref(args.profileId);
 }

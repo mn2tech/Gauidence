@@ -20,7 +20,10 @@ import SimpleNavigation from "@/components/simple-home/SimpleNavigation";
 import SimpleSecondaryNavLinks from "@/components/simple-home/SimpleSecondaryNavLinks";
 import { employeeShowsPowerNav } from "@/lib/employee-hub/entitlements";
 import { employeeGideonHref } from "@/lib/employee-hub/routing";
-import { SIMPLE_HOME_PATH } from "@/lib/simple-home/routing";
+import {
+  ADD_ANYTHING_PATH,
+  ASK_GIDEON_PATH,
+} from "@/lib/simple-home/routing";
 
 export default function SiteHeader() {
   const pathname = usePathname();
@@ -99,17 +102,19 @@ export default function SiteHeader() {
   }
 
   const showSimpleNav = signedIn && simpleHomeEnabled && !needsSetup && !isEmployeeVault;
-  const homeHref = simpleHomeEnabled ? SIMPLE_HOME_PATH : "/ask";
+  const homeHref = ASK_GIDEON_PATH;
   const cameraHref = needsSetup
-    ? "/ask"
-    : active
-      ? `/dashboard?camera=1#documents-${active.id}`
-      : "/dashboard?camera=1";
+    ? ASK_GIDEON_PATH
+    : simpleHomeEnabled
+      ? ADD_ANYTHING_PATH
+      : active
+        ? `/dashboard?camera=1#documents-${active.id}`
+        : "/dashboard?camera=1";
   const documentsNavHref = documentsHref(active?.id);
   const askHref = isEmployeeVault
     ? employeeGideonHref(active?.id)
-    : "/ask";
-  const researchHref = needsSetup ? "/ask" : "/research";
+    : ASK_GIDEON_PATH;
+  const researchHref = needsSetup ? ASK_GIDEON_PATH : "/research";
 
   const linkClass =
     "block rounded-lg px-3 py-2.5 text-sm font-medium text-foreground transition hover:bg-stone-100 sm:inline sm:rounded-none sm:px-0 sm:py-0 sm:font-normal sm:text-ink-muted sm:hover:bg-transparent sm:hover:text-foreground";

@@ -108,6 +108,34 @@ export async function POST() {
 
   await cleanupUserStorage(admin, user.id);
 
+  // Clear Space chat authorship before auth delete. sender_user_id is SET NULL on
+  // user delete, but a legacy CHECK required it for sender_type=user and blocked
+  // cascade. Prefer nulling (keeps history); fall back to deleting those rows.
+  try {
+    const { error: nullErr } = await admin
+      .from("space_conversation_messages")
+      .update({ sender_user_id: null })
+      .eq("sender_user_id", user.id);
+    if (nullErr) {
+      console.warn(
+        "[account/delete] could not null space message authors:",
+        nullErr.message
+      );
+      const { error: msgDelErr } = await admin
+        .from("space_conversation_messages")
+        .delete()
+        .eq("sender_user_id", user.id);
+      if (msgDelErr) {
+        console.error(
+          "[account/delete] space message cleanup failed:",
+          msgDelErr.message
+        );
+      }
+    }
+  } catch (err) {
+    console.error("[account/delete] space message cleanup failed:", err);
+  }
+
   const { error: deleteError } = await admin.auth.admin.deleteUser(user.id);
   if (deleteError) {
     console.error("[account/delete] deleteUser failed:", deleteError.message);

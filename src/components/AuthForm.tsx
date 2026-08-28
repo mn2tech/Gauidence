@@ -15,6 +15,8 @@ import { LEGAL_VERSIONS } from "@/lib/legal/versions";
 const ERROR_MESSAGES: Record<string, string> = {
   access_denied:
     "Google sign-in was canceled. You can try again whenever you're ready.",
+  reset_link_expired:
+    "That reset link expired (they last about an hour). Request a new one from Forgot password and open it soon after it arrives.",
   provider_error:
     "Google could not complete the sign-in. Please try again in a moment.",
   exchange_failed:
@@ -252,12 +254,23 @@ export default function AuthForm({ mode }: { mode: Mode }) {
       )}
 
       {notice && (
-        <p
+        <div
           role="status"
-          className="mt-6 rounded-xl border border-brand/30 bg-brand-light p-4 text-sm text-brand-dark"
+          className="mt-6 scroll-mt-24 rounded-xl border border-brand/30 bg-brand-light p-4 text-sm text-brand-dark"
         >
-          {notice}
-        </p>
+          <p className="font-semibold">Check your email to finish</p>
+          <p className="mt-1">{notice}</p>
+          <p className="mt-2 text-xs opacity-90">
+            After you open the confirmation link, you can{" "}
+            <Link
+              href={authHref("/login")}
+              className="font-semibold underline hover:text-brand-dark"
+            >
+              log in here
+            </Link>
+            .
+          </p>
+        </div>
       )}
 
       {isSignup ? (
@@ -380,15 +393,40 @@ export default function AuthForm({ mode }: { mode: Mode }) {
             className="mt-1.5 w-full rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
           />
         </div>
+        {notice ? (
+          <div
+            role="status"
+            className="rounded-xl border border-brand/30 bg-brand-light p-3 text-sm text-brand-dark"
+          >
+            <p className="font-semibold">Account created — confirm your email</p>
+            <p className="mt-1 text-xs leading-relaxed">
+              Open the confirmation link we sent, then{" "}
+              <Link
+                href={authHref("/login")}
+                className="font-semibold underline"
+              >
+                log in
+              </Link>
+              . Check spam if you don&apos;t see it.
+            </p>
+          </div>
+        ) : null}
         <button
           type="submit"
           disabled={
-            !configured || emailLoading || (isSignup && !legalAgreed)
+            !configured ||
+            emailLoading ||
+            (isSignup && !legalAgreed) ||
+            Boolean(notice)
           }
           className="flex w-full items-center justify-center gap-2 rounded-full bg-brand px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand-dark focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-50"
         >
           {emailLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-          {isSignup ? "Create account" : "Log in"}
+          {notice
+            ? "Waiting for email confirmation"
+            : isSignup
+              ? "Create account"
+              : "Log in"}
         </button>
       </form>
 

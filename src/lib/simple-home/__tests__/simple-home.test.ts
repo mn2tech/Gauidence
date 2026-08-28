@@ -79,15 +79,15 @@ describe("simple home routing", () => {
     );
   });
 
-  it("lands other profiles on /home when enabled", () => {
+  it("lands other profiles on /ask (one-screen product)", () => {
     process.env.GUARDIAN_SIMPLE_HOME_FLAG = "enabled";
     assert.equal(
       signedInLandingPath({ profile_type: "personal", parent_profile_id: null }),
-      "/home"
+      "/ask"
     );
   });
 
-  it("keeps /ask when disabled", () => {
+  it("keeps /ask when simple home is disabled", () => {
     process.env.GUARDIAN_SIMPLE_HOME_FLAG = "disabled";
     assert.equal(
       signedInLandingPath({ profile_type: "personal", parent_profile_id: null }),

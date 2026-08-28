@@ -27,6 +27,7 @@ describe("Personal Space — onboarding", () => {
     assert.equal(w.showWelcome, true);
     assert.equal(w.skipCreateSpaceForm, true);
     assert.equal(w.actions.length, 3);
+    assert.equal(w.actions[0]?.id, "add-something");
     assert.ok(w.actions.some((a) => a.label === "Ask Gideon"));
   });
 

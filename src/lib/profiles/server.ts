@@ -71,16 +71,8 @@ async function membershipRoleMap(
   return map;
 }
 
-function personalDisplayName(user: User): string {
-  const meta = user.user_metadata ?? {};
-  const fromMeta =
-    typeof meta.full_name === "string" && meta.full_name.trim()
-      ? meta.full_name.trim()
-      : typeof meta.name === "string" && meta.name.trim()
-        ? meta.name.trim()
-        : "";
-  if (fromMeta) return fromMeta;
-  return user.email?.split("@")[0]?.trim() || "Me";
+function personalDisplayName(_user: User): string {
+  return "My Personal Space";
 }
 
 /**
@@ -94,6 +86,17 @@ async function createPersonalGuardianProfile(
 ): Promise<GuardianProfile | null> {
   const admin = createAdminClient();
   const client = admin ?? supabase;
+
+  // Prefer an existing personal Space — never create a duplicate.
+  const { data: existingPersonal } = await client
+    .from("guardian_profiles")
+    .select(PROFILE_SELECT)
+    .eq("owner_user_id", user.id)
+    .eq("profile_type", "personal")
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (existingPersonal) return asProfile(existingPersonal, "owner");
 
   // Guard against concurrent requests racing to create the first profile.
   const { data: existing } = await client

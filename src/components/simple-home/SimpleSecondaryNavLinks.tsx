@@ -5,7 +5,10 @@ import { useActiveProfile } from "@/components/ProfileProvider";
 import { useEmployeeHubEntitlements } from "@/hooks/useEmployeeHubEntitlements";
 import { employeeShowsPowerNav } from "@/lib/employee-hub/entitlements";
 import { isOrgStyleProfile } from "@/lib/profiles/types";
-import { COMMAND_CENTER_PATH } from "@/lib/simple-home/routing";
+import {
+  COMMAND_CENTER_PATH,
+  SIMPLE_HOME_PATH,
+} from "@/lib/simple-home/routing";
 import { LEADS_PATH, PROPOSALS_PATH } from "@/lib/routes";
 
 type SimpleSecondaryNavLinksProps = {
@@ -55,7 +58,10 @@ export default function SimpleSecondaryNavLinks({
 
   if (needsSetup) return null;
 
-  const universalLinks = [{ href: COMMAND_CENTER_PATH, label: "Command Center" }];
+  const universalLinks = [
+    { href: SIMPLE_HOME_PATH, label: "Guardian Today" },
+    { href: COMMAND_CENTER_PATH, label: "Command Center" },
+  ];
 
   const ent = employeeEntitlements;
   const links = isBusinessVault
