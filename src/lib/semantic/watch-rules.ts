@@ -6,12 +6,15 @@ import {
   semanticFollowUpQuietDays,
 } from "@/lib/features/semantic-layer";
 import { logSemanticEvent } from "./log";
+import { isActionableCommitmentText } from "./commitment-filter";
 import type { SemanticEntity, SemanticFact, SemanticRelationship } from "./types";
 import {
   SEMANTIC_ENTITY_SELECT,
   SEMANTIC_FACT_SELECT,
   SEMANTIC_RELATIONSHIP_SELECT,
 } from "./types";
+
+export { isActionableCommitmentText } from "./commitment-filter";
 
 export type SemanticWatchRuleCategory =
   | "opportunity"
@@ -22,7 +25,8 @@ export type SemanticWatchRuleCategory =
 export type SemanticWatchContext = {
   supabase: SupabaseClient;
   userId: string;
-  spaceId?: string;
+  /** Preferred Space (e.g. document just processed). Not used to fan out. */
+  preferredSpaceId?: string;
   now: Date;
   entities: SemanticEntity[];
   relationships: SemanticRelationship[];
@@ -71,8 +75,6 @@ function entityById(
 }
 
 function userOrgIds(entities: SemanticEntity[]): Set<string> {
-  // Heuristic: organizations the user "owns" are those appearing as source of
-  // supported/works_with/partner relationships most often — Phase 1: all orgs.
   return new Set(
     entities.filter((e) => e.entity_type === "organization").map((e) => e.id)
   );
@@ -177,7 +179,6 @@ const upcomingDeadline: SemanticWatchRule = {
       if (!dueIso && deadline.attributes?.date) {
         dueIso = String(deadline.attributes.date);
       }
-      // Try parsing date from canonical name (e.g. "September 15")
       if (!dueIso) {
         const parsed = Date.parse(deadline.canonical_name);
         if (Number.isFinite(parsed)) dueIso = new Date(parsed).toISOString();
@@ -220,7 +221,6 @@ const upcomingDeadline: SemanticWatchRule = {
       });
     }
 
-    // Also check opportunity/task facts with deadline_date
     for (const fact of ctx.facts) {
       if (fact.predicate !== "deadline_date" || !fact.value_date) continue;
       if (!fact.subject_entity_id) continue;
@@ -271,13 +271,11 @@ const followUpRelationship: SemanticWatchRule = {
     const now = ctx.now.getTime();
 
     const contactRels = ctx.relationships.filter((r) =>
-      ["met_with", "introduced_to", "contact_for", "works_with"].includes(
-        r.relationship_type
-      )
+      ["met_with", "introduced_to", "contact_for"].includes(r.relationship_type)
     );
 
     for (const rel of contactRels) {
-      if ((rel.confidence ?? 0) < 0.9) continue;
+      if ((rel.confidence ?? 0) < 0.92) continue;
       const lastSeen = rel.last_seen_at
         ? Date.parse(rel.last_seen_at)
         : Date.parse(rel.created_at);
@@ -312,7 +310,7 @@ const followUpRelationship: SemanticWatchRule = {
   },
 };
 
-/** Open commitment from clear evidence. */
+/** Open commitment from clear evidence — conservative. */
 const openCommitment: SemanticWatchRule = {
   id: "open_commitment",
   name: "Open commitment",
@@ -330,8 +328,9 @@ const openCommitment: SemanticWatchRule = {
 
     for (const fact of ctx.facts) {
       if (!predicates.has(fact.predicate)) continue;
-      if ((fact.confidence ?? 0) < 0.85) continue;
+      if ((fact.confidence ?? 0) < 0.92) continue;
       if (!fact.value_text) continue;
+      if (!isActionableCommitmentText(fact.value_text)) continue;
 
       candidates.push({
         type: "commitment",
@@ -344,18 +343,19 @@ const openCommitment: SemanticWatchRule = {
           ? [fact.subject_entity_id]
           : [],
         semanticFactIds: [fact.id],
-        confidence: fact.confidence ?? 0.85,
+        confidence: fact.confidence ?? 0.92,
         sourceExcerpt: fact.value_text.slice(0, 200),
       });
     }
 
     const assigned = ctx.relationships.filter(
-      (r) => r.relationship_type === "assigned_to" && (r.confidence ?? 0) >= 0.9
+      (r) => r.relationship_type === "assigned_to" && (r.confidence ?? 0) >= 0.92
     );
     for (const rel of assigned) {
       const task = entityById(ctx.entities, rel.source_entity_id);
       const assignee = entityById(ctx.entities, rel.target_entity_id);
       if (!task || task.entity_type !== "task") continue;
+      if (!isActionableCommitmentText(task.canonical_name)) continue;
 
       candidates.push({
         type: "commitment",
@@ -366,7 +366,7 @@ const openCommitment: SemanticWatchRule = {
         dedupeKey: `semantic:assigned:${rel.id}`,
         semanticEntityIds: [task.id, ...(assignee ? [assignee.id] : [])],
         semanticRelationshipIds: [rel.id],
-        confidence: rel.confidence ?? 0.9,
+        confidence: rel.confidence ?? 0.92,
       });
     }
 
@@ -384,7 +384,9 @@ export const SEMANTIC_WATCH_RULES: SemanticWatchRule[] = [
 async function loadSemanticContext(
   supabase: SupabaseClient,
   userId: string
-): Promise<Omit<SemanticWatchContext, "supabase" | "userId" | "spaceId" | "now">> {
+): Promise<
+  Omit<SemanticWatchContext, "supabase" | "userId" | "preferredSpaceId" | "now">
+> {
   const [{ data: entities }, { data: relationships }, { data: facts }] =
     await Promise.all([
       supabase
@@ -412,21 +414,168 @@ async function loadSemanticContext(
   };
 }
 
-async function persistCandidate(
+/** Spaces that provided evidence for this semantic object. */
+async function resolveEvidenceSpaceIds(
   supabase: SupabaseClient,
   userId: string,
-  spaceId: string,
   candidate: SemanticWatchCandidate
+): Promise<string[]> {
+  const objectIds: Array<{ type: string; id: string }> = [];
+  for (const id of candidate.semanticFactIds ?? []) {
+    objectIds.push({ type: "fact", id });
+  }
+  for (const id of candidate.semanticRelationshipIds ?? []) {
+    objectIds.push({ type: "relationship", id });
+  }
+  for (const id of candidate.semanticEntityIds ?? []) {
+    objectIds.push({ type: "entity", id });
+  }
+  if (objectIds.length === 0) return [];
+
+  const spaceIds = new Set<string>();
+
+  for (const obj of objectIds.slice(0, 8)) {
+    const { data: links } = await supabase
+      .from("semantic_evidence_links")
+      .select("evidence_id")
+      .eq("user_id", userId)
+      .eq("semantic_object_type", obj.type)
+      .eq("semantic_object_id", obj.id)
+      .limit(10);
+
+    const evidenceIds = (links ?? []).map((l) => l.evidence_id as string);
+    if (evidenceIds.length === 0) continue;
+
+    const { data: evidence } = await supabase
+      .from("semantic_evidence")
+      .select("space_id")
+      .eq("user_id", userId)
+      .in("id", evidenceIds);
+
+    for (const row of evidence ?? []) {
+      if (row.space_id) spaceIds.add(row.space_id as string);
+    }
+  }
+
+  return [...spaceIds];
+}
+
+async function hasActiveDedupeAnywhere(
+  supabase: SupabaseClient,
+  userId: string,
+  dedupeKey: string
 ): Promise<boolean> {
-  const { data: existing } = await supabase
+  const { data } = await supabase
     .from("guardian_items")
     .select("id")
-    .eq("space_id", spaceId)
-    .eq("dedupe_key", candidate.dedupeKey)
+    .eq("user_id", userId)
+    .eq("dedupe_key", dedupeKey)
     .eq("status", "active")
+    .limit(1)
     .maybeSingle();
+  return Boolean(data?.id);
+}
 
-  if (existing?.id) return false;
+/**
+ * Collapse existing cross-Space semantic duplicates: keep oldest active item
+ * per semantic dedupe_key, dismiss the rest. Also dismiss non-actionable
+ * commitment false positives (e.g. school bus permissions).
+ */
+export async function collapseSemanticWatchDuplicates(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<number> {
+  const { data: rows } = await supabase
+    .from("guardian_items")
+    .select("id, dedupe_key, created_at, title, description")
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .eq("extraction_version", "semantic-v1")
+    .like("dedupe_key", "semantic:%")
+    .order("created_at", { ascending: true })
+    .limit(500);
+
+  if (!rows?.length) return 0;
+
+  const seen = new Set<string>();
+  const dismissIds: string[] = [];
+  for (const row of rows) {
+    const key = row.dedupe_key as string;
+    const desc = String(row.description ?? "");
+    const isCommitment =
+      key.startsWith("semantic:commitment:") ||
+      key.startsWith("semantic:assigned:");
+    if (isCommitment && !isActionableCommitmentText(desc)) {
+      dismissIds.push(row.id as string);
+      continue;
+    }
+    if (seen.has(key)) {
+      dismissIds.push(row.id as string);
+    } else {
+      seen.add(key);
+    }
+  }
+
+  if (dismissIds.length === 0) return 0;
+
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .from("guardian_items")
+    .update({
+      status: "dismissed",
+      dismissed_at: now,
+      updated_at: now,
+    })
+    .eq("user_id", userId)
+    .in("id", dismissIds);
+
+  if (error) {
+    console.error("Failed to collapse semantic watch duplicates:", error.message);
+    return 0;
+  }
+  return dismissIds.length;
+}
+
+async function persistCandidateOnce(
+  supabase: SupabaseClient,
+  userId: string,
+  preferredSpaceId: string | undefined,
+  candidate: SemanticWatchCandidate
+): Promise<boolean> {
+  if (await hasActiveDedupeAnywhere(supabase, userId, candidate.dedupeKey)) {
+    return false;
+  }
+
+  const evidenceSpaces = await resolveEvidenceSpaceIds(
+    supabase,
+    userId,
+    candidate
+  );
+
+  let spaceId: string | null = null;
+  if (preferredSpaceId && evidenceSpaces.includes(preferredSpaceId)) {
+    spaceId = preferredSpaceId;
+  } else if (evidenceSpaces.length === 1) {
+    spaceId = evidenceSpaces[0]!;
+  } else if (evidenceSpaces.length > 1) {
+    // Multiple evidence Spaces — still only one item; prefer preferred if any,
+    // else first evidence Space.
+    spaceId = preferredSpaceId && evidenceSpaces.includes(preferredSpaceId)
+      ? preferredSpaceId
+      : evidenceSpaces[0]!;
+  } else if (preferredSpaceId) {
+    // No evidence Space (e.g. lab without spaceId) — allow preferred once.
+    spaceId = preferredSpaceId;
+  } else {
+    return false;
+  }
+
+  // If caller provided a preferred Space from a document job, only create when
+  // that Space is the chosen target — prevents fan-out when rules re-run
+  // for unrelated Spaces during backfill.
+  if (preferredSpaceId && spaceId !== preferredSpaceId) {
+    return false;
+  }
 
   const metadata = {
     semantic_entity_ids: candidate.semanticEntityIds ?? [],
@@ -464,24 +613,24 @@ async function persistCandidate(
 }
 
 /**
- * Evaluate semantic Watch rules and create guardian_items when warranted.
- * Avoids duplicates via dedupe_key. Non-destructive to existing Watch logic.
+ * Evaluate semantic Watch rules and create at most one guardian_item per
+ * semantic identity (global dedupe). Attaches to evidence Space when known.
  */
 export async function evaluateSemanticWatchRules(
   supabase: SupabaseClient,
   userId: string,
   options: { spaceId?: string; now?: Date } = {}
-): Promise<{ created: number; evaluated: number }> {
-  const spaceId = options.spaceId;
-  if (!spaceId) {
-    return { created: 0, evaluated: 0 };
-  }
+): Promise<{ created: number; evaluated: number; duplicatesCollapsed: number }> {
+  const duplicatesCollapsed = await collapseSemanticWatchDuplicates(
+    supabase,
+    userId
+  );
 
   const loaded = await loadSemanticContext(supabase, userId);
   const ctx: SemanticWatchContext = {
     supabase,
     userId,
-    spaceId,
+    preferredSpaceId: options.spaceId,
     now: options.now ?? new Date(),
     ...loaded,
   };
@@ -497,18 +646,23 @@ export async function evaluateSemanticWatchRules(
     const candidates = await rule.evaluate(ctx);
     evaluated += candidates.length;
     for (const candidate of candidates) {
-      const ok = await persistCandidate(supabase, userId, spaceId, candidate);
+      const ok = await persistCandidateOnce(
+        supabase,
+        userId,
+        options.spaceId,
+        candidate
+      );
       if (ok) {
         created += 1;
         logSemanticEvent("semantic_watch_rule_fired", {
           user_id: userId,
           rule_id: rule.id,
-          space_id: spaceId,
+          space_id: options.spaceId ?? null,
           dedupe_key: candidate.dedupeKey,
         });
       }
     }
   }
 
-  return { created, evaluated };
+  return { created, evaluated, duplicatesCollapsed };
 }

@@ -91,13 +91,12 @@ export async function getGuardianWatch(
       const { evaluateSemanticWatchRules } = await import(
         "@/lib/semantic/watch-rules"
       );
-      const targetSpace = options.spaceId ?? spaceIds[0];
-      if (targetSpace) {
-        await evaluateSemanticWatchRules(supabase, userId, {
-          spaceId: targetSpace,
-          now: options.now,
-        });
-      }
+      // Prefer explicit Space when scoped; otherwise evidence-based attach +
+      // global dedupe (avoids fanning one fact across all Spaces).
+      await evaluateSemanticWatchRules(supabase, userId, {
+        spaceId: options.spaceId,
+        now: options.now,
+      });
     } catch (err) {
       console.error(
         "Semantic watch rules failed (non-blocking):",

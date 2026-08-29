@@ -16,6 +16,7 @@ import {
   isSemanticEntityType,
   formatOntologyForPrompt,
 } from "../ontology.ts";
+import { isActionableCommitmentText } from "../commitment-filter.ts";
 
 describe("semantic ontology", () => {
   it("exports Phase 1 entity and relationship vocabularies", () => {
@@ -245,6 +246,24 @@ describe("semantic watch rules", () => {
     ];
     assert.equal(ids.length, 4);
     assert.ok(ids.includes("existing_relationship_opportunity"));
+  });
+});
+
+describe("commitment filter", () => {
+  it("rejects school bus permission text", () => {
+    assert.equal(
+      isActionableCommitmentText(
+        "Permission granted to exit MCPS school bus without adult present"
+      ),
+      false
+    );
+  });
+
+  it("accepts clear personal commitments", () => {
+    assert.equal(
+      isActionableCommitmentText("I will send the proposal to Onyx by Friday"),
+      true
+    );
   });
 });
 

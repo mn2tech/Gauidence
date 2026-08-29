@@ -6,6 +6,7 @@ import { extractSemanticKnowledge } from "./extract-semantic-knowledge";
 import { resolveEntity } from "./resolve-entity";
 import { truncateExcerpt } from "./normalize";
 import { logSemanticEvent } from "./log";
+import { isActionableCommitmentText } from "./commitment-filter";
 import type {
   EntityResolutionKind,
   SemanticExtractionInput,
@@ -412,6 +413,7 @@ export async function ingestSemanticKnowledge(
     ) {
       continue;
     }
+    if (!isActionableCommitmentText(action.description)) continue;
     const upserted = await upsertFact(supabase, {
       userId: input.userId,
       subjectEntityId: null,
