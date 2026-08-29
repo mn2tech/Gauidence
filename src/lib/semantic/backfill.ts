@@ -151,7 +151,7 @@ export async function queueSemanticBackfill(
     .select("id, profile_id, semantic_status, analysis_status")
     .in("profile_id", spaceIds)
     .in("analysis_status", [...ANALYZED])
-    .order("updated_at", { ascending: false })
+    .order("created_at", { ascending: false })
     .limit(limit);
 
   if (!args.includeCompleted) {
