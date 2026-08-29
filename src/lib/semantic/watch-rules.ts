@@ -74,42 +74,69 @@ function entityById(
   return entities.find((e) => e.id === id);
 }
 
-function userOrgIds(entities: SemanticEntity[]): Set<string> {
-  return new Set(
-    entities.filter((e) => e.entity_type === "organization").map((e) => e.id)
-  );
+/**
+ * Organizations that look like *the user's* org: they have outbound
+ * supports/supported/works_with edges to an agency (prior customer experience).
+ * Do NOT treat every organization in the graph as "yours".
+ */
+function inferUserOrganizationIds(
+  entities: SemanticEntity[],
+  relationships: SemanticRelationship[]
+): Set<string> {
+  const ids = new Set<string>();
+  for (const r of relationships) {
+    if (!EXPERIENCE_RELS.has(r.relationship_type)) continue;
+    const target = entityById(entities, r.target_entity_id);
+    if (target?.entity_type === "agency") {
+      ids.add(r.source_entity_id);
+    }
+  }
+  return ids;
 }
 
-/** Opportunity matches prior agency/org experience. */
+/** Opportunity matches prior agency experience — conservative. */
 const existingRelationshipOpportunity: SemanticWatchRule = {
   id: "existing_relationship_opportunity",
   name: "Existing relationship opportunity",
   description:
-    "Opportunity tied to an agency/org the user's organization has supported or worked with.",
+    "Opportunity issued by an agency the user's organization has supported or worked with.",
   category: "opportunity",
   priority: 10,
   async evaluate(ctx) {
     const candidates: SemanticWatchCandidate[] = [];
-    const orgs = userOrgIds(ctx.entities);
+    const userOrgs = inferUserOrganizationIds(ctx.entities, ctx.relationships);
+    if (userOrgs.size === 0) return candidates;
+
     const opportunities = ctx.entities.filter(
       (e) => e.entity_type === "opportunity"
     );
 
     for (const opp of opportunities) {
-      const issuedBy = ctx.relationships.filter(
+      // Require a real issuer edge — not loose associated_with/related_to
+      // (those fire false positives like "opportunity associated with NM2TECH").
+      const issuerLinks = ctx.relationships.filter(
         (r) =>
           r.source_entity_id === opp.id &&
           (r.relationship_type === "issued_by" ||
-            r.relationship_type === "associated_with" ||
-            r.relationship_type === "related_to")
+            r.relationship_type === "pursuing") &&
+          (r.confidence ?? 0) >= 0.85
       );
 
-      for (const link of issuedBy) {
+      for (const link of issuerLinks) {
         const agency = entityById(ctx.entities, link.target_entity_id);
         if (!agency) continue;
+        // Must be an agency (or org that is not the user's own company)
+        if (userOrgs.has(agency.id)) continue;
         if (
           agency.entity_type !== "agency" &&
           agency.entity_type !== "organization"
+        ) {
+          continue;
+        }
+        // Prefer agencies; allow org issuers only with issued_by
+        if (
+          agency.entity_type === "organization" &&
+          link.relationship_type !== "issued_by"
         ) {
           continue;
         }
@@ -117,8 +144,9 @@ const existingRelationshipOpportunity: SemanticWatchRule = {
         const prior = ctx.relationships.find(
           (r) =>
             EXPERIENCE_RELS.has(r.relationship_type) &&
-            orgs.has(r.source_entity_id) &&
-            r.target_entity_id === agency.id
+            userOrgs.has(r.source_entity_id) &&
+            r.target_entity_id === agency.id &&
+            (r.confidence ?? 0) >= 0.85
         );
         if (!prior) continue;
 
@@ -126,7 +154,7 @@ const existingRelationshipOpportunity: SemanticWatchRule = {
         candidates.push({
           type: "informational",
           title: "Opportunity matches your existing experience",
-          description: `${userOrg?.canonical_name ?? "Your organization"} has prior ${agency.canonical_name} experience and ${opp.canonical_name} is associated with ${agency.canonical_name}.`,
+          description: `${userOrg?.canonical_name ?? "Your organization"} has prior ${agency.canonical_name} experience and ${opp.canonical_name} is issued by / pursuing ${agency.canonical_name}.`,
           priority: "high",
           requiresAction: true,
           dedupeKey: `semantic:opp-experience:${opp.id}:${agency.id}`,
@@ -506,6 +534,14 @@ export async function collapseSemanticWatchDuplicates(
       key.startsWith("semantic:commitment:") ||
       key.startsWith("semantic:assigned:");
     if (isCommitment && !isActionableCommitmentText(desc)) {
+      dismissIds.push(row.id as string);
+      continue;
+    }
+    // False-positive opportunity matches used loose "associated with" wording.
+    if (
+      key.startsWith("semantic:opp-experience:") &&
+      /\bis associated with\b/i.test(desc)
+    ) {
       dismissIds.push(row.id as string);
       continue;
     }
