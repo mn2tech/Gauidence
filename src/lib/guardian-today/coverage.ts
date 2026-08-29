@@ -144,24 +144,10 @@ export function needsIntelligenceBackfill(
 }
 
 export function formatCoverageSummary(coverage: GuardianTodayCoverage): string {
-  const parts = [
+  // Keep counts only — a wall-clock "Last checked 10:44 PM" confuses users
+  // (sounds like a deadline or backfill status, not a scan timestamp).
+  return [
     `Guardian checked ${coverage.spaceCount} Space${coverage.spaceCount === 1 ? "" : "s"}`,
     `${coverage.processedSourceCount} source${coverage.processedSourceCount === 1 ? "" : "s"} analyzed`,
-  ];
-  if (coverage.lastWatchEvaluationAt || coverage.lastExtractionAt) {
-    const iso = coverage.lastWatchEvaluationAt ?? coverage.lastExtractionAt!;
-    parts.push(`Last checked ${formatClock(iso)}`);
-  }
-  return parts.join(" · ");
-}
-
-function formatClock(iso: string): string {
-  try {
-    return new Date(iso).toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  } catch {
-    return iso;
-  }
+  ].join(" · ");
 }
