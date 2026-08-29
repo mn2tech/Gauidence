@@ -189,12 +189,16 @@ export async function queueSemanticBackfill(
         })
         .eq("id", doc.id);
 
-      await retryDocumentProcessing(supabase, {
+      const { jobId } = await retryDocumentProcessing(supabase, {
         documentId: doc.id,
         profileId: doc.profile_id,
         userId: args.userId,
         stage: "extract_semantic",
       });
+      if (!jobId) {
+        skipped += 1;
+        continue;
+      }
       queuedIds.push(doc.id);
     } catch (err) {
       console.error(
