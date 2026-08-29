@@ -6,7 +6,8 @@ export type SemanticLogEvent =
   | "semantic_entity_resolved"
   | "semantic_ingestion_completed"
   | "semantic_watch_rule_fired"
-  | "semantic_extraction_failed";
+  | "semantic_extraction_failed"
+  | "semantic_backfill_queued";
 
 export function logSemanticEvent(
   event: SemanticLogEvent,
