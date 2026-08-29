@@ -24,9 +24,12 @@ export async function GET(request: Request) {
 
   let semanticQueued = 0;
   let semanticSkipped = 0;
+  let semanticProcessed = 0;
+  let semanticFailed = 0;
+
   if (isGuardianSemanticLayerEnabled()) {
     try {
-      const backfill = await queueSemanticBackfillAdmin(admin, { limit: 15 });
+      const backfill = await queueSemanticBackfillAdmin(admin, { limit: 20 });
       semanticQueued = backfill.queued;
       semanticSkipped = backfill.skipped;
     } catch (err) {
@@ -35,16 +38,30 @@ export async function GET(request: Request) {
         err instanceof Error ? err.message : err
       );
     }
+
+    // Drain semantic jobs first so they are not stuck behind older analyze/index jobs.
+    try {
+      const semanticDrain = await processPendingDocumentJobsAdmin(admin, {
+        limit: 8,
+        jobTypes: ["extract_semantic"],
+      });
+      semanticProcessed = semanticDrain.processed;
+      semanticFailed = semanticDrain.failed;
+    } catch (err) {
+      console.error(
+        "Semantic job drain failed (non-blocking):",
+        err instanceof Error ? err.message : err
+      );
+    }
   }
 
-  // Prefer draining semantic jobs when backlog exists; still process other stages.
-  const result = await processPendingDocumentJobsAdmin(admin, {
-    limit: semanticQueued > 0 ? 6 : 4,
-  });
+  const result = await processPendingDocumentJobsAdmin(admin, { limit: 3 });
 
   return NextResponse.json({
     ...result,
     semanticQueued,
     semanticSkipped,
+    semanticProcessed,
+    semanticFailed,
   });
 }

@@ -247,6 +247,16 @@ async function enqueueNextStage(
   }
 
   if (completedStage === "extract_semantic") {
+    // Backfill: don't re-run guardian items if that stage already finished.
+    const { data: doc } = await supabase
+      .from("documents")
+      .select("guardian_items_status")
+      .eq("id", args.documentId)
+      .maybeSingle();
+    const gi = doc?.guardian_items_status ?? "pending";
+    if (gi === "completed" || gi === "skipped") {
+      return;
+    }
     await enqueueGuardianItemsOrKnowledge(supabase, args);
     return;
   }
@@ -1084,17 +1094,30 @@ export async function processPendingDocumentJobs(
 
 export async function processPendingDocumentJobsAdmin(
   supabase: SupabaseClient,
-  options: { limit?: number } = {}
+  options: {
+    limit?: number;
+    jobTypes?: ProcessingJobType[];
+    userId?: string;
+  } = {}
 ): Promise<{ processed: number; failed: number; recovered: number }> {
   await recoverStaleProcessingJobs(supabase);
   const limit = options.limit ?? processingConcurrencyLimit() * 2;
 
-  const { data: jobs } = await supabase
+  let query = supabase
     .from("document_processing_jobs")
     .select("id, document_id, profile_id, user_id, job_type, attempts, status")
     .in("status", ["pending", "retryable"])
     .order("created_at", { ascending: true })
     .limit(limit);
+
+  if (options.jobTypes?.length) {
+    query = query.in("job_type", options.jobTypes);
+  }
+  if (options.userId) {
+    query = query.eq("user_id", options.userId);
+  }
+
+  const { data: jobs } = await query;
 
   if (!jobs?.length) {
     return { processed: 0, failed: 0, recovered: 0 };

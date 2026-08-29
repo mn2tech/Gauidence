@@ -25,12 +25,15 @@ type BackfillStatus = {
   semanticFailed: number;
   semanticProcessing: number;
   semanticSkipped: number;
+  jobsPending?: number;
 };
 
 type BackfillQueueResult = {
   ok?: boolean;
   queued?: number;
   skipped?: number;
+  processed?: number;
+  failed?: number;
   spaceCount?: number;
   remainingEstimate?: number | null;
   note?: string;
@@ -106,9 +109,10 @@ export default function SemanticTestLabPanel() {
       if (body.status) setBackfillStatus(body.status);
       else await refreshBackfillStatus();
       setBackfillNote(
-        `Queued ${body.queued ?? 0} documents across ${body.spaceCount ?? 0} Spaces. ` +
-          `Remaining ≈ ${body.remainingEstimate ?? "?"}. ` +
-          (body.note ?? "Workers will process shortly — click again for the next batch.")
+        `Queued ${body.queued ?? 0}, processed ${body.processed ?? 0}` +
+          (body.failed ? ` (${body.failed} failed)` : "") +
+          ` across ${body.spaceCount ?? 0} Spaces. Remaining ≈ ${body.remainingEstimate ?? "?"}. ` +
+          (body.note ?? "")
       );
     } finally {
       setBackfillRunning(false);
@@ -137,9 +141,10 @@ export default function SemanticTestLabPanel() {
             {backfillStatus.semanticProcessing} processing ·{" "}
             {backfillStatus.semanticFailed} failed ·{" "}
             {backfillStatus.semanticSkipped} skipped
-            {backfillStatus.enabled === false
-              ? " · flag off"
+            {typeof backfillStatus.jobsPending === "number"
+              ? ` · ${backfillStatus.jobsPending} jobs in queue`
               : null}
+            {backfillStatus.enabled === false ? " · flag off" : null}
           </p>
         ) : (
           <p className="mt-3 text-sm text-ink-muted">Loading status…</p>
