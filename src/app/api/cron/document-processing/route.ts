@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { processPendingDocumentJobsAdmin } from "@/lib/documents/processingJobs";
+import { isGuardianSemanticLayerEnabled } from "@/lib/features/semantic-layer";
+import { queueSemanticBackfillAdmin } from "@/lib/semantic/backfill";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -20,6 +22,29 @@ export async function GET(request: Request) {
     );
   }
 
-  const result = await processPendingDocumentJobsAdmin(admin, { limit: 4 });
-  return NextResponse.json(result);
+  let semanticQueued = 0;
+  let semanticSkipped = 0;
+  if (isGuardianSemanticLayerEnabled()) {
+    try {
+      const backfill = await queueSemanticBackfillAdmin(admin, { limit: 15 });
+      semanticQueued = backfill.queued;
+      semanticSkipped = backfill.skipped;
+    } catch (err) {
+      console.error(
+        "Semantic auto-backfill failed (non-blocking):",
+        err instanceof Error ? err.message : err
+      );
+    }
+  }
+
+  // Prefer draining semantic jobs when backlog exists; still process other stages.
+  const result = await processPendingDocumentJobsAdmin(admin, {
+    limit: semanticQueued > 0 ? 6 : 4,
+  });
+
+  return NextResponse.json({
+    ...result,
+    semanticQueued,
+    semanticSkipped,
+  });
 }

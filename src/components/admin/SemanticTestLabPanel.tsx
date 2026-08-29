@@ -122,10 +122,11 @@ export default function SemanticTestLabPanel() {
           Backfill all Spaces
         </h2>
         <p className="mt-1 text-sm text-ink-muted">
-          Queue Semantic Layer extraction for analyzed documents across every
-          Space you can access. Runs in batches so you can click repeatedly
-          until pending reaches zero. Requires{" "}
+          Semantic extraction for analyzed documents runs automatically every
+          few minutes via cron while{" "}
           <code className="text-xs">GUARDIAN_SEMANTIC_LAYER_ENABLED=true</code>.
+          Use the button below to queue an extra batch immediately. Refresh to
+          watch pending drop and completed rise.
         </p>
         {backfillStatus ? (
           <p className="mt-3 text-sm text-ink-muted">
