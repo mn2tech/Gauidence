@@ -5,6 +5,7 @@ import type { User } from "@supabase/supabase-js";
 import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
 import { isKnowledgeEngineV2Enabled } from "@/lib/features/knowledge-engine-v2";
 import { isGuardianOntologyEnabled } from "@/lib/features/ontology";
+import { isGuardianSemanticLayerEnabled } from "@/lib/features/semantic-layer";
 import { isVaultEmbeddingConfigured } from "@/lib/vault/embeddings";
 import {
   createDiagnostics,
@@ -27,6 +28,7 @@ export type ProcessingJobType =
   | "analyze_document"
   | "index_document"
   | "extract_ontology"
+  | "extract_semantic"
   | "extract_guardian_items"
   | "extract_knowledge";
 
@@ -42,6 +44,7 @@ const STAGE_TIMEOUT_MS: Record<ProcessingJobType, number> = {
   analyze_document: 6 * 60 * 1000,
   index_document: 5 * 60 * 1000,
   extract_ontology: 5 * 60 * 1000,
+  extract_semantic: 5 * 60 * 1000,
   extract_guardian_items: 5 * 60 * 1000,
   extract_knowledge: 5 * 60 * 1000,
 };
@@ -214,7 +217,7 @@ async function enqueueNextStage(
       });
       return;
     }
-    await enqueueGuardianItemsOrKnowledge(supabase, args);
+    await enqueueSemanticOrGuardianItems(supabase, args);
     return;
   }
 
@@ -234,11 +237,16 @@ async function enqueueNextStage(
       });
       return;
     }
-    await enqueueGuardianItemsOrKnowledge(supabase, args);
+    await enqueueSemanticOrGuardianItems(supabase, args);
     return;
   }
 
   if (completedStage === "extract_ontology") {
+    await enqueueSemanticOrGuardianItems(supabase, args);
+    return;
+  }
+
+  if (completedStage === "extract_semantic") {
     await enqueueGuardianItemsOrKnowledge(supabase, args);
     return;
   }
@@ -246,6 +254,32 @@ async function enqueueNextStage(
   if (completedStage === "extract_guardian_items") {
     await enqueueKnowledgeOrReady(supabase, args);
   }
+}
+
+async function enqueueSemanticOrGuardianItems(
+  supabase: SupabaseClient,
+  args: {
+    documentId: string;
+    profileId: string;
+    userId: string;
+  }
+): Promise<void> {
+  if (isGuardianSemanticLayerEnabled()) {
+    await supabase
+      .from("documents")
+      .update({
+        semantic_status: "pending",
+        processing_step: "semantic",
+      })
+      .eq("id", args.documentId);
+    await enqueueDocumentProcessingJob(supabase, {
+      ...args,
+      jobType: "extract_semantic",
+      force: true,
+    });
+    return;
+  }
+  await enqueueGuardianItemsOrKnowledge(supabase, args);
 }
 
 async function enqueueGuardianItemsOrKnowledge(
@@ -355,6 +389,14 @@ async function markJobFailed(
       .from("documents")
       .update({
         ontology_status: retryable ? "retryable" : "failed",
+        last_processing_error: message.slice(0, 500),
+      })
+      .eq("id", job.document_id);
+  } else if (job.job_type === "extract_semantic") {
+    await supabase
+      .from("documents")
+      .update({
+        semantic_status: retryable ? "retryable" : "failed",
         last_processing_error: message.slice(0, 500),
       })
       .eq("id", job.document_id);
@@ -647,6 +689,58 @@ async function runOntologyJob(
   };
 }
 
+async function runSemanticJob(
+  supabase: SupabaseClient,
+  userId: string,
+  documentId: string,
+  profileId: string,
+  diagnostics: ProcessingDiagnostics
+): Promise<ProcessingDiagnostics> {
+  const start = Date.now();
+  await supabase
+    .from("documents")
+    .update({
+      semantic_status: "processing",
+      processing_step: "semantic",
+    })
+    .eq("id", documentId);
+
+  try {
+    const { processSemanticExtraction } = await import(
+      "@/lib/semantic/processJob"
+    );
+    const result = await processSemanticExtraction(
+      supabase,
+      userId,
+      documentId,
+      profileId
+    );
+    await supabase
+      .from("documents")
+      .update({
+        semantic_status: result.skipped ? "skipped" : "completed",
+      })
+      .eq("id", documentId);
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Semantic extraction failed";
+    console.error(
+      "Semantic extraction failed (non-blocking):",
+      documentId,
+      message
+    );
+    await supabase
+      .from("documents")
+      .update({
+        semantic_status: "failed",
+        last_processing_error: message.slice(0, 500),
+      })
+      .eq("id", documentId);
+  }
+
+  return recordDuration(diagnostics, "semantic_extraction_ms", start);
+}
+
 async function runGuardianItemsJob(
   supabase: SupabaseClient,
   userId: string,
@@ -808,6 +902,14 @@ export async function processDocumentProcessingJob(
       );
       diagnostics = ontologyResult.diagnostics;
       deferredForOcr = ontologyResult.deferredForOcr;
+    } else if (job.job_type === "extract_semantic") {
+      diagnostics = await runSemanticJob(
+        supabase,
+        user.id,
+        job.document_id,
+        job.profile_id,
+        diagnostics
+      );
     } else if (job.job_type === "extract_guardian_items") {
       diagnostics = await runGuardianItemsJob(
         supabase,
@@ -1053,6 +1155,11 @@ export async function retryDocumentProcessing(
     await supabase
       .from("documents")
       .update({ ontology_status: "pending", last_processing_error: null })
+      .eq("id", args.documentId);
+  } else if (stage === "extract_semantic") {
+    await supabase
+      .from("documents")
+      .update({ semantic_status: "pending", last_processing_error: null })
       .eq("id", args.documentId);
   } else if (stage === "extract_guardian_items") {
     await supabase

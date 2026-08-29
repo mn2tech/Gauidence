@@ -78,6 +78,13 @@ export type GuardianItemRow = {
   needs_review: boolean;
   extraction_version: string | null;
   dedupe_key: string;
+  /** Extensible metadata; semantic refs live under semantic_*_ids keys. */
+  metadata?: {
+    semantic_entity_ids?: string[];
+    semantic_relationship_ids?: string[];
+    semantic_fact_ids?: string[];
+    [key: string]: unknown;
+  } | null;
   created_at: string;
   updated_at: string;
   completed_at: string | null;

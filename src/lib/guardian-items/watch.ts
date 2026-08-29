@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { calendarDateInUserZone } from "@/lib/timezone";
 import { getUserTimeZone } from "@/lib/timezone/server";
+import { isGuardianSemanticLayerEnabled } from "@/lib/features/semantic-layer";
 import { classifyWatchBucket, effectiveCalendarDate } from "./dates";
 import { logGuardianEvent } from "./log";
 import {
@@ -18,7 +19,7 @@ const ITEM_SELECT = `
   event_date, start_at, end_at, due_at, remind_at,
   status, priority, requires_action, action_label, action_url,
   source_type, source_id, source_document_id, source_excerpt, source_page,
-  confidence, needs_review, extraction_version, dedupe_key,
+  confidence, needs_review, extraction_version, dedupe_key, metadata,
   created_at, updated_at, completed_at, dismissed_at
 `;
 
@@ -82,6 +83,27 @@ export async function getGuardianWatch(
       later: 0,
     });
     return empty;
+  }
+
+  // Semantic Watch rules (additive; failures never block existing Watch)
+  if (isGuardianSemanticLayerEnabled()) {
+    try {
+      const { evaluateSemanticWatchRules } = await import(
+        "@/lib/semantic/watch-rules"
+      );
+      const targetSpace = options.spaceId ?? spaceIds[0];
+      if (targetSpace) {
+        await evaluateSemanticWatchRules(supabase, userId, {
+          spaceId: targetSpace,
+          now: options.now,
+        });
+      }
+    } catch (err) {
+      console.error(
+        "Semantic watch rules failed (non-blocking):",
+        err instanceof Error ? err.message : err
+      );
+    }
   }
 
   const timeZone = await getUserTimeZone(supabase, userId);

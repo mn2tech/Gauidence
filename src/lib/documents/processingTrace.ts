@@ -12,6 +12,7 @@ export type ProcessingJobType =
   | "analyze_document"
   | "index_document"
   | "extract_ontology"
+  | "extract_semantic"
   | "extract_guardian_items"
   | "extract_knowledge";
 
@@ -48,6 +49,7 @@ export const PROCESSING_TIMING_LABELS: Record<ProcessingTimingKey, string> = {
   chunking_ms: "Chunking",
   embedding_ms: "Search indexing",
   ontology_extraction_ms: "Ontology extraction",
+  semantic_extraction_ms: "Semantic extraction",
   guardian_items_extraction_ms: "Finding what matters",
   knowledge_extraction_ms: "Knowledge graph",
   total_to_searchable_ms: "Total to searchable",
@@ -58,6 +60,7 @@ const STAGE_ORDER: ProcessingJobType[] = [
   "analyze_document",
   "index_document",
   "extract_ontology",
+  "extract_semantic",
   "extract_guardian_items",
   "extract_knowledge",
 ];
@@ -66,6 +69,7 @@ const STAGE_LABELS: Record<ProcessingJobType, string> = {
   analyze_document: "Reading & analyzing",
   index_document: "Making searchable",
   extract_ontology: "Extracting entities",
+  extract_semantic: "Building semantic graph",
   extract_guardian_items: "Finding what matters",
   extract_knowledge: "Building knowledge",
 };
@@ -113,6 +117,13 @@ function mapJobStatus(
         const ontology = doc.ontology_status ?? "pending";
         if (ontology === "skipped") return "skipped";
         if (ontology === "failed") return "failed";
+      }
+      if (stageId === "extract_semantic") {
+        const semantic =
+          (doc as { semantic_status?: string | null }).semantic_status ??
+          "pending";
+        if (semantic === "skipped") return "skipped";
+        if (semantic === "failed") return "failed";
       }
       if (stageId === "extract_guardian_items") {
         const gi =
@@ -176,6 +187,13 @@ export function buildProcessingTrace(args: {
     if (
       id === "extract_ontology" &&
       (args.doc.ontology_status ?? "") === "skipped"
+    ) {
+      status = "skipped";
+    }
+    if (
+      id === "extract_semantic" &&
+      ((args.doc as { semantic_status?: string | null }).semantic_status ??
+        "") === "skipped"
     ) {
       status = "skipped";
     }
