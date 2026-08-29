@@ -2,7 +2,10 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isGuardianSemanticLayerEnabled } from "@/lib/features/semantic-layer";
-import { retryDocumentProcessing } from "@/lib/documents/processingJobs";
+import {
+  enqueueDocumentProcessingJob,
+  retryDocumentProcessing,
+} from "@/lib/documents/processingJobs";
 import { logSemanticEvent } from "./log";
 
 const ANALYZED = new Set(["completed", "needs_verification"]);
@@ -229,4 +232,93 @@ export async function queueSemanticBackfill(
     spaceCount: spaceIds.length,
     remainingEstimate,
   };
+}
+
+/**
+ * Service-role cron helper: queue extract_semantic for any analyzed docs still
+ * needing Semantic Layer (all users). Caps per tick to protect LLM spend.
+ */
+export async function queueSemanticBackfillAdmin(
+  supabase: SupabaseClient,
+  options: { limit?: number } = {}
+): Promise<{ queued: number; skipped: number }> {
+  if (!isGuardianSemanticLayerEnabled()) {
+    return { queued: 0, skipped: 0 };
+  }
+
+  if (process.env.GUARDIAN_SEMANTIC_AUTO_BACKFILL === "false") {
+    return { queued: 0, skipped: 0 };
+  }
+
+  const limit = Math.min(Math.max(options.limit ?? 15, 1), 40);
+
+  const { data, error } = await supabase
+    .from("documents")
+    .select("id, profile_id, user_id, semantic_status")
+    .in("analysis_status", [...ANALYZED])
+    .in("semantic_status", [...NEEDS_SEMANTIC])
+    .order("created_at", { ascending: true })
+    .limit(limit);
+
+  if (error) {
+    console.error("Semantic auto-backfill query failed:", error.message);
+    return { queued: 0, skipped: 0 };
+  }
+
+  let queued = 0;
+  let skipped = 0;
+
+  for (const doc of data ?? []) {
+    if (!doc.user_id || !doc.profile_id) {
+      skipped += 1;
+      continue;
+    }
+    if ((doc.semantic_status as string) === "processing") {
+      skipped += 1;
+      continue;
+    }
+
+    try {
+      await supabase
+        .from("documents")
+        .update({
+          semantic_status: "pending",
+          last_processing_error: null,
+        })
+        .eq("id", doc.id);
+
+      const { enqueued } = await enqueueDocumentProcessingJob(supabase, {
+        documentId: doc.id,
+        profileId: doc.profile_id,
+        userId: doc.user_id,
+        jobType: "extract_semantic",
+        force: true,
+      });
+
+      if (enqueued) queued += 1;
+      else skipped += 1;
+    } catch (err) {
+      console.error(
+        "Semantic auto-backfill enqueue failed:",
+        doc.id,
+        err instanceof Error ? err.message : err
+      );
+      skipped += 1;
+    }
+  }
+
+  if (queued > 0) {
+    logSemanticEvent("semantic_backfill_queued", {
+      user_id: "cron",
+      source_id: "auto_backfill",
+      entities_created: queued,
+      entities_resolved: skipped,
+      relationships: 0,
+      facts: 0,
+      evidence_links: 0,
+      resolutions: queued,
+    });
+  }
+
+  return { queued, skipped };
 }
