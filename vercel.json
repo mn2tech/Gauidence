@@ -9,6 +9,10 @@
       "schedule": "15 12 * * *"
     },
     {
+      "path": "/api/cron/due-soon",
+      "schedule": "*/15 * * * *"
+    },
+    {
       "path": "/api/cron/weekly-brief",
       "schedule": "30 12 * * 1"
     },
