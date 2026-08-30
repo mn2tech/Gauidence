@@ -200,7 +200,8 @@ export async function POST(_request: Request, ctx: Ctx) {
     .from("profiles")
     .update({
       onboarding_completed_at: now,
-      onboarding_skipped: true,
+      onboarding_skipped: false,
+      onboarding_step: "completed",
       updated_at: now,
     })
     .eq("id", user.id)

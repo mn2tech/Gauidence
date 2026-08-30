@@ -74,7 +74,9 @@ export async function GET() {
     new Set((rows ?? []).map((r) => r.user_id).filter(Boolean)).size;
 
   const signups = signupsRes.count ?? 0;
-  const firstSpace = unique(spaceEvents.data as { user_id: string | null }[] | null);
+  const firstSpaceFromEvents = unique(
+    spaceEvents.data as { user_id: string | null }[] | null
+  );
   const firstItem = unique(itemEvents.data as { user_id: string | null }[] | null);
   const firstValue = unique(valueEvents.data as { user_id: string | null }[] | null);
   const firstGideon = unique(
@@ -84,6 +86,18 @@ export async function GET() {
     upgradeEvents.data as { user_id: string | null }[] | null
   );
   const paidSubscribers = paidRes.count ?? 0;
+
+  // Also count users who own a top-level Space (auto-created or converted).
+  const { data: ownedSpaces } = await admin
+    .from("guardian_profiles")
+    .select("owner_user_id")
+    .is("parent_profile_id", null);
+  const firstSpaceFromDb = unique(
+    (ownedSpaces ?? []).map((r) => ({
+      user_id: r.owner_user_id as string | null,
+    }))
+  );
+  const firstSpace = Math.max(firstSpaceFromEvents, firstSpaceFromDb);
 
   const funnel: FunnelCounts = {
     signups,
