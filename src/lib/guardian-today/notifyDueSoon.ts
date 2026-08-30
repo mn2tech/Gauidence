@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { planAllowsOutboundDigests } from "@/lib/billing/notifyEntitlements";
 import { sendReminderEmail, type ReminderItem } from "@/lib/email";
 import { sendPushToUser } from "@/lib/push/send";
 import { dueSoonWindowIso } from "@/lib/guardian-today/dueSoon";
@@ -134,7 +135,7 @@ export async function notifyDueSoon(admin: SupabaseClient): Promise<{
   const { data: profiles } = await admin
     .from("profiles")
     .select(
-      "id, email, email_reminders_enabled, push_notifications_enabled"
+      "id, email, email_reminders_enabled, push_notifications_enabled, plan"
     )
     .in("id", [...byUser.keys()]);
 
@@ -151,6 +152,8 @@ export async function notifyDueSoon(admin: SupabaseClient): Promise<{
   for (const [userId, rows] of byUser) {
     const profile = profileById.get(userId);
     if (!profile) continue;
+
+    if (!planAllowsOutboundDigests(profile.plan)) continue;
 
     const emailOk =
       Boolean(profile.email) && profile.email_reminders_enabled !== false;

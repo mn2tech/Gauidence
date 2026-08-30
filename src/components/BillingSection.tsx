@@ -183,11 +183,12 @@ export default function BillingSection() {
             <h2 className="text-base font-semibold">Plan & billing</h2>
           </div>
           <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-            Free includes one Space and light monthly AI use. Upgrade to{" "}
+            Free includes one Space, Today, and light Ask Gideon use. Upgrade to{" "}
             {PLAN_LABELS.personal} ({PLAN_PRICE_DISPLAY.personal}), Family{" "}
             {PLAN_PRICE_DISPLAY.family}, or Business {PLAN_PRICE_DISPLAY.business}{" "}
-            for more Spaces, documents, and Gideon questions. Your Free knowledge
-            always stays available.
+            for more Spaces, documents, Gideon questions, and outbound digests
+            (Weekly Brief + due-soon alerts). Your Free knowledge always stays
+            available.
           </p>
           <p className="mt-2 text-xs text-ink-muted">
             See{" "}

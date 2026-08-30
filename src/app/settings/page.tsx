@@ -21,6 +21,7 @@ import {
   REFERRAL_MAX_PER_YEAR,
   REFERRAL_REWARD_CENTS,
 } from "@/lib/share/referral";
+import { isProPlan, normalizePlan } from "@/lib/billing/plans";
 
 export const metadata: Metadata = {
   title: "Settings — Guardian",
@@ -37,9 +38,11 @@ export default async function SettingsPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, avatar_url, email, email_reminders_enabled, email_tips_enabled, email_vault_activity_enabled, company_name, push_notifications_enabled, auto_organize_mode, auto_organize_threshold, weekly_brief_enabled")
+    .select("full_name, avatar_url, email, email_reminders_enabled, email_tips_enabled, email_vault_activity_enabled, company_name, push_notifications_enabled, auto_organize_mode, auto_organize_threshold, weekly_brief_enabled, plan")
     .eq("id", user.id)
     .maybeSingle();
+
+  const outboundDigestsIncluded = isProPlan(normalizePlan(profile?.plan));
 
   const showUsage = isPlatformAdmin(user.email);
 
@@ -204,6 +207,7 @@ export default async function SettingsPage() {
                 ? profile.auto_organize_threshold
                 : 0.85
             }
+            outboundDigestsIncluded={outboundDigestsIncluded}
           />
           <div className="mt-8 space-y-8">
             <NotificationSettings
