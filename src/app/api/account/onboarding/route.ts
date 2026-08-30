@@ -381,24 +381,46 @@ export async function PATCH(request: Request) {
   const action =
     typeof body.action === "string" ? body.action : body.skip === true ? "skip" : null;
 
-  // ── Skip entire onboarding ──────────────────────────────────────────
+  // ── Soft exit after Space exists (no full skip before Space) ────────
   if (action === "skip" || body.skip === true) {
+    const { row: current } = await readOnboardingRow(supabase, user.id);
+    const step = current?.onboarding_step;
+    const pastSpace =
+      step === "add_knowledge" ||
+      step === "first_value" ||
+      step === "ask_gideon" ||
+      step === "completed" ||
+      Boolean(current?.onboarding_intent);
+
+    if (!pastSpace) {
+      return NextResponse.json(
+        {
+          error:
+            "Pick what Guardian should help with and create your Space first.",
+        },
+        { status: 400 }
+      );
+    }
+
+    // Count as completed-with-Space, not abandoned skip.
     const now = new Date().toISOString();
     const { error } = await updateProfile(supabase, user.id, {
       onboarding_completed_at: now,
-      onboarding_skipped: true,
+      onboarding_skipped: false,
       onboarding_step: "completed",
     });
     if (error) {
       return NextResponse.json(
-        { error: "Couldn't skip onboarding." },
+        { error: "Couldn't finish setup." },
         { status: 502 }
       );
     }
-    await recordProductEvent(supabase, user.id, "intent_skipped");
+    await recordProductEvent(supabase, user.id, "coach_completed", {
+      deferredKnowledge: true,
+    });
     const { row } = await readOnboardingRow(supabase, user.id);
     return NextResponse.json({
-      ...(row ? statusPayload(row) : { needsOnboarding: false, skipped: true }),
+      ...(row ? statusPayload(row) : { needsOnboarding: false, skipped: false }),
       activeProfileId: null,
       createdProfileId: null,
     });

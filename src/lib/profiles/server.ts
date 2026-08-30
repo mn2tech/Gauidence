@@ -146,6 +146,12 @@ async function createPersonalGuardianProfile(
     .update({ active_guardian_profile_id: data.id })
     .eq("id", user.id);
 
+  const { recordProductEvent } = await import("@/lib/analytics/productEvents");
+  await recordProductEvent(supabase, user.id, "space_created", {
+    source: "auto_personal",
+    profileId: data.id,
+  });
+
   return asProfile(data, "owner");
 }
 

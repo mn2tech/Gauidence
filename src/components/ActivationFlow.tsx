@@ -191,9 +191,22 @@ export default function ActivationFlow({ onComplete }: Props) {
     setError(null);
     try {
       await patch({ action: "select_category", intent: id });
+      const name = DEFAULT_SPACE_NAMES[id] ?? "My Space";
       setIntent(id);
-      setSpaceName(DEFAULT_SPACE_NAMES[id] ?? "My Space");
-      setStep("create_space");
+      setSpaceName(name);
+      const created = await patch({
+        action: "create_space",
+        intent: id,
+        workspaceName: name,
+      });
+      const profileId =
+        created.activeProfileId ?? created.createdProfileId ?? null;
+      if (profileId) {
+        setActiveProfileId(profileId);
+        await refresh();
+        await switchProfile(profileId);
+      }
+      setStep("add_knowledge");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't save your choice.");
     } finally {
@@ -211,17 +224,30 @@ export default function ActivationFlow({ onComplete }: Props) {
         intent: "school",
         schoolIntent: id,
       });
-      setIntent("school");
-      setSchoolIntent(id);
-      setSpaceName(
+      const name =
         id === "teacher"
           ? "Teaching"
           : id === "parent"
             ? "My child"
-            : "My studies"
-      );
+            : "My studies";
+      setIntent("school");
+      setSchoolIntent(id);
+      setSpaceName(name);
       setSchoolStep(false);
-      setStep("create_space");
+      const created = await patch({
+        action: "create_space",
+        intent: "school",
+        schoolIntent: id,
+        workspaceName: name,
+      });
+      const profileId =
+        created.activeProfileId ?? created.createdProfileId ?? null;
+      if (profileId) {
+        setActiveProfileId(profileId);
+        await refresh();
+        await switchProfile(profileId);
+      }
+      setStep("add_knowledge");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't save your choice.");
     } finally {
@@ -419,10 +445,10 @@ export default function ActivationFlow({ onComplete }: Props) {
     setSaving(true);
     try {
       await patch({ skip: true });
-      trackFunnelEvent("intent_skipped");
-      await onComplete({ activeProfileId: null, skipped: true });
+      trackFunnelEvent("coach_completed", { deferredKnowledge: true });
+      await onComplete({ activeProfileId: activeProfileId, skipped: false });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't skip.");
+      setError(e instanceof Error ? e.message : "Couldn't continue.");
     } finally {
       setSaving(false);
     }
@@ -855,14 +881,14 @@ export default function ActivationFlow({ onComplete }: Props) {
           </p>
         ) : null}
 
-        {step === "welcome" || step === "create_space" ? (
+        {step === "add_knowledge" ? (
           <button
             type="button"
             disabled={saving}
             onClick={() => void skipAll()}
             className="mt-6 text-center text-sm font-medium text-ink-muted underline-offset-2 hover:text-foreground hover:underline disabled:opacity-50"
           >
-            Just explore
+            I&apos;ll add something later
           </button>
         ) : null}
       </div>
