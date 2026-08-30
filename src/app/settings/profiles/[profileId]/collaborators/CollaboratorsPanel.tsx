@@ -268,6 +268,13 @@ export default function CollaboratorsPanel({
                 Viewers only see documents marked shared below. Nested client
                 Spaces are not included unless invited separately.
               </>
+            ) : vaultKind === "family" ? (
+              <>
+                {" "}
+                Invite a spouse or partner as <strong>Edit</strong> so you both
+                see the same Today — school, kids, and home. Nested Spaces stay
+                private unless invited separately.
+              </>
             ) : (
               <>
                 {" "}
@@ -297,7 +304,11 @@ export default function CollaboratorsPanel({
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="colleague@company.com"
+              placeholder={
+                vaultKind === "family"
+                  ? "partner@email.com"
+                  : "colleague@company.com"
+              }
               className="min-w-0 flex-1 rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand"
             />
             <button
