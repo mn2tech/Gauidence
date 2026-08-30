@@ -58,7 +58,7 @@ import {
 } from "@/lib/profiles/server";
 import type { GuardianProfile } from "@/lib/profiles/types";
 import { askGideonContextLabel } from "@/lib/profiles/types";
-import { parseProposedReminder } from "@/lib/reminders/propose";
+import { parseProposedReminder, wantsReminderAgent } from "@/lib/reminders/propose";
 import { withLlmUsage } from "@/lib/usage/record";
 import { assertBillingQuota, recordChatEvent } from "@/lib/billing/quota";
 import { refreshUserAwards } from "@/lib/awards/grant";
@@ -1810,6 +1810,7 @@ export async function POST(request: Request) {
         !inventoryAnswer &&
         !openChartAnswer &&
         !pianoClarify &&
+        !wantsReminderAgent(question) &&
         typeof businessAnswerDraft === "string" &&
         businessAnswerDraft.trim()
           ? businessAnswerDraft.trim()
