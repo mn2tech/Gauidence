@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { inviteAcceptLandingPath, ASK_GIDEON_PATH } from "@/lib/routes";
+import { inviteAcceptLandingPath } from "@/lib/routes";
 import { SIMPLE_HOME_PATH } from "@/lib/simple-home/routing";
 import { EMPLOYEE_HUB_PATH } from "@/lib/employee-hub/routing";
 
@@ -17,7 +17,7 @@ describe("inviteAcceptLandingPath", () => {
     );
   });
 
-  it("keeps other simple-home invites on Ask", () => {
+  it("sends other simple-home invites to Today", () => {
     assert.equal(
       inviteAcceptLandingPath({
         profileId: "biz-1",
@@ -25,7 +25,7 @@ describe("inviteAcceptLandingPath", () => {
         role: "editor",
         simpleHome: true,
       }),
-      ASK_GIDEON_PATH
+      SIMPLE_HOME_PATH
     );
   });
 
