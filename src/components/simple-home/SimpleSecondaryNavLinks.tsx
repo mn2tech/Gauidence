@@ -57,18 +57,6 @@ export default function SimpleSecondaryNavLinks({
 
   const universalLinks = [{ href: COMMAND_CENTER_PATH, label: "Command Center" }];
 
-  const isFamilyContext =
-    active?.profile_type === "family" ||
-    active?.profile_type === "child" ||
-    active?.profile_type === "student" ||
-    active?.profile_type === "spouse_partner" ||
-    active?.profile_type === "parent" ||
-    active?.profile_type === "family_member";
-
-  const familyLinks = isFamilyContext
-    ? [{ href: "/parent", label: "My School" }]
-    : [];
-
   const ent = employeeEntitlements;
   const links = isBusinessVault
     ? [
