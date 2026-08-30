@@ -5,7 +5,7 @@ import { isOlneyNnoRef, OLNEY_NNO_PATH } from "@/lib/campaigns/olney-nno";
 export const metadata: Metadata = {
   title: "Try Guardian",
   description:
-    "Create a free Guardian account — upload documents, track deadlines, and ask Gideon in plain language.",
+    "Try a sample Guardian vault — ask Gideon about demo documents, or create a free account.",
 };
 
 type Props = {
@@ -22,5 +22,5 @@ export default async function TryPage({ searchParams }: Props) {
   if (ref) {
     redirect(`/signup?ref=${encodeURIComponent(ref)}`);
   }
-  redirect("/signup");
+  redirect("/demo");
 }

@@ -35,7 +35,7 @@ export default function PersonalSpaceWelcome({
       <div className="grid gap-3 sm:grid-cols-3">
         {PERSONAL_SPACE_ACTIONS.map((action) => {
           const Icon = ICONS[action.id];
-          const primary = action.id === "ask-gideon";
+          const primary = action.id === "add-something";
           return (
             <Link
               key={action.id}

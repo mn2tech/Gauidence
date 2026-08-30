@@ -5,7 +5,9 @@ import { createClient } from "@/lib/supabase/server";
 import { getActiveGuardianProfile } from "@/lib/profiles/server";
 import { isEmployeeHubProfile } from "@/lib/employee-hub/routing";
 import { getEmployeeHubEntitlements } from "@/lib/employee-hub/server";
+import { canAccessSimpleHome } from "@/lib/features/simple-home";
 import SiteHeader from "@/components/SiteHeader";
+import SimpleAppShell from "@/components/simple-home/SimpleAppShell";
 import VaultChatPanel from "@/components/VaultChatPanelLazy";
 
 export const metadata: Metadata = {
@@ -31,18 +33,27 @@ export default async function AskGideonPage() {
     }
   }
 
+  const chat = (
+    <Suspense
+      fallback={
+        <p className="p-6 text-sm text-ink-muted">Loading Ask Gideon…</p>
+      }
+    >
+      <VaultChatPanel variant="page" />
+    </Suspense>
+  );
+
+  if (
+    canAccessSimpleHome({ email: user.email }) &&
+    !isEmployeeHubProfile(active)
+  ) {
+    return <SimpleAppShell layout="chat">{chat}</SimpleAppShell>;
+  }
+
   return (
     <div className="flex h-[100dvh] flex-col overflow-hidden">
       <SiteHeader />
-      <div className="min-h-0 flex-1">
-        <Suspense
-          fallback={
-            <p className="p-6 text-sm text-ink-muted">Loading Ask Gideon…</p>
-          }
-        >
-          <VaultChatPanel variant="page" />
-        </Suspense>
-      </div>
+      <div className="min-h-0 flex-1">{chat}</div>
     </div>
   );
 }

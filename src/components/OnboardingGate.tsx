@@ -8,7 +8,7 @@ import {
   isEmployeeHubProfile,
   postLoginPathForProfile,
 } from "@/lib/employee-hub/routing";
-import { SIMPLE_HOME_PATH } from "@/lib/simple-home/routing";
+import { ASK_GIDEON_PATH } from "@/lib/simple-home/routing";
 import type { GuardianProfile } from "@/lib/profiles/types";
 
 const ActivationFlow = dynamic(
@@ -118,32 +118,22 @@ export default function OnboardingGate({
           if (activeProfileId) {
             await switchProfile(activeProfileId);
           }
-          let landing = "/ask";
+          let landing = ASK_GIDEON_PATH;
           try {
-            const [profilesRes, flagRes] = await Promise.all([
-              fetch("/api/profiles"),
-              fetch("/api/features/simple-home"),
-            ]);
+            const profilesRes = await fetch("/api/profiles");
             const body = (await profilesRes.json().catch(() => ({}))) as {
               active?: Pick<
                 GuardianProfile,
                 "profile_type" | "parent_profile_id"
               >;
             };
-            const flagBody = (await flagRes.json().catch(() => ({}))) as {
-              enabled?: boolean;
-            };
             if (profilesRes.ok && body.active) {
-              if (flagBody.enabled && !isEmployeeHubProfile(body.active)) {
-                landing = SIMPLE_HOME_PATH;
-              } else {
-                landing = postLoginPathForProfile(body.active);
-              }
-            } else if (flagBody.enabled) {
-              landing = SIMPLE_HOME_PATH;
+              landing = isEmployeeHubProfile(body.active)
+                ? postLoginPathForProfile(body.active)
+                : ASK_GIDEON_PATH;
             }
           } catch {
-            // Keep default /ask.
+            // Keep default Ask landing.
           }
           if (pathname !== landing) {
             router.replace(landing);

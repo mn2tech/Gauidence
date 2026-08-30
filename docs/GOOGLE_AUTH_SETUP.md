@@ -46,7 +46,15 @@ Supabase Dashboard → **Authentication → URL Configuration**:
 - **Site URL:** `https://guardian.nm2tech.com`
 - **Additional Redirect URLs** (add each line; keep localhost for dev):
   - `http://localhost:3000/auth/callback`
+  - `http://localhost:3000/auth/callback?**`
   - `http://localhost:3001/auth/callback` (used when port 3000 is taken)
+  - `http://localhost:3001/auth/callback?**`
+  - `http://localhost:3000/auth/recovery`
+  - `http://localhost:3000/auth/recovery?**`
+  - `http://localhost:3001/auth/recovery`
+  - `http://localhost:3001/auth/recovery?**`
+  - `http://localhost:3000/auth/update-password?**`
+  - `http://localhost:3001/auth/update-password?**`
   - `https://guardian.nm2tech.com/auth/callback`
   - `https://guardian.nm2tech.com/auth/callback?**`
   - `https://guardian-app-delta.vercel.app/auth/callback` (legacy; optional)
@@ -59,9 +67,60 @@ wildcard if your project requires exact query matches):
 
 - `https://guardian.nm2tech.com/auth/update-password`
 - `https://guardian.nm2tech.com/auth/update-password?**`
+- `https://guardian.nm2tech.com/auth/recovery`
+- `https://guardian.nm2tech.com/auth/recovery?**`
+- `https://guardian.nm2tech.com/auth/callback?**`
+- `https://guardian.nm2tech.com/auth/confirm?**`
 
 If you later add a custom domain, add `https://yourdomain.com/auth/callback`
 here too and update the Google authorized origins.
+
+Also allowlist confirm routes (used by the reset email template below):
+
+- `http://localhost:3000/auth/confirm?**`
+- `http://localhost:3001/auth/confirm?**`
+
+### Password reset email template (required)
+
+If the reset email arrives **without a clickable link** (or the link is just
+your homepage), the **Reset password** template in Supabase is wrong — not the
+Guardian app.
+
+Supabase Dashboard → **Authentication → Email Templates → Reset password**.
+
+Replace the body with this (works for local dev and production):
+
+```html
+<h2>Reset your password</h2>
+
+<p>We received a request to reset your Guardian password.</p>
+
+<p>
+  <a href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=recovery">
+    Reset password
+  </a>
+</p>
+
+<p>If you did not request this, you can ignore this email.</p>
+```
+
+**Do not** append query params after `{{ .ConfirmationURL }}` — Supabase
+overwrites them and the link can end up empty. Also watch variable casing:
+`{{ .ConfirmationUrl }}` (lowercase u) renders blank.
+
+Alternative (uses `/auth/confirm`, which Guardian already handles):
+
+```html
+<a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=/auth/update-password">
+  Reset password
+</a>
+```
+
+That variant always uses **Site URL** (`guardian.nm2tech.com`), so prefer the
+`{{ .RedirectTo }}` version when testing on `localhost`.
+
+After saving the template, request a **new** reset from
+`/forgot-password` and open the email within about an hour.
 
 ### Database migration
 

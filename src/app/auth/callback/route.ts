@@ -45,7 +45,13 @@ export async function GET(request: Request) {
       : "/ask";
 
   const providerError = searchParams.get("error");
+  const errorCode = searchParams.get("error_code");
   if (providerError) {
+    if (errorCode === "otp_expired") {
+      return NextResponse.redirect(
+        `${origin}/login?error=reset_link_expired`
+      );
+    }
     const reason =
       providerError === "access_denied" ? "access_denied" : "provider_error";
     return NextResponse.redirect(`${origin}/login?error=${reason}`);
@@ -88,7 +94,10 @@ export async function GET(request: Request) {
       "Auth callback exchange failed:",
       error.message?.slice(0, 200)
     );
-    return NextResponse.redirect(`${origin}/login?error=exchange_failed`);
+    const expired = /expired|invalid|otp/i.test(error.message);
+    return NextResponse.redirect(
+      `${origin}/login?error=${expired ? "reset_link_expired" : "exchange_failed"}`
+    );
   }
 
   const {

@@ -375,12 +375,12 @@ export default function AddAnythingScreen() {
     <div className="simple-home-page mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-6 sm:py-8">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-          Add Anything
+          Add Something
         </h1>
         <p className="mt-1.5 text-sm text-ink-muted">
-          Upload, paste, import a website, or capture into{" "}
-          {profile ? profileContainerName(profile) : "your Space"} — then Ask
-          Gideon can use it.
+          Upload files, photos, notes, receipts, and more into{" "}
+          {profile ? profileContainerName(profile) : "your Personal Space"}.
+          Guardian analyzes and organizes — you do not pick a folder first.
         </p>
       </header>
 
@@ -395,6 +395,31 @@ export default function AddAnythingScreen() {
 
       {stage === "input" ? (
         <>
+          <div className="flex flex-wrap gap-2">
+            {(
+              [
+                { label: "Add note", hint: "Note: " },
+                { label: "Add receipt", hint: "Receipt: " },
+                { label: "Add important date", hint: "Important date: " },
+                { label: "Add person", hint: "Person: " },
+                { label: "Add vehicle", hint: "Vehicle: " },
+                { label: "Add event", hint: "Event: " },
+              ] as const
+            ).map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                onClick={() => {
+                  setShowWebsite(false);
+                  setShowPaste(true);
+                  setPasteText((prev) => (prev.trim() ? prev : item.hint));
+                }}
+                className="rounded-full border border-border-subtle bg-white px-3 py-1.5 text-xs font-semibold text-foreground transition hover:border-brand/40"
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <button
               type="button"
@@ -467,9 +492,11 @@ export default function AddAnythingScreen() {
                 <Camera className="h-5 w-5" />
               </span>
               <span>
-                <span className="block text-sm font-semibold">Take photo</span>
+                <span className="block text-sm font-semibold">
+                  Take / upload photo
+                </span>
                 <span className="mt-0.5 block text-xs text-ink-muted">
-                  Use your camera to capture a document
+                  Capture a document, receipt, or image
                 </span>
               </span>
             </Link>
