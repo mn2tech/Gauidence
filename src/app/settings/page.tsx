@@ -16,6 +16,11 @@ import {
   guardianReferralCode,
   guardianTryUrl,
 } from "@/lib/share/guardian";
+import {
+  loadReferrerStats,
+  REFERRAL_MAX_PER_YEAR,
+  REFERRAL_REWARD_CENTS,
+} from "@/lib/share/referral";
 
 export const metadata: Metadata = {
   title: "Settings — Guardian",
@@ -37,6 +42,19 @@ export default async function SettingsPage() {
     .maybeSingle();
 
   const showUsage = isPlatformAdmin(user.email);
+
+  let referralStats = {
+    grantedThisYear: 0,
+    totalGranted: 0,
+    totalCreditCents: 0,
+    maxPerYear: REFERRAL_MAX_PER_YEAR,
+    rewardCents: REFERRAL_REWARD_CENTS,
+  };
+  try {
+    referralStats = await loadReferrerStats(supabase, user.id);
+  } catch {
+    /* table may not exist until migration 0108 */
+  }
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -160,6 +178,7 @@ export default async function SettingsPage() {
             <StorageSection />
             <ShareGuardianCard
               shareUrl={guardianTryUrl(guardianReferralCode(user.id))}
+              stats={referralStats}
             />
           </div>
           <SettingsForm
