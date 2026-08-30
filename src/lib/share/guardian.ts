@@ -14,8 +14,7 @@ export function guardianTryUrl(ref?: string | null): string {
 }
 
 export const GUARDIAN_SHARE_BLURB =
-  "Try Guardian — upload your documents, track deadlines, and ask Gideon in plain language. Free to start.";
-
+  "Try Guardian — upload school or work docs, see what needs attention Today, and ask Gideon in plain language. Free to start.";
 export function guardianShareMessage(url: string): string {
   return `${GUARDIAN_SHARE_BLURB}\n\n${url}`;
 }
