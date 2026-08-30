@@ -9,6 +9,10 @@ import { calendarDateInUserZone, GUARDIAN_TIME_ZONE } from "@/lib/timezone";
 import { appBaseUrl } from "@/lib/profiles/invitations";
 import { SIMPLE_HOME_PATH } from "@/lib/simple-home/routing";
 import { hrefForResult } from "@/lib/search";
+import {
+  memberUserIdsBySpace,
+  recipientsForSpaceItem,
+} from "@/lib/guardian-today/spaceNotifyRecipients";
 
 type AlertDueSoon = {
   id: string;
@@ -23,6 +27,7 @@ type AlertDueSoon = {
 type ItemDueSoon = {
   id: string;
   user_id: string;
+  space_id: string | null;
   title: string;
   due_at: string;
   event_date: string | null;
@@ -32,7 +37,6 @@ type ItemDueSoon = {
 type Pending = {
   kind: "alert" | "item";
   id: string;
-  userId: string;
   title: string;
   dueAt: string;
   path: string;
@@ -58,7 +62,7 @@ function alertPath(a: AlertDueSoon): string {
 
 /**
  * Email + push for timed reminders / Guardian items whose due_at is
- * imminent (within the same window as the in-app Ask banner).
+ * imminent. Fans out to space members; stamps after any successful delivery.
  */
 export async function notifyDueSoon(admin: SupabaseClient): Promise<{
   usersNotified: number;
@@ -82,7 +86,7 @@ export async function notifyDueSoon(admin: SupabaseClient): Promise<{
       .limit(200),
     admin
       .from("guardian_items")
-      .select("id, user_id, title, due_at, event_date, remind_at")
+      .select("id, user_id, space_id, title, due_at, event_date, remind_at")
       .eq("status", "active")
       .not("due_at", "is", null)
       .is("due_soon_notified_at", null)
@@ -91,45 +95,68 @@ export async function notifyDueSoon(admin: SupabaseClient): Promise<{
       .limit(200),
   ]);
 
-  const pending: Pending[] = [];
+  const alertRows = (alerts ?? []) as AlertDueSoon[];
+  const itemRows = (items ?? []) as ItemDueSoon[];
 
-  for (const a of (alerts ?? []) as AlertDueSoon[]) {
+  const spaceIds: string[] = [];
+  for (const a of alertRows) {
+    if (a.profile_id) spaceIds.push(a.profile_id);
+  }
+  for (const item of itemRows) {
+    if (item.space_id) spaceIds.push(item.space_id);
+  }
+  const membersBySpace = await memberUserIdsBySpace(admin, spaceIds);
+
+  const byUser = new Map<string, Pending[]>();
+
+  function addPending(userId: string, pending: Pending) {
+    const list = byUser.get(userId) ?? [];
+    list.push(pending);
+    byUser.set(userId, list);
+  }
+
+  for (const a of alertRows) {
     if (!a.due_at) continue;
-    pending.push({
+    const pending: Pending = {
       kind: "alert",
       id: a.id,
-      userId: a.user_id,
       title: a.title,
       dueAt: a.due_at,
       path: alertPath(a),
-    });
+    };
+    for (const userId of recipientsForSpaceItem(
+      a.profile_id,
+      a.user_id,
+      membersBySpace
+    )) {
+      addPending(userId, pending);
+    }
   }
 
-  for (const item of (items ?? []) as ItemDueSoon[]) {
+  for (const item of itemRows) {
     if (!item.due_at) continue;
     if (item.remind_at) {
       const remindMs = new Date(item.remind_at).getTime();
       if (!Number.isNaN(remindMs) && remindMs > now) continue;
     }
-    pending.push({
+    const pending: Pending = {
       kind: "item",
       id: item.id,
-      userId: item.user_id,
       title: item.title,
       dueAt: item.due_at,
       path: SIMPLE_HOME_PATH,
-    });
+    };
+    for (const userId of recipientsForSpaceItem(
+      item.space_id,
+      item.user_id,
+      membersBySpace
+    )) {
+      addPending(userId, pending);
+    }
   }
 
-  if (pending.length === 0) {
+  if (byUser.size === 0) {
     return { usersNotified: 0, alertsNotified: 0, itemsNotified: 0 };
-  }
-
-  const byUser = new Map<string, Pending[]>();
-  for (const p of pending) {
-    const list = byUser.get(p.userId) ?? [];
-    list.push(p);
-    byUser.set(p.userId, list);
   }
 
   const { data: profiles } = await admin
@@ -146,8 +173,8 @@ export async function notifyDueSoon(admin: SupabaseClient): Promise<{
   const base = appBaseUrl();
   const nowIso = new Date(now).toISOString();
   let usersNotified = 0;
-  let alertsNotified = 0;
-  let itemsNotified = 0;
+  const deliveredAlertIds = new Set<string>();
+  const deliveredItemIds = new Set<string>();
 
   for (const [userId, rows] of byUser) {
     const profile = profileById.get(userId);
@@ -202,25 +229,29 @@ export async function notifyDueSoon(admin: SupabaseClient): Promise<{
 
     if (!delivered) continue;
 
-    const alertIds = rows.filter((r) => r.kind === "alert").map((r) => r.id);
-    const itemIds = rows.filter((r) => r.kind === "item").map((r) => r.id);
-
-    if (alertIds.length > 0) {
-      await admin
-        .from("alerts")
-        .update({ due_soon_notified_at: nowIso })
-        .in("id", alertIds);
-      alertsNotified += alertIds.length;
-    }
-    if (itemIds.length > 0) {
-      await admin
-        .from("guardian_items")
-        .update({ due_soon_notified_at: nowIso })
-        .in("id", itemIds);
-      itemsNotified += itemIds.length;
-    }
     usersNotified += 1;
+    for (const row of rows) {
+      if (row.kind === "alert") deliveredAlertIds.add(row.id);
+      else deliveredItemIds.add(row.id);
+    }
   }
 
-  return { usersNotified, alertsNotified, itemsNotified };
+  if (deliveredAlertIds.size > 0) {
+    await admin
+      .from("alerts")
+      .update({ due_soon_notified_at: nowIso })
+      .in("id", [...deliveredAlertIds]);
+  }
+  if (deliveredItemIds.size > 0) {
+    await admin
+      .from("guardian_items")
+      .update({ due_soon_notified_at: nowIso })
+      .in("id", [...deliveredItemIds]);
+  }
+
+  return {
+    usersNotified,
+    alertsNotified: deliveredAlertIds.size,
+    itemsNotified: deliveredItemIds.size,
+  };
 }

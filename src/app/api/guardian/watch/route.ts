@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getGuardianWatch } from "@/lib/guardian-items/watch";
 
 export const runtime = "nodejs";
@@ -15,6 +16,14 @@ export async function GET(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
+  const admin = createAdminClient();
+  if (admin) {
+    const { repairFamilyCascadeForUser } = await import(
+      "@/lib/profiles/cascadeMembership"
+    );
+    await repairFamilyCascadeForUser(admin, user.id);
   }
 
   const url = new URL(request.url);

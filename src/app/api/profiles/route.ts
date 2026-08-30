@@ -337,6 +337,23 @@ export async function POST(request: Request) {
     );
   }
 
+  if (admin && parentId) {
+    const { data: parent } = await admin
+      .from("guardian_profiles")
+      .select("profile_type")
+      .eq("id", parentId)
+      .maybeSingle();
+    if (parent?.profile_type === "family") {
+      const { mirrorFamilyCollaboratorsOntoChild } = await import(
+        "@/lib/profiles/cascadeMembership"
+      );
+      await mirrorFamilyCollaboratorsOntoChild(admin, {
+        familyProfileId: parentId,
+        childProfileId: created.id as string,
+      });
+    }
+  }
+
   const createdId = String(created.id);
   const switchTo = body.switchTo !== false;
   if (switchTo) {
