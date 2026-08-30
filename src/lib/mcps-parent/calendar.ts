@@ -48,7 +48,9 @@ export function buildIcs(event: CalendarEventInput): string {
     event.description?.trim() || "",
     event.schoolName ? `School: ${event.schoolName}` : "",
     event.sourceUrl ? `Source: ${event.sourceUrl}` : "",
-    "Via Guardian — verify with MCPS for official decisions.",
+    event.schoolName
+      ? "Via Guardian — verify with MCPS for official decisions."
+      : "Via Guardian",
   ].filter(Boolean);
 
   const lines = [
