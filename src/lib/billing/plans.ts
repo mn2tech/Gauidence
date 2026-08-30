@@ -96,8 +96,34 @@ export const PLAN_TAGLINES: Record<PlanId, string> = {
   free: "Try Guardian with one Space and light monthly AI use.",
   personal:
     "Keep building knowledge — more Spaces, higher limits, and richer memory.",
-  family: "For households with shared people, pets, and homes.",
-  business: "For teams, clients, and higher AI volume.",
+  family: "Share one household Space — kids, school, pets, and home together.",
+  business: "Clients, team tools, Leads, and higher volume for your firm.",
+};
+
+/** Plan-specific value bullets for pricing + upgrade modal (beyond quotas). */
+export const PLAN_WEDGE_FEATURES: Record<PlanId, string[]> = {
+  free: [
+    "One Space to try Guardian",
+    "Today’s priorities from your documents",
+    "Ask Gideon grounded in your knowledge",
+  ],
+  personal: [
+    "More Spaces for work and life",
+    "Higher Ask Gideon & analysis limits",
+    "Weekly Brief + Needs Attention alerts",
+  ],
+  family: [
+    "Invite a spouse/partner to your Family Space",
+    "Kids, school calendar (My School), pets & home",
+    "Shared household memory in one place",
+    "Higher limits for the whole household",
+  ],
+  business: [
+    "Client Spaces + team Employee Hub",
+    "Leads, Recruit, Proposals & Work Memory",
+    "Business Pack intelligence in Ask Gideon",
+    "Higher volume for firm workflows",
+  ],
 };
 
 export const FREE_PRICE_DISPLAY = "$0";
@@ -123,12 +149,12 @@ export const PLAN_PRODUCT_COPY: Record<
   family: {
     name: "Guardian Family",
     description:
-      "200 analyses, 1,000 Ask Gideon turns, and 100 Research briefs per month — built for household vaults.",
+      "Shared household Space, My School, and higher limits for kids, pets, and home — 200 analyses and 1,000 Ask Gideon turns / month.",
   },
   business: {
     name: "Guardian Business",
     description:
-      "500 analyses, 3,000 Ask Gideon turns, and 300 Research briefs per month — for teams and client work.",
+      "Clients, Employee Hub, Leads, and firm workflows — 500 analyses and 3,000 Ask Gideon turns / month.",
   },
 };
 

@@ -10,7 +10,7 @@ import { useUpgradeModal } from "@/components/UpgradeProvider";
 import { useSimpleHomeData } from "@/hooks/useSimpleHomeData";
 import { useGuardianToday } from "@/hooks/useGuardianToday";
 import PersonalSpaceWelcome from "@/components/personal-space/PersonalSpaceWelcome";
-import GideonWelcome from "@/components/gideon-welcome/GideonWelcome";
+import PlanWedgeBanner from "@/components/simple-home/PlanWedgeBanner";
 import { GuardianPriorityCard } from "@/components/guardian-today/GuardianPriorityCard";
 import {
   GuardianCoverageFooter,
@@ -123,6 +123,8 @@ export default function SimpleHomeScreen() {
       ) : (
         <GideonWelcome mode="today" />
       )}
+
+      <PlanWedgeBanner />
 
       {today.loading ? (
         <Section title="Today's priorities">
