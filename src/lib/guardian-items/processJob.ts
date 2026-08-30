@@ -39,15 +39,44 @@ export async function processGuardianItemExtraction(
     return { created: 0, deduped: 0, lowConfidence: 0, skipped: true };
   }
 
-  const { data: extracted } = await supabase
+  const { data: extracted, error: extractedError } = await supabase
     .from("extracted_data")
     .select(
-      "title, summary, document_type, source_text, important_dates, specialist"
+      "title, summary, document_type, source_text, specialist, vision_transcription, vision_summary"
     )
     .eq("document_id", documentId)
     .maybeSingle();
 
-  const sourceText = String(extracted?.source_text ?? "").trim();
+  if (extractedError) {
+    logGuardianEvent("guardian_extraction_completed", {
+      document_id: documentId,
+      space_id: spaceId,
+      created: 0,
+      deduped: 0,
+      low_confidence: 0,
+      skipped: true,
+      reason: "extracted_data_query_failed",
+      error: extractedError.message,
+    });
+    return { created: 0, deduped: 0, lowConfidence: 0, skipped: true };
+  }
+
+  // Prefer OCR/source text; for chat image uploads fall back to vision fields.
+  // Join unique parts so a short source_text still gets vision OCR dates.
+  const sourceText = [
+    ...new Set(
+      [
+        extracted?.source_text,
+        extracted?.vision_transcription,
+        extracted?.vision_summary,
+        extracted?.summary,
+        extracted?.title,
+      ]
+        .map((v) => String(v ?? "").trim())
+        .filter((v) => v.length > 0)
+    ),
+  ].join("\n\n");
+
   if (!sourceText) {
     logGuardianEvent("guardian_extraction_completed", {
       document_id: documentId,
@@ -79,12 +108,16 @@ export async function processGuardianItemExtraction(
     display_name: c.display_name,
   }));
 
-  const importantDates = Array.isArray(extracted?.important_dates)
-    ? (extracted.important_dates as {
-        label?: string;
-        date?: string;
-        value?: string;
-      }[])
+  // important_dates live under specialist (no top-level column on extracted_data).
+  const specialist = (extracted?.specialist ?? {}) as {
+    important_dates?: {
+      label?: string;
+      date?: string;
+      value?: string;
+    }[];
+  };
+  const importantDates = Array.isArray(specialist.important_dates)
+    ? specialist.important_dates
     : null;
 
   const parsed = await extractGuardianItemsWithLlm({

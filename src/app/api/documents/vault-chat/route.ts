@@ -49,7 +49,10 @@ import {
 } from "@/lib/vision/gideonImages";
 import { loadAuthorizedVisionImages } from "@/lib/vision/loadAuthorized";
 import { wantsSingleImageFocus } from "@/lib/vault/images";
-import { enqueueAnalyzePipeline } from "@/lib/documents/processingJobs";
+import {
+  enqueueAnalyzePipeline,
+  enqueueGuardianItemsPipeline,
+} from "@/lib/documents/processingJobs";
 import { chatScopedProfilePayload } from "@/lib/vault/detectVaultScope";
 import {
   listGuardianProfiles,
@@ -1512,22 +1515,48 @@ export async function POST(request: Request) {
         });
       }
 
-      // Chat uploads should surface on Today ASAP — kick job workers without
-      // blocking the reply (analyze → guardian_items runs in background).
+      // Chat attachments should create Watch/Today items. If analysis already
+      // has text (or vision summary), force guardian_items and drain that doc.
       if (attachedDoc?.documentId && attachedDoc.profileId) {
-        void import("@/lib/documents/processingJobs")
-          .then(async ({ processPendingDocumentJobs }) => {
+        const hasExtractableText = Boolean(
+          attachedDoc.sourceText?.trim() ||
+            attachedDoc.visionSummary?.trim()
+        );
+        const analysisDone =
+          attachedDoc.analysisStatus === "completed" ||
+          attachedDoc.analysisStatus === "needs_verification" ||
+          attachedDoc.visionStatus === "analyzed";
+
+        void (async () => {
+          try {
+            const {
+              processPendingDocumentJobs,
+            } = await import("@/lib/documents/processingJobs");
+
+            if (hasExtractableText && analysisDone) {
+              await enqueueGuardianItemsPipeline(supabase, {
+                documentId: attachedDoc.documentId,
+                profileId: attachedDoc.profileId,
+                userId: user.id,
+              });
+            }
+
             await processPendingDocumentJobs(supabase, user.id, {
-              limit: 3,
+              limit: 4,
+              documentId: attachedDoc.documentId,
+            });
+            // Also drain any other pending jobs for this Space.
+            await processPendingDocumentJobs(supabase, user.id, {
+              limit: 2,
               profileId: attachedDoc.profileId,
             });
-          })
-          .catch((err) => {
+          } catch (err) {
             console.error(
               "Chat attachment job kick failed (non-blocking):",
               err instanceof Error ? err.message : err
             );
-          });
+          }
+        })();
       }
 
       const orchestrationRoute = routeGideonKnowledgeRequest({

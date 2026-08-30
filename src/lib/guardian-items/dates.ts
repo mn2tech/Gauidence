@@ -99,6 +99,19 @@ export function classifyWatchBucket(args: {
     if (days === null && args.requiresAction) return "needsAttention";
   }
 
+  // Near-term calendar events (summits, appointments, travel) belong in
+  // Needs Attention even without an explicit action flag.
+  const isNearTermCalendar =
+    days !== null &&
+    days > 0 &&
+    days <= 7 &&
+    (args.type === "event" ||
+      args.type === "appointment" ||
+      args.type === "travel");
+  if (isNearTermCalendar) {
+    return "needsAttention";
+  }
+
   if (days !== null && days > 0 && days <= args.horizonDays) {
     return "comingUp";
   }
