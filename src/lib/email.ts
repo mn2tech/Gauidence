@@ -137,6 +137,135 @@ export async function sendReminderEmail(to: string, items: ReminderItem[]) {
   return true;
 }
 
+export type WeeklyBriefLine = {
+  title: string;
+  detail: string;
+  url: string;
+};
+
+export type WeeklyBriefEmailArgs = {
+  to: string;
+  greetName?: string | null;
+  comingUp: WeeklyBriefLine[];
+  whatChanged: WeeklyBriefLine[];
+  caughtCount: number;
+  homeUrl: string;
+};
+
+export function renderWeeklyBriefEmail(args: WeeklyBriefEmailArgs) {
+  const name = args.greetName?.trim() || "there";
+  const comingRows = args.comingUp
+    .map(
+      (item) => `
+        <tr>
+          <td style="padding:10px 16px;border-bottom:1px solid #e7e5e4;">
+            <a href="${escapeHtml(item.url)}" style="font-weight:600;color:#0f766e;text-decoration:underline;">${escapeHtml(item.title)}</a>
+            <div style="margin-top:2px;font-size:13px;color:#57534e;">${escapeHtml(item.detail)}</div>
+          </td>
+        </tr>`
+    )
+    .join("");
+
+  const changedRows = args.whatChanged
+    .map(
+      (item) => `
+        <tr>
+          <td style="padding:10px 16px;border-bottom:1px solid #e7e5e4;">
+            <a href="${escapeHtml(item.url)}" style="font-weight:600;color:#0f766e;text-decoration:underline;">${escapeHtml(item.title)}</a>
+            <div style="margin-top:2px;font-size:13px;color:#57534e;">${escapeHtml(item.detail)}</div>
+          </td>
+        </tr>`
+    )
+    .join("");
+
+  const subject =
+    args.comingUp.length > 0
+      ? `Your Weekly Brief · ${args.comingUp.length} coming up`
+      : "Your Weekly Guardian Brief";
+
+  const caughtLine =
+    args.caughtCount > 0
+      ? `Guardian caught <strong>${args.caughtCount}</strong> thing${args.caughtCount === 1 ? "" : "s"} that may need you this week.`
+      : "Here's what Guardian is watching for you.";
+
+  const html = `
+  <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#fafaf9;padding:32px 16px;">
+    <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e7e5e4;border-radius:16px;overflow:hidden;">
+      <div style="padding:24px 24px 8px;">
+        ${brandHeaderHtml()}
+        <p style="margin:16px 0 4px;font-size:18px;font-weight:600;color:#1c1917;">Hi ${escapeHtml(name)},</p>
+        <p style="margin:0 0 8px;font-size:15px;color:#1c1917;line-height:1.5;">${caughtLine}</p>
+      </div>
+      ${
+        args.comingUp.length
+          ? `<div style="padding:8px 24px 0;"><p style="margin:0;font-size:13px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#57534e;">Coming up</p></div>
+      <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;">${comingRows}</table>`
+          : ""
+      }
+      ${
+        args.whatChanged.length
+          ? `<div style="padding:16px 24px 0;"><p style="margin:0;font-size:13px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#57534e;">What changed</p></div>
+      <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;">${changedRows}</table>`
+          : ""
+      }
+      <div style="padding:24px;">
+        <a href="${escapeHtml(args.homeUrl)}" style="display:inline-block;padding:12px 18px;border-radius:12px;background:#0f766e;color:#ffffff;font-weight:600;font-size:14px;text-decoration:none;">Open Today's priorities</a>
+        <p style="margin:16px 0 0;font-size:12px;color:#78716c;line-height:1.4;">You're getting this because Weekly Brief is on in Settings. Manage email preferences anytime.</p>
+      </div>
+    </div>
+  </div>`;
+
+  const textParts = [
+    `Hi ${name},`,
+    args.caughtCount > 0
+      ? `Guardian caught ${args.caughtCount} thing(s) that may need you this week.`
+      : "Here's what Guardian is watching for you.",
+    "",
+  ];
+  if (args.comingUp.length) {
+    textParts.push("Coming up:");
+    for (const item of args.comingUp) {
+      textParts.push(`- ${item.title} (${item.detail})`);
+    }
+    textParts.push("");
+  }
+  if (args.whatChanged.length) {
+    textParts.push("What changed:");
+    for (const item of args.whatChanged) {
+      textParts.push(`- ${item.title} (${item.detail})`);
+    }
+    textParts.push("");
+  }
+  textParts.push(`Open Today's priorities: ${args.homeUrl}`);
+
+  return { subject, html, text: textParts.join("\n") };
+}
+
+export async function sendWeeklyBriefEmail(
+  args: WeeklyBriefEmailArgs
+): Promise<boolean> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return false;
+
+  const from =
+    process.env.REMINDER_FROM_EMAIL ?? "Guardian <onboarding@resend.dev>";
+  const resend = new Resend(apiKey);
+  const { subject, html, text } = renderWeeklyBriefEmail(args);
+
+  const { error } = await resend.emails.send({
+    from,
+    to: args.to,
+    subject,
+    html,
+    text,
+  });
+  if (error) {
+    console.error("Weekly brief email failed:", args.to, error.message);
+    return false;
+  }
+  return true;
+}
+
 export type VaultInviteEmailArgs = {
   to: string;
   vaultName: string;
