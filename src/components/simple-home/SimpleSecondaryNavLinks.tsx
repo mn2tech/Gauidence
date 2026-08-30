@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { ChevronDown } from "lucide-react";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import { useEmployeeHubEntitlements } from "@/hooks/useEmployeeHubEntitlements";
 import { employeeShowsPowerNav } from "@/lib/employee-hub/entitlements";
@@ -18,20 +20,93 @@ type SimpleSecondaryNavLinksProps = {
   showDivider?: boolean;
 };
 
+type NavLink = { href: string; label: string };
+
 const DEFAULT_LINK_CLASS =
   "block rounded-lg px-3 py-2.5 text-sm font-medium text-foreground transition hover:bg-stone-100";
 
-const BUSINESS_TOOL_LINKS = [
+const BUSINESS_TOOL_LINKS: NavLink[] = [
   { href: "/work-memory", label: "Work Memory" },
   { href: LEADS_PATH, label: "Leads" },
   { href: "/recruit", label: "Recruit" },
   { href: "/business-advisor", label: "Business Advisor" },
   { href: "/proposals", label: "Proposals" },
-] as const;
+];
+
+function ToolsDropdown({
+  links,
+  onNavigate,
+  linkClassName,
+}: {
+  links: NavLink[];
+  onNavigate?: () => void;
+  linkClassName: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  if (links.length === 0) return null;
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-haspopup="menu"
+        onClick={() => setOpen((v) => !v)}
+        className={`inline-flex items-center gap-1 ${linkClassName}`}
+      >
+        Tools
+        <ChevronDown
+          className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`}
+          aria-hidden
+        />
+      </button>
+      {open ? (
+        <div
+          role="menu"
+          className="absolute left-0 z-50 mt-2 min-w-[12rem] rounded-xl border border-stone-200 bg-white py-1 shadow-lg"
+        >
+          {links.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                onNavigate?.();
+              }}
+              className="block px-3 py-2 text-sm font-medium text-foreground hover:bg-stone-50"
+            >
+              {link.label}
+            </Link>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 /**
  * Secondary tools for the simple home experience (profile menu / desktop header).
- * Business vaults always see Work Memory and Recruit once a vault exists.
+ * Desktop: Guardian Today stays primary; Command Center + vault tools collapse under Tools.
+ * Mobile drawer: same split under a Tools heading.
  */
 export default function SimpleSecondaryNavLinks({
   onNavigate,
@@ -58,9 +133,8 @@ export default function SimpleSecondaryNavLinks({
 
   if (needsSetup) return null;
 
-  const universalLinks = [
+  const primaryLinks: NavLink[] = [
     { href: SIMPLE_HOME_PATH, label: "Guardian Today" },
-    { href: COMMAND_CENTER_PATH, label: "Command Center" },
   ];
 
   const isFamilyContext =
@@ -76,7 +150,7 @@ export default function SimpleSecondaryNavLinks({
     : [];
 
   const ent = employeeEntitlements;
-  const links = isBusinessVault
+  const vaultToolLinks: NavLink[] = isBusinessVault
     ? [
         ...BUSINESS_TOOL_LINKS,
         { href: "/research", label: "Research" },
@@ -85,67 +159,70 @@ export default function SimpleSecondaryNavLinks({
     : isClientVault
       ? [{ href: PROPOSALS_PATH, label: "Proposals" }]
       : isEmployeeVault
-      ? [
-          ...(ent?.research ? [{ href: "/research", label: "Research" }] : []),
-          ...(ent?.work_memory
-            ? [{ href: "/work-memory", label: "Work Memory" }]
-            : []),
-          ...(ent?.experts ? [{ href: "/experts", label: "Experts" }] : []),
-          ...(ent?.recruit ? [{ href: "/recruit", label: "Recruit" }] : []),
-          ...(ent?.payroll_admin
-            ? [{ href: "/payroll", label: "Payroll" }]
-            : []),
-        ]
-      : [...familyLinks];
+        ? [
+            ...(ent?.research ? [{ href: "/research", label: "Research" }] : []),
+            ...(ent?.work_memory
+              ? [{ href: "/work-memory", label: "Work Memory" }]
+              : []),
+            ...(ent?.experts ? [{ href: "/experts", label: "Experts" }] : []),
+            ...(ent?.recruit ? [{ href: "/recruit", label: "Recruit" }] : []),
+            ...(ent?.payroll_admin
+              ? [{ href: "/payroll", label: "Payroll" }]
+              : []),
+          ]
+        : [...familyLinks];
 
-  if (isEmployeeVault && !showEmployeeTools && links.length === 0) {
-    return (
-      <div className={`${showDivider ? "simple-tools-panel mb-2 p-2" : ""} ${className ?? ""}`.trim()}>
-        {universalLinks.map((link) => (
-          <Link
-            key={link.href}
-            href={link.href}
-            onClick={onNavigate}
-            className={linkClassName}
-          >
-            {link.label}
-          </Link>
-        ))}
-      </div>
-    );
+  const toolLinks: NavLink[] = [
+    { href: COMMAND_CENTER_PATH, label: "Command Center" },
+    ...vaultToolLinks,
+  ];
+
+  if (isEmployeeVault && !showEmployeeTools) {
+    // Hub-locked employees: Today + Command Center only (no vault tool suite).
+    if (vaultToolLinks.length > 0) return null;
   }
-  if (isEmployeeVault && !showEmployeeTools) return null;
-  if (links.length === 0 && universalLinks.length === 0) return null;
+
+  if (primaryLinks.length === 0 && toolLinks.length === 0) return null;
 
   const panelClass = showDivider ? "simple-tools-panel mb-2 p-2" : "";
+  const desktop = !showDivider;
 
   return (
     <div className={`${panelClass} ${className ?? ""}`.trim()}>
-      {showDivider ? (
-        <p className="px-2 pb-1.5 pt-1 text-[11px] font-semibold uppercase tracking-wide text-brand-dark">
-          Tools
-        </p>
+      {primaryLinks.map((link) => (
+        <Link
+          key={link.href}
+          href={link.href}
+          onClick={onNavigate}
+          className={linkClassName}
+        >
+          {link.label}
+        </Link>
+      ))}
+
+      {desktop ? (
+        <ToolsDropdown
+          links={toolLinks}
+          onNavigate={onNavigate}
+          linkClassName={linkClassName}
+        />
+      ) : toolLinks.length > 0 ? (
+        <>
+          <p className="px-2 pb-1.5 pt-2 text-[11px] font-semibold uppercase tracking-wide text-brand-dark">
+            Tools
+          </p>
+          {toolLinks.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              onClick={onNavigate}
+              className={linkClassName}
+            >
+              {link.label}
+            </Link>
+          ))}
+        </>
       ) : null}
-      {universalLinks.map((link) => (
-        <Link
-          key={link.href}
-          href={link.href}
-          onClick={onNavigate}
-          className={linkClassName}
-        >
-          {link.label}
-        </Link>
-      ))}
-      {links.map((link) => (
-        <Link
-          key={link.href}
-          href={link.href}
-          onClick={onNavigate}
-          className={linkClassName}
-        >
-          {link.label}
-        </Link>
-      ))}
     </div>
   );
 }
