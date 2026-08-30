@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Users, Briefcase } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { Users, Briefcase, UserPlus } from "lucide-react";
 import { useUpgradeModal } from "@/components/UpgradeProvider";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
+  canManageProfileAccess,
   isOrgStyleProfile,
+  topLevelProfiles,
+  type GuardianProfile,
   type GuardianProfileType,
 } from "@/lib/profiles/types";
 import { planRank, type PlanId } from "@/lib/billing/plans";
@@ -25,9 +29,26 @@ function isFamilyType(type: GuardianProfileType | undefined): boolean {
   );
 }
 
+function ownedFamilySpace(
+  profiles: GuardianProfile[],
+  active: GuardianProfile | null
+): GuardianProfile | null {
+  if (
+    active?.profile_type === "family" &&
+    canManageProfileAccess(active)
+  ) {
+    return active;
+  }
+  return (
+    topLevelProfiles(profiles).find(
+      (p) => p.profile_type === "family" && canManageProfileAccess(p)
+    ) ?? null
+  );
+}
+
 /**
- * Soft upgrade wedge on Home when the user's Spaces scream Family or Business
- * but their plan is below that tier.
+ * Soft upgrade / invite wedge on Home when Spaces scream Family or Business.
+ * Paid Family (or higher) with an owned Family Space → Invite partner CTA.
  */
 export default function PlanWedgeBanner() {
   const { openUpgrade } = useUpgradeModal();
@@ -52,6 +73,11 @@ export default function PlanWedgeBanner() {
     };
   }, []);
 
+  const familySpace = useMemo(
+    () => ownedFamilySpace(profiles, active),
+    [profiles, active]
+  );
+
   if (plan == null) return null;
 
   const hasFamilySpace = profiles.some((p) => isFamilyType(p.profile_type));
@@ -62,11 +88,13 @@ export default function PlanWedgeBanner() {
   const activeIsBusiness =
     active != null && isOrgStyleProfile(active.profile_type);
 
-  const showFamily =
+  const showFamilyUpgrade =
     (hasFamilySpace || activeIsFamily) && planRank(plan) < planRank("family");
   const showBusiness =
     (hasBusinessSpace || activeIsBusiness) &&
     planRank(plan) < planRank("business");
+  const showInvitePartner =
+    familySpace != null && planRank(plan) >= planRank("family");
 
   // Prefer context of active Space; otherwise first matching wedge.
   if (activeIsBusiness && showBusiness) {
@@ -87,7 +115,7 @@ export default function PlanWedgeBanner() {
     );
   }
 
-  if ((activeIsFamily || showFamily) && showFamily) {
+  if ((activeIsFamily || showFamilyUpgrade) && showFamilyUpgrade) {
     return (
       <WedgeCard
         icon={<Users className="h-4 w-4" aria-hidden />}
@@ -101,6 +129,19 @@ export default function PlanWedgeBanner() {
               "You're building a household in Guardian. Family lets you share one Space and keep school + home in one place.",
           })
         }
+      />
+    );
+  }
+
+  if (showInvitePartner && familySpace) {
+    const name = familySpace.display_name?.trim() || "your Family Space";
+    return (
+      <WedgeCard
+        icon={<UserPlus className="h-4 w-4" aria-hidden />}
+        title="Invite a partner"
+        body={`Add a spouse or partner to ${name} so you both see the same Today — school, kids, and home.`}
+        cta="Invite partner"
+        href={`/settings/profiles/${familySpace.id}/collaborators`}
       />
     );
   }
@@ -132,13 +173,18 @@ function WedgeCard({
   body,
   cta,
   onClick,
+  href,
 }: {
   icon: React.ReactNode;
   title: string;
   body: string;
   cta: string;
-  onClick: () => void;
+  onClick?: () => void;
+  href?: string;
 }) {
+  const ctaClass =
+    "shrink-0 rounded-xl bg-brand px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-brand-dark";
+
   return (
     <aside className="simple-home-card flex flex-col gap-3 border-brand/25 bg-gradient-to-br from-brand-light/70 via-white to-white p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
       <div className="min-w-0">
@@ -150,13 +196,15 @@ function WedgeCard({
         </p>
         <p className="mt-1.5 text-sm leading-relaxed text-stone-700">{body}</p>
       </div>
-      <button
-        type="button"
-        onClick={onClick}
-        className="shrink-0 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark"
-      >
-        {cta}
-      </button>
+      {href ? (
+        <Link href={href} className={ctaClass}>
+          {cta}
+        </Link>
+      ) : (
+        <button type="button" onClick={onClick} className={ctaClass}>
+          {cta}
+        </button>
+      )}
     </aside>
   );
 }
