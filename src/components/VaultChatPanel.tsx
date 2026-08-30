@@ -3491,9 +3491,10 @@ export default function VaultChatPanel({
                 {sec.title}
               </p>
             )}
-            <p className="whitespace-pre-wrap text-foreground/90">
-              {renderGideonText(sec.content)}
-            </p>
+            <GideonCompactAnswer
+              content={sec.content}
+              forceFull={Boolean(options?.isStreaming)}
+            />
           </div>
         ))}
         {proposedReminder ? (
