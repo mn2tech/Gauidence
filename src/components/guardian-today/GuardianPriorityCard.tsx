@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { HelpCircle } from "lucide-react";
 import type { GuardianIntelligenceItem } from "@/lib/guardian-today/types";
@@ -38,7 +39,8 @@ function daysRemaining(date: string | null, today?: string): string | null {
       })()
     : Date.now();
   const days = Math.round((target - now) / 86_400_000);
-  if (days < 0) return `${Math.abs(days)} day${Math.abs(days) === 1 ? "" : "s"} overdue`;
+  if (days < 0)
+    return `${Math.abs(days)} day${Math.abs(days) === 1 ? "" : "s"} overdue`;
   if (days === 0) return "Due today";
   return `${days} day${days === 1 ? "" : "s"} remaining`;
 }
@@ -65,6 +67,44 @@ export function GuardianPriorityCard({
   const dot = PRIORITY_DOT[item.priority] ?? PRIORITY_DOT.medium;
   const when = formatWhen(item.effectiveDate);
   const remaining = daysRemaining(item.effectiveDate);
+  const [calendarBusy, setCalendarBusy] = useState(false);
+  const [calendarNote, setCalendarNote] = useState<string | null>(null);
+
+  async function addToPhoneCalendar() {
+    if (!item.effectiveDate) return;
+    setCalendarBusy(true);
+    setCalendarNote(null);
+    try {
+      const res = await fetch(`/api/guardian/items/${item.id}/calendar`);
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        google_url?: string;
+        ics?: string;
+        filename?: string;
+      };
+      if (!res.ok) {
+        setCalendarNote(body.error ?? "Calendar event unavailable.");
+        return;
+      }
+      if (body.google_url) {
+        window.open(body.google_url, "_blank", "noopener,noreferrer");
+      }
+      if (body.ics && body.filename) {
+        const blob = new Blob([body.ics], {
+          type: "text/calendar;charset=utf-8",
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = body.filename;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+      setCalendarNote("Added — open the file or Google Calendar to save it.");
+    } finally {
+      setCalendarBusy(false);
+    }
+  }
 
   return (
     <li className="rounded-xl border border-border-subtle bg-white p-3.5 shadow-sm sm:p-4">
@@ -92,6 +132,9 @@ export function GuardianPriorityCard({
               {item.spaceName}
             </p>
           ) : null}
+          {calendarNote ? (
+            <p className="mt-1.5 text-xs font-medium text-brand">{calendarNote}</p>
+          ) : null}
         </div>
       </div>
 
@@ -110,6 +153,16 @@ export function GuardianPriorityCard({
         >
           Ask Gideon
         </Link>
+        {item.effectiveDate ? (
+          <button
+            type="button"
+            disabled={calendarBusy}
+            onClick={() => void addToPhoneCalendar()}
+            className="text-sm font-semibold text-brand hover:text-brand-dark disabled:opacity-60"
+          >
+            {calendarBusy ? "Adding…" : "Add to calendar"}
+          </button>
+        ) : null}
         <button
           type="button"
           onClick={() => onComplete(item.id)}

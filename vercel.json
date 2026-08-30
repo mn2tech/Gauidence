@@ -5,6 +5,10 @@
       "schedule": "0 12 * * *"
     },
     {
+      "path": "/api/cron/guardian-attention",
+      "schedule": "15 12 * * *"
+    },
+    {
       "path": "/api/cron/re-engagement",
       "schedule": "0 13 * * *"
     },
