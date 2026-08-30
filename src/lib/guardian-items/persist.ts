@@ -173,6 +173,7 @@ export async function insertManualGuardianItem(
     dueAt: string;
     eventDate: string;
     type?: GuardianItemType;
+    description?: string | null;
   }
 ): Promise<GuardianItemRow | null> {
   const type = args.type ?? "reminder";
@@ -184,6 +185,10 @@ export async function insertManualGuardianItem(
     sourceDocumentId: null,
   });
 
+  const description = args.description?.trim()
+    ? args.description.trim().slice(0, 500)
+    : null;
+
   const row = {
     user_id: args.userId,
     space_id: args.spaceId,
@@ -191,7 +196,7 @@ export async function insertManualGuardianItem(
     school_context_id: null,
     type,
     title: args.title.slice(0, 300),
-    description: null,
+    description,
     event_date: args.eventDate,
     due_at: args.dueAt,
     status: "active" as const,
