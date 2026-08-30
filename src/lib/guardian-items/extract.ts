@@ -42,6 +42,7 @@ Rules:
 - Prefer school_closure for "schools closed" / "no school" / holiday closures.
 - Prefer expiration for registration/license/warranty end dates.
 - Prefer follow_up for "follow up within N days" style commitments.
+- Conferences, summits, forums, and similar dated events → type "event" with event_date; set requires_action true when registration, RSVP, or attendance is implied.
 - Return {"items":[]} if nothing actionable/future-valued is present.
 - Max 40 items. Prefer fewer high-quality items.`;
 }

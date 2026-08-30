@@ -329,6 +329,20 @@ describe("Watch classification", () => {
     );
   });
 
+  it("puts near-term events in Needs Attention", () => {
+    assert.equal(
+      classifyWatchBucket({
+        type: "event",
+        requiresAction: false,
+        priority: "normal",
+        effectiveDate: "2026-09-01",
+        today: "2026-08-29",
+        horizonDays: 30,
+      }),
+      "needsAttention"
+    );
+  });
+
   it("does not double-bucket the same day event", () => {
     const bucket = classifyWatchBucket({
       type: "school_closure",

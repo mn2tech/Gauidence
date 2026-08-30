@@ -324,6 +324,18 @@ async function enqueueGuardianItemsOrKnowledge(
   });
 }
 
+/** Force-queue Watch/Today extraction (e.g. after a Gideon chat attachment). */
+export async function enqueueGuardianItemsPipeline(
+  supabase: SupabaseClient,
+  args: {
+    documentId: string;
+    profileId: string;
+    userId: string;
+  }
+): Promise<void> {
+  await enqueueGuardianItemsOrKnowledge(supabase, args);
+}
+
 async function enqueueKnowledgeOrReady(
   supabase: SupabaseClient,
   args: {
@@ -1052,7 +1064,12 @@ export async function recoverStaleProcessingJobs(
 export async function processPendingDocumentJobs(
   supabase: SupabaseClient,
   userId: string,
-  options: { limit?: number; profileId?: string } = {}
+  options: {
+    limit?: number;
+    profileId?: string;
+    documentId?: string;
+    jobTypes?: ProcessingJobType[];
+  } = {}
 ): Promise<{ processed: number; failed: number }> {
   await recoverStaleProcessingJobs(supabase);
 
@@ -1079,6 +1096,12 @@ export async function processPendingDocumentJobs(
 
     if (options.profileId) {
       query = query.eq("profile_id", options.profileId);
+    }
+    if (options.documentId) {
+      query = query.eq("document_id", options.documentId);
+    }
+    if (options.jobTypes?.length) {
+      query = query.in("job_type", options.jobTypes);
     }
 
     const { data: jobs } = await query;
