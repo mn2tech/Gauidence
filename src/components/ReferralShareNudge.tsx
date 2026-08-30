@@ -72,6 +72,8 @@ export default function ReferralShareNudge({ open, onClose }: Props) {
 
   if (!open || suppressed || !shareUrl) return null;
 
+  const inviteUrl = shareUrl;
+
   function dismiss() {
     markDismissed();
     setSuppressed(true);
@@ -79,13 +81,13 @@ export default function ReferralShareNudge({ open, onClose }: Props) {
   }
 
   async function share() {
-    const text = guardianShareMessage(shareUrl);
+    const text = guardianShareMessage(inviteUrl);
     if (typeof navigator.share === "function") {
       try {
         await navigator.share({
           title: "Try Guardian",
           text,
-          url: shareUrl,
+          url: inviteUrl,
         });
         markDismissed();
         onClose();
@@ -95,7 +97,7 @@ export default function ReferralShareNudge({ open, onClose }: Props) {
       }
     }
     try {
-      await navigator.clipboard.writeText(shareUrl);
+      await navigator.clipboard.writeText(inviteUrl);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
