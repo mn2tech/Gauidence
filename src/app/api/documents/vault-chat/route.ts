@@ -49,10 +49,7 @@ import {
 } from "@/lib/vision/gideonImages";
 import { loadAuthorizedVisionImages } from "@/lib/vision/loadAuthorized";
 import { wantsSingleImageFocus } from "@/lib/vault/images";
-import {
-  enqueueAnalyzePipeline,
-  enqueueGuardianItemsPipeline,
-} from "@/lib/documents/processingJobs";
+import { enqueueAnalyzePipeline } from "@/lib/documents/processingJobs";
 import { chatScopedProfilePayload } from "@/lib/vault/detectVaultScope";
 import {
   listGuardianProfiles,
@@ -1515,8 +1512,8 @@ export async function POST(request: Request) {
         });
       }
 
-      // Chat attachments should create Watch/Today items. If analysis already
-      // has text (or vision summary), force guardian_items and drain that doc.
+      // Chat attachments should create Watch/Today items. Prefer a sync
+      // extract when text already exists so Needs Attention updates ASAP.
       if (attachedDoc?.documentId && attachedDoc.profileId) {
         const hasExtractableText = Boolean(
           attachedDoc.sourceText?.trim() ||
@@ -1529,23 +1526,30 @@ export async function POST(request: Request) {
 
         void (async () => {
           try {
-            const {
-              processPendingDocumentJobs,
-            } = await import("@/lib/documents/processingJobs");
+            const { processPendingDocumentJobs } = await import(
+              "@/lib/documents/processingJobs"
+            );
 
             if (hasExtractableText && analysisDone) {
-              await enqueueGuardianItemsPipeline(supabase, {
-                documentId: attachedDoc.documentId,
-                profileId: attachedDoc.profileId,
-                userId: user.id,
-              });
+              const { processGuardianItemExtraction } = await import(
+                "@/lib/guardian-items/processJob"
+              );
+              await processGuardianItemExtraction(
+                supabase,
+                user.id,
+                attachedDoc.documentId,
+                attachedDoc.profileId
+              );
+              await supabase
+                .from("documents")
+                .update({ guardian_items_status: "completed" })
+                .eq("id", attachedDoc.documentId);
             }
 
             await processPendingDocumentJobs(supabase, user.id, {
               limit: 4,
               documentId: attachedDoc.documentId,
             });
-            // Also drain any other pending jobs for this Space.
             await processPendingDocumentJobs(supabase, user.id, {
               limit: 2,
               profileId: attachedDoc.profileId,

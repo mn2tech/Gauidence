@@ -49,6 +49,7 @@ function asFact(args: {
   excerpt?: string;
   date?: string | null;
   isPast?: boolean;
+  isDeadline?: boolean;
 }): ExtractedFact | null {
   return normalizeFact({
     label: args.label,
@@ -59,7 +60,53 @@ function asFact(args: {
     needs_verification: args.confidence < 0.75,
     date: args.date ?? null,
     is_past_event: args.isPast,
+    is_deadline: args.isDeadline,
   });
+}
+
+/** Best-effort ISO date from vision date strings like "September 1–2, 2026". */
+function parseLooseVisionDate(raw: string): string | null {
+  const t = raw.replace(/\s+/g, " ").trim();
+  if (!t) return null;
+  const iso = /\b(20\d{2})-(\d{2})-(\d{2})\b/.exec(t);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+
+  const months: Record<string, string> = {
+    january: "01",
+    jan: "01",
+    february: "02",
+    feb: "02",
+    march: "03",
+    mar: "03",
+    april: "04",
+    apr: "04",
+    may: "05",
+    june: "06",
+    jun: "06",
+    july: "07",
+    jul: "07",
+    august: "08",
+    aug: "08",
+    september: "09",
+    sept: "09",
+    sep: "09",
+    october: "10",
+    oct: "10",
+    november: "11",
+    nov: "11",
+    december: "12",
+    dec: "12",
+  };
+  const long =
+    /\b(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sept?|oct|nov|dec)\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s*[–—-]\s*\d{1,2}(?:st|nd|rd|th)?)?,?\s*(20\d{2})\b/i.exec(
+      t
+    );
+  if (!long) return null;
+  const month = months[long[1]!.toLowerCase()];
+  const day = String(Number(long[2])).padStart(2, "0");
+  const year = long[3];
+  if (!month || !year) return null;
+  return `${year}-${month}-${day}`;
 }
 
 export function mapVisionResultToAnalysis(
@@ -95,14 +142,25 @@ export function mapVisionResultToAnalysis(
   }
 
   const dateFacts: ExtractedFact[] = [];
+  const todayIso = new Date().toISOString().slice(0, 10);
   for (const date of result.dates) {
     if ((date.confidence ?? 1) < 0.5) continue;
+    const iso =
+      /^\d{4}-\d{2}-\d{2}$/.test(date.value)
+        ? date.value
+        : parseLooseVisionDate(date.value);
+    const context = `${date.context || ""} ${date.value}`.toLowerCase();
+    const looksDeadline = /\b(due|deadline|register|registration|rsvp|expire|expiration)\b/.test(
+      context
+    );
+    const isPast = iso ? iso < todayIso : false;
     const fact = asFact({
       label: date.context || "Date",
       value: date.value,
       confidence: date.confidence ?? 0.7,
-      date: /^\d{4}-\d{2}-\d{2}$/.test(date.value) ? date.value : null,
-      isPast: true,
+      date: iso,
+      isPast,
+      isDeadline: looksDeadline && !isPast,
     });
     if (fact) dateFacts.push(fact);
     push(fact);
