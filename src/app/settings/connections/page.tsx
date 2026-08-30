@@ -32,8 +32,9 @@ export default async function ConnectionsSettingsPage() {
             Connections
           </h1>
           <p className="mt-2 text-sm text-ink-muted">
-            Connect folders and services so Guardian can discover files. Files
-            stay on your device until you choose otherwise.
+            Connect Device Storage, Drive, and other services so Guardian can
+            discover files. Files stay on your device until you choose
+            otherwise.
           </p>
           <div className="mt-8">
             <ConnectionsPanel />

@@ -24,7 +24,6 @@ import {
   type NestedVaultGroup,
 } from "@/lib/profiles/types";
 import { useVaultSubVaultMenu } from "@/components/VaultSubVaultMenu";
-import AskConnectedSourcesPanel from "@/components/connections/AskConnectedSourcesPanel";
 
 type ChatSummary = {
   id: string;
@@ -372,7 +371,6 @@ export default function AskGideonSidebar({
   const vaultLabel = activeVaultName?.trim() || "this space";
   const [vaultsOpen, setVaultsOpen] = useState(true);
   const [chatsOpen, setChatsOpen] = useState(true);
-  const [connectionsOpen, setConnectionsOpen] = useState(true);
 
   return (
     <>
@@ -436,16 +434,6 @@ export default function AskGideonSidebar({
         </CollapsibleSection>
       </div>
 
-      <div className="shrink-0 border-b border-stone-200 p-2">
-        <CollapsibleSection
-          title="Connections"
-          open={connectionsOpen}
-          onToggle={() => setConnectionsOpen((o) => !o)}
-        >
-          <AskConnectedSourcesPanel onNavigate={onSidebarAction} />
-        </CollapsibleSection>
-      </div>
-
       <div className="min-h-0 flex-1 overflow-y-auto p-2">
         <CollapsibleSection
           title={`Chats · ${vaultLabel}`}
@@ -496,10 +484,17 @@ export default function AskGideonSidebar({
         </CollapsibleSection>
       </div>
 
-      <div className="shrink-0 border-t border-stone-200 p-3">
+      <div className="shrink-0 space-y-1.5 border-t border-stone-200 p-3">
+        <Link
+          href="/settings/connections"
+          onClick={() => onSidebarAction?.()}
+          className="block text-xs font-medium text-ink-muted hover:text-foreground"
+        >
+          Device Storage &amp; connections
+        </Link>
         <Link
           href={docsHref}
-          className="text-xs font-medium text-ink-muted hover:text-foreground"
+          className="block text-xs font-medium text-ink-muted hover:text-foreground"
         >
           ← Docs
         </Link>
