@@ -116,7 +116,7 @@ import {
 } from "@/lib/ontology/connectorCitationIds";
 import { extractYouTubeUrls } from "@/lib/ontology/pipeline/youtubeUrls";
 import { renderPdfThumbnailFromFile, renderPdfThumbnailFromUrl } from "@/lib/vault/pdfThumbnail";
-import { renderGideonText } from "@/components/gideonText";
+import GideonCompactAnswer from "@/components/GideonCompactAnswer";
 import { clipboardImageToFile } from "@/lib/vault/clipboardImage";
 import {
   uploadAndAnalyzeToVault,
