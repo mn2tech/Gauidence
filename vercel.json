@@ -9,6 +9,10 @@
       "schedule": "15 12 * * *"
     },
     {
+      "path": "/api/cron/weekly-brief",
+      "schedule": "30 12 * * 1"
+    },
+    {
       "path": "/api/cron/re-engagement",
       "schedule": "0 13 * * *"
     },

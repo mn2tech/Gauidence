@@ -20,6 +20,7 @@ type Props = {
   initialCompanyName: string;
   avatarUrl: string | null;
   initialRemindersEnabled: boolean;
+  initialWeeklyBriefEnabled?: boolean;
   initialTipsEnabled: boolean;
   initialVaultActivityEnabled?: boolean;
   initialAutoOrganizeMode?: "off" | "suggest" | "auto";
@@ -33,6 +34,7 @@ export default function SettingsForm({
   initialCompanyName,
   avatarUrl,
   initialRemindersEnabled,
+  initialWeeklyBriefEnabled = true,
   initialTipsEnabled,
   initialVaultActivityEnabled = true,
   initialAutoOrganizeMode = "suggest",
@@ -77,6 +79,12 @@ export default function SettingsForm({
   const [remindersEnabled, setRemindersEnabled] = useState(initialRemindersEnabled);
   const [savingReminders, setSavingReminders] = useState(false);
   const [remindersError, setRemindersError] = useState<string | null>(null);
+
+  const [weeklyBriefEnabled, setWeeklyBriefEnabled] = useState(
+    initialWeeklyBriefEnabled
+  );
+  const [savingWeeklyBrief, setSavingWeeklyBrief] = useState(false);
+  const [weeklyBriefError, setWeeklyBriefError] = useState<string | null>(null);
 
   const [tipsEnabled, setTipsEnabled] = useState(initialTipsEnabled);
   const [savingTips, setSavingTips] = useState(false);
@@ -175,6 +183,26 @@ export default function SettingsForm({
       setRemindersError("We couldn't save that change. Please try again.");
     }
     setSavingReminders(false);
+  }
+
+  async function handleToggleWeeklyBrief() {
+    if (!supabase || savingWeeklyBrief) return;
+    const next = !weeklyBriefEnabled;
+    setWeeklyBriefError(null);
+    setWeeklyBriefEnabled(next);
+    setSavingWeeklyBrief(true);
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        weekly_brief_enabled: next,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", userId);
+    if (error) {
+      setWeeklyBriefEnabled(!next);
+      setWeeklyBriefError("We couldn't save that change. Please try again.");
+    }
+    setSavingWeeklyBrief(false);
   }
 
   async function handleToggleTips() {
@@ -603,6 +631,45 @@ export default function SettingsForm({
             <span
               className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
                 remindersEnabled ? "translate-x-[22px]" : "translate-x-0.5"
+              }`}
+            />
+          </button>
+        </div>
+      </section>
+
+      {/* Weekly Brief */}
+      <section className="rounded-2xl border border-stone-200 bg-white p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <Mail className="h-5 w-5 text-brand" />
+              <h2 className="text-base font-semibold">Weekly Brief</h2>
+            </div>
+            <p className="mt-2 text-sm leading-relaxed text-ink-muted">
+              Every Monday we email {email} a short digest of what&apos;s coming
+              up and what changed across your Spaces — so you stay covered
+              without opening the app.
+            </p>
+            {weeklyBriefError && (
+              <p role="alert" className="mt-2 text-sm text-red-700">
+                {weeklyBriefError}
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={weeklyBriefEnabled}
+            aria-label="Weekly Brief"
+            onClick={handleToggleWeeklyBrief}
+            disabled={savingWeeklyBrief}
+            className={`relative mt-1 inline-flex h-6 w-11 shrink-0 items-center rounded-full transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-60 ${
+              weeklyBriefEnabled ? "bg-brand" : "bg-stone-300"
+            }`}
+          >
+            <span
+              className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
+                weeklyBriefEnabled ? "translate-x-[22px]" : "translate-x-0.5"
               }`}
             />
           </button>
