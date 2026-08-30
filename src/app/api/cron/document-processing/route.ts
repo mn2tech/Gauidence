@@ -27,6 +27,7 @@ export async function GET(request: Request) {
   let semanticProcessed = 0;
   let semanticFailed = 0;
 
+  // Prefer draining attention + semantic jobs so chat uploads hit Today quickly.
   if (isGuardianSemanticLayerEnabled()) {
     try {
       const backfill = await queueSemanticBackfillAdmin(admin, { limit: 20 });
@@ -39,10 +40,9 @@ export async function GET(request: Request) {
       );
     }
 
-    // Drain semantic jobs first so they are not stuck behind older analyze/index jobs.
     try {
       const semanticDrain = await processPendingDocumentJobsAdmin(admin, {
-        limit: 8,
+        limit: 6,
         jobTypes: ["extract_semantic"],
       });
       semanticProcessed = semanticDrain.processed;
@@ -53,6 +53,19 @@ export async function GET(request: Request) {
         err instanceof Error ? err.message : err
       );
     }
+  }
+
+  // Always drain guardian items so Ask/chat uploads surface on Today.
+  try {
+    await processPendingDocumentJobsAdmin(admin, {
+      limit: 6,
+      jobTypes: ["extract_guardian_items"],
+    });
+  } catch (err) {
+    console.error(
+      "Guardian items drain failed (non-blocking):",
+      err instanceof Error ? err.message : err
+    );
   }
 
   const result = await processPendingDocumentJobsAdmin(admin, { limit: 3 });
