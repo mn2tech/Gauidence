@@ -197,6 +197,10 @@ import {
   formatAssistantMessagePlainText,
   formatAssistantMessageSpeechText,
 } from "@/lib/vault/assistantMessageText";
+import {
+  snippetFromAssistantPlainText,
+  titleFromAssistantPlainText,
+} from "@/lib/vault/actionTitle";
 import { askSpaceHref, documentsHref, VAULT_NAV_LABEL } from "@/lib/routes";
 import { practiceStatsListPrompt } from "@/lib/vault/askInventory";
 import type { WorkProject } from "@/lib/work-memory/types";
@@ -2288,6 +2292,64 @@ export default function VaultChatPanel({
     }
   };
 
+  const addAnswerToToday = async (_messageId: string, plainText: string) => {
+    if (!profileId) {
+      setError("Pick a Space first, then add this to Today.");
+      throw new Error("no_profile");
+    }
+    const title = titleFromAssistantPlainText(plainText, 120);
+    const description = snippetFromAssistantPlainText(plainText, title);
+    const res = await fetch("/api/guardian/items", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        profileId,
+        title,
+        description: description ?? undefined,
+      }),
+    });
+    const body = (await res.json().catch(() => ({}))) as { error?: string };
+    if (!res.ok) {
+      setError(body.error ?? "Couldn't add that to Today.");
+      throw new Error("add_today_failed");
+    }
+    window.dispatchEvent(new Event("guardian:alerts-updated"));
+    pushLocalNote(
+      `Added to Today: "${title}". Open Guardian Today to review or mark it done.`
+    );
+  };
+
+  const remindFromAnswer = async (_messageId: string, plainText: string) => {
+    if (!profileId) {
+      setError("Pick a Space first, then set a reminder.");
+      throw new Error("no_profile");
+    }
+    const title = titleFromAssistantPlainText(plainText, 120);
+    const defaults = defaultReminderDateTime(timeZone);
+    const res = await fetch("/api/reminders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        profileId,
+        title,
+        date: defaults.date,
+        time: defaults.time,
+      }),
+    });
+    const body = (await res.json().catch(() => ({}))) as {
+      error?: string;
+      whenLabel?: string;
+    };
+    if (!res.ok) {
+      setError(body.error ?? "Couldn't save reminder.");
+      throw new Error("remind_failed");
+    }
+    window.dispatchEvent(new Event("guardian:alerts-updated"));
+    pushLocalNote(
+      `Reminder set: "${title}" — ${body.whenLabel ?? "in about an hour"}. You'll see it under Attention.`
+    );
+  };
+
   const confirmProposedDailyLog = async (
     messageId: string,
     proposal: ProposedDailyLog,
@@ -3949,7 +4011,11 @@ export default function VaultChatPanel({
             speechSupported={speechOutputSupported}
             disabled={sending || vaultBusy || Boolean(streamingAssistantId)}
             canRegenerate={Boolean(options?.userMessage && activeChatId)}
+            canAddToToday={Boolean(profileId)}
+            canRemind={Boolean(profileId)}
             onSpeak={speakAssistant}
+            onAddToToday={addAnswerToToday}
+            onRemindMe={remindFromAnswer}
             onRegenerate={
               options?.userMessage
                 ? () =>
