@@ -70,60 +70,64 @@ export function GuardianPriorityCard({
     <li className="rounded-xl border border-border-subtle bg-white p-3.5 shadow-sm sm:p-4">
       <div className="flex items-start gap-2.5">
         <span
-          className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${dot}`}
+          className={`mt-2 h-2.5 w-2.5 shrink-0 rounded-full ${dot}`}
           aria-hidden
         />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-foreground">{item.title}</p>
-          <p className="mt-0.5 text-sm text-ink-muted">{item.summary}</p>
+          <p className="text-base font-bold leading-snug tracking-tight text-foreground">
+            {item.title}
+          </p>
+          <p className="mt-1.5 text-[15px] leading-relaxed text-stone-800">
+            {item.summary}
+          </p>
           {remaining ? (
-            <p className="mt-1 text-xs font-medium text-foreground/80">
+            <p className="mt-2 text-sm font-semibold text-foreground">
               {remaining}
             </p>
           ) : when ? (
-            <p className="mt-1 text-xs text-ink-muted">{when}</p>
+            <p className="mt-2 text-sm font-medium text-stone-700">{when}</p>
           ) : null}
           {item.spaceName ? (
-            <p className="mt-1.5 text-xs font-medium text-brand">
+            <p className="mt-1.5 text-sm font-semibold text-brand">
               {item.spaceName}
             </p>
           ) : null}
         </div>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+      <div className="mt-3.5 flex flex-wrap items-center gap-x-3.5 gap-y-2">
         <Link
           href={reviewHref(item)}
           onClick={() => onReview(item)}
-          className="text-xs font-semibold text-brand hover:text-brand-dark"
+          className="text-sm font-semibold text-brand hover:text-brand-dark"
         >
           Review
         </Link>
         <Link
           href={gideonHandoffHref(item)}
           onClick={() => onAskGideon(item)}
-          className="text-xs font-semibold text-brand hover:text-brand-dark"
+          className="text-sm font-semibold text-brand hover:text-brand-dark"
         >
           Ask Gideon
         </Link>
         <button
           type="button"
           onClick={() => onComplete(item.id)}
-          className="text-xs font-semibold text-ink-muted hover:text-foreground"
+          className="text-sm font-semibold text-stone-600 hover:text-foreground"
         >
           Done
         </button>
         <button
           type="button"
           onClick={() => onSnooze(item.id)}
-          className="text-xs font-semibold text-ink-muted hover:text-foreground"
+          className="text-sm font-semibold text-stone-600 hover:text-foreground"
         >
           Remind me later
         </button>
         <button
           type="button"
           onClick={() => onDismiss(item.id)}
-          className="text-xs font-semibold text-ink-muted hover:text-foreground"
+          className="text-sm font-semibold text-stone-600 hover:text-foreground"
         >
           Dismiss
         </button>
@@ -131,7 +135,7 @@ export function GuardianPriorityCard({
           <button
             type="button"
             onClick={() => onViewSource(item)}
-            className="text-xs font-semibold text-ink-muted hover:text-foreground"
+            className="text-sm font-semibold text-stone-600 hover:text-foreground"
           >
             View source
           </button>
@@ -139,9 +143,9 @@ export function GuardianPriorityCard({
         <button
           type="button"
           onClick={() => onWhy(item)}
-          className="inline-flex items-center gap-1 text-xs font-semibold text-ink-muted hover:text-foreground"
+          className="inline-flex items-center gap-1 text-sm font-semibold text-stone-600 hover:text-foreground"
         >
-          <HelpCircle className="h-3 w-3" aria-hidden />
+          <HelpCircle className="h-3.5 w-3.5" aria-hidden />
           Why am I seeing this?
         </button>
       </div>

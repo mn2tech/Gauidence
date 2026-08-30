@@ -36,10 +36,10 @@ function Section({
 }) {
   return (
     <section className="simple-home-card p-4 sm:p-5">
-      <h2 className="text-sm font-semibold tracking-tight text-foreground">
+      <h2 className="text-lg font-bold tracking-tight text-foreground sm:text-xl">
         {title}
       </h2>
-      <div className="mt-3">{children}</div>
+      <div className="mt-3.5">{children}</div>
     </section>
   );
 }
