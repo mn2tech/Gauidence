@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { HelpCircle } from "lucide-react";
+import ReferralShareNudge from "@/components/ReferralShareNudge";
 import type { GuardianIntelligenceItem } from "@/lib/guardian-today/types";
 import {
   gideonHandoffHref,
@@ -69,6 +70,7 @@ export function GuardianPriorityCard({
   const remaining = daysRemaining(item.effectiveDate);
   const [calendarBusy, setCalendarBusy] = useState(false);
   const [calendarNote, setCalendarNote] = useState<string | null>(null);
+  const [showReferralNudge, setShowReferralNudge] = useState(false);
 
   async function addToPhoneCalendar() {
     if (!item.effectiveDate) return;
@@ -101,6 +103,7 @@ export function GuardianPriorityCard({
         URL.revokeObjectURL(url);
       }
       setCalendarNote("Added — open the file or Google Calendar to save it.");
+      setShowReferralNudge(true);
     } finally {
       setCalendarBusy(false);
     }
@@ -135,6 +138,10 @@ export function GuardianPriorityCard({
           {calendarNote ? (
             <p className="mt-1.5 text-xs font-medium text-brand">{calendarNote}</p>
           ) : null}
+          <ReferralShareNudge
+            open={showReferralNudge}
+            onClose={() => setShowReferralNudge(false)}
+          />
         </div>
       </div>
 
