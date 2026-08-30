@@ -13,6 +13,7 @@ import {
   PLAN_LIMITS,
   PLAN_PRICE_DISPLAY,
   PLAN_TAGLINES,
+  PLAN_WEDGE_FEATURES,
   type PlanId,
 } from "@/lib/billing/plans";
 import { formatStorageBytes } from "@/lib/billing/storageFormat";
@@ -77,16 +78,13 @@ export default async function PricingPage() {
               const limits = PLAN_LIMITS[plan];
               const featured = plan === "personal";
               const features = [
+                ...PLAN_WEDGE_FEATURES[plan],
                 plan === "free"
                   ? `${limits.spacesPerAccount} Space`
                   : `Up to ${limits.spacesPerAccount.toLocaleString("en-US")} Spaces`,
-                `Up to ${limits.documentsPerAccount.toLocaleString("en-US")} stored items`,
                 `${formatStorageBytes(limits.storageBytes)} vault storage`,
                 `${limits.analyzePerMonth} document analyses / month`,
                 `${limits.chatPerMonth.toLocaleString("en-US")} Ask Gideon questions / month`,
-                `${limits.researchPerMonth} Research briefs / month`,
-                "Private Spaces & deadline alerts",
-                "Ask Gideon grounded in your knowledge",
               ];
               return (
                 <div

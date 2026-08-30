@@ -5,6 +5,7 @@ import { Loader2, Sparkles, X } from "lucide-react";
 import {
   PLAN_LABELS,
   PLAN_PRICE_DISPLAY,
+  PLAN_WEDGE_FEATURES,
   PRO_PLAN_ID,
   type PaidPlanId,
 } from "@/lib/billing/plans";
@@ -96,12 +97,18 @@ export default function UpgradeModal({
             id="upgrade-title"
             className="mt-4 text-xl font-bold tracking-tight text-foreground"
           >
-            Your Guardian is starting to know your world.
+            {plan === "family"
+              ? "Keep the whole household covered."
+              : plan === "business"
+                ? "Run your firm from one Guardian."
+                : "Your Guardian is starting to know your world."}
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-            Keep building your knowledge and let Guardian help you remember what
-            matters, find information, surface commitments, and stay ahead of
-            important follow-ups.
+            {plan === "family"
+              ? "Share one Family Space, connect school calendars, and keep kids, pets, and home in the same memory."
+              : plan === "business"
+                ? "Clients, Employee Hub, Leads, and higher limits — built for how your business actually works."
+                : "Keep building your knowledge and let Guardian help you remember what matters, find information, surface commitments, and stay ahead of important follow-ups."}
           </p>
           {reason ? (
             <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-950">
@@ -119,6 +126,13 @@ export default function UpgradeModal({
               {PLAN_PRICE_DISPLAY[plan]} — cancel anytime. Your Free knowledge
               stays available.
             </p>
+            <ul className="mt-3 space-y-1.5">
+              {(PLAN_WEDGE_FEATURES[plan] ?? []).map((f) => (
+                <li key={f} className="text-xs leading-snug text-stone-700">
+                  · {f}
+                </li>
+              ))}
+            </ul>
           </div>
 
           {error ? (

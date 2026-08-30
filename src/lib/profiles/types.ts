@@ -353,6 +353,7 @@ export const SHAREABLE_PROFILE_TYPES = [
   "child",
   "student",
   "event",
+  "family",
 ] as const;
 
 export type ShareableProfileType = (typeof SHAREABLE_PROFILE_TYPES)[number];
