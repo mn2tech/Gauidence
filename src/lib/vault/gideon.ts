@@ -3,6 +3,7 @@
  */
 
 import {
+  calendarDateInUserZone,
   formatGuardianTimeLabel,
   formatGuardianTodayLabel,
   guardianTimeZoneLabel,
@@ -71,6 +72,7 @@ Grounding (strict) — when retrieval blocks ARE provided:
 - When the user asks to learn / practice a song on piano (or says "this song") and CONNECTED FILE CONTENT lists more than one chart, ask which song before teaching chords. Never teach a different song than the one they named or the chart title in CONNECTED FILE CONTENT. Do not invent a substitute hymn from unrelated PDFs.
 - If the answer is not in the user's spaces but is a general knowledge question AND no Space retrieval blocks were provided for this turn, answer using general knowledge and clearly indicate that the information comes from general knowledge rather than the user's Guardian spaces. When Space retrieval blocks ARE provided, never fall back to general knowledge — say you could not find it in this Space instead.
 - When CURRENT DATE AND TIME is provided below, use it for "today", day-of-week, current time, and calendar questions. Do not say you lack access to today's date or current time.
+- When stating how far away a date is, count calendar days carefully from the CURRENT DATE ISO (YYYY-MM-DD). Prefer exact day counts (e.g. "in 3 days"). Never say "about N weeks" unless the gap is at least 7 days; for gaps under 14 days, prefer days over weeks. Do not guess week spans.
 - Ask Gideon can show a live ticking countdown in the chat header for an active focus block. Never say you cannot display a live countdown. If ACTIVE FOCUS BLOCK is provided, answer remaining-time questions from it and point to that clock.
 - When UPCOMING SCHEDULE is provided below, use it for reminders, deadlines, and "what's coming up" questions. Do not say you lack access to the user's schedule when items are listed.
 - When excerpts come from multiple spaces, attribute each fact to the space owner named in the source. Do not imply a document is in one space when it came from another.
@@ -126,11 +128,14 @@ export function buildGideonTodayNote(
   timeZone: string = GUARDIAN_TIME_ZONE
 ): string {
   const today = formatGuardianTodayLabel(instant, timeZone);
+  const isoDate = calendarDateInUserZone(instant, timeZone);
   const time = formatGuardianTimeLabel(instant, timeZone);
   const zone = guardianTimeZoneLabel(timeZone);
   return `--- CURRENT DATE AND TIME (authoritative) ---
 ${today} — ${time} (${zone})
+ISO calendar date (use for day-count math): ${isoDate}
 Use this for "today", the current day of the week, the current time, "this week", and similar calendar or clock questions. Answer directly from this block — do not say you lack real-time date or time access, and do not infer today's date or time only from stored documents or logs.
+Relative dates: count whole calendar days from ${isoDate} to the target date. Prefer "in N days" / "N days ago". Only say "weeks" when N ≥ 7; for N < 14 prefer days (e.g. Aug 29 → Sep 1 is 3 days, not 3 weeks). Never invent approximate week spans.
 --- END CURRENT DATE AND TIME ---`;
 }
 

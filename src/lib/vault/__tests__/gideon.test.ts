@@ -63,9 +63,12 @@ describe("Gideon helpers", () => {
     );
     assert.match(note, /CURRENT DATE AND TIME \(authoritative\)/);
     assert.match(note, /Saturday, July 25, 2026/);
+    assert.match(note, /ISO calendar date \(use for day-count math\): 2026-07-25/);
     assert.match(note, /3:00 PM/);
     assert.match(note, /Eastern Time/);
     assert.match(note, /do not say you lack real-time date or time access/i);
+    assert.match(note, /Prefer "in N days"/i);
+    assert.match(note, /3 days, not 3 weeks/i);
   });
 
   it("detects simple today-date questions", () => {
