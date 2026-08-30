@@ -127,6 +127,24 @@ export default function SimpleHomeScreen() {
 
       <PlanWedgeBanner />
 
+      {today.actionNote ? (
+        <p className="-mb-2 text-sm font-medium text-brand" role="status">
+          {today.actionNote}
+        </p>
+      ) : null}
+      {today.actionError ? (
+        <p className="-mb-2 text-sm font-medium text-rose-700" role="alert">
+          {today.actionError}{" "}
+          <button
+            type="button"
+            onClick={() => today.clearActionError()}
+            className="underline"
+          >
+            Dismiss
+          </button>
+        </p>
+      ) : null}
+
       {today.loading ? (
         <Section title="Today's priorities">
           <p className="text-sm text-ink-muted">Loading…</p>

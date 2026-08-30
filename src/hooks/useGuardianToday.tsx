@@ -49,8 +49,11 @@ export function useGuardianToday() {
   const [data, setData] = useState<GuardianTodayResult>(EMPTY);
   const [loading, setLoading] = useState(true);
   const [retrying, setRetrying] = useState(false);
+  const [actionNote, setActionNote] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const backfillStarted = useRef(false);
   const mounted = useRef(true);
+  const noteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [provenanceOpen, setProvenanceOpen] =
     useState<GuardianIntelligenceItem | null>(null);
   const [sourceOpen, setSourceOpen] = useState<{
@@ -61,12 +64,21 @@ export function useGuardianToday() {
     message: string;
   } | null>(null);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
+  const flashNote = useCallback((message: string) => {
+    if (noteTimer.current) clearTimeout(noteTimer.current);
+    setActionError(null);
+    setActionNote(message);
+    noteTimer.current = setTimeout(() => {
+      if (mounted.current) setActionNote(null);
+    }, 2800);
+  }, []);
+
+  const refresh = useCallback(async (opts?: { quiet?: boolean }) => {
+    if (!opts?.quiet) setLoading(true);
     try {
       const res = await fetch("/api/guardian/today");
       if (!res.ok) {
-        if (mounted.current) setData(EMPTY);
+        if (mounted.current && !opts?.quiet) setData(EMPTY);
         return EMPTY;
       }
       const body = (await res.json()) as Partial<GuardianTodayResult>;
@@ -74,10 +86,10 @@ export function useGuardianToday() {
       if (mounted.current) setData(next);
       return next;
     } catch {
-      if (mounted.current) setData(EMPTY);
+      if (mounted.current && !opts?.quiet) setData(EMPTY);
       return EMPTY;
     } finally {
-      if (mounted.current) setLoading(false);
+      if (mounted.current && !opts?.quiet) setLoading(false);
     }
   }, []);
 
@@ -112,16 +124,14 @@ export function useGuardianToday() {
       if (!shouldBackfill) return;
 
       backfillStarted.current = true;
-      // Queue docs + sync Daily Logs (includes existing Prayer Breakfast etc.).
       void fetch("/api/guardian/intelligence/backfill", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ limit: 8, drain: false }),
       }).then(() => {
         if (!cancelled) {
-          // Second refresh after sync so new guardian_items appear.
           window.setTimeout(() => {
-            if (!cancelled) void refresh();
+            if (!cancelled) void refresh({ quiet: true });
           }, 1500);
         }
       });
@@ -130,6 +140,7 @@ export function useGuardianToday() {
     return () => {
       cancelled = true;
       mounted.current = false;
+      if (noteTimer.current) clearTimeout(noteTimer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -145,34 +156,65 @@ export function useGuardianToday() {
     []
   );
 
-  const complete = useCallback(
-    async (id: string) => {
-      const res = await fetch(`/api/guardian/items/${id}/complete`, {
-        method: "POST",
-      });
-      if (res.ok) await refresh();
+  const removePriorityOptimistic = useCallback((id: string) => {
+    let snapshot: GuardianTodayResult = EMPTY;
+    setData((prev) => {
+      snapshot = prev;
+      const priorities = prev.priorities.filter((p) => p.id !== id);
+      return {
+        ...prev,
+        priorities,
+        caughtUp: priorities.length === 0 ? true : prev.caughtUp,
+      };
+    });
+    return snapshot;
+  }, []);
+
+  const runLifecycle = useCallback(
+    async (
+      id: string,
+      path: "complete" | "dismiss" | "snooze",
+      successNote: string
+    ) => {
+      const snapshot = removePriorityOptimistic(id);
+      flashNote(successNote);
+      try {
+        const res = await fetch(`/api/guardian/items/${id}/${path}`, {
+          method: "POST",
+        });
+        if (!res.ok) {
+          if (snapshot && mounted.current) {
+            setData(snapshot);
+            setActionNote(null);
+            setActionError("Couldn't update that item. Try again.");
+          }
+          return;
+        }
+        void refresh({ quiet: true });
+      } catch {
+        if (snapshot && mounted.current) {
+          setData(snapshot);
+          setActionNote(null);
+          setActionError("Couldn't update that item. Check your connection.");
+        }
+      }
     },
-    [refresh]
+    [flashNote, refresh, removePriorityOptimistic]
+  );
+
+  const complete = useCallback(
+    (id: string) => runLifecycle(id, "complete", "Marked done."),
+    [runLifecycle]
   );
 
   const dismiss = useCallback(
-    async (id: string) => {
-      const res = await fetch(`/api/guardian/items/${id}/dismiss`, {
-        method: "POST",
-      });
-      if (res.ok) await refresh();
-    },
-    [refresh]
+    (id: string) => runLifecycle(id, "dismiss", "Dismissed."),
+    [runLifecycle]
   );
 
   const snooze = useCallback(
-    async (id: string) => {
-      const res = await fetch(`/api/guardian/items/${id}/snooze`, {
-        method: "POST",
-      });
-      if (res.ok) await refresh();
-    },
-    [refresh]
+    (id: string) => runLifecycle(id, "snooze", "Snoozed until tomorrow."),
+    [runLifecycle]
   );
 
   const viewSource = useCallback(
@@ -215,6 +257,9 @@ export function useGuardianToday() {
     data,
     loading,
     retrying,
+    actionNote,
+    actionError,
+    clearActionError: () => setActionError(null),
     refresh,
     runBackfill,
     complete,
