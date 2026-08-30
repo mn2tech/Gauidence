@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   detectBusinessQueryIntent,
   extractBusinessEntityMentions,
+  isBusinessIntelligenceQuestion,
   planBusinessQuery,
 } from "../queryPlanner";
 import {
@@ -81,6 +82,17 @@ describe("business query planner", () => {
     const mentions = extractBusinessEntityMentions(
       "What relationships do we have with Onyx?"
     );
+    assert.ok(mentions.some((m) => /onyx/i.test(m)));
+  });
+
+  it("does not treat thanks/remind as Entity 360", () => {
+    const q =
+      "Thanks for the advice I will ask onyx on Monday. Please remind me on Monday";
+    assert.equal(detectBusinessQueryIntent(q), "GENERAL_KNOWLEDGE");
+    assert.equal(isBusinessIntelligenceQuestion(q), false);
+    const mentions = extractBusinessEntityMentions(q);
+    assert.ok(!mentions.some((m) => /^thanks$/i.test(m)));
+    assert.ok(!mentions.some((m) => /^monday$/i.test(m)));
     assert.ok(mentions.some((m) => /onyx/i.test(m)));
   });
 });

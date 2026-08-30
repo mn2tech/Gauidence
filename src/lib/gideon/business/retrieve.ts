@@ -323,7 +323,7 @@ export async function loadBusinessIntelligence(
             `I could not find a Guardian entity or matching proposals for "${mention}" in this Space yet.`,
             "",
             "Known from Guardian: no canonical client/organization match in the ontology for this Space.",
-            "Gideon recommendation: run Analyze Knowledge on Proxdose documents, or confirm the exact name used in Guardian (for example PROXDOSE / Proxdose LLC / proxdose.com).",
+            `Gideon recommendation: confirm the exact name used in Guardian for "${mention}", or run Analyze Knowledge on documents that mention them.`,
           ].join("\n");
           sections.push(
             `ENTITY 360: no canonical entity and no mention hits for "${mention}".`

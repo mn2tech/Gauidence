@@ -93,7 +93,54 @@ const ENTITY_STOP = new Set([
   "need",
   "needs",
   "attention",
+  // Conversational / calendar noise (must not become Entity 360 mentions)
+  "thanks",
+  "thank",
+  "please",
+  "sorry",
+  "hello",
+  "hi",
+  "hey",
+  "yes",
+  "yeah",
+  "yep",
+  "okay",
+  "ok",
+  "advice",
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+  "sunday",
+  "today",
+  "tomorrow",
+  "tonight",
+  "morning",
+  "afternoon",
+  "evening",
+  "week",
+  "weekend",
+  "remind",
+  "reminder",
+  "ask",
+  "asking",
+  "will",
+  "would",
+  "could",
+  "can",
+  "just",
+  "also",
+  "still",
 ]);
+
+/** Orgs we recognize even when typed lowercase (soft business cues). */
+const KNOWN_ORG_TOKENS = ["onyx", "proxdose"] as const;
+
+/** Reminder / action phrasing — never treat as Entity 360. */
+const ACTION_OR_REMINDER =
+  /\b(remind me|set a reminder|add a reminder|please remind|nudge me|alert me|draft (an? |the )?email|schedule (a |an )?(meeting|call|appointment)|save (this|that|it) (as |to )?(a )?daily log)\b/i;
 
 function strategyFor(intent: BusinessQueryIntent): string {
   switch (intent) {
@@ -227,6 +274,13 @@ export function extractBusinessEntityMentions(question: string): string[] {
     if (m[1]) entities.push(m[1].trim());
   }
 
+  // Known orgs even when lowercase ("ask onyx on Monday")
+  for (const token of KNOWN_ORG_TOKENS) {
+    if (new RegExp(`\\b${token}\\b`, "i").test(q)) {
+      entities.push(token.charAt(0).toUpperCase() + token.slice(1));
+    }
+  }
+
   // Capitalized multi-word or single tokens that aren't stopwords
   for (const m of q.matchAll(/\b([A-Z][A-Za-z0-9.&'-]{1,40}(?:\s+[A-Z][A-Za-z0-9.&'-]{1,40}){0,3})\b/g)) {
     const name = m[1]?.replace(/[.,;:!?]+$/g, "").trim();
@@ -241,8 +295,23 @@ export function extractBusinessEntityMentions(question: string): string[] {
 
   const seen = new Set<string>();
   const unique: string[] = [];
-  for (const e of entities) {
+  // Prefer known org tokens first so "Thanks … onyx" does not lead with Thanks.
+  const ranked = [
+    ...entities.filter((e) =>
+      KNOWN_ORG_TOKENS.includes(
+        e.toLowerCase() as (typeof KNOWN_ORG_TOKENS)[number]
+      )
+    ),
+    ...entities.filter(
+      (e) =>
+        !KNOWN_ORG_TOKENS.includes(
+          e.toLowerCase() as (typeof KNOWN_ORG_TOKENS)[number]
+        )
+    ),
+  ];
+  for (const e of ranked) {
     const key = e.toLowerCase();
+    if (ENTITY_STOP.has(key)) continue;
     if (seen.has(key)) continue;
     seen.add(key);
     unique.push(e);
@@ -254,6 +323,9 @@ export function extractBusinessEntityMentions(question: string): string[] {
 export function detectBusinessQueryIntent(question: string): BusinessQueryIntent {
   const q = question.trim();
   if (!q) return "GENERAL_KNOWLEDGE";
+
+  // "Please remind me on Monday" / thanks + remind — not Entity 360.
+  if (ACTION_OR_REMINDER.test(q)) return "GENERAL_KNOWLEDGE";
 
   if (EVIDENCE_REQUEST.test(q)) return "EVIDENCE_REQUEST";
   if (KNOWLEDGE_GAP.test(q)) return "KNOWLEDGE_GAP";
@@ -284,6 +356,7 @@ export function detectBusinessQueryIntent(question: string): BusinessQueryIntent
 
 /** True when the question should use Business Pack BI retrieval. */
 export function isBusinessIntelligenceQuestion(question: string): boolean {
+  if (ACTION_OR_REMINDER.test(question)) return false;
   const intent = detectBusinessQueryIntent(question);
   if (intent !== "GENERAL_KNOWLEDGE") return true;
   return /\b(client|clients|proposal|proposals|contract|contracts|commitment|ontology|business)\b/i.test(
