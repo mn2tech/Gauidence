@@ -185,6 +185,10 @@ async function enqueueNextStage(
 ): Promise<void> {
   const { completedStage } = args;
   if (completedStage === "analyze_document") {
+    // Watch/Today as soon as analysis text exists — do not wait for
+    // index/ontology (chat uploads need attention items immediately).
+    await enqueueGuardianItemsOrKnowledge(supabase, args);
+
     if (isVaultEmbeddingConfigured()) {
       await supabase
         .from("documents")
@@ -217,7 +221,20 @@ async function enqueueNextStage(
       });
       return;
     }
-    await enqueueSemanticOrGuardianItems(supabase, args);
+    // Guardian items already queued above; semantic if enabled.
+    if (isGuardianSemanticLayerEnabled()) {
+      await supabase
+        .from("documents")
+        .update({
+          semantic_status: "pending",
+        })
+        .eq("id", args.documentId);
+      await enqueueDocumentProcessingJob(supabase, {
+        ...args,
+        jobType: "extract_semantic",
+        force: true,
+      });
+    }
     return;
   }
 

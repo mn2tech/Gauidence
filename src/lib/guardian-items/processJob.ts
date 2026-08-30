@@ -5,9 +5,11 @@ import { calendarDateInUserZone } from "@/lib/timezone";
 import { getUserTimeZone } from "@/lib/timezone/server";
 import { associateGuardianItem } from "./associate";
 import { extractGuardianItemsWithLlm } from "./extract";
+import { guardianItemsFromImportantDates, guardianItemsFromSourceText } from "./fromImportantDates";
 import { logGuardianEvent } from "./log";
 import { isLowValueHistoricalFact } from "./negativeFilter";
 import { persistExtractedGuardianItem } from "./persist";
+import type { GuardianExtractedItem } from "./schema";
 
 /**
  * Run Guardian item extraction for a document after analysis/indexing/ontology.
@@ -120,6 +122,26 @@ export async function processGuardianItemExtraction(
     ? specialist.important_dates
     : null;
 
+  const timeZone = await getUserTimeZone(supabase, userId);
+  const today = calendarDateInUserZone(new Date(), timeZone);
+
+  const seeded = guardianItemsFromImportantDates({
+    dates: importantDates,
+    title: extracted?.title,
+    summary: extracted?.summary,
+    today,
+  });
+  if (seeded.length === 0) {
+    seeded.push(
+      ...guardianItemsFromSourceText({
+        sourceText,
+        title: extracted?.title,
+        summary: extracted?.summary,
+        today,
+      })
+    );
+  }
+
   const parsed = await extractGuardianItemsWithLlm({
     sourceText,
     fileName: doc.file_name ?? "document",
@@ -130,7 +152,14 @@ export async function processGuardianItemExtraction(
     importantDates,
   });
 
-  if (!parsed) {
+  const merged: GuardianExtractedItem[] = [...seeded];
+  if (parsed?.items?.length) {
+    for (const item of parsed.items) {
+      merged.push(item);
+    }
+  }
+
+  if (merged.length === 0) {
     logGuardianEvent("guardian_extraction_completed", {
       document_id: documentId,
       space_id: spaceId,
@@ -138,19 +167,17 @@ export async function processGuardianItemExtraction(
       deduped: 0,
       low_confidence: 0,
       skipped: true,
-      reason: "parse_failed",
+      reason: parsed ? "no_items" : "parse_failed",
+      seeded: seeded.length,
     });
     return { created: 0, deduped: 0, lowConfidence: 0, skipped: true };
   }
-
-  const timeZone = await getUserTimeZone(supabase, userId);
-  const today = calendarDateInUserZone(new Date(), timeZone);
 
   let created = 0;
   let deduped = 0;
   let lowConfidence = 0;
 
-  for (const item of parsed.items) {
+  for (const item of merged) {
     if (isLowValueHistoricalFact(item)) {
       continue;
     }
@@ -186,7 +213,8 @@ export async function processGuardianItemExtraction(
     created,
     deduped,
     low_confidence: lowConfidence,
-    item_count: parsed.items.length,
+    item_count: merged.length,
+    seeded: seeded.length,
   });
 
   return { created, deduped, lowConfidence, skipped: false };
