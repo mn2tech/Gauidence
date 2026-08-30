@@ -18,10 +18,15 @@ import { GUARDIAN_WATCH_HORIZON_DAYS } from "@/lib/guardian-items/types";
 import { calendarDateInUserZone, GUARDIAN_TIME_ZONE } from "@/lib/timezone";
 import { appBaseUrl } from "@/lib/profiles/invitations";
 import { SIMPLE_HOME_PATH } from "@/lib/simple-home/routing";
+import {
+  memberUserIdsBySpace,
+  recipientsForSpaceItem,
+} from "@/lib/guardian-today/spaceNotifyRecipients";
 
 type AttentionRow = {
   id: string;
   user_id: string;
+  space_id: string | null;
   title: string;
   type: string;
   priority: string;
@@ -38,7 +43,7 @@ function todayInZone(timeZone: string): string {
 
 /**
  * Find active Guardian items that belong in Today / Needs Attention and
- * have not been notified yet. Stamp + email/push per user.
+ * have not been notified yet. Fan out to space members; stamp after any delivery.
  */
 export async function notifyGuardianAttention(
   admin: SupabaseClient
@@ -50,7 +55,7 @@ export async function notifyGuardianAttention(
   const { data: rows, error } = await admin
     .from("guardian_items")
     .select(
-      "id, user_id, title, type, priority, requires_action, event_date, due_at, remind_at, attention_notified_at"
+      "id, user_id, space_id, title, type, priority, requires_action, event_date, due_at, remind_at, attention_notified_at"
     )
     .eq("status", "active")
     .is("attention_notified_at", null)
@@ -97,11 +102,23 @@ export async function notifyGuardianAttention(
     return { usersNotified: 0, itemsNotified: 0, skipped: rows.length };
   }
 
+  const membersBySpace = await memberUserIdsBySpace(
+    admin,
+    candidates.map((c) => c.space_id).filter((id): id is string => Boolean(id))
+  );
+
   const byUser = new Map<string, AttentionRow[]>();
   for (const item of candidates) {
-    const list = byUser.get(item.user_id) ?? [];
-    list.push(item);
-    byUser.set(item.user_id, list);
+    const recipients = recipientsForSpaceItem(
+      item.space_id,
+      item.user_id,
+      membersBySpace
+    );
+    for (const userId of recipients) {
+      const list = byUser.get(userId) ?? [];
+      list.push(item);
+      byUser.set(userId, list);
+    }
   }
 
   const { data: profiles } = await admin
@@ -119,7 +136,7 @@ export async function notifyGuardianAttention(
   const homeUrl = `${base}${SIMPLE_HOME_PATH}`;
   const nowIso = now.toISOString();
   let usersNotified = 0;
-  let itemsNotified = 0;
+  const deliveredItemIds = new Set<string>();
 
   for (const [userId, items] of byUser) {
     const profile = profileById.get(userId);
@@ -205,18 +222,20 @@ export async function notifyGuardianAttention(
 
     if (!delivered) continue;
 
-    const ids = items.map((i) => i.id);
+    usersNotified += 1;
+    for (const item of items) deliveredItemIds.add(item.id);
+  }
+
+  if (deliveredItemIds.size > 0) {
     await admin
       .from("guardian_items")
       .update({ attention_notified_at: nowIso })
-      .in("id", ids);
-    usersNotified += 1;
-    itemsNotified += ids.length;
+      .in("id", [...deliveredItemIds]);
   }
 
   return {
     usersNotified,
-    itemsNotified,
+    itemsNotified: deliveredItemIds.size,
     skipped: rows.length - candidates.length,
   };
 }

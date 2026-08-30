@@ -167,13 +167,6 @@ export async function POST(_request: Request, ctx: Ctx) {
     );
   }
 
-  await admin
-    .from("guardian_profile_invitations")
-    .update({ accepted_at: new Date().toISOString() })
-    .eq("id", invite.id);
-
-  await setActiveGuardianProfile(supabase, user.id, invite.profile_id);
-
   const { data: profile } = await admin
     .from("guardian_profiles")
     .select("profile_type, parent_profile_id")
@@ -181,6 +174,25 @@ export async function POST(_request: Request, ctx: Ctx) {
     .maybeSingle();
 
   const profileType = profile?.profile_type ?? "business";
+
+  if (profileType === "family") {
+    const { cascadeMembershipToFamilyChildren } = await import(
+      "@/lib/profiles/cascadeMembership"
+    );
+    await cascadeMembershipToFamilyChildren(admin, {
+      familyProfileId: invite.profile_id,
+      userId: user.id,
+      role: invite.role,
+      invitedBy: invite.invited_by_user_id,
+    });
+  }
+
+  await admin
+    .from("guardian_profile_invitations")
+    .update({ accepted_at: new Date().toISOString() })
+    .eq("id", invite.id);
+
+  await setActiveGuardianProfile(supabase, user.id, invite.profile_id);
 
   // Invited collaborators shouldn't hit first-run intent capture.
   const now = new Date().toISOString();
