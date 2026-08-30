@@ -62,6 +62,10 @@ async function applySubscription(
         plan,
         status: sub.status,
       });
+      const { maybeGrantReferralReward } = await import(
+        "@/lib/share/referral"
+      );
+      await maybeGrantReferralReward(admin, userId);
     }
   } catch {
     /* non-fatal */

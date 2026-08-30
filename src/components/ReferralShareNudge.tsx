@@ -114,7 +114,7 @@ export default function ReferralShareNudge({ open, onClose }: Props) {
             Know someone who&apos;d use this?
           </p>
           <p className="mt-0.5 text-xs text-stone-700">
-            Share your invite link — they can try Guardian free.
+            Share your invite link — when they subscribe, you earn a free month.
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
             <button

@@ -129,11 +129,33 @@ export async function GET(request: Request) {
         })
         .eq("id", user.id);
     }
+    const metaRef =
+      typeof user.user_metadata?.signup_ref === "string"
+        ? user.user_metadata.signup_ref.trim()
+        : null;
+    const effectiveRef = signupRef || metaRef;
     if (
       signupRef &&
       typeof user.user_metadata?.signup_ref !== "string"
     ) {
       await supabase.auth.updateUser({ data: { signup_ref: signupRef } });
+    }
+    if (effectiveRef) {
+      try {
+        const { createAdminClient } = await import("@/lib/supabase/admin");
+        const admin = createAdminClient();
+        if (admin) {
+          const { persistReferralAttribution } = await import(
+            "@/lib/share/referral"
+          );
+          await persistReferralAttribution(admin, user.id, effectiveRef);
+        }
+      } catch (err) {
+        console.error(
+          "Referral attribution failed:",
+          err instanceof Error ? err.message : "error"
+        );
+      }
     }
     if (!explicitNext) {
       const active = await getActiveGuardianProfile(supabase, user);

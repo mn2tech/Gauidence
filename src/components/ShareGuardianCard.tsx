@@ -4,14 +4,25 @@ import { useState } from "react";
 import QRCode from "react-qr-code";
 import { Check, Copy, QrCode, Share2 } from "lucide-react";
 import { guardianShareMessage } from "@/lib/share/guardian";
+import type { ReferralStats } from "@/lib/share/referralConstants";
 
 type Props = {
   shareUrl: string;
+  stats?: ReferralStats | null;
 };
 
-export default function ShareGuardianCard({ shareUrl }: Props) {
+function formatUsd(cents: number): string {
+  return `$${(cents / 100).toFixed(2)}`;
+}
+
+export default function ShareGuardianCard({ shareUrl, stats }: Props) {
   const [copied, setCopied] = useState(false);
   const [shareNote, setShareNote] = useState<string | null>(null);
+
+  const rewardLabel = stats
+    ? formatUsd(stats.rewardCents)
+    : "$9.99";
+  const maxPerYear = stats?.maxPerYear ?? 3;
 
   async function copyLink() {
     try {
@@ -54,12 +65,23 @@ export default function ShareGuardianCard({ shareUrl }: Props) {
         <div className="min-w-0">
           <h2 className="text-base font-semibold">Invite a friend</h2>
           <p className="mt-1 text-sm text-ink-muted">
-            Share your personal link so someone can try Guardian free. After a
-            win of your own — a deadline on Today, a calendar event — pass it
-            along.
+            Share your personal link. When they subscribe, you get{" "}
+            {rewardLabel} credited to your next bill (up to {maxPerYear}{" "}
+            rewards per year).
           </p>
         </div>
       </div>
+
+      {stats && stats.totalGranted > 0 ? (
+        <p className="mt-4 rounded-xl bg-brand-light/50 px-3 py-2 text-sm font-medium text-foreground">
+          You&apos;ve earned {formatUsd(stats.totalCreditCents)} in referral
+          credit
+          {stats.grantedThisYear > 0
+            ? ` (${stats.grantedThisYear} of ${maxPerYear} this year)`
+            : null}
+          . It applies automatically on your next Stripe invoice.
+        </p>
+      ) : null}
 
       <div className="mt-5 flex flex-wrap gap-2">
         <button
