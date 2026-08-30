@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { planAllowsOutboundDigests } from "@/lib/billing/notifyEntitlements";
 import {
   sendWeeklyBriefEmail,
   type WeeklyBriefLine,
@@ -65,7 +66,7 @@ export async function sendWeeklyBriefs(
   const { data: profiles, error: profilesError } = await admin
     .from("profiles")
     .select(
-      "id, email, full_name, weekly_brief_enabled, weekly_brief_sent_at, email_reminders_enabled"
+      "id, email, full_name, weekly_brief_enabled, weekly_brief_sent_at, email_reminders_enabled, plan"
     )
     .eq("weekly_brief_enabled", true)
     .not("email", "is", null)
@@ -77,6 +78,7 @@ export async function sendWeeklyBriefs(
 
   const eligible = profiles.filter((p) => {
     if (!p.email) return false;
+    if (!planAllowsOutboundDigests(p.plan)) return false;
     if (p.email_reminders_enabled === false) return false;
     if (p.weekly_brief_sent_at) {
       const sent = new Date(p.weekly_brief_sent_at).getTime();

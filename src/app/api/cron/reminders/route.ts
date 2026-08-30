@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { sendReminderEmail, type ReminderItem } from "@/lib/email";
 import { sendPushToUser } from "@/lib/push/send";
 import { sendSms } from "@/lib/sms/send";
+import { planAllowsOutboundDigests } from "@/lib/billing/notifyEntitlements";
 import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
 import { appBaseUrl } from "@/lib/profiles/invitations";
 import { hrefForResult } from "@/lib/search";
@@ -119,7 +120,7 @@ export async function GET(request: Request) {
   const { data: profiles, error: profilesError } = await admin
     .from("profiles")
     .select(
-      "id, email, email_reminders_enabled, sms_notifications_enabled, phone_e164"
+      "id, email, email_reminders_enabled, sms_notifications_enabled, phone_e164, plan"
     )
     .in("id", [...byUser.keys()]);
   if (profilesError) {
@@ -128,7 +129,12 @@ export async function GET(request: Request) {
 
   const recipients = new Map(
     (profiles ?? [])
-      .filter((p) => p.email && p.email_reminders_enabled !== false)
+      .filter(
+        (p) =>
+          p.email &&
+          p.email_reminders_enabled !== false &&
+          planAllowsOutboundDigests(p.plan)
+      )
       .map((p) => [p.id as string, p])
   );
 

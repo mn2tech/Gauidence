@@ -110,7 +110,7 @@ export const PLAN_WEDGE_FEATURES: Record<PlanId, string[]> = {
   personal: [
     "More Spaces for work and life",
     "Higher Ask Gideon & analysis limits",
-    "Weekly Brief + Needs Attention alerts",
+    "Weekly Brief + due-soon / Needs Attention alerts",
     "Referral credit when friends subscribe",
   ],
   family: [

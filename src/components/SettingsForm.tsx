@@ -7,6 +7,7 @@ import { AlertTriangle, BellRing, Check, Loader2, Mail, UserRound, Users } from 
 import { createClient } from "@/lib/supabase/client";
 import { VAULT_ORGANIZATION_SUGGESTIONS_ENABLED } from "@/lib/features/organization";
 import { useActiveProfile } from "@/components/ProfileProvider";
+import { useUpgradeModal } from "@/components/UpgradeProvider";
 import { detectBrowserTimeZone } from "@/lib/timezone";
 import {
   TIMEZONE_OPTIONS,
@@ -25,6 +26,8 @@ type Props = {
   initialVaultActivityEnabled?: boolean;
   initialAutoOrganizeMode?: "off" | "suggest" | "auto";
   initialAutoOrganizeThreshold?: number;
+  /** When false, outbound digests are Pro+ (prefs still save for later). */
+  outboundDigestsIncluded?: boolean;
 };
 
 export default function SettingsForm({
@@ -39,9 +42,11 @@ export default function SettingsForm({
   initialVaultActivityEnabled = true,
   initialAutoOrganizeMode = "suggest",
   initialAutoOrganizeThreshold = 0.85,
+  outboundDigestsIncluded = true,
 }: Props) {
   const supabase = createClient();
   const router = useRouter();
+  const { openUpgrade } = useUpgradeModal();
   const {
     timeZone,
     timeZoneLabel,
@@ -603,14 +608,31 @@ export default function SettingsForm({
           <div>
             <div className="flex items-center gap-2">
               <BellRing className="h-5 w-5 text-brand" />
-              <h2 className="text-base font-semibold">Email reminders</h2>
+              <h2 className="text-base font-semibold">Email &amp; push digests</h2>
             </div>
             <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-              We email {email}
-              {" "}
-              when a deadline from your documents is a week away, and again
-              the day before it&apos;s due. Dismissed alerts are never emailed.
+              Deadline reminders, Needs Attention, and due-soon alerts for{" "}
+              {email}. Free includes Today in the app; outbound digests are
+              included with Guardian Pro and above.
             </p>
+            {!outboundDigestsIncluded ? (
+              <p className="mt-2 text-sm font-medium text-brand">
+                Upgrade to receive these emails and push alerts.{" "}
+                <button
+                  type="button"
+                  onClick={() =>
+                    openUpgrade({
+                      plan: "personal",
+                      reason:
+                        "Guardian Pro sends due-soon and Needs Attention alerts so you stay covered without opening the app.",
+                    })
+                  }
+                  className="underline hover:text-brand-dark"
+                >
+                  Upgrade to Pro
+                </button>
+              </p>
+            ) : null}
             {remindersError && (
               <p role="alert" className="mt-2 text-sm text-red-700">
                 {remindersError}
@@ -650,6 +672,24 @@ export default function SettingsForm({
               up and what changed across your Spaces — so you stay covered
               without opening the app.
             </p>
+            {!outboundDigestsIncluded ? (
+              <p className="mt-2 text-sm font-medium text-brand">
+                Included with Guardian Pro.{" "}
+                <button
+                  type="button"
+                  onClick={() =>
+                    openUpgrade({
+                      plan: "personal",
+                      reason:
+                        "Guardian Pro includes the Monday Weekly Brief so you stay ahead of school and work deadlines.",
+                    })
+                  }
+                  className="underline hover:text-brand-dark"
+                >
+                  Upgrade to Pro
+                </button>
+              </p>
+            ) : null}
             {weeklyBriefError && (
               <p role="alert" className="mt-2 text-sm text-red-700">
                 {weeklyBriefError}
