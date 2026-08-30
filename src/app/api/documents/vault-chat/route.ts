@@ -1512,6 +1512,24 @@ export async function POST(request: Request) {
         });
       }
 
+      // Chat uploads should surface on Today ASAP — kick job workers without
+      // blocking the reply (analyze → guardian_items runs in background).
+      if (attachedDoc?.documentId && attachedDoc.profileId) {
+        void import("@/lib/documents/processingJobs")
+          .then(async ({ processPendingDocumentJobs }) => {
+            await processPendingDocumentJobs(supabase, user.id, {
+              limit: 3,
+              profileId: attachedDoc.profileId,
+            });
+          })
+          .catch((err) => {
+            console.error(
+              "Chat attachment job kick failed (non-blocking):",
+              err instanceof Error ? err.message : err
+            );
+          });
+      }
+
       const orchestrationRoute = routeGideonKnowledgeRequest({
         question,
         userId: user.id,

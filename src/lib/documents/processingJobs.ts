@@ -247,14 +247,20 @@ async function enqueueNextStage(
   }
 
   if (completedStage === "extract_semantic") {
-    // Backfill: don't re-run guardian items if that stage already finished.
+    // Guardian items are enqueued in parallel with semantic; only recover
+    // if that stage failed / never completed.
     const { data: doc } = await supabase
       .from("documents")
       .select("guardian_items_status")
       .eq("id", args.documentId)
       .maybeSingle();
     const gi = doc?.guardian_items_status ?? "pending";
-    if (gi === "completed" || gi === "skipped") {
+    if (
+      gi === "completed" ||
+      gi === "skipped" ||
+      gi === "processing" ||
+      gi === "pending"
+    ) {
       return;
     }
     await enqueueGuardianItemsOrKnowledge(supabase, args);
@@ -266,6 +272,10 @@ async function enqueueNextStage(
   }
 }
 
+/**
+ * After analysis/index/ontology: start Guardian Items promptly for Today/Watch,
+ * and run Semantic Layer in parallel when enabled (do not block attention items).
+ */
 async function enqueueSemanticOrGuardianItems(
   supabase: SupabaseClient,
   args: {
@@ -274,12 +284,14 @@ async function enqueueSemanticOrGuardianItems(
     userId: string;
   }
 ): Promise<void> {
+  // Always queue Watch/Today extraction first so chat uploads surface soon.
+  await enqueueGuardianItemsOrKnowledge(supabase, args);
+
   if (isGuardianSemanticLayerEnabled()) {
     await supabase
       .from("documents")
       .update({
         semantic_status: "pending",
-        processing_step: "semantic",
       })
       .eq("id", args.documentId);
     await enqueueDocumentProcessingJob(supabase, {
@@ -287,9 +299,7 @@ async function enqueueSemanticOrGuardianItems(
       jobType: "extract_semantic",
       force: true,
     });
-    return;
   }
-  await enqueueGuardianItemsOrKnowledge(supabase, args);
 }
 
 async function enqueueGuardianItemsOrKnowledge(
