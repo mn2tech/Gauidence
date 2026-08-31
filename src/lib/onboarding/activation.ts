@@ -203,3 +203,142 @@ export function firstValueCategoryLine(cat: FirstValueCategory): string {
       return `${n} topic${n === 1 ? "" : "s"}`;
   }
 }
+
+export type FirstKnowledgeCopy = {
+  headline: string;
+  subcopy: string;
+  uploadLabel: string;
+  uploadHint: string;
+  notePlaceholder: string;
+  starters: string[];
+  sampleLabel: string;
+};
+
+/** Copy + starters for Space → first knowledge (activation). */
+export function firstKnowledgeCopy(
+  intent: string | null | undefined,
+  schoolIntent?: string | null
+): FirstKnowledgeCopy {
+  const school = schoolIntent ?? "student";
+  switch (intent) {
+    case "family":
+      return {
+        headline: "Add one household thing Guardian should remember.",
+        subcopy:
+          "A flyer, schedule, or short note is enough to unlock Today and Ask.",
+        uploadLabel: "Upload a school flyer or schedule",
+        uploadHint: "PDF or photo",
+        notePlaceholder:
+          "e.g. Soccer practice Thursdays 5pm — pick up Maya at the field.",
+        starters: [
+          "Soccer practice Thursdays at 5pm — pick up at the field.",
+          "School picture day is next Friday.",
+          "Dentist for the kids — March 20 at 3:30pm.",
+        ],
+        sampleLabel: "Try a sample camp flyer",
+      };
+    case "business":
+      return {
+        headline: "Add one work item Guardian should remember.",
+        subcopy:
+          "A contract, invoice, or note gets you to first value fastest.",
+        uploadLabel: "Upload an invoice or contract",
+        uploadHint: "PDF or photo",
+        notePlaceholder:
+          "e.g. Follow up with Maya about the proposal by Friday.",
+        starters: [
+          "Follow up with Maya about the proposal by Friday.",
+          "Invoice #4821 due April 15 — $2,400.",
+          "Renew the vendor contract before June 1.",
+        ],
+        sampleLabel: "Try a sample receipt",
+      };
+    case "organization":
+      return {
+        headline: "Add one thing your organization needs remembered.",
+        subcopy: "A policy, agenda, or note is enough to start.",
+        uploadLabel: "Upload a policy or agenda",
+        uploadHint: "PDF or photo",
+        notePlaceholder: "e.g. Board meeting April 8 — approve the budget.",
+        starters: [
+          "Board meeting April 8 — approve the budget.",
+          "Volunteer orientation is Saturday at 10am.",
+          "Grant report due May 1.",
+        ],
+        sampleLabel: "Try a sample document",
+      };
+    case "school":
+      if (school === "teacher") {
+        return {
+          headline: "Add one classroom thing to remember.",
+          subcopy: "A lesson note or schedule unlocks Ask Gideon.",
+          uploadLabel: "Upload a lesson plan or notes",
+          uploadHint: "PDF or photo",
+          notePlaceholder: "e.g. Parent conferences March 12–13.",
+          starters: [
+            "Parent conferences March 12–13.",
+            "Unit test on fractions Friday.",
+            "Field trip permission slips due Thursday.",
+          ],
+          sampleLabel: "Try a sample document",
+        };
+      }
+      if (school === "parent") {
+        return {
+          headline: "Add one school item for your child.",
+          subcopy: "A flyer, note, or photo is enough.",
+          uploadLabel: "Upload a school flyer or schedule",
+          uploadHint: "PDF or photo",
+          notePlaceholder: "e.g. Picture day Friday — dress nice.",
+          starters: [
+            "Picture day Friday — dress nice.",
+            "Book fair next week — need $20.",
+            "Early dismissal Wednesday at noon.",
+          ],
+          sampleLabel: "Try a sample camp flyer",
+        };
+      }
+      return {
+        headline: "Add one school thing to remember.",
+        subcopy: "Homework, notes, or a due date gets you started.",
+        uploadLabel: "Upload homework or class notes",
+        uploadHint: "PDF or photo",
+        notePlaceholder: "e.g. History essay due Friday — 3 pages.",
+        starters: [
+          "History essay due Friday — 3 pages.",
+          "Chem lab report due next Tuesday.",
+          "Study group Thursday at the library.",
+        ],
+        sampleLabel: "Try a sample document",
+      };
+    case "personal":
+    default:
+      return {
+        headline: "Give Guardian one thing to work with.",
+        subcopy:
+          "A document, photo, or short note is enough to unlock Ask Gideon.",
+        uploadLabel: "Upload a document or photo",
+        uploadHint: "PDF, photo, or file",
+        notePlaceholder: "e.g. Renew car registration by April 30.",
+        starters: [
+          "Renew car registration by April 30.",
+          "Call the dentist to reschedule.",
+          "Pay rent by the 1st — $1,850.",
+        ],
+        sampleLabel: "Try a sample document",
+      };
+  }
+}
+
+/** Best first Ask question from what Guardian found. */
+export function firstAskQuestionFromCategories(
+  categories: FirstValueCategory[]
+): string {
+  const ids = new Set(categories.map((c) => c.id));
+  if (ids.has("dates")) return "What are the important dates?";
+  if (ids.has("follow_ups")) return "What should I follow up on?";
+  if (ids.has("commitments")) return "What commitments were made?";
+  if (ids.has("people")) return "Who are the people involved?";
+  if (ids.has("amounts")) return "What amounts or payments matter?";
+  return GUIDED_GIDEON_QUESTIONS[0]!;
+}
