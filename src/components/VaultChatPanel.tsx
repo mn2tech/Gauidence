@@ -141,6 +141,7 @@ import { recordClientActionEvent } from "@/lib/actions/client";
 import {
   resolveAskSpaceAutoRoute,
   resolveChatMemorySpaceSuggestion,
+  shouldClearPeerChatScope,
 } from "@/lib/vault/detectVaultScope";
 import {
   consumeSpaceSwitchNote,
@@ -2173,6 +2174,33 @@ export default function VaultChatPanel({
       setError("Couldn't return to your workspace. Try again.");
     }
   };
+
+  // Legacy sticky "Searching Tesla" overlays trap users in the wrong Space.
+  // Clear peer-space sticky scope on load; keep nested child-vault search.
+  const clearedPeerStickyRef = useRef<string | null>(null);
+  useEffect(() => {
+    const sticky = meta?.chatScopedProfile;
+    if (!sticky?.profileId || !effectiveProfile?.id) return;
+    if (sticky.profileId === effectiveProfile.id) return;
+    if (
+      !shouldClearPeerChatScope({
+        activeProfileId: effectiveProfile.id,
+        stickyProfileId: sticky.profileId,
+        profiles,
+      })
+    ) {
+      return;
+    }
+    const key = `${activeChatId ?? "none"}:${sticky.profileId}`;
+    if (clearedPeerStickyRef.current === key) return;
+    clearedPeerStickyRef.current = key;
+    void clearChatScopedProfile();
+  }, [
+    meta?.chatScopedProfile?.profileId,
+    effectiveProfile?.id,
+    profiles,
+    activeChatId,
+  ]);
 
   const openSideVault = (profileId: string, profileName: string, messageId: string) => {
     setSideVault({ profileId, profileName });

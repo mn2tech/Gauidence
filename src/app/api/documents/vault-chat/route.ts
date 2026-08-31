@@ -1999,6 +1999,8 @@ export async function POST(request: Request) {
   if (widenedToAllSpaces) {
     chatUpdates.scoped_profile_id = null;
   }
+  // Always clear Ask sticky Searching overlays after a turn.
+  chatUpdates.scoped_profile_id = null;
   if (
     shouldGenerateVaultChatTitle({ isFirstExchange, question })
   ) {
@@ -2028,13 +2030,7 @@ export async function POST(request: Request) {
   const chats = await listChats(supabase, user.id, active.id);
   const proposedReminder = parseProposedReminder(answer, Date.now(), userTz);
   const newlyGranted = await refreshUserAwards(user.id, supabase);
-  const persistedChatScopedProfile = widenedToAllSpaces
-    ? null
-    : chatScopedProfilePayload({
-        scopedProfileId: chatScopedProfileId,
-        accessibleProfiles: scopeCandidates,
-        chatHomeProfileId,
-      });
+  const persistedChatScopedProfile = null;
 
   return NextResponse.json({
     chatId,

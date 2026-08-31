@@ -421,9 +421,24 @@ export function resolveAskSpaceAutoRoute(args: {
 
   const stickyProfile =
     args.accessibleProfiles.find((p) => p.id === stickyId) ?? null;
-  if (!stickyProfile) return null;
+  if (stickyProfile) return stickyProfile;
 
-  return stickyProfile;
+  // Sticky id may exist server-side even if not in the local profiles list yet.
+  const stickyName = args.stickyScopedProfile?.profileName?.trim();
+  if (!stickyName) return null;
+  return { id: stickyId, display_name: stickyName };
+}
+
+/** Drop peer-space sticky Searching overlays (keep nested child vault search). */
+export function shouldClearPeerChatScope(args: {
+  activeProfileId: string;
+  stickyProfileId: string;
+  profiles: { id: string; parent_profile_id?: string | null }[];
+}): boolean {
+  const sticky = args.profiles.find((p) => p.id === args.stickyProfileId);
+  if (!sticky) return true;
+  if (sticky.parent_profile_id === args.activeProfileId) return false;
+  return true;
 }
 
 /**

@@ -11,6 +11,7 @@ import {
   resolveNamedSpaceOutsideSearch,
   resolveChatMemorySpaceSuggestion,
   resolveAskSpaceAutoRoute,
+  shouldClearPeerChatScope,
 } from "../detectVaultScope";
 
 const profiles = [
@@ -308,19 +309,44 @@ describe("resolveAskSpaceAutoRoute", () => {
     );
   });
 
-  it("promotes sticky scope even when the question does not rename it", () => {
-    const spaces = [
-      { id: "nolan", display_name: "Nolan Kola", profile_type: "child" as const },
-      { id: "tesla", display_name: "Tesla", profile_type: "vehicle" as const },
-    ];
+  it("promotes sticky scope even when missing from the local profiles list", () => {
     assert.deepEqual(
       resolveAskSpaceAutoRoute({
         question: "list the files",
         activeProfileId: "nolan",
-        accessibleProfiles: spaces,
+        accessibleProfiles: [
+          { id: "nolan", display_name: "Nolan Kola", profile_type: "child" },
+        ],
         stickyScopedProfile: { profileId: "tesla", profileName: "Tesla" },
       }),
-      { id: "tesla", display_name: "Tesla", profile_type: "vehicle" }
+      { id: "tesla", display_name: "Tesla" }
+    );
+  });
+});
+
+describe("shouldClearPeerChatScope", () => {
+  it("clears peer Spaces but keeps nested child vault search", () => {
+    const tree = [
+      { id: "biz", parent_profile_id: null },
+      { id: "payroll", parent_profile_id: "biz" },
+      { id: "nolan", parent_profile_id: "family" },
+      { id: "tesla", parent_profile_id: "family" },
+    ];
+    assert.equal(
+      shouldClearPeerChatScope({
+        activeProfileId: "biz",
+        stickyProfileId: "payroll",
+        profiles: tree,
+      }),
+      false
+    );
+    assert.equal(
+      shouldClearPeerChatScope({
+        activeProfileId: "nolan",
+        stickyProfileId: "tesla",
+        profiles: tree,
+      }),
+      true
     );
   });
 });

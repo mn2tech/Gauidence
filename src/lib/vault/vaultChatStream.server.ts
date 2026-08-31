@@ -32,7 +32,6 @@ import {
   resolveGideonWriteVault,
   type VaultScopeCandidate,
 } from "@/lib/vault/detectVaultScope";
-import { shouldPersistChatScopedProfile } from "@/lib/vault/widenWorkspaceSearch";
 import type { AttachedVaultDocument } from "@/lib/vault/attachedDocument";
 import type { RetrievedChunk } from "@/lib/vault/retrieve";
 import {
@@ -352,25 +351,15 @@ export function createVaultChatStreamResponse(
           accessibleProfiles: args.accessibleProfiles,
           retrievedChunks: args.chunks,
         });
-        let responseVaultScope = buildVaultScopePayload({
+        // Citation/write attribution only — do NOT sticky-lock the chat into
+        // "Searching Tesla" overlays (that traps users in the wrong Space).
+        const responseVaultScope = buildVaultScopePayload({
           writeVault: resolvedWriteVault,
           activeProfile: {
             id: args.active.id,
             display_name: args.active.display_name,
           },
         });
-        // Don't sticky-lock the chat into a named Space that had no evidence
-        // (e.g. "Tesla" while docs live under Mini Cooper).
-        if (
-          responseVaultScope &&
-          !shouldPersistChatScopedProfile({
-            scopedProfileId: responseVaultScope.profileId,
-            activeProfileId: args.active.id,
-            retrievedChunks: args.chunks,
-          })
-        ) {
-          responseVaultScope = null;
-        }
 
         const claimsPayload = Array.isArray(args.claims) ? args.claims : [];
         const baseInsert = {
@@ -478,14 +467,11 @@ export function createVaultChatStreamResponse(
         }
 
         let persistedScopedProfileId = args.chatScopedProfileId;
-        if (args.widenedToAllSpaces) {
-          // Drop sticky "Searching Tesla" when we had to look everywhere.
-          chatUpdates.scoped_profile_id = null;
-          persistedScopedProfileId = null;
-        } else if (responseVaultScope) {
-          chatUpdates.scoped_profile_id = responseVaultScope.profileId;
-          persistedScopedProfileId = responseVaultScope.profileId;
-        }
+        // Always clear auto sticky Searching overlays after a turn. Named Spaces
+        // are handled by client auto-switch; keeping scoped_profile_id set makes
+        // Ask look like Tesla while still answering as Nolan.
+        chatUpdates.scoped_profile_id = null;
+        persistedScopedProfileId = null;
 
         await args.updateVaultChatRow(args.supabase, args.chatId, chatUpdates);
 
