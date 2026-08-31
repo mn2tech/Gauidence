@@ -290,6 +290,28 @@ describe("resolveChatMemorySpaceSuggestion", () => {
       { id: "nolan", display_name: "Nolan" }
     );
   });
+
+  it("resolves in the Tesla space without treating 'the' as the name", () => {
+    const spaces = [
+      { id: "nolan", display_name: "Nolan Kola", profile_type: "child" as const },
+      { id: "tesla", display_name: "Tesla", profile_type: "vehicle" as const },
+    ];
+    assert.deepEqual(
+      resolveExplicitSpaceScope({
+        question: "what's in the Tesla space ?",
+        accessibleProfiles: spaces,
+      }),
+      { id: "tesla", display_name: "Tesla", profile_type: "vehicle" }
+    );
+    assert.deepEqual(
+      resolveChatMemorySpaceSuggestion({
+        question: "what's in the Tesla space ?",
+        activeProfileId: "nolan",
+        accessibleProfiles: spaces,
+      }),
+      { id: "tesla", display_name: "Tesla", profile_type: "vehicle" }
+    );
+  });
 });
 
 describe("resolveAskSpaceAutoRoute", () => {

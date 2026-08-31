@@ -308,12 +308,14 @@ export function resolveExplicitSpaceScope(args: {
   accessibleProfiles: VaultScopeCandidate[];
 }): VaultScopeCandidate | null {
   const match = args.question.match(
-    /\bin\s+(?:my\s+)?(.+?)\s+(?:space|workspace)\b/i
+    /\bin\s+(?:(?:my|the|a|an)\s+)?(.+?)\s+(?:space|workspace)\b/i
   );
   if (!match) return null;
 
   let nameHint = match[1]!.trim();
   nameHint = nameHint.replace(/['']s$/i, "").trim();
+  // "in the Tesla space" → strip a leftover article if the optional group missed it
+  nameHint = nameHint.replace(/^(the|a|an)\s+/i, "").trim();
   if (!nameHint || /^(this|that|the|a|an)$/i.test(nameHint)) return null;
 
   const exact = args.accessibleProfiles.filter(

@@ -2175,22 +2175,22 @@ export default function VaultChatPanel({
     }
   };
 
-  // Legacy sticky "Searching Tesla" overlays trap users in the wrong Space.
-  // Clear peer-space sticky scope on load; keep nested child-vault search.
+  // Sticky "Searching Tesla" overlays trap users while Nolan stays active.
+  // On Ask, clear any temporary peer/search overlay as soon as it appears.
+  // Nested child-vault search (e.g. Payroll under a business) is preserved off Ask.
   const clearedPeerStickyRef = useRef<string | null>(null);
   useEffect(() => {
     const sticky = meta?.chatScopedProfile;
     if (!sticky?.profileId || !effectiveProfile?.id) return;
     if (sticky.profileId === effectiveProfile.id) return;
-    if (
+    const keepNestedChild =
+      !isPage &&
       !shouldClearPeerChatScope({
         activeProfileId: effectiveProfile.id,
         stickyProfileId: sticky.profileId,
         profiles,
-      })
-    ) {
-      return;
-    }
+      });
+    if (keepNestedChild) return;
     const key = `${activeChatId ?? "none"}:${sticky.profileId}`;
     if (clearedPeerStickyRef.current === key) return;
     clearedPeerStickyRef.current = key;
@@ -2200,6 +2200,7 @@ export default function VaultChatPanel({
     effectiveProfile?.id,
     profiles,
     activeChatId,
+    isPage,
   ]);
 
   const openSideVault = (profileId: string, profileName: string, messageId: string) => {
