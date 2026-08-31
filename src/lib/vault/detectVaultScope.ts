@@ -399,6 +399,34 @@ export function resolveChatMemorySpaceSuggestion(args: {
 }
 
 /**
+ * Pick the Space Ask should switch into before answering.
+ * Prefers an explicitly named Space; otherwise promotes sticky temporary
+ * "Searching X" into a real Space switch so chats don't answer as the home Space.
+ */
+export function resolveAskSpaceAutoRoute(args: {
+  question: string;
+  activeProfileId: string;
+  accessibleProfiles: VaultScopeCandidate[];
+  stickyScopedProfile?: { profileId: string; profileName: string } | null;
+}): VaultScopeCandidate | null {
+  const named = resolveChatMemorySpaceSuggestion({
+    question: args.question,
+    activeProfileId: args.activeProfileId,
+    accessibleProfiles: args.accessibleProfiles,
+  });
+  if (named) return named;
+
+  const stickyId = args.stickyScopedProfile?.profileId?.trim();
+  if (!stickyId || stickyId === args.activeProfileId.trim()) return null;
+
+  const stickyProfile =
+    args.accessibleProfiles.find((p) => p.id === stickyId) ?? null;
+  if (!stickyProfile) return null;
+
+  return stickyProfile;
+}
+
+/**
  * Vault profiles Gideon searches when answering in a chat thread.
  * workspace = chat home (+ optional scoped vault); global = every accessible vault.
  */

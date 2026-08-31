@@ -10,6 +10,7 @@ import {
   resolveGideonWriteVault,
   resolveNamedSpaceOutsideSearch,
   resolveChatMemorySpaceSuggestion,
+  resolveAskSpaceAutoRoute,
 } from "../detectVaultScope";
 
 const profiles = [
@@ -286,6 +287,40 @@ describe("resolveChatMemorySpaceSuggestion", () => {
         accessibleProfiles: profiles,
       }),
       { id: "nolan", display_name: "Nolan" }
+    );
+  });
+});
+
+describe("resolveAskSpaceAutoRoute", () => {
+  it("promotes sticky Searching Tesla into a real switch", () => {
+    const spaces = [
+      { id: "nolan", display_name: "Nolan Kola", profile_type: "child" as const },
+      { id: "tesla", display_name: "Tesla", profile_type: "vehicle" as const },
+    ];
+    assert.deepEqual(
+      resolveAskSpaceAutoRoute({
+        question: "whats in my tesla space",
+        activeProfileId: "nolan",
+        accessibleProfiles: spaces,
+        stickyScopedProfile: { profileId: "tesla", profileName: "Tesla" },
+      }),
+      { id: "tesla", display_name: "Tesla", profile_type: "vehicle" }
+    );
+  });
+
+  it("promotes sticky scope even when the question does not rename it", () => {
+    const spaces = [
+      { id: "nolan", display_name: "Nolan Kola", profile_type: "child" as const },
+      { id: "tesla", display_name: "Tesla", profile_type: "vehicle" as const },
+    ];
+    assert.deepEqual(
+      resolveAskSpaceAutoRoute({
+        question: "list the files",
+        activeProfileId: "nolan",
+        accessibleProfiles: spaces,
+        stickyScopedProfile: { profileId: "tesla", profileName: "Tesla" },
+      }),
+      { id: "tesla", display_name: "Tesla", profile_type: "vehicle" }
     );
   });
 });

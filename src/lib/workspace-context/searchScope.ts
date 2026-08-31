@@ -49,7 +49,7 @@ export function buildWorkingInDisplay(args: {
         ? profileTypeLabel(tempProfile.profile_type)
         : null,
       homeName: home.display_name,
-      scopeNote: `Searching ${temporary.profileName} — return to ${home.display_name} when done.`,
+      scopeNote: `Searching ${temporary.profileName} — tap Open to chat there, or Return to ${home.display_name}.`,
       workspaceProfileId: home.id,
       temporaryProfileId: temporary.profileId,
     };

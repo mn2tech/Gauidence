@@ -24,6 +24,8 @@ type Props = {
   activeProfileId: string;
   onSwitchWorkspace: (profileId: string) => void;
   onReturnToWorkspace?: () => void;
+  /** Promote sticky temporary search into a real Space switch. */
+  onOpenTemporarySpace?: () => void;
   onOpenSearch?: () => void;
   searchScope?: SearchScopeMode;
   showSearchScopeToggle?: boolean;
@@ -96,6 +98,7 @@ export default function WorkspaceContextBar({
   activeProfileId,
   onSwitchWorkspace,
   onReturnToWorkspace,
+  onOpenTemporarySpace,
   onOpenSearch,
   searchScope = "workspace",
   showSearchScopeToggle = false,
@@ -199,14 +202,25 @@ export default function WorkspaceContextBar({
 
       <div className="flex shrink-0 items-center gap-1.5">
         {display.mode === "searching" && onReturnToWorkspace ? (
-          <button
-            type="button"
-            onClick={onReturnToWorkspace}
-            className="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-stone-50"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Return
-          </button>
+          <>
+            {onOpenTemporarySpace && display.temporaryProfileId ? (
+              <button
+                type="button"
+                onClick={onOpenTemporarySpace}
+                className="inline-flex items-center gap-1 rounded-lg bg-brand px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-brand-dark"
+              >
+                Open {display.primaryName}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={onReturnToWorkspace}
+              className="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-stone-50"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Return
+            </button>
+          </>
         ) : (
           <div className="relative" ref={rootRef}>
             <button

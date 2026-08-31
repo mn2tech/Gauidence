@@ -138,7 +138,10 @@ import {
   shouldPromptSmartUpload,
 } from "@/lib/actions/client";
 import { recordClientActionEvent } from "@/lib/actions/client";
-import { resolveChatMemorySpaceSuggestion } from "@/lib/vault/detectVaultScope";
+import {
+  resolveAskSpaceAutoRoute,
+  resolveChatMemorySpaceSuggestion,
+} from "@/lib/vault/detectVaultScope";
 import {
   consumeSpaceSwitchNote,
   rememberSpaceSwitchNote,
@@ -2822,7 +2825,7 @@ export default function VaultChatPanel({
       profiles.length > 1 &&
       effectiveProfile
     ) {
-      const suggested = resolveChatMemorySpaceSuggestion({
+      const suggested = resolveAskSpaceAutoRoute({
         question,
         activeProfileId: effectiveProfile.id,
         accessibleProfiles: profiles.map((p) => ({
@@ -2830,6 +2833,7 @@ export default function VaultChatPanel({
           display_name: p.display_name,
           profile_type: p.profile_type,
         })),
+        stickyScopedProfile: meta?.chatScopedProfile ?? null,
       });
       if (suggested && suggested.id !== effectiveProfile.id) {
         setInput("");
@@ -5073,6 +5077,15 @@ export default function VaultChatPanel({
           onReturnToWorkspace={
             workingInDisplay.mode === "searching"
               ? () => void clearChatScopedProfile()
+              : undefined
+          }
+          onOpenTemporarySpace={
+            workingInDisplay.mode === "searching" &&
+            workingInDisplay.temporaryProfileId
+              ? () =>
+                  void handleSwitchWorkspace(
+                    workingInDisplay.temporaryProfileId!
+                  )
               : undefined
           }
           onOpenSearch={
