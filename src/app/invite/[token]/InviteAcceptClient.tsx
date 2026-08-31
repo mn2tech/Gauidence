@@ -7,6 +7,7 @@ import { Loader2 } from "lucide-react";
 import GuardianIcon from "@/components/brand/GuardianIcon";
 import { createClient } from "@/lib/supabase/client";
 import { collaboratorRoleLabel } from "@/lib/profiles/types";
+import { SIMPLE_HOME_PATH } from "@/lib/simple-home/routing";
 
 type Peek = {
   email: string;
@@ -24,6 +25,11 @@ export default function InviteAcceptClient({ token }: { token: string }) {
   const [loading, setLoading] = useState(true);
   const [accepting, setAccepting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hint, setHint] = useState<string | null>(null);
+  const [alreadyMember, setAlreadyMember] = useState<{
+    vaultName: string;
+    redirectTo: string;
+  } | null>(null);
 
   const nextPath = `/invite/${encodeURIComponent(token)}`;
 
@@ -43,9 +49,26 @@ export default function InviteAcceptClient({ token }: { token: string }) {
         if (cancelled) return;
         const body = (await peekRes.json().catch(() => ({}))) as Peek & {
           error?: string;
+          hint?: string;
+          alreadyMember?: boolean;
+          vaultName?: string;
+          redirectTo?: string;
         };
+        if (body.alreadyMember && body.redirectTo) {
+          setAlreadyMember({
+            vaultName: body.vaultName ?? "Shared vault",
+            redirectTo: body.redirectTo,
+          });
+          setSignedIn(!!session);
+          setUserEmail(session?.user.email ?? null);
+          return;
+        }
         if (!peekRes.ok) {
           setError(body.error ?? "This invitation isn't available.");
+          setHint(
+            body.hint ??
+              "Ask the vault owner to open Collaborators and tap Resend invite."
+          );
           return;
         }
         setPeek(body);
@@ -72,6 +95,7 @@ export default function InviteAcceptClient({ token }: { token: string }) {
       );
       const body = (await res.json().catch(() => ({}))) as {
         error?: string;
+        hint?: string;
         profileId?: string;
         profileType?: string;
         redirectTo?: string;
@@ -79,13 +103,14 @@ export default function InviteAcceptClient({ token }: { token: string }) {
       };
       if (!res.ok) {
         setError(body.error ?? "Couldn't accept this invitation.");
+        if (body.hint) setHint(body.hint);
         return;
       }
       const destination =
         body.redirectTo ??
         (body.profileId
           ? `/dashboard?profileId=${encodeURIComponent(body.profileId)}`
-          : "/dashboard");
+          : SIMPLE_HOME_PATH);
       router.push(destination);
       router.refresh();
     } finally {
@@ -101,15 +126,47 @@ export default function InviteAcceptClient({ token }: { token: string }) {
     );
   }
 
+  if (alreadyMember) {
+    return (
+      <div className="rounded-2xl border border-stone-200 bg-white p-6 text-center shadow-sm sm:p-8">
+        <GuardianIcon size={48} className="mx-auto" />
+        <h1 className="mt-4 text-xl font-bold tracking-tight">
+          You already have access
+        </h1>
+        <p className="mt-2 text-sm text-ink-muted">
+          You&apos;re a collaborator on{" "}
+          <span className="font-semibold text-foreground">
+            {alreadyMember.vaultName}
+          </span>
+          . Open it from the Space switcher (top left), or go there now.
+        </p>
+        <Link
+          href={alreadyMember.redirectTo}
+          className="mt-6 inline-flex items-center justify-center rounded-full bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark"
+        >
+          Open {alreadyMember.vaultName}
+        </Link>
+      </div>
+    );
+  }
+
   if (error && !peek) {
     return (
-      <div className="rounded-2xl border border-stone-200 bg-white p-6 text-center shadow-sm">
-        <p className="text-sm text-red-700">{error}</p>
+      <div className="rounded-2xl border border-stone-200 bg-white p-6 text-center shadow-sm sm:p-8">
+        <p className="text-sm font-medium text-red-700">{error}</p>
+        {hint ? (
+          <p className="mt-3 text-sm text-ink-muted">{hint}</p>
+        ) : null}
+        <p className="mt-4 text-xs text-ink-muted">
+          Owner path: Settings → the Family Space → Collaborators →{" "}
+          <strong>Resend invite</strong>, then open the new link while signed in
+          as the invited email.
+        </p>
         <Link
-          href="/dashboard"
-          className="mt-4 inline-flex text-sm font-semibold text-brand"
+          href={SIMPLE_HOME_PATH}
+          className="mt-6 inline-flex text-sm font-semibold text-brand"
         >
-          Go to dashboard
+          Go to Guardian
         </Link>
       </div>
     );
@@ -182,7 +239,8 @@ export default function InviteAcceptClient({ token }: { token: string }) {
           className="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50"
         >
           {accepting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          Accept &amp; open {peek?.profileType === "employee" ? "employee hub" : "vault"}
+          Accept &amp; open{" "}
+          {peek?.profileType === "employee" ? "employee hub" : "vault"}
         </button>
       )}
     </div>
