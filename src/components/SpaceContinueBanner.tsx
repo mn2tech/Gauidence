@@ -29,7 +29,7 @@ export default function SpaceContinueBanner({
             Continue in the right space?
           </p>
           <p className="mt-1 text-sm leading-snug text-foreground">
-            This looks like{" "}
+            Found this in{" "}
             <span className="font-semibold">{suggestedSpaceName}</span>. You&apos;re
             in <span className="font-semibold">{activeSpaceName}</span>, so this
             thread is saving there.

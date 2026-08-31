@@ -908,6 +908,11 @@ export default function VaultChatPanel({
   >(null);
   const [continuingInSpace, setContinuingInSpace] = useState(false);
   const [spaceSwitchToast, setSpaceSwitchToast] = useState<string | null>(null);
+  const [foundInSpaceHint, setFoundInSpaceHint] = useState<{
+    profileId: string;
+    profileName: string;
+    question: string;
+  } | null>(null);
   const lastWriteProfileIdRef = useRef<string | null>(null);
   const [reminderOpen, setReminderOpen] = useState(false);
   const [reminderTargetProfileId, setReminderTargetProfileId] = useState<
@@ -3006,6 +3011,8 @@ export default function VaultChatPanel({
         vaultScopeNote?: string;
         writeProfile?: { profileId: string; profileName: string };
         actionTimeline?: ActionTimelineItem[];
+        foundInSpace?: { profileId: string; profileName: string } | null;
+        widenedToAllSpaces?: boolean;
       }) => {
         if (body.chats) setChats(body.chats);
         const resolvedChatId = body.chatId ?? activeChatIdRef.current;
@@ -3041,6 +3048,21 @@ export default function VaultChatPanel({
               ? { ...prev, actionTimeline: body.actionTimeline }
               : prev
           );
+        }
+        if (body.widenedToAllSpaces) {
+          setSpaceSwitchToast("Searched all your spaces");
+        }
+        if (
+          body.foundInSpace?.profileId &&
+          body.foundInSpace.profileId !== (effectiveProfile?.id ?? profileId)
+        ) {
+          setFoundInSpaceHint({
+            profileId: body.foundInSpace.profileId,
+            profileName: body.foundInSpace.profileName,
+            question,
+          });
+        } else {
+          setFoundInSpaceHint(null);
         }
         const turn = hydrateVaultChatMessages(body.messages ?? []);
         const optimisticAttachment = options?.attachment;
@@ -4690,9 +4712,28 @@ export default function VaultChatPanel({
   }, [messages]);
 
   const spaceContinueSuggestion = useMemo(() => {
-    if (!lastUserMessageForSpaceHint || !effectiveProfile) return null;
+    if (!effectiveProfile) return null;
     if (profiles.length < 2) return null;
     if (streamingAssistantId || sending || vaultBusy) return null;
+
+    if (
+      foundInSpaceHint &&
+      foundInSpaceHint.profileId !== effectiveProfile.id
+    ) {
+      const dismissKey = `found:${foundInSpaceHint.profileId}:${foundInSpaceHint.question.slice(0, 40)}`;
+      if (dismissedSpaceContinueKey === dismissKey) return null;
+      return {
+        suggested: {
+          id: foundInSpaceHint.profileId,
+          display_name: foundInSpaceHint.profileName,
+        },
+        question: foundInSpaceHint.question,
+        dismissKey,
+        activeName: effectiveProfile.display_name,
+      };
+    }
+
+    if (!lastUserMessageForSpaceHint) return null;
     const suggested = resolveChatMemorySpaceSuggestion({
       question: lastUserMessageForSpaceHint.content,
       activeProfileId: effectiveProfile.id,
@@ -4719,12 +4760,14 @@ export default function VaultChatPanel({
     sending,
     vaultBusy,
     dismissedSpaceContinueKey,
+    foundInSpaceHint,
   ]);
 
   const handleContinueInSuggestedSpace = useCallback(async () => {
     if (!spaceContinueSuggestion) return;
     const { suggested, question, dismissKey } = spaceContinueSuggestion;
     setDismissedSpaceContinueKey(dismissKey);
+    setFoundInSpaceHint(null);
     setContinuingInSpace(true);
     setLoadingLabel(`Switching to ${suggested.display_name}…`);
     try {
@@ -4791,9 +4834,16 @@ export default function VaultChatPanel({
               role="status"
               className="rounded-xl border border-brand/25 bg-brand-light/40 px-3 py-2 text-xs text-foreground"
             >
-              Switched to{" "}
-              <span className="font-semibold">{spaceSwitchToast}</span> — answering
-              there.
+              {spaceSwitchToast.startsWith("Searched all") ||
+              spaceSwitchToast.startsWith("Looking across") ? (
+                <>{spaceSwitchToast}.</>
+              ) : (
+                <>
+                  Switched to{" "}
+                  <span className="font-semibold">{spaceSwitchToast}</span> —
+                  answering there.
+                </>
+              )}
             </div>
           ) : null}
           {firstWin ? (
@@ -4911,9 +4961,10 @@ export default function VaultChatPanel({
               suggestedSpaceName={spaceContinueSuggestion.suggested.display_name}
               busy={continuingInSpace}
               onContinue={() => void handleContinueInSuggestedSpace()}
-              onStay={() =>
-                setDismissedSpaceContinueKey(spaceContinueSuggestion.dismissKey)
-              }
+              onStay={() => {
+                setDismissedSpaceContinueKey(spaceContinueSuggestion.dismissKey);
+                setFoundInSpaceHint(null);
+              }}
             />
           ) : null}
           {(sending || vaultBusy || savingLog || continuingInSpace) &&

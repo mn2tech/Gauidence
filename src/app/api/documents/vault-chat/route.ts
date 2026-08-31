@@ -1351,6 +1351,8 @@ export async function POST(request: Request) {
     profileId: active.id,
     profileName: active.display_name,
   };
+  let foundInSpace: { profileId: string; profileName: string } | null = null;
+  let widenedToAllSpaces = false;
 
   const attachmentDocumentId =
     resolveGideonImageAttachmentId({
@@ -1599,7 +1601,17 @@ export async function POST(request: Request) {
           .reverse()
           .find((row) => row.role === "assistant")?.claims ?? [];
 
-      const { chunks, context: workspaceContext, explicitSpaceName, connectorCitations, youtubeUrls, businessClaims, businessAnswerDraft } =
+      const {
+        chunks,
+        context: workspaceContext,
+        explicitSpaceName,
+        connectorCitations,
+        youtubeUrls,
+        businessClaims,
+        businessAnswerDraft,
+        foundInSpace: foundInSpaceFromContext,
+        widenedToAllSpaces: widenedFromContext,
+      } =
         await loadWorkspaceContext({
         supabase,
         user,
@@ -1617,6 +1629,8 @@ export async function POST(request: Request) {
         confirmationRequired: gideonRoute.confirmationRequired,
         priorClaims: priorAssistantClaims,
       });
+      foundInSpace = foundInSpaceFromContext ?? null;
+      widenedToAllSpaces = Boolean(widenedFromContext);
 
       workspaceContext.promptOptions.agentMode = agentMode;
 
@@ -1885,6 +1899,8 @@ export async function POST(request: Request) {
           connectorCitations,
           youtubeUrls,
           claims: businessClaims ?? workspaceContext.businessClaims ?? [],
+          foundInSpace,
+          widenedToAllSpaces,
         });
       }
     } catch (err) {
@@ -2036,5 +2052,7 @@ export async function POST(request: Request) {
     chatScopedProfile: persistedChatScopedProfile,
     searchScope: chatSearchScope,
     vaultScopeNote: workspaceMeta.vaultScopeNote,
+    foundInSpace: foundInSpace ?? null,
+    widenedToAllSpaces: Boolean(widenedToAllSpaces),
   });
 }

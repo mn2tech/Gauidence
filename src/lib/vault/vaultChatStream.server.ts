@@ -106,6 +106,8 @@ export type VaultChatStreamArgs = {
   youtubeUrls?: string[];
   /** Business Pack claim/evidence payload to persist with the assistant message. */
   claims?: unknown;
+  foundInSpace?: { profileId: string; profileName: string } | null;
+  widenedToAllSpaces?: boolean;
 };
 
 export function createVaultChatStreamResponse(
@@ -542,6 +544,8 @@ export function createVaultChatStreamResponse(
           },
           chatScopedProfile: persistedChatScopedProfile,
           actionTimeline,
+          foundInSpace: args.foundInSpace ?? null,
+          widenedToAllSpaces: Boolean(args.widenedToAllSpaces),
         });
       } catch (err) {
         const { error, code } = formatVaultChatError(err);

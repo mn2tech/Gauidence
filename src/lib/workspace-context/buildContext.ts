@@ -94,7 +94,9 @@ import type { AttachedVaultDocument } from "@/lib/vault/attachedDocument";
 import {
   resolveExplicitSpaceScope,
   resolveNamedSpaceOutsideSearch,
+  dominantRetrievalProfileId,
 } from "@/lib/vault/detectVaultScope";
+import { shouldWidenWorkspaceDocumentSearch } from "@/lib/vault/widenWorkspaceSearch";
 import { isOrgStyleProfile, type GuardianProfileType } from "@/lib/profiles/types";
 import { collaboratorDisplayName } from "@/lib/profiles/collaboratorDisplay";
 import { isGuardianPackEngineEnabled } from "@/lib/features/packs";
@@ -153,6 +155,10 @@ export type WorkspaceContextResult = {
   businessClaims?: GideonClaim[];
   /** Prefer as the user-facing answer for Business Pack BI intents. */
   businessAnswerDraft?: string | null;
+  /** This-space search was empty; this turn searched all accessible Spaces. */
+  widenedToAllSpaces?: boolean;
+  /** When widened (or cross-space) evidence mostly comes from one other Space. */
+  foundInSpace?: { profileId: string; profileName: string } | null;
 };
 
 /** Fetch retrieval results and formatted context blocks for Gideon. */
@@ -281,8 +287,42 @@ export async function loadWorkspaceContext(
     searchableChunkCount = count ?? 0;
   }
 
+  let widenedToAllSpaces = false;
+  const allAccessibleScopes: LinkedVaultProfile[] = scopeCandidates.map(
+    (p) => ({
+      id: p.id,
+      display_name: p.display_name,
+      profile_type:
+        p.profile_type ??
+        (activeProfile.profile_type as GuardianProfileType),
+    })
+  );
+
+  // Empty vault in the active Space — widen before embedding so we still search.
+  if (
+    shouldWidenWorkspaceDocumentSearch({
+      searchScope: meta.searchScope,
+      hasExplicitSpaceFocus: Boolean(explicitSpace || namedOutsideSpace),
+      retrievedChunkCount: 0,
+      accessibleProfileCount: allAccessibleScopes.length,
+      workspaceSearchProfileCount: searchProfileIds.length,
+    }) &&
+    searchableChunkCount === 0 &&
+    runDocumentSearch &&
+    !songListOnly
+  ) {
+    effectiveSearchIds = allAccessibleScopes.map((s) => s.id);
+    effectiveRetrievalScopes = allAccessibleScopes;
+    widenedToAllSpaces = true;
+    const { count } = await supabase
+      .from("document_chunks")
+      .select("id", { count: "exact", head: true })
+      .in("profile_id", effectiveSearchIds);
+    searchableChunkCount = count ?? 0;
+  }
+
   const embeddingStarted = Date.now();
-  const queryEmbedding =
+  let queryEmbedding =
     runDocumentSearch && searchableChunkCount > 0 && !songListOnly
       ? await embedQuery(documentRetrievalQuery).catch((embedErr) => {
           console.warn(
@@ -295,7 +335,7 @@ export async function loadWorkspaceContext(
   embeddingDurationMs = Date.now() - embeddingStarted;
 
   const matchCount = showPictures ? 10 : transcriptionMode ? 20 : 8;
-  const rollupScopes: LinkedVaultProfile[] = effectiveRetrievalScopes.map((scope) => ({
+  let rollupScopes: LinkedVaultProfile[] = effectiveRetrievalScopes.map((scope) => ({
     id: scope.id,
     display_name: scope.display_name,
     profile_type:
@@ -324,6 +364,49 @@ export async function loadWorkspaceContext(
         retrievedChunks,
         { maxDocuments: 3, maxChunks: 80 }
       );
+    }
+  }
+
+  // This-space search returned nothing — widen once and search everywhere.
+  if (
+    !widenedToAllSpaces &&
+    queryEmbedding &&
+    shouldWidenWorkspaceDocumentSearch({
+      searchScope: meta.searchScope,
+      hasExplicitSpaceFocus: Boolean(explicitSpace || namedOutsideSpace),
+      retrievedChunkCount: retrievedChunks.length,
+      accessibleProfileCount: allAccessibleScopes.length,
+      workspaceSearchProfileCount: searchProfileIds.length,
+    })
+  ) {
+    const widenStarted = Date.now();
+    const hybrid = await hybridRetrieveVaultChunks({
+      supabase,
+      query: documentRetrievalQuery,
+      queryEmbedding,
+      scopes: allAccessibleScopes,
+      finalTopK: matchCount,
+    });
+    retrievalDurationMs += Date.now() - widenStarted;
+    vectorCandidateCount = Math.max(vectorCandidateCount, hybrid.vectorCount);
+    keywordCandidateCount = Math.max(
+      keywordCandidateCount,
+      hybrid.keywordCount
+    );
+    mergedCandidateCount = Math.max(mergedCandidateCount, hybrid.mergedCount);
+    if (hybrid.results.length > 0) {
+      retrievedChunks = hybrid.results;
+      if (transcriptionMode) {
+        retrievedChunks = await expandTranscriptionDocumentChunks(
+          supabase,
+          retrievedChunks,
+          { maxDocuments: 3, maxChunks: 80 }
+        );
+      }
+      effectiveSearchIds = allAccessibleScopes.map((s) => s.id);
+      effectiveRetrievalScopes = allAccessibleScopes;
+      rollupScopes = allAccessibleScopes;
+      widenedToAllSpaces = true;
     }
   }
 
@@ -720,7 +803,9 @@ export async function loadWorkspaceContext(
 
   const allVaultsNote =
     explicitScopeNote +
-    (meta.searchScope === "global" && retrievalScopes.length > 1
+    (widenedToAllSpaces
+      ? `Nothing matched in the active space (${activeProfile.display_name}), so document search was widened to all accessible spaces for this turn (${effectiveRetrievalScopes.map((s) => s.display_name).join(", ")}). Attribute every fact to the correct space by name. Prefer answering from the matching space; do not invent that files live in ${activeProfile.display_name}.`
+      : meta.searchScope === "global" && retrievalScopes.length > 1
       ? `${GIDEON_CROSS_VAULT_NOTE}
 
 Active space in the UI: ${activeProfile.display_name}. Document search includes all ${retrievalScopes.length} spaces and workspaces you can access (${retrievalScopes.map((s) => s.display_name).join(", ")}).`
@@ -857,5 +942,19 @@ Active space in the UI: ${activeProfile.display_name}. Document search includes 
       forceDocumentSearch || forceNamedSpaceDocs
         ? null
         : (businessIntelligenceBundle?.userAnswerDraft ?? null),
+    widenedToAllSpaces,
+    foundInSpace: (() => {
+      const dominantId = dominantRetrievalProfileId(chunks);
+      if (!dominantId || dominantId === activeProfile.id) return null;
+      if (!widenedToAllSpaces && meta.searchScope !== "global") return null;
+      const match =
+        allAccessibleScopes.find((s) => s.id === dominantId) ??
+        scopeCandidates.find((s) => s.id === dominantId);
+      if (!match) return null;
+      return {
+        profileId: match.id,
+        profileName: match.display_name,
+      };
+    })(),
   };
 }

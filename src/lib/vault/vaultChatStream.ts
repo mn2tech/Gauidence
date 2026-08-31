@@ -76,6 +76,8 @@ export type VaultChatStreamDone = {
   writeProfile?: { profileId: string; profileName: string };
   chatScopedProfile?: { profileId: string; profileName: string } | null;
   actionTimeline?: ActionTimelineItem[];
+  foundInSpace?: { profileId: string; profileName: string } | null;
+  widenedToAllSpaces?: boolean;
 };
 
 export type VaultChatStreamEvent =
