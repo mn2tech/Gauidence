@@ -6,9 +6,7 @@ import {
   FileUp,
   GraduationCap,
   Home,
-  IdCard,
   Loader2,
-  MessageSquareText,
   NotebookPen,
   Sparkles,
   Users,
@@ -21,18 +19,22 @@ import {
   activationProgressIndex,
   categorizeFirstValueFacts,
   DEFAULT_SPACE_NAMES,
+  firstAskQuestionFromCategories,
+  firstKnowledgeCopy,
   firstValueCategoryLine,
   GUIDED_GIDEON_QUESTIONS,
   type ActivationStep,
   type FirstValueCategory,
 } from "@/lib/onboarding/activation";
 import {
+  suggestionKindForIntent,
   INTENT_OPTIONS,
   SCHOOL_INTENT_OPTIONS,
   type OnboardingIntent,
   type SchoolIntent,
 } from "@/lib/onboarding/intent";
 import { trackFunnelEvent } from "@/lib/onboarding/events";
+import { buildSampleDocumentFile } from "@/lib/onboarding/sampleDocument";
 import { timeOfDayGreeting } from "@/lib/simple-home/helpers";
 import {
   buildPastedTextFile,
@@ -50,7 +52,7 @@ type Props = {
   }) => void | Promise<void>;
 };
 
-type KnowledgeMode = "choose" | "note" | "tell" | "card";
+type KnowledgeMode = "choose" | "note";
 
 const CATEGORY_ICONS: Record<string, typeof Building2> = {
   business: Building2,
@@ -456,6 +458,20 @@ export default function ActivationFlow({ onComplete }: Props) {
 
   const categoryLabel =
     INTENT_OPTIONS.find((o) => o.id === intent)?.label ?? "Space";
+  const knowledgeCopy = firstKnowledgeCopy(intent, schoolIntent);
+
+  async function trySample() {
+    if (saving) return;
+    const kind = intent
+      ? suggestionKindForIntent(intent, schoolIntent)
+      : "personal";
+    trackFunnelEvent("sample_started", {
+      source: "activation",
+      intent: intent ?? null,
+    });
+    const file = buildSampleDocumentFile(kind);
+    await handleFile(file);
+  }
 
   return (
     <div className="flex min-h-[100dvh] flex-col bg-gradient-to-b from-brand-light/50 via-background to-background">
@@ -609,97 +625,68 @@ export default function ActivationFlow({ onComplete }: Props) {
             <div className="space-y-5">
               <div>
                 <h1 className="text-2xl font-bold tracking-tight">
-                  Give Guardian something to work with.
+                  {knowledgeCopy.headline}
                 </h1>
                 <p className="mt-2 text-sm text-ink-muted">
-                  Upload a contract, meeting notes, receipt, school document,
-                  business card, policy, proposal, or anything you may want
-                  Guardian to remember later.
+                  {knowledgeCopy.subcopy}
                 </p>
               </div>
 
               {knowledgeMode === "choose" ? (
-                <ul className="grid gap-2.5 sm:grid-cols-2">
-                  <li>
-                    <button
-                      type="button"
-                      disabled={saving}
-                      onClick={() => fileRef.current?.click()}
-                      className="flex h-full w-full flex-col gap-2 rounded-2xl border border-stone-200 bg-white p-4 text-left transition hover:border-brand hover:bg-brand-light/30 disabled:opacity-60"
-                    >
-                      <FileUp className="h-5 w-5 text-brand" />
-                      <span className="text-sm font-semibold">
-                        Upload a document
-                      </span>
-                      <span className="text-xs text-ink-muted">
-                        PDF, photo, or file
-                      </span>
-                    </button>
-                    <input
-                      ref={fileRef}
-                      type="file"
-                      accept={VAULT_FILE_ACCEPT}
-                      className="hidden"
-                      onChange={(e) => {
-                        const f = e.target.files?.[0] ?? null;
-                        e.target.value = "";
-                        void handleFile(f);
-                      }}
-                    />
-                  </li>
-                  <li>
-                    <button
-                      type="button"
-                      disabled={saving}
-                      onClick={() => setKnowledgeMode("note")}
-                      className="flex h-full w-full flex-col gap-2 rounded-2xl border border-stone-200 bg-white p-4 text-left transition hover:border-brand hover:bg-brand-light/30 disabled:opacity-60"
-                    >
-                      <NotebookPen className="h-5 w-5 text-brand" />
-                      <span className="text-sm font-semibold">Add a note</span>
-                      <span className="text-xs text-ink-muted">
-                        Quick text Guardian can remember
-                      </span>
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      type="button"
-                      disabled={saving}
-                      onClick={() => {
-                        setKnowledgeMode("card");
-                        fileRef.current?.click();
-                      }}
-                      className="flex h-full w-full flex-col gap-2 rounded-2xl border border-stone-200 bg-white p-4 text-left transition hover:border-brand hover:bg-brand-light/30 disabled:opacity-60"
-                    >
-                      <IdCard className="h-5 w-5 text-brand" />
-                      <span className="text-sm font-semibold">
-                        Scan a business card
-                      </span>
-                      <span className="text-xs text-ink-muted">
-                        Photo of a card or contact
-                      </span>
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      type="button"
-                      disabled={saving}
-                      onClick={() => setKnowledgeMode("tell")}
-                      className="flex h-full w-full flex-col gap-2 rounded-2xl border border-stone-200 bg-white p-4 text-left transition hover:border-brand hover:bg-brand-light/30 disabled:opacity-60"
-                    >
-                      <MessageSquareText className="h-5 w-5 text-brand" />
-                      <span className="text-sm font-semibold">
-                        Tell Gideon something
-                      </span>
-                      <span className="text-xs text-ink-muted">
-                        A fact, commitment, or reminder
-                      </span>
-                    </button>
-                  </li>
-                </ul>
+                <div className="space-y-3">
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={() => fileRef.current?.click()}
+                    className="flex w-full flex-col gap-1 rounded-2xl border border-brand/30 bg-brand-light/40 p-4 text-left transition hover:border-brand hover:bg-brand-light/60 disabled:opacity-60"
+                  >
+                    <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                      <FileUp className="h-5 w-5 text-brand" aria-hidden />
+                      {knowledgeCopy.uploadLabel}
+                    </span>
+                    <span className="pl-7 text-xs text-ink-muted">
+                      {knowledgeCopy.uploadHint}
+                    </span>
+                  </button>
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept={VAULT_FILE_ACCEPT}
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0] ?? null;
+                      e.target.value = "";
+                      void handleFile(f);
+                    }}
+                  />
+
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={() => setKnowledgeMode("note")}
+                    className="flex w-full flex-col gap-1 rounded-2xl border border-stone-200 bg-white p-4 text-left transition hover:border-brand hover:bg-brand-light/30 disabled:opacity-60"
+                  >
+                    <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                      <NotebookPen className="h-5 w-5 text-brand" aria-hidden />
+                      Add a quick note instead
+                    </span>
+                    <span className="pl-7 text-xs text-ink-muted">
+                      No file needed — type one fact or reminder
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={() => void trySample()}
+                    className="w-full rounded-xl border border-dashed border-stone-300 bg-white px-4 py-3 text-sm font-medium text-brand hover:border-brand hover:bg-brand-light/30 disabled:opacity-60"
+                  >
+                    {knowledgeCopy.sampleLabel}
+                  </button>
+                </div>
               ) : null}
 
-              {(knowledgeMode === "note" || knowledgeMode === "tell") && (
+              {knowledgeMode === "note" ? (
                 <div className="space-y-3">
                   <button
                     type="button"
@@ -711,28 +698,36 @@ export default function ActivationFlow({ onComplete }: Props) {
                   >
                     ← Back
                   </button>
+                  <div className="flex flex-wrap gap-2">
+                    {knowledgeCopy.starters.map((starter) => (
+                      <button
+                        key={starter}
+                        type="button"
+                        disabled={saving}
+                        onClick={() => setNoteText(starter)}
+                        className="rounded-full border border-stone-200 bg-white px-3 py-1.5 text-left text-xs font-medium text-foreground transition hover:border-brand hover:bg-brand-light/40 disabled:opacity-60"
+                      >
+                        {starter.length > 42
+                          ? `${starter.slice(0, 40)}…`
+                          : starter}
+                      </button>
+                    ))}
+                  </div>
                   <textarea
                     value={noteText}
                     onChange={(e) => setNoteText(e.target.value)}
-                    rows={5}
+                    rows={4}
                     className="w-full resize-none rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm outline-none ring-brand focus:ring-2"
-                    placeholder={
-                      knowledgeMode === "tell"
-                        ? "e.g. Follow up with Maya about the proposal by Friday."
-                        : "Type a note Guardian should remember…"
-                    }
+                    placeholder={knowledgeCopy.notePlaceholder}
                   />
                   <button
                     type="button"
                     disabled={saving || !noteText.trim()}
                     onClick={() =>
                       void submitTextItem({
-                        title:
-                          knowledgeMode === "tell"
-                            ? "Told Gideon"
-                            : "First note",
+                        title: "First note",
                         content: noteText,
-                        source: knowledgeMode,
+                        source: "note",
                       })
                     }
                     className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-60"
@@ -745,7 +740,7 @@ export default function ActivationFlow({ onComplete }: Props) {
                     Save for Guardian
                   </button>
                 </div>
-              )}
+              ) : null}
 
               {statusLabel ? (
                 <p className="flex items-center gap-2 text-sm text-ink-muted">
@@ -808,7 +803,11 @@ export default function ActivationFlow({ onComplete }: Props) {
                     <button
                       type="button"
                       disabled={saving}
-                      onClick={() => setStep("ask_gideon")}
+                      onClick={() =>
+                        void finishAndAsk(
+                          firstAskQuestionFromCategories(categories)
+                        )
+                      }
                       className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-60"
                     >
                       <Sparkles className="h-4 w-4" aria-hidden />

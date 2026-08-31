@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import {
   activationProgressIndex,
   categorizeFirstValueFacts,
+  firstAskQuestionFromCategories,
+  firstKnowledgeCopy,
   firstValueCategoryLine,
 } from "../activation.ts";
 
@@ -36,5 +38,33 @@ describe("activation first-value categories", () => {
     assert.equal(activationProgressIndex("add_knowledge"), 1);
     assert.equal(activationProgressIndex("ask_gideon"), 2);
     assert.equal(activationProgressIndex("completed"), 3);
+  });
+
+  it("tunes first-knowledge copy by intent", () => {
+    const family = firstKnowledgeCopy("family");
+    assert.match(family.uploadLabel, /flyer|schedule/i);
+    assert.ok(family.starters.length >= 2);
+
+    const biz = firstKnowledgeCopy("business");
+    assert.match(biz.uploadLabel, /invoice|contract/i);
+    assert.match(biz.sampleLabel, /receipt/i);
+  });
+
+  it("picks first Ask question from found categories", () => {
+    assert.equal(
+      firstAskQuestionFromCategories([
+        {
+          id: "dates",
+          label: "important dates",
+          count: 1,
+          samples: [],
+        },
+      ]),
+      "What are the important dates?"
+    );
+    assert.match(
+      firstAskQuestionFromCategories([]),
+      /important dates|commitments|people|follow/i
+    );
   });
 });
