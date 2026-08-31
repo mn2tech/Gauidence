@@ -3051,6 +3051,9 @@ export default function VaultChatPanel({
         }
         if (body.widenedToAllSpaces) {
           setSpaceSwitchToast("Searched all your spaces");
+          setMeta((prev) =>
+            prev ? { ...prev, chatScopedProfile: null } : prev
+          );
         }
         if (
           body.foundInSpace?.profileId &&

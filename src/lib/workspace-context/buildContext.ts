@@ -96,7 +96,10 @@ import {
   resolveNamedSpaceOutsideSearch,
   dominantRetrievalProfileId,
 } from "@/lib/vault/detectVaultScope";
-import { shouldWidenWorkspaceDocumentSearch } from "@/lib/vault/widenWorkspaceSearch";
+import {
+  shouldWidenAfterFocusedSpaceMiss,
+  shouldWidenWorkspaceDocumentSearch,
+} from "@/lib/vault/widenWorkspaceSearch";
 import { isOrgStyleProfile, type GuardianProfileType } from "@/lib/profiles/types";
 import { collaboratorDisplayName } from "@/lib/profiles/collaboratorDisplay";
 import { isGuardianPackEngineEnabled } from "@/lib/features/packs";
@@ -319,6 +322,26 @@ export async function loadWorkspaceContext(
       .select("id", { count: "exact", head: true })
       .in("profile_id", effectiveSearchIds);
     searchableChunkCount = count ?? 0;
+  } else if (
+    shouldWidenAfterFocusedSpaceMiss({
+      hadNamedSpaceFocus: Boolean(explicitSpace || namedOutsideSpace),
+      retrievedChunkCount: 0,
+      accessibleProfileCount: allAccessibleScopes.length,
+      focusedSearchProfileCount: effectiveSearchIds.length,
+    }) &&
+    searchableChunkCount === 0 &&
+    runDocumentSearch &&
+    !songListOnly
+  ) {
+    effectiveSearchIds = allAccessibleScopes.map((s) => s.id);
+    effectiveRetrievalScopes = allAccessibleScopes;
+    focusedSpaceName = null;
+    widenedToAllSpaces = true;
+    const { count } = await supabase
+      .from("document_chunks")
+      .select("id", { count: "exact", head: true })
+      .in("profile_id", effectiveSearchIds);
+    searchableChunkCount = count ?? 0;
   }
 
   const embeddingStarted = Date.now();
@@ -406,6 +429,51 @@ export async function loadWorkspaceContext(
       effectiveSearchIds = allAccessibleScopes.map((s) => s.id);
       effectiveRetrievalScopes = allAccessibleScopes;
       rollupScopes = allAccessibleScopes;
+      widenedToAllSpaces = true;
+    }
+  }
+
+  // Named-Space focus (e.g. Searching Tesla) missed — don't dead-end; search all.
+  const focusedBeforeWiden = Boolean(explicitSpace || namedOutsideSpace);
+  const focusedIdCount = effectiveSearchIds.length;
+  if (
+    !widenedToAllSpaces &&
+    queryEmbedding &&
+    shouldWidenAfterFocusedSpaceMiss({
+      hadNamedSpaceFocus: focusedBeforeWiden,
+      retrievedChunkCount: retrievedChunks.length,
+      accessibleProfileCount: allAccessibleScopes.length,
+      focusedSearchProfileCount: focusedIdCount,
+    })
+  ) {
+    const widenStarted = Date.now();
+    const hybrid = await hybridRetrieveVaultChunks({
+      supabase,
+      query: documentRetrievalQuery,
+      queryEmbedding,
+      scopes: allAccessibleScopes,
+      finalTopK: matchCount,
+    });
+    retrievalDurationMs += Date.now() - widenStarted;
+    vectorCandidateCount = Math.max(vectorCandidateCount, hybrid.vectorCount);
+    keywordCandidateCount = Math.max(
+      keywordCandidateCount,
+      hybrid.keywordCount
+    );
+    mergedCandidateCount = Math.max(mergedCandidateCount, hybrid.mergedCount);
+    if (hybrid.results.length > 0) {
+      retrievedChunks = hybrid.results;
+      if (transcriptionMode) {
+        retrievedChunks = await expandTranscriptionDocumentChunks(
+          supabase,
+          retrievedChunks,
+          { maxDocuments: 3, maxChunks: 80 }
+        );
+      }
+      effectiveSearchIds = allAccessibleScopes.map((s) => s.id);
+      effectiveRetrievalScopes = allAccessibleScopes;
+      rollupScopes = allAccessibleScopes;
+      focusedSpaceName = null;
       widenedToAllSpaces = true;
     }
   }

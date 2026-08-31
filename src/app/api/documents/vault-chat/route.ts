@@ -1996,6 +1996,9 @@ export async function POST(request: Request) {
   } = {
     updated_at: new Date().toISOString(),
   };
+  if (widenedToAllSpaces) {
+    chatUpdates.scoped_profile_id = null;
+  }
   if (
     shouldGenerateVaultChatTitle({ isFirstExchange, question })
   ) {
@@ -2025,11 +2028,13 @@ export async function POST(request: Request) {
   const chats = await listChats(supabase, user.id, active.id);
   const proposedReminder = parseProposedReminder(answer, Date.now(), userTz);
   const newlyGranted = await refreshUserAwards(user.id, supabase);
-  const persistedChatScopedProfile = chatScopedProfilePayload({
-    scopedProfileId: chatScopedProfileId,
-    accessibleProfiles: scopeCandidates,
-    chatHomeProfileId,
-  });
+  const persistedChatScopedProfile = widenedToAllSpaces
+    ? null
+    : chatScopedProfilePayload({
+        scopedProfileId: chatScopedProfileId,
+        accessibleProfiles: scopeCandidates,
+        chatHomeProfileId,
+      });
 
   return NextResponse.json({
     chatId,
