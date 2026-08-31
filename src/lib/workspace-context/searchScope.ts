@@ -95,14 +95,13 @@ export function searchScopeHint(
   spaceName: string
 ): string {
   if (mode === "global") {
-    return `Answers can come from any space you can access. New files still save in ${spaceName}.`;
+    return `Answers can come from any space you can access. This chat still saves in ${spaceName}.`;
   }
-  return "Answers come only from this space.";
+  return `Answers come only from this space. This chat saves in ${spaceName}.`;
 }
 
 export const SEARCH_SCOPE_FIRST_HINT =
-  "You have more than one space. Stay in this one, or search all of them? New files always save here.";
-
+  "You have more than one space. Stay in this one, or search all of them? This chat always saves in the space you're in.";
 export function formatSearchConfidence(score: number): string {
   const pct = Math.round(Math.max(0, Math.min(100, score)));
   return `${pct}%`;

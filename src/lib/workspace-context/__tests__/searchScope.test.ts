@@ -65,11 +65,11 @@ describe("searchScopeHint", () => {
   it("explains this-space vs all-spaces in one line", () => {
     assert.equal(
       searchScopeHint("workspace", "NM2TECH"),
-      "Answers come only from this space."
+      "Answers come only from this space. This chat saves in NM2TECH."
     );
     assert.equal(
       searchScopeHint("global", "NM2TECH"),
-      "Answers can come from any space you can access. New files still save in NM2TECH."
+      "Answers can come from any space you can access. This chat still saves in NM2TECH."
     );
   });
 });

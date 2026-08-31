@@ -360,6 +360,45 @@ export function resolveNamedSpaceOutsideSearch(args: {
 }
 
 /**
+ * When the question clearly names another Space than the active one, suggest
+ * continuing there so chat memory lands on the right Space (even if All spaces
+ * search already answered correctly).
+ */
+export function resolveChatMemorySpaceSuggestion(args: {
+  question: string;
+  activeProfileId: string;
+  accessibleProfiles: VaultScopeCandidate[];
+}): VaultScopeCandidate | null {
+  const activeId = args.activeProfileId.trim();
+  if (!activeId || args.accessibleProfiles.length < 2) return null;
+
+  const explicit = resolveExplicitSpaceScope({
+    question: args.question,
+    accessibleProfiles: args.accessibleProfiles,
+  });
+  if (explicit && explicit.id !== activeId) return explicit;
+
+  const active =
+    args.accessibleProfiles.find((p) => p.id === activeId) ?? null;
+  // Already in the named Space — don't nudge toward a longer name that shares
+  // a first token (e.g. "Nolan's test" while in Nolan → not Nolan Smith).
+  if (
+    active &&
+    profileMentionedInQuestion(args.question, active.display_name)
+  ) {
+    return null;
+  }
+
+  const others = args.accessibleProfiles.filter((p) => p.id !== activeId);
+  if (others.length === 0) return null;
+
+  return detectMentionedVault({
+    question: args.question,
+    accessibleProfiles: others,
+  });
+}
+
+/**
  * Vault profiles Gideon searches when answering in a chat thread.
  * workspace = chat home (+ optional scoped vault); global = every accessible vault.
  */

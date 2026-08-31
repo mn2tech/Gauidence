@@ -29,13 +29,17 @@ export const ASK_GIDEON_PATH = "/ask";
 export function askSpaceHref(
   profileId: string,
   searchParams: URLSearchParams,
-  options?: { clearChat?: boolean }
+  options?: { clearChat?: boolean; draft?: string | null }
 ): string {
   const params = new URLSearchParams(searchParams.toString());
   params.set("profileId", profileId);
   if (options?.clearChat) {
     params.delete("chatId");
     params.delete("draft");
+  }
+  const draft = options?.draft?.trim();
+  if (draft) {
+    params.set("draft", draft);
   }
   const qs = params.toString();
   return `${ASK_GIDEON_PATH}${qs ? `?${qs}` : ""}`;

@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ClipboardEvent,
@@ -127,6 +128,7 @@ import {
   type VaultUploadResult,
 } from "@/lib/vault/clientUpload";
 import SmartUploadSuggestionCard from "@/components/SmartUploadSuggestionCard";
+import SpaceContinueBanner from "@/components/SpaceContinueBanner";
 import WorkspaceContextBar from "@/components/WorkspaceContextBar";
 import GlobalVaultSearch from "@/components/GlobalVaultSearch";
 import { buildWorkingInDisplay } from "@/lib/workspace-context/client";
@@ -136,6 +138,7 @@ import {
   shouldPromptSmartUpload,
 } from "@/lib/actions/client";
 import { recordClientActionEvent } from "@/lib/actions/client";
+import { resolveChatMemorySpaceSuggestion } from "@/lib/vault/detectVaultScope";
 import ProfileSetupHub from "@/components/ProfileSetupHub";
 import AskGideonSidebar from "@/components/AskGideonSidebar";
 import { todayLogDate } from "@/lib/logs/types";
@@ -896,6 +899,10 @@ export default function VaultChatPanel({
   const [logTitle, setLogTitle] = useState("");
   const [logContent, setLogContent] = useState("");
   const [savingLog, setSavingLog] = useState(false);
+  const [dismissedSpaceContinueKey, setDismissedSpaceContinueKey] = useState<
+    string | null
+  >(null);
+  const [continuingInSpace, setContinuingInSpace] = useState(false);
   const lastWriteProfileIdRef = useRef<string | null>(null);
   const [reminderOpen, setReminderOpen] = useState(false);
   const [reminderTargetProfileId, setReminderTargetProfileId] = useState<
@@ -1101,7 +1108,10 @@ export default function VaultChatPanel({
     scopedProfileId ?? active?.id ?? meta?.profileId ?? null;
 
   const syncAskProfileUrl = useCallback(
-    (profileId: string, options?: { clearChat?: boolean }) => {
+    (
+      profileId: string,
+      options?: { clearChat?: boolean; draft?: string | null }
+    ) => {
       if (isScopedPanel || isDrawer) return;
       ignoreUrlProfileRef.current = true;
       router.replace(askSpaceHref(profileId, searchParams, options), {
@@ -4578,6 +4588,88 @@ export default function VaultChatPanel({
     />
   );
 
+  const lastUserMessageForSpaceHint = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      if (m?.role === "user" && m.content.trim()) return m;
+    }
+    return null;
+  }, [messages]);
+
+  const spaceContinueSuggestion = useMemo(() => {
+    if (!lastUserMessageForSpaceHint || !effectiveProfile) return null;
+    if (profiles.length < 2) return null;
+    if (streamingAssistantId || sending || vaultBusy) return null;
+    const suggested = resolveChatMemorySpaceSuggestion({
+      question: lastUserMessageForSpaceHint.content,
+      activeProfileId: effectiveProfile.id,
+      accessibleProfiles: profiles.map((p) => ({
+        id: p.id,
+        display_name: p.display_name,
+        profile_type: p.profile_type,
+      })),
+    });
+    if (!suggested) return null;
+    const dismissKey = `${lastUserMessageForSpaceHint.id}:${suggested.id}`;
+    if (dismissedSpaceContinueKey === dismissKey) return null;
+    return {
+      suggested,
+      question: lastUserMessageForSpaceHint.content.trim(),
+      dismissKey,
+      activeName: effectiveProfile.display_name,
+    };
+  }, [
+    lastUserMessageForSpaceHint,
+    effectiveProfile,
+    profiles,
+    streamingAssistantId,
+    sending,
+    vaultBusy,
+    dismissedSpaceContinueKey,
+  ]);
+
+  const handleContinueInSuggestedSpace = useCallback(async () => {
+    if (!spaceContinueSuggestion) return;
+    const { suggested, question, dismissKey } = spaceContinueSuggestion;
+    setDismissedSpaceContinueKey(dismissKey);
+    setContinuingInSpace(true);
+    try {
+      const ok = await switchProfile(suggested.id);
+      if (!ok) {
+        setError("Couldn't switch spaces. Try again from the Switch menu.");
+        return;
+      }
+      setMeta((prev) =>
+        prev
+          ? {
+              ...prev,
+              chatScopedProfile: null,
+              searchScope: "workspace",
+            }
+          : prev
+      );
+      if (isDrawer || scopedProfileId) {
+        if (typeof window !== "undefined") {
+          const params = new URLSearchParams({
+            profileId: suggested.id,
+            draft: question,
+          });
+          window.location.href = `/ask?${params.toString()}`;
+        }
+        return;
+      }
+      syncAskProfileUrl(suggested.id, { clearChat: true, draft: question });
+    } finally {
+      setContinuingInSpace(false);
+    }
+  }, [
+    spaceContinueSuggestion,
+    switchProfile,
+    isDrawer,
+    scopedProfileId,
+    syncAskProfileUrl,
+  ]);
+
   const messageList = (
     <div
       className={
@@ -4702,6 +4794,17 @@ export default function VaultChatPanel({
                 );
               })()
             : null}
+          {spaceContinueSuggestion ? (
+            <SpaceContinueBanner
+              activeSpaceName={spaceContinueSuggestion.activeName}
+              suggestedSpaceName={spaceContinueSuggestion.suggested.display_name}
+              busy={continuingInSpace}
+              onContinue={() => void handleContinueInSuggestedSpace()}
+              onStay={() =>
+                setDismissedSpaceContinueKey(spaceContinueSuggestion.dismissKey)
+              }
+            />
+          ) : null}
           {(sending || vaultBusy || savingLog) && !streamingAssistantId && (
             <div className="flex items-center gap-2 text-xs text-ink-muted">
               <GideonAvatar size={40} variant="portrait" pulse />

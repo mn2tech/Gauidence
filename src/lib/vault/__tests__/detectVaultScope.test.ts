@@ -9,6 +9,7 @@ import {
   resolveExplicitSpaceScope,
   resolveGideonWriteVault,
   resolveNamedSpaceOutsideSearch,
+  resolveChatMemorySpaceSuggestion,
 } from "../detectVaultScope";
 
 const profiles = [
@@ -231,6 +232,60 @@ describe("resolveNamedSpaceOutsideSearch", () => {
         currentSearchProfileIds: ["nm2", "kendall"],
       }),
       null
+    );
+  });
+});
+
+describe("resolveChatMemorySpaceSuggestion", () => {
+  it("suggests Nolan while chatting from Mini Cooper / All spaces", () => {
+    const spaces = [
+      {
+        id: "mini",
+        display_name: "Mini Cooper",
+        profile_type: "vehicle" as const,
+      },
+      { id: "nolan", display_name: "Nolan", profile_type: "child" as const },
+    ];
+    assert.deepEqual(
+      resolveChatMemorySpaceSuggestion({
+        question: "How did Nolan do on his spelling test?",
+        activeProfileId: "mini",
+        accessibleProfiles: spaces,
+      }),
+      { id: "nolan", display_name: "Nolan", profile_type: "child" }
+    );
+  });
+
+  it("returns null when the mentioned Space is already active", () => {
+    assert.equal(
+      resolveChatMemorySpaceSuggestion({
+        question: "How did Nolan do on his spelling test?",
+        activeProfileId: "nolan",
+        accessibleProfiles: profiles,
+      }),
+      null
+    );
+  });
+
+  it("does not nudge to a longer name sharing the active Space token", () => {
+    assert.equal(
+      resolveChatMemorySpaceSuggestion({
+        question: "Nolan's spelling list for Friday",
+        activeProfileId: "nolan",
+        accessibleProfiles: profiles,
+      }),
+      null
+    );
+  });
+
+  it("honors explicit in-my-X-space phrasing", () => {
+    assert.deepEqual(
+      resolveChatMemorySpaceSuggestion({
+        question: "In my Nolan space, what homework is due?",
+        activeProfileId: "personal",
+        accessibleProfiles: profiles,
+      }),
+      { id: "nolan", display_name: "Nolan" }
     );
   });
 });
