@@ -8,6 +8,7 @@ import {
   Copy,
   Loader2,
   Mail,
+  RefreshCw,
   UserMinus,
   UserPlus,
   Users,
@@ -160,6 +161,36 @@ export default function CollaboratorsPanel({
         const body = (await res.json().catch(() => ({}))) as { error?: string };
         setError(body.error ?? "Couldn't revoke invitation.");
         return;
+      }
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const resendInvite = async (invitationId: string) => {
+    setBusy(true);
+    setError(null);
+    setLastInviteUrl(null);
+    try {
+      const res = await fetch(
+        `/api/profiles/${profileId}/collaborators/invitations/${invitationId}`,
+        { method: "POST" }
+      );
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        acceptUrl?: string;
+        emailed?: boolean;
+      };
+      if (!res.ok) {
+        setError(body.error ?? "Couldn't resend invitation.");
+        return;
+      }
+      setLastInviteUrl(body.acceptUrl ?? null);
+      if (!body.emailed && body.acceptUrl) {
+        setError(
+          "New link ready, but email couldn't be sent. Copy the link below and share it."
+        );
       }
       await load();
     } finally {
@@ -423,11 +454,14 @@ export default function CollaboratorsPanel({
       {invitations.length > 0 ? (
         <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
           <h2 className="text-sm font-semibold">Pending invitations</h2>
+          <p className="mt-1 text-xs text-ink-muted">
+            If their old link says invalid, tap Resend and share the new link.
+          </p>
           <ul className="mt-3 divide-y divide-stone-100">
             {invitations.map((inv) => (
               <li
                 key={inv.id}
-                className="flex items-center justify-between gap-3 py-3"
+                className="flex flex-wrap items-center justify-between gap-3 py-3"
               >
                 <div className="min-w-0">
                   <p className="flex items-center gap-1.5 truncate text-sm font-medium">
@@ -439,15 +473,26 @@ export default function CollaboratorsPanel({
                     {new Date(inv.expiresAt).toLocaleDateString()}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void revokeInvite(inv.id)}
-                  aria-label={`Revoke invite to ${inv.email}`}
-                  className="rounded-full p-1.5 text-ink-muted hover:bg-stone-100 hover:text-foreground disabled:opacity-50"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void resendInvite(inv.id)}
+                    className="inline-flex items-center gap-1 rounded-full border border-stone-300 px-2.5 py-1 text-xs font-medium text-foreground hover:bg-stone-50 disabled:opacity-50"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    Resend
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void revokeInvite(inv.id)}
+                    aria-label={`Revoke invite to ${inv.email}`}
+                    className="rounded-full p-1.5 text-ink-muted hover:bg-stone-100 hover:text-foreground disabled:opacity-50"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
               </li>
             ))}
           </ul>

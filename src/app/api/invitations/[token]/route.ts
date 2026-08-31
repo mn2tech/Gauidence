@@ -63,15 +63,73 @@ export async function GET(_request: Request, ctx: Ctx) {
     .eq("token_hash", tokenHash)
     .maybeSingle();
 
-  if (!invite || invite.revoked_at || invite.accepted_at) {
+  if (!invite) {
     return NextResponse.json(
-      { error: "This invitation is invalid or has already been used." },
+      {
+        error: "This invitation link isn't valid.",
+        code: "invite_not_found",
+        hint: "Ask the vault owner to open Collaborators and tap Resend invite for a fresh link.",
+      },
+      { status: 404 }
+    );
+  }
+
+  if (invite.revoked_at || invite.accepted_at) {
+    // Already used/revoked: if the signed-in user is already a member, send them in.
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = supabase ? await supabase.auth.getUser() : { data: { user: null } };
+
+    if (user) {
+      const { data: membership } = await admin
+        .from("guardian_profile_members")
+        .select("role")
+        .eq("profile_id", invite.profile_id)
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (membership) {
+        const { data: profile } = await admin
+          .from("guardian_profiles")
+          .select("display_name, profile_type, parent_profile_id")
+          .eq("id", invite.profile_id)
+          .maybeSingle();
+        const profileType = profile?.profile_type ?? "business";
+        return NextResponse.json({
+          alreadyMember: true,
+          vaultName: profile?.display_name ?? "Shared vault",
+          profileId: invite.profile_id,
+          profileType,
+          redirectTo: inviteAcceptLandingPath({
+            profileId: invite.profile_id,
+            profileType,
+            parentProfileId: profile?.parent_profile_id,
+            role: membership.role as string,
+            simpleHome: canAccessSimpleHome({ email: user.email }),
+          }),
+        });
+      }
+    }
+
+    return NextResponse.json(
+      {
+        error: invite.accepted_at
+          ? "This invitation was already used."
+          : "This invitation was revoked.",
+        code: invite.accepted_at ? "invite_used" : "invite_revoked",
+        hint: "Ask the vault owner to Resend invite from Collaborators for a new link.",
+      },
       { status: 404 }
     );
   }
   if (new Date(invite.expires_at).getTime() < Date.now()) {
     return NextResponse.json(
-      { error: "This invitation has expired." },
+      {
+        error: "This invitation has expired.",
+        code: "invite_expired",
+        hint: "Ask the vault owner to Resend invite from Collaborators.",
+      },
       { status: 410 }
     );
   }
@@ -124,8 +182,53 @@ export async function POST(_request: Request, ctx: Ctx) {
     .maybeSingle();
 
   if (!invite || invite.revoked_at || invite.accepted_at) {
+    // Idempotent: already accepted and still a member → open the vault.
+    if (invite && (invite.accepted_at || invite.revoked_at) && user) {
+      const { data: membership } = await admin
+        .from("guardian_profile_members")
+        .select("role")
+        .eq("profile_id", invite.profile_id)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (membership) {
+        const { data: profile } = await admin
+          .from("guardian_profiles")
+          .select("profile_type, parent_profile_id")
+          .eq("id", invite.profile_id)
+          .maybeSingle();
+        const profileType = profile?.profile_type ?? "business";
+        await setActiveGuardianProfile(supabase, user.id, invite.profile_id);
+        if (profileType === "family") {
+          const { cascadeMembershipToFamilyChildren } = await import(
+            "@/lib/profiles/cascadeMembership"
+          );
+          await cascadeMembershipToFamilyChildren(admin, {
+            familyProfileId: invite.profile_id,
+            userId: user.id,
+            role: membership.role as string,
+            invitedBy: invite.invited_by_user_id,
+          });
+        }
+        return NextResponse.json({
+          ok: true,
+          alreadyMember: true,
+          profileId: invite.profile_id,
+          profileType,
+          redirectTo: inviteAcceptLandingPath({
+            profileId: invite.profile_id,
+            profileType,
+            parentProfileId: profile?.parent_profile_id,
+            role: membership.role as string,
+            simpleHome: canAccessSimpleHome({ email: user.email }),
+          }),
+        });
+      }
+    }
     return NextResponse.json(
-      { error: "This invitation is invalid or has already been used." },
+      {
+        error: "This invitation is invalid or has already been used.",
+        hint: "Ask the vault owner to Resend invite from Collaborators.",
+      },
       { status: 404 }
     );
   }
