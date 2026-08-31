@@ -139,6 +139,10 @@ import {
 } from "@/lib/actions/client";
 import { recordClientActionEvent } from "@/lib/actions/client";
 import { resolveChatMemorySpaceSuggestion } from "@/lib/vault/detectVaultScope";
+import {
+  consumeSpaceSwitchNote,
+  rememberSpaceSwitchNote,
+} from "@/lib/vault/spaceSwitchNoteClient";
 import ProfileSetupHub from "@/components/ProfileSetupHub";
 import AskGideonSidebar from "@/components/AskGideonSidebar";
 import { todayLogDate } from "@/lib/logs/types";
@@ -903,6 +907,7 @@ export default function VaultChatPanel({
     string | null
   >(null);
   const [continuingInSpace, setContinuingInSpace] = useState(false);
+  const [spaceSwitchToast, setSpaceSwitchToast] = useState<string | null>(null);
   const lastWriteProfileIdRef = useRef<string | null>(null);
   const [reminderOpen, setReminderOpen] = useState(false);
   const [reminderTargetProfileId, setReminderTargetProfileId] = useState<
@@ -1059,9 +1064,18 @@ export default function VaultChatPanel({
   sendingRef.current = sending;
   activeChatIdRef.current = activeChatId;
   const workProjectPrefillDone = useRef(false);
-  const sendQuestionRef = useRef<(questionRaw: string) => Promise<void>>(
-    async () => {}
-  );
+  const sendQuestionRef = useRef<
+    (
+      questionRaw: string,
+      options?: {
+        attachment?: VaultMessageAttachment;
+        userDisplayContent?: string;
+        replaceUserMessageId?: string;
+        regenerateAssistantId?: string;
+        skipSpaceAutoRoute?: boolean;
+      }
+    ) => Promise<void>
+  >(async () => {});
   const inputId = isPage
     ? "ask-gideon-page-input"
     : isDrawer
@@ -1170,7 +1184,7 @@ export default function VaultChatPanel({
       const next = `${window.location.pathname}${qs ? `?${qs}` : ""}`;
       window.history.replaceState(window.history.state, "", next);
     }
-    void sendQuestionRef.current(draft);
+    void sendQuestionRef.current(draft, { skipSpaceAutoRoute: true });
   }, [
     requestedDraft,
     isScopedPanel,
@@ -2785,10 +2799,82 @@ export default function VaultChatPanel({
       userDisplayContent?: string;
       replaceUserMessageId?: string;
       regenerateAssistantId?: string;
+      /** Skip named-Space auto-route (already on the right Space). */
+      skipSpaceAutoRoute?: boolean;
     }
   ) => {
     const question = questionRaw.trim();
-    if (!question || sending || vaultBusy) return;
+    if (!question || sending || vaultBusy || continuingInSpace) return;
+
+    // Approach A: if the question clearly names another Space, switch there
+    // first so the answer and chat memory land together.
+    if (
+      !options?.skipSpaceAutoRoute &&
+      !options?.attachment &&
+      !options?.regenerateAssistantId &&
+      !options?.replaceUserMessageId &&
+      !isScopedPanel &&
+      profiles.length > 1 &&
+      effectiveProfile
+    ) {
+      const suggested = resolveChatMemorySpaceSuggestion({
+        question,
+        activeProfileId: effectiveProfile.id,
+        accessibleProfiles: profiles.map((p) => ({
+          id: p.id,
+          display_name: p.display_name,
+          profile_type: p.profile_type,
+        })),
+      });
+      if (suggested && suggested.id !== effectiveProfile.id) {
+        setInput("");
+        setError(null);
+        setContinuingInSpace(true);
+        setLoadingLabel(`Switching to ${suggested.display_name}…`);
+        try {
+          const ok = await switchProfile(suggested.id);
+          if (!ok) {
+            setError(
+              `Couldn't switch to ${suggested.display_name}. Try Switch in the header.`
+            );
+            setInput(question);
+            return;
+          }
+          rememberSpaceSwitchNote(suggested.display_name);
+          setMeta((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  chatScopedProfile: null,
+                  searchScope: "workspace",
+                }
+              : prev
+          );
+          if (isDrawer || scopedProfileId) {
+            if (typeof window !== "undefined") {
+              const params = new URLSearchParams({
+                profileId: suggested.id,
+                draft: question,
+              });
+              window.location.href = `/ask?${params.toString()}`;
+            }
+            return;
+          }
+          syncAskProfileUrl(suggested.id, {
+            clearChat: true,
+            draft: question,
+          });
+        } finally {
+          setContinuingInSpace(false);
+        }
+        return;
+      }
+    }
+
+    const switchedToName = consumeSpaceSwitchNote();
+    if (switchedToName) {
+      setSpaceSwitchToast(switchedToName);
+    }
 
     if (!onboardingProgress.hasAskedGideon) {
       trackOnboardingEvent("first_gideon_ask", {
@@ -3169,7 +3255,14 @@ export default function VaultChatPanel({
     e.preventDefault();
     const question = input.trim();
     const attachment = pendingAttachment;
-    if ((!question && !attachment) || sending || vaultBusy || loadingHistory) return;
+    if (
+      (!question && !attachment) ||
+      sending ||
+      vaultBusy ||
+      continuingInSpace ||
+      loadingHistory
+    )
+      return;
 
     if (attachment) {
       const { file, previewUrl: stagedPreviewUrl } = attachment;
@@ -4633,12 +4726,14 @@ export default function VaultChatPanel({
     const { suggested, question, dismissKey } = spaceContinueSuggestion;
     setDismissedSpaceContinueKey(dismissKey);
     setContinuingInSpace(true);
+    setLoadingLabel(`Switching to ${suggested.display_name}…`);
     try {
       const ok = await switchProfile(suggested.id);
       if (!ok) {
         setError("Couldn't switch spaces. Try again from the Switch menu.");
         return;
       }
+      rememberSpaceSwitchNote(suggested.display_name);
       setMeta((prev) =>
         prev
           ? {
@@ -4670,6 +4765,12 @@ export default function VaultChatPanel({
     syncAskProfileUrl,
   ]);
 
+  useEffect(() => {
+    if (!spaceSwitchToast) return;
+    const t = window.setTimeout(() => setSpaceSwitchToast(null), 4500);
+    return () => window.clearTimeout(t);
+  }, [spaceSwitchToast]);
+
   const messageList = (
     <div
       className={
@@ -4685,6 +4786,16 @@ export default function VaultChatPanel({
         </p>
       ) : (
         <>
+          {spaceSwitchToast ? (
+            <div
+              role="status"
+              className="rounded-xl border border-brand/25 bg-brand-light/40 px-3 py-2 text-xs text-foreground"
+            >
+              Switched to{" "}
+              <span className="font-semibold">{spaceSwitchToast}</span> — answering
+              there.
+            </div>
+          ) : null}
           {firstWin ? (
             <FirstWinCard
               fileName={firstWin.fileName}
@@ -4805,11 +4916,14 @@ export default function VaultChatPanel({
               }
             />
           ) : null}
-          {(sending || vaultBusy || savingLog) && !streamingAssistantId && (
+          {(sending || vaultBusy || savingLog || continuingInSpace) &&
+            !streamingAssistantId && (
             <div className="flex items-center gap-2 text-xs text-ink-muted">
               <GideonAvatar size={40} variant="portrait" pulse />
               {savingLog
                 ? "Saving to your space…"
+                : continuingInSpace
+                  ? loadingLabel
                 : vaultBusy && vaultStatus
                   ? vaultStatus
                   : loadingLabel}
@@ -4967,7 +5081,13 @@ export default function VaultChatPanel({
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleComposerKeyDown}
-              disabled={sending || vaultBusy || loadingHistory || voiceListening}
+              disabled={
+                sending ||
+                vaultBusy ||
+                continuingInSpace ||
+                loadingHistory ||
+                voiceListening
+              }
               spellCheck={true}
               autoCorrect="on"
               autoCapitalize="sentences"

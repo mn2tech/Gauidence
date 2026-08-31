@@ -10,7 +10,7 @@ type Props = {
   busy?: boolean;
 };
 
-/** Offer to move the conversation to the Space the user was clearly talking about. */
+/** Fallback when a thread landed in the wrong Space (auto-route didn't run). */
 export default function SpaceContinueBanner({
   activeSpaceName,
   suggestedSpaceName,
@@ -26,7 +26,7 @@ export default function SpaceContinueBanner({
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-xs font-medium uppercase tracking-wide text-brand">
-            Wrong space for this chat?
+            Continue in the right space?
           </p>
           <p className="mt-1 text-sm leading-snug text-foreground">
             This looks like{" "}

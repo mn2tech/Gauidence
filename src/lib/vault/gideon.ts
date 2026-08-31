@@ -520,7 +520,8 @@ export const GIDEON_CROSS_VAULT_NOTE = `All-spaces search:
 - Start the reply with "From all your spaces:" then the answer.
 - When a fact is from a specific space, name it (for example "From Nolan's space:").
 - Do not imply a document is in the active space unless the source says so.
-- New files, notes, reminders, and this chat still belong in the active space.`;
+- New files, notes, reminders, and this chat still belong in the active space.
+- When the user clearly names another Space they can access, the app may switch into that Space before answering so memory lands with the topic.`;
 
 export const GIDEON_TRANSCRIPTION_NOTE = `Transcription mode:
 - The user wants a readable transcription or list from their space (often a photo, scan, CSV, or roster file).

@@ -65,7 +65,7 @@ const HOW_TO = [
   {
     icon: MessageCircle,
     title: "Ask Gideon",
-    body: "Ask questions about the active space. Use This space for only that room, or All spaces to search everywhere you can access — this chat still saves in the space you're in. Say “remind me…” to propose a reminder — you confirm before it is saved. Always verify important decisions against the original file.",
+    body: "Ask questions in a Space — if you name another Space (like a child), Gideon switches there so the chat saves in the right place. Use This space or All spaces to control search. Say “remind me…” to propose a reminder — you confirm before it is saved. Always verify important decisions against the original file.",
     href: "/ask",
     linkLabel: "Ask Gideon",
   },
