@@ -50,7 +50,7 @@ import {
 import { loadAuthorizedVisionImages } from "@/lib/vision/loadAuthorized";
 import { wantsSingleImageFocus } from "@/lib/vault/images";
 import { enqueueAnalyzePipeline } from "@/lib/documents/processingJobs";
-import { chatScopedProfilePayload, shouldClearPeerChatScope } from "@/lib/vault/detectVaultScope";
+import { chatScopedProfilePayload } from "@/lib/vault/detectVaultScope";
 import {
   listGuardianProfiles,
   getActiveGuardianProfile,
@@ -515,17 +515,9 @@ export async function GET(request: Request) {
       ? accessibleProfiles.find((p) => p.id === scopedProfileId) ?? null
       : null;
 
-    // Drop peer sticky "Searching Tesla" overlays server-side so even stale
-    // clients stop showing the trap. Keep nested child-vault search.
-    if (
-      scopedProfileId &&
-      scopedProfileId !== chatProfile.id &&
-      shouldClearPeerChatScope({
-        activeProfileId: chatProfile.id,
-        stickyProfileId: scopedProfileId,
-        profiles: accessibleProfiles,
-      })
-    ) {
+    // Always clear temporary Searching overlays on Ask chat load.
+    // Peer/nested checks were still leaving Tesla sticky while home was Nolan.
+    if (scopedProfileId && scopedProfileId !== chatProfile.id) {
       await clearVaultChatScopedProfile(supabase, String(chat.id));
       scopedProfileId = null;
       scopedProfile = null;

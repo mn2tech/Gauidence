@@ -10,7 +10,7 @@ export const ASK_VAULT_NAME_PREVIEW = 6;
 export const RECENT_VAULT_FILE_PREVIEW = 5;
 
 const INVENTORY_QUESTION_PATTERN =
-  /\b(what(?:'s| is| are)?\s+(?:do\s+)?(?:i|we)\s+have\b|what(?:'s| is| are)?\s+(?:in\s+)?(?:the\s+)?(?:vault|space|workspace|uploaded|stored|files?|documents?|photos?)|list\s+(?:all\s+)?(?:files?|documents?|uploads?|photos?)|how\s+many\s+(?:files?|documents?|photos?|uploads?)|show\s+(?:me\s+)?(?:all\s+)?(?:files?|documents?|uploads?)|(?:count|browse|compare)\s+(?:files?|documents?|uploads?)|everything\s+(?:in|uploaded)|file\s+inventory)\b/i;
+  /\b(what(?:'s|s| is| are)?\s+(?:do\s+)?(?:i|we)\s+have\b|what(?:'s|s| is| are)?\s+(?:in\s+)?(?:the\s+)?(?:vault|space|workspace|uploaded|stored|files?|documents?|photos?)|what(?:'s|s| is| are)?\s+in\s+(?:(?:my|the|a|an)\s+)?[\w'%-]+(?:\s+[\w'%-]+)?\s+(?:space|workspace|vault)\b|list\s+(?:all\s+)?(?:files?|documents?|uploads?|photos?)|how\s+many\s+(?:files?|documents?|photos?|uploads?)|show\s+(?:me\s+)?(?:all\s+)?(?:files?|documents?|uploads?)|(?:count|browse|compare)\s+(?:files?|documents?|uploads?)|everything\s+(?:in|uploaded)|file\s+inventory)\b/i;
 
 const SONG_LIST_QUESTION_PATTERN =
   /\b((?:list|show|give(?:\s+me)?)\s+(?:(?:me|us)\s+)?(?:the\s+)?(?:list\s+of\s+)?songs?|what songs|songs (?:are |on |in )|song list|song titles?|which songs)\b/i;
