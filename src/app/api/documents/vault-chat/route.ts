@@ -50,7 +50,7 @@ import {
 import { loadAuthorizedVisionImages } from "@/lib/vision/loadAuthorized";
 import { wantsSingleImageFocus } from "@/lib/vault/images";
 import { enqueueAnalyzePipeline } from "@/lib/documents/processingJobs";
-import { chatScopedProfilePayload } from "@/lib/vault/detectVaultScope";
+import { chatScopedProfilePayload, shouldClearPeerChatScope } from "@/lib/vault/detectVaultScope";
 import {
   listGuardianProfiles,
   getActiveGuardianProfile,
@@ -509,11 +509,27 @@ export async function GET(request: Request) {
 
     const threadChats = await listChats(supabase, user.id, chatProfile.id);
 
-    const scopedProfile =
-      typeof chat.scoped_profile_id === "string"
-        ? accessibleProfiles.find((p) => p.id === chat.scoped_profile_id) ??
-          null
-        : null;
+    let scopedProfileId =
+      typeof chat.scoped_profile_id === "string" ? chat.scoped_profile_id : null;
+    let scopedProfile = scopedProfileId
+      ? accessibleProfiles.find((p) => p.id === scopedProfileId) ?? null
+      : null;
+
+    // Drop peer sticky "Searching Tesla" overlays server-side so even stale
+    // clients stop showing the trap. Keep nested child-vault search.
+    if (
+      scopedProfileId &&
+      scopedProfileId !== chatProfile.id &&
+      shouldClearPeerChatScope({
+        activeProfileId: chatProfile.id,
+        stickyProfileId: scopedProfileId,
+        profiles: accessibleProfiles,
+      })
+    ) {
+      await clearVaultChatScopedProfile(supabase, String(chat.id));
+      scopedProfileId = null;
+      scopedProfile = null;
+    }
 
     const { data: messages, error } = await supabase
       .from("vault_chat_messages")
@@ -546,7 +562,7 @@ export async function GET(request: Request) {
     const template = getVaultTemplate(profileKind);
     const scopeMeta = await askGideonScopeMeta(supabase, user.id, chatProfile, {
       chatHomeProfileId: chatProfile.id,
-      chatScopedProfileId: chat.scoped_profile_id,
+      chatScopedProfileId: scopedProfileId,
       searchScope: parseSearchScope(chat.search_scope),
       accessibleProfiles,
     });

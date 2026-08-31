@@ -233,6 +233,18 @@ export async function loadWorkspaceContext(
       (scope) => scope.id === explicitSpace.id
     );
     focusedSpaceName = explicitSpace.display_name;
+  } else if (explicitSpace) {
+    // Named Space outside This-space search (e.g. Tesla while home is Nolan).
+    effectiveSearchIds = [explicitSpace.id];
+    effectiveRetrievalScopes = [
+      {
+        id: explicitSpace.id,
+        display_name: explicitSpace.display_name,
+        profile_type:
+          explicitSpace.profile_type ?? activeProfile.profile_type,
+      },
+    ];
+    focusedSpaceName = explicitSpace.display_name;
   } else if (namedOutsideSpace) {
     effectiveSearchIds = [namedOutsideSpace.id];
     effectiveRetrievalScopes = [
@@ -246,7 +258,7 @@ export async function loadWorkspaceContext(
     focusedSpaceName = namedOutsideSpace.display_name;
   }
 
-  const forceNamedSpaceDocs = Boolean(namedOutsideSpace);
+  const forceNamedSpaceDocs = Boolean(namedOutsideSpace || explicitSpace);
   const runDocumentSearch =
     load.documents &&
     (forceDocumentSearch ||
@@ -858,9 +870,9 @@ export async function loadWorkspaceContext(
     : workMemoryBody;
 
   const explicitScopeNote = focusedSpaceName
-    ? `This question is scoped to the ${focusedSpaceName} space only. Use RETRIEVED EXCERPTS, DAILY LOGS, and SPACE FILE INVENTORY for that space.${
-        namedOutsideSpace
-          ? ` The user named ${focusedSpaceName} while working from ${activeProfile.display_name}.`
+    ? `This question is about the ${focusedSpaceName} space. Use RETRIEVED EXCERPTS, DAILY LOGS, and SPACE FILE INVENTORY for ${focusedSpaceName}. If inventory lists files, summarize them. If inventory is empty, say ${focusedSpaceName} has no files yet — do NOT claim you cannot access ${focusedSpaceName} or that the conversation is only connected to ${activeProfile.display_name}.${
+        namedOutsideSpace || explicitSpace
+          ? ` The user named ${focusedSpaceName} while the UI home space is ${activeProfile.display_name}.`
           : ""
       }${
         /\babout\b/i.test(retrievalQuestion)
