@@ -1,6 +1,25 @@
 import { EMPLOYEE_HUB_PATH } from "@/lib/employee-hub/routing";
 import { SIMPLE_HOME_PATH } from "@/lib/simple-home/routing";
 
+/** Public share routes — no onboarding gate or start splash. */
+export const PUBLIC_SHARE_PATH_PREFIXES = [
+  "/s/",
+  "/crossroadsconnect",
+  "/share/",
+  "/proposal/",
+  "/payroll-share/",
+  "/intake/",
+  "/invite/",
+] as const;
+
+export function isPublicSharePath(pathname: string | null): boolean {
+  if (!pathname) return false;
+  if (pathname === "/crossroadsconnect") return true;
+  return PUBLIC_SHARE_PATH_PREFIXES.some(
+    (prefix) => pathname === prefix.slice(0, -1) || pathname.startsWith(prefix)
+  );
+}
+
 /** Full vault workspace (sections for files, logs, linked people, etc.). */
 export const DOCUMENTS_PATH = "/dashboard?docs=1";
 export const REQUESTS_PATH = "/requests";
