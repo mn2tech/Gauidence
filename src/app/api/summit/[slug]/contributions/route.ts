@@ -182,8 +182,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     const extraction = row.extracted_data as CommunityExtractionResult;
     const approvedEntities =
       body.approvedEntities ??
-      row.approved_entities ??
-      (row.approved_entities?.length
+      (row.approved_entities.length > 0
         ? row.approved_entities
         : buildDefaultApprovedEntities(extraction));
 
