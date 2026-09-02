@@ -71,11 +71,7 @@ export default function SummitContributionForm({
     const input = fileRef.current;
     if (input) {
       input.accept = type === "resource" ? "image/*,application/pdf" : "image/*";
-      if (type === "photo") {
-        input.setAttribute("capture", "environment");
-      } else {
-        input.removeAttribute("capture");
-      }
+      input.removeAttribute("capture");
       input.value = "";
       input.click();
     }
@@ -172,10 +168,6 @@ export default function SummitContributionForm({
               key={type}
               type="button"
               onClick={() => {
-                if (type === "photo") {
-                  openFilePicker("photo");
-                  return;
-                }
                 setContributionType(type);
                 setStep("form");
               }}
@@ -271,17 +263,17 @@ export default function SummitContributionForm({
                 <Camera className="h-8 w-8 text-brand" aria-hidden />
                 <span className="font-semibold text-brand">
                   {contributionType === "photo"
-                    ? "Take or Upload Photo"
+                    ? "Choose Photo"
                     : "Upload File"}
                 </span>
                 <span className="text-xs text-ink-muted">
-                  Slides, booth materials, session notes
+                  Camera, photo library, or saved files
                 </span>
               </button>
             )}
             {contributionType === "photo" && !selectedFile ? (
               <p className="mt-2 text-xs text-ink-muted">
-                Use the button above to open your camera or photo library.
+                Tap above to take a new photo or choose one from your library.
               </p>
             ) : null}
           </div>
