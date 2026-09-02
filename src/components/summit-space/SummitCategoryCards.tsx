@@ -10,6 +10,10 @@ import {
   Target,
 } from "lucide-react";
 import type { SummitEntityRow } from "@/lib/summit-space/types";
+import {
+  filterSummitEntitiesForCategory,
+  SUMMIT_CATEGORY_LABELS,
+} from "@/lib/summit-space/categories";
 import { summitOrganizationPath } from "@/lib/summit-space/constants";
 
 const ICONS: Record<string, typeof Target> = {
@@ -27,55 +31,21 @@ type Props = {
   onSelectCategory?: (categoryId: string) => void;
 };
 
-function filterForCategory(
-  categoryId: string,
-  entities: SummitEntityRow[]
-): SummitEntityRow[] {
-  switch (categoryId) {
-    case "opportunities":
-      return entities.filter((e) => e.entity_type === "opportunity");
-    case "prime-contractors":
-      return entities.filter(
-        (e) =>
-          e.entity_type === "organization" &&
-          (e.properties as Record<string, string>).role === "prime_contractor"
-      );
-    case "agencies":
-      return entities.filter((e) => e.entity_type === "agency");
-    case "sessions":
-      return entities.filter((e) => e.entity_type === "session");
-    case "resources":
-      return entities.filter((e) => e.entity_type === "resource");
-    case "takeaways":
-      return entities.filter(
-        (e) =>
-          e.entity_type === "action_item" ||
-          (e.properties as Record<string, string>).category === "takeaway"
-      );
-    default:
-      return [];
-  }
-}
-
 export default function SummitCategoryCards({
   summitSlug,
   entities,
   onSelectCategory,
 }: Props) {
-  const cards = [
-    { id: "opportunities", label: "Opportunities" },
-    { id: "prime-contractors", label: "Prime Contractors" },
-    { id: "agencies", label: "Agencies" },
-    { id: "sessions", label: "Sessions" },
-    { id: "resources", label: "Resources" },
-    { id: "takeaways", label: "Summit Takeaways" },
-  ];
+  const cards = Object.entries(SUMMIT_CATEGORY_LABELS).map(([id, label]) => ({
+    id,
+    label,
+  }));
 
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
       {cards.map((card) => {
         const Icon = ICONS[card.id] ?? Target;
-        const count = filterForCategory(card.id, entities).length;
+        const count = filterSummitEntitiesForCategory(card.id, entities).length;
         return (
           <Link
             key={card.id}
@@ -94,5 +64,3 @@ export default function SummitCategoryCards({
     </div>
   );
 }
-
-export { filterForCategory };
