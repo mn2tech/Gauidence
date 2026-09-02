@@ -143,13 +143,10 @@ export default function SummitOpportunityPage({ summitSlug, data }: Props) {
       </section>
 
       <section className="mt-10">
-        <h2 className="text-lg font-semibold">Ask Gideon about this opportunity</h2>
-        <div className="mt-4">
-          <SummitAskGideon
-            summitSlug={summitSlug}
-            placeholder={`Ask about ${opportunity.name}…`}
-          />
-        </div>
+        <SummitAskGideon
+          summitSlug={summitSlug}
+          placeholder={`Ask about ${opportunity.name}…`}
+        />
       </section>
     </div>
   );

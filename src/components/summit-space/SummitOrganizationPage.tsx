@@ -216,15 +216,10 @@ export default function SummitOrganizationPage({
       </section>
 
       <section className="mt-10">
-        <h2 className="text-lg font-semibold">
-          Ask Gideon about {organization.name}
-        </h2>
-        <div className="mt-4">
-          <SummitAskGideon
-            summitSlug={summitSlug}
-            placeholder={`Ask about ${organization.name}…`}
-          />
-        </div>
+        <SummitAskGideon
+          summitSlug={summitSlug}
+          placeholder={`Ask about ${organization.name}…`}
+        />
       </section>
     </div>
   );
