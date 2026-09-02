@@ -39,12 +39,15 @@ export default async function SummitPublicPage({ params }: PageProps) {
   if (!knowledge) notFound();
 
   const serverClient = await createClient();
-  const {
-    data: { user },
-  } = await serverClient.auth.getUser();
-  const isOwner = user
-    ? await isSummitOwner(serverClient, slug, user.id)
-    : false;
+  let isOwner = false;
+  if (serverClient) {
+    const {
+      data: { user },
+    } = await serverClient.auth.getUser();
+    if (user) {
+      isOwner = await isSummitOwner(serverClient, slug, user.id);
+    }
+  }
 
   return (
     <main className="min-h-screen bg-[var(--background)] px-4 py-8 sm:px-6 sm:py-12">

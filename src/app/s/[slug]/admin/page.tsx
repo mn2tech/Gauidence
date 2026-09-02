@@ -8,6 +8,9 @@ type PageProps = { params: Promise<{ slug: string }> };
 export default async function SummitAdminPage({ params }: PageProps) {
   const { slug } = await params;
   const supabase = await createClient();
+  if (!supabase) {
+    redirect(`/s/${slug}`);
+  }
   const {
     data: { user },
   } = await supabase.auth.getUser();

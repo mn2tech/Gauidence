@@ -12,6 +12,9 @@ type RouteParams = { params: Promise<{ slug: string }> };
 
 async function requireSummitOwner(slug: string) {
   const supabase = await createClient();
+  if (!supabase) {
+    return { error: "Guardian is not configured", status: 503 as const };
+  }
   const {
     data: { user },
   } = await supabase.auth.getUser();
