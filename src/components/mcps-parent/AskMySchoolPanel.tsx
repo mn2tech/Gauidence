@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
 type AskResult = {
   answer: string;
@@ -25,6 +25,12 @@ export default function AskMySchoolPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<AskResult | null>(null);
+  const responseRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!busy && !result && !error) return;
+    responseRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [busy, result, error]);
 
   async function ask(q: string) {
     setBusy(true);
@@ -108,41 +114,51 @@ export default function AskMySchoolPanel({
         </button>
       </form>
 
-      {error ? (
-        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-          {error}
-        </p>
-      ) : null}
+      {busy || error || result ? (
+        <div ref={responseRef} className="scroll-mt-4" aria-live="polite">
+          {busy ? (
+            <p className="border-t border-stone-100 pt-4 text-sm text-ink-muted">
+              Asking…
+            </p>
+          ) : null}
 
-      {result ? (
-        <div className="space-y-3 border-t border-stone-100 pt-4">
-          <p className="whitespace-pre-wrap text-sm leading-relaxed">
-            {result.answer}
-          </p>
-          {result.sources_used.length > 0 ? (
-            <details className="text-xs text-ink-muted">
-              <summary className="cursor-pointer font-medium">
-                View sources
-              </summary>
-              <ul className="mt-2 space-y-1">
-                {result.sources_used.map((s) => (
-                  <li key={s.id}>
-                    {s.source_url ? (
-                      <a
-                        href={s.source_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-brand hover:underline"
-                      >
-                        {s.title}
-                      </a>
-                    ) : (
-                      s.title
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </details>
+          {error ? (
+            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+              {error}
+            </p>
+          ) : null}
+
+          {result ? (
+            <div className="space-y-3 border-t border-stone-100 pt-4">
+              <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                {result.answer}
+              </p>
+              {result.sources_used.length > 0 ? (
+                <details className="text-xs text-ink-muted">
+                  <summary className="cursor-pointer font-medium">
+                    View sources
+                  </summary>
+                  <ul className="mt-2 space-y-1">
+                    {result.sources_used.map((s) => (
+                      <li key={s.id}>
+                        {s.source_url ? (
+                          <a
+                            href={s.source_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-brand hover:underline"
+                          >
+                            {s.title}
+                          </a>
+                        ) : (
+                          s.title
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              ) : null}
+            </div>
           ) : null}
         </div>
       ) : null}

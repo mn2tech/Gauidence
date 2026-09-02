@@ -12,12 +12,14 @@ export const SUMMIT_DESCRIPTION =
 export const SUMMIT_OWNER = "NM2TECH LLC" as const;
 
 export const SUMMIT_SUGGESTED_QUESTIONS = [
-  "Which prime contractors should small businesses approach?",
-  "What subcontracting opportunities were discussed?",
-  "How do I connect with prime contractors?",
-  "What should I do after the summit?",
-  "Which companies are interested in IT, AI, data or cybersecurity?",
-  "What resources are available for small businesses?",
+  "What subcontracting opportunities should I explore?",
+  "Which prime contractors were represented?",
+  "Which agencies should small businesses research?",
+  "What resources can help me find federal contracts?",
+  "What were the biggest takeaways from the summit?",
+  "Who represented SAIC?",
+  "What should I do after this summit?",
+  "Show me opportunities related to AI and data.",
 ] as const;
 
 export const SUMMIT_CATEGORY_CARDS = [
@@ -42,3 +44,35 @@ export function summitOrganizationPath(
 ): string {
   return `/s/${slug}/organization/${orgSlug}`;
 }
+
+export function summitOpportunityPath(
+  slug: string,
+  oppSlug: string
+): string {
+  return `/s/${slug}/opportunity/${oppSlug}`;
+}
+
+export function summitAgencyPath(slug: string, agencySlug: string): string {
+  return `/s/${slug}/agency/${agencySlug}`;
+}
+
+export function summitResourcePath(slug: string, resourceSlug: string): string {
+  return `/s/${slug}/resource/${resourceSlug}`;
+}
+
+export function summitSessionPath(slug: string, sessionSlug: string): string {
+  return `/s/${slug}/session/${sessionSlug}`;
+}
+
+export function summitTakeawayPath(slug: string, takeawaySlug: string): string {
+  return `/s/${slug}/takeaway/${takeawaySlug}`;
+}
+
+export const SUMMIT_CATEGORY_ROUTES = [
+  "opportunities",
+  "prime-contractors",
+  "agencies",
+  "sessions",
+  "resources",
+  "takeaways",
+] as const;

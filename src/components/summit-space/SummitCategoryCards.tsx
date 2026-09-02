@@ -56,7 +56,7 @@ export default function SummitCategoryCards({
             <Icon className="h-6 w-6 text-brand" aria-hidden />
             <span className="mt-3 font-semibold leading-tight">{card.label}</span>
             <span className="mt-1 text-xs text-ink-muted">
-              {count > 0 ? `${count} item${count === 1 ? "" : "s"}` : "Explore"}
+              {count} item{count === 1 ? "" : "s"}
             </span>
           </Link>
         );
