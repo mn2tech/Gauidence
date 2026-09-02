@@ -4,19 +4,11 @@ import { ArrowLeft } from "lucide-react";
 import { createAnonServerClient } from "@/lib/supabase/anon";
 import { createClient } from "@/lib/supabase/server";
 import {
-  filterForCategory,
-} from "@/components/summit-space/SummitCategoryCards";
+  filterSummitEntitiesForCategory,
+  SUMMIT_CATEGORY_LABELS,
+} from "@/lib/summit-space/categories";
 import { loadPublishedSummitKnowledge } from "@/lib/summit-space/retrieve";
 import { summitOrganizationPath, summitPublicPath } from "@/lib/summit-space/constants";
-
-const CATEGORY_LABELS: Record<string, string> = {
-  opportunities: "Opportunities",
-  "prime-contractors": "Prime Contractors",
-  agencies: "Agencies",
-  sessions: "Sessions",
-  resources: "Resources",
-  takeaways: "Summit Takeaways",
-};
 
 type PageProps = { params: Promise<{ slug: string; category: string }> };
 
@@ -28,10 +20,10 @@ export default async function SummitCategoryPage({ params }: PageProps) {
   const knowledge = await loadPublishedSummitKnowledge(supabase, slug);
   if (!knowledge) notFound();
 
-  const label = CATEGORY_LABELS[category];
+  const label = SUMMIT_CATEGORY_LABELS[category];
   if (!label) notFound();
 
-  const items = filterForCategory(category, knowledge.entities);
+  const items = filterSummitEntitiesForCategory(category, knowledge.entities);
 
   return (
     <main className="min-h-screen bg-[var(--background)] px-4 py-8 sm:px-6 sm:py-12">
