@@ -6,6 +6,7 @@ import type { SummitEntityRow, SummitSpaceRow } from "@/lib/summit-space/types";
 import { SUMMIT_DISCLAIMER } from "@/lib/summit-space/constants";
 import SummitAskGideon from "./SummitAskGideon";
 import SummitCategoryCards from "./SummitCategoryCards";
+import SummitCommunityInsights from "./SummitCommunityInsights";
 import SummitLeadForm from "./SummitLeadForm";
 import SummitShareButton from "./SummitShareButton";
 
@@ -76,6 +77,8 @@ export default function SummitHub({ space, entities, isOwner }: Props) {
         <h2 className="mb-4 text-lg font-semibold">Explore the Hub</h2>
         <SummitCategoryCards summitSlug={space.slug} entities={entities} />
       </section>
+
+      <SummitCommunityInsights summitSlug={space.slug} entities={entities} />
 
       {showLeadForm ? (
         <section className="mt-10">

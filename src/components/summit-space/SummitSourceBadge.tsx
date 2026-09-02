@@ -10,9 +10,11 @@ export default function SummitSourceBadge({ sourceType, className = "" }: Props)
   const colorClass =
     sourceType === "guardian_insight"
       ? "text-amber-700"
-      : sourceType === "public"
-        ? "text-blue-700"
-        : "text-brand";
+      : sourceType === "community"
+        ? "text-violet-700"
+        : sourceType === "public"
+          ? "text-blue-700"
+          : "text-brand";
 
   return (
     <p className={`text-xs font-medium ${colorClass} ${className}`}>{label}</p>

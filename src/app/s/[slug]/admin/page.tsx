@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isSummitOwner } from "@/lib/summit-space/linkProfile";
 import { loadPublishedSummitKnowledge } from "@/lib/summit-space/retrieve";
 import SummitAdminCapture from "@/components/summit-space/SummitAdminCapture";
+import SummitAdminContributions from "@/components/summit-space/SummitAdminContributions";
 import SummitKnowledgeCoverage from "@/components/summit-space/SummitKnowledgeCoverage";
 
 type PageProps = { params: Promise<{ slug: string }> };
@@ -37,6 +38,7 @@ export default async function SummitAdminPage({ params }: PageProps) {
           before becoming publicly visible.
         </p>
         {knowledge ? <SummitKnowledgeCoverage knowledge={knowledge} /> : null}
+        <SummitAdminContributions summitSlug={slug} />
       </div>
       <SummitAdminCapture summitSlug={slug} />
     </main>

@@ -21,6 +21,7 @@ Rules:
 - Clearly distinguish information types in your answer:
   • VERIFIED SUMMIT INFORMATION — from captured summit materials (source_type: summit)
   • PUBLICLY VERIFIED INFORMATION — official public sources (source_type: public)
+  • COMMUNITY CONTRIBUTION — approved attendee submissions (source_type: community). When using these, say something like "An approved community contribution from the summit indicates…" Do not imply the information was stated by an official speaker unless evidence establishes that.
   • GUARDIAN INSIGHT — synthesis or recommended actions (source_type: guardian_insight). Never present these as speaker statements.
 - If the knowledge does not support an answer, reply exactly:
 ${NO_SUMMIT_INFORMATION}

@@ -491,12 +491,16 @@ describe("summit knowledge retrieval helpers", () => {
 });
 
 describe("source type labeling", () => {
-  it("labels summit, public, and guardian insight sources", () => {
+  it("labels summit, public, guardian insight, and community sources", () => {
     assert.equal(formatSourceAttribution("summit"), SUMMIT_SOURCE_LABELS.summit);
     assert.equal(formatSourceAttribution("public"), SUMMIT_SOURCE_LABELS.public);
     assert.equal(
       formatSourceAttribution("guardian_insight"),
       SUMMIT_SOURCE_LABELS.guardian_insight
+    );
+    assert.equal(
+      formatSourceAttribution("community"),
+      SUMMIT_SOURCE_LABELS.community
     );
   });
 

@@ -68,6 +68,10 @@ export function summitTakeawayPath(slug: string, takeawaySlug: string): string {
   return `/s/${slug}/takeaway/${takeawaySlug}`;
 }
 
+export function summitCommunityPath(slug: string = SUMMIT_SLUG): string {
+  return `/s/${slug}/community`;
+}
+
 export const SUMMIT_CATEGORY_ROUTES = [
   "opportunities",
   "prime-contractors",
