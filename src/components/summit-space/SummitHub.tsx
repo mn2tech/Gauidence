@@ -65,18 +65,11 @@ export default function SummitHub({ space, entities, isOwner }: Props) {
         </Link>
       </div>
 
-      <section className="mt-10 rounded-3xl border border-stone-200 bg-white p-5 shadow-sm sm:p-6">
-        <h2 className="text-lg font-semibold">Ask Gideon</h2>
-        <p className="mt-1 text-sm text-ink-muted">
-          Get answers from summit materials — prime contractors, sessions, and
-          resources.
-        </p>
-        <div className="mt-4">
-          <SummitAskGideon
-            summitSlug={space.slug}
-            onAnswered={() => setShowLeadForm(true)}
-          />
-        </div>
+      <section className="mt-10">
+        <SummitAskGideon
+          summitSlug={space.slug}
+          onAnswered={() => setShowLeadForm(true)}
+        />
       </section>
 
       <section className="mt-10">

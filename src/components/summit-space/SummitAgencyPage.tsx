@@ -161,10 +161,7 @@ export default function SummitAgencyPage({ summitSlug, data }: Props) {
       </section>
 
       <section className="mt-10">
-        <h2 className="text-lg font-semibold">Ask Gideon about {agency.name}</h2>
-        <div className="mt-4">
-          <SummitAskGideon summitSlug={summitSlug} />
-        </div>
+        <SummitAskGideon summitSlug={summitSlug} />
       </section>
     </div>
   );

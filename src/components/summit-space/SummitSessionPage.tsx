@@ -113,10 +113,7 @@ export default function SummitSessionPage({
       ) : null}
 
       <section className="mt-10">
-        <h2 className="text-lg font-semibold">Ask Gideon about this session</h2>
-        <div className="mt-4">
-          <SummitAskGideon summitSlug={summitSlug} />
-        </div>
+        <SummitAskGideon summitSlug={summitSlug} />
       </section>
     </div>
   );
