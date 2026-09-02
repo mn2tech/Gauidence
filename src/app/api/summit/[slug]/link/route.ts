@@ -12,6 +12,9 @@ type RouteParams = { params: Promise<{ slug: string }> };
 export async function POST(request: Request, { params }: RouteParams) {
   const { slug } = await params;
   const supabase = await createClient();
+  if (!supabase) {
+    return NextResponse.json({ error: "Guardian is not configured" }, { status: 503 });
+  }
   const {
     data: { user },
   } = await supabase.auth.getUser();
