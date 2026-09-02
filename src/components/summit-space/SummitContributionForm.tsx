@@ -1,7 +1,8 @@
 "use client";
 
-import { FormEvent, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { Camera } from "lucide-react";
 import type { SummitEntityRow } from "@/lib/summit-space/types";
 import {
   CONTRIBUTION_TYPE_ICONS,
@@ -42,11 +43,53 @@ export default function SummitContributionForm({
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const sessions = entities.filter((e) => e.entity_type === "session");
   const organizations = entities.filter((e) => e.entity_type === "organization");
   const speakers = entities.filter((e) => e.entity_type === "person");
+
+  useEffect(() => {
+    if (!selectedFile) {
+      setPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(selectedFile);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [selectedFile]);
+
+  useEffect(() => {
+    if (step === "form") {
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [step]);
+
+  function openFilePicker(type: ContributionType) {
+    const input = fileRef.current;
+    if (input) {
+      input.accept = type === "resource" ? "image/*,application/pdf" : "image/*";
+      if (type === "photo") {
+        input.setAttribute("capture", "environment");
+      } else {
+        input.removeAttribute("capture");
+      }
+      input.value = "";
+      input.click();
+    }
+    setContributionType(type);
+    setStep("form");
+  }
+
+  function handleFileChange(file: File | null) {
+    setSelectedFile(file);
+    if (file && contributionType !== "photo" && contributionType !== "resource") {
+      setContributionType("photo");
+    }
+    if (file) setStep("form");
+  }
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -83,8 +126,10 @@ export default function SummitContributionForm({
     }
   }
 
+  let body: ReactNode = null;
+
   if (step === "success") {
-    return (
+    body = (
       <div className="rounded-2xl border border-brand/30 bg-brand-light/20 p-6 text-center">
         <p className="text-lg font-semibold">Thanks for contributing!</p>
         <p className="mt-2 text-sm text-ink-muted">
@@ -114,10 +159,8 @@ export default function SummitContributionForm({
         ) : null}
       </div>
     );
-  }
-
-  if (step === "type") {
-    return (
+  } else if (step === "type") {
+    body = (
       <div>
         <h2 className="text-lg font-semibold">Share What You Learned</h2>
         <p className="mt-1 text-sm text-ink-muted">
@@ -129,6 +172,10 @@ export default function SummitContributionForm({
               key={type}
               type="button"
               onClick={() => {
+                if (type === "photo") {
+                  openFilePicker("photo");
+                  return;
+                }
                 setContributionType(type);
                 setStep("form");
               }}
@@ -162,10 +209,9 @@ export default function SummitContributionForm({
         ) : null}
       </div>
     );
-  }
-
-  return (
-    <form onSubmit={submit}>
+  } else {
+    body = (
+      <form ref={formRef} onSubmit={submit}>
       <div className="flex items-center gap-2">
         <button
           type="button"
@@ -183,18 +229,60 @@ export default function SummitContributionForm({
         {(contributionType === "photo" || contributionType === "resource") && (
           <div>
             <label className="block text-sm font-medium">
-              {contributionType === "photo" ? "Photo" : "File"} (optional)
+              {contributionType === "photo" ? "Photo" : "File"}
+              {contributionType === "photo" ? (
+                <span className="text-rose-600"> *</span>
+              ) : (
+                " (optional)"
+              )}
             </label>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*,application/pdf"
-              capture={contributionType === "photo" ? "environment" : undefined}
-              onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
-              className="mt-1 w-full text-sm"
-            />
+            {previewUrl && selectedFile?.type.startsWith("image/") ? (
+              <button
+                type="button"
+                onClick={() => openFilePicker(contributionType)}
+                className="mt-2 block w-full overflow-hidden rounded-xl border border-stone-200"
+              >
+                <img
+                  src={previewUrl}
+                  alt="Selected upload preview"
+                  className="max-h-64 w-full object-contain bg-stone-50"
+                />
+                <span className="block py-2 text-center text-xs font-medium text-brand">
+                  Tap to change photo
+                </span>
+              </button>
+            ) : selectedFile ? (
+              <div className="mt-2 rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm">
+                <p className="font-medium">{selectedFile.name}</p>
+                <button
+                  type="button"
+                  onClick={() => openFilePicker(contributionType)}
+                  className="mt-2 text-sm font-medium text-brand hover:underline"
+                >
+                  Choose a different file
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => openFilePicker(contributionType)}
+                className="mt-2 flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-stone-300 bg-stone-50 px-4 py-8 transition hover:border-brand/50 hover:bg-brand-light/10"
+              >
+                <Camera className="h-8 w-8 text-brand" aria-hidden />
+                <span className="font-semibold text-brand">
+                  {contributionType === "photo"
+                    ? "Take or Upload Photo"
+                    : "Upload File"}
+                </span>
+                <span className="text-xs text-ink-muted">
+                  Slides, booth materials, session notes
+                </span>
+              </button>
+            )}
             {contributionType === "photo" && !selectedFile ? (
-              <p className="mt-1 text-xs text-rose-600">Photo required for photo contributions</p>
+              <p className="mt-2 text-xs text-ink-muted">
+                Use the button above to open your camera or photo library.
+              </p>
             ) : null}
           </div>
         )}
@@ -344,5 +432,21 @@ export default function SummitContributionForm({
         {status === "loading" ? "Submitting…" : "Share Insight"}
       </button>
     </form>
+    );
+  }
+
+  return (
+    <>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        className="sr-only"
+        tabIndex={-1}
+        aria-hidden
+        onChange={(e) => handleFileChange(e.target.files?.[0] ?? null)}
+      />
+      {body}
+    </>
   );
 }
