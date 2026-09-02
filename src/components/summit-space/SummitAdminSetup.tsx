@@ -47,7 +47,7 @@ export default function SummitAdminSetup({ summitSlug }: Props) {
     setLinking(false);
     if (res.ok) {
       setDone(true);
-      window.location.reload();
+      setTimeout(() => window.location.reload(), 600);
     } else {
       setError(json.error ?? "Could not link summit profile");
     }

@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { SUMMIT_SLUG } from "./constants";
 
 /**
@@ -22,7 +23,12 @@ export async function linkSummitToProfile(
     return { ok: false, error: "Not authorized for this profile" };
   }
 
-  await supabase
+  const admin = createAdminClient();
+  if (!admin) {
+    return { ok: false, error: "Guardian is not configured" };
+  }
+
+  const { error: profileError } = await admin
     .from("guardian_profiles")
     .update({
       public_slug: summitSlug,
@@ -35,10 +41,18 @@ export async function linkSummitToProfile(
     })
     .eq("id", profileId);
 
-  await supabase
+  if (profileError) {
+    return { ok: false, error: profileError.message };
+  }
+
+  const { error: spaceError } = await admin
     .from("summit_spaces")
-    .update({ profile_id: profileId })
+    .update({ profile_id: profileId, updated_at: new Date().toISOString() })
     .eq("slug", summitSlug);
+
+  if (spaceError) {
+    return { ok: false, error: spaceError.message };
+  }
 
   return { ok: true };
 }
