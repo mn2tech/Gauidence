@@ -9,6 +9,7 @@ import {
   postLoginPathForProfile,
 } from "@/lib/employee-hub/routing";
 import { SIMPLE_HOME_PATH } from "@/lib/simple-home/routing";
+import { isPublicSharePath } from "@/lib/routes";
 import type { GuardianProfile } from "@/lib/profiles/types";
 
 const ActivationFlow = dynamic(
@@ -39,6 +40,7 @@ const SKIP_PATH_PREFIXES = [
 function shouldSkipPath(pathname: string | null): boolean {
   if (!pathname) return true;
   if (pathname === "/") return true;
+  if (isPublicSharePath(pathname)) return true;
   return SKIP_PATH_PREFIXES.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`)
   );
