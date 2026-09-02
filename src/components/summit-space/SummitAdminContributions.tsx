@@ -26,6 +26,9 @@ export default function SummitAdminContributions({ summitSlug }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState("");
+  const [editPublishedSummary, setEditPublishedSummary] = useState("");
+  const [editSourceUrl, setEditSourceUrl] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -44,9 +47,22 @@ export default function SummitAdminContributions({ summitSlug }: Props) {
 
   const selected = contributions.find((c) => c.id === selectedId);
 
+  useEffect(() => {
+    if (!selected) return;
+    setEditContent(selected.content);
+    setEditPublishedSummary(selected.published_summary ?? selected.content);
+    setEditSourceUrl(selected.source_url ?? "");
+  }, [selected]);
+
   async function moderate(
-    action: "approve" | "reject" | "publish",
-    extra?: { approvedEntities?: ApprovedEntitySpec[]; rejectionReason?: string }
+    action: "approve" | "reject" | "publish" | "update" | "unpublish" | "delete",
+    extra?: {
+      approvedEntities?: ApprovedEntitySpec[];
+      rejectionReason?: string;
+      content?: string;
+      publishedSummary?: string;
+      sourceUrl?: string | null;
+    }
   ) {
     if (!selectedId) return;
     setActionLoading(true);
@@ -64,10 +80,16 @@ export default function SummitAdminContributions({ summitSlug }: Props) {
           ? "Published to Summit Knowledge Hub."
           : action === "approve"
             ? "Approved — ready to publish."
-            : "Rejected."
+            : action === "update"
+              ? "Contribution updated."
+              : action === "unpublish"
+                ? "Removed from Community Insights."
+                : action === "delete"
+                  ? "Contribution deleted."
+                  : "Rejected."
       );
       await load();
-      if (action === "reject") setSelectedId(null);
+      if (action === "reject" || action === "delete") setSelectedId(null);
     } else {
       setMessage(json.error ?? "Action failed");
     }
@@ -150,6 +172,58 @@ export default function SummitAdminContributions({ summitSlug }: Props) {
               <p className="mt-1 text-ink-muted">{selected.content}</p>
             </div>
 
+            <div className="space-y-3 rounded-xl border border-stone-200 p-3">
+              <p className="font-medium">Edit contribution</p>
+              <label className="block text-xs font-medium text-ink-muted">
+                Submission text
+              </label>
+              <textarea
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+                rows={3}
+                className="w-full rounded-lg border border-stone-200 p-2 text-sm"
+              />
+              {selected.status === "published" ? (
+                <>
+                  <label className="block text-xs font-medium text-ink-muted">
+                    Public summary (shown on Community Insights)
+                  </label>
+                  <textarea
+                    value={editPublishedSummary}
+                    onChange={(e) => setEditPublishedSummary(e.target.value)}
+                    rows={3}
+                    className="w-full rounded-lg border border-stone-200 p-2 text-sm"
+                  />
+                </>
+              ) : null}
+              <label className="block text-xs font-medium text-ink-muted">
+                Source URL
+              </label>
+              <input
+                type="url"
+                value={editSourceUrl}
+                onChange={(e) => setEditSourceUrl(e.target.value)}
+                className="w-full rounded-lg border border-stone-200 p-2 text-sm"
+              />
+              <button
+                type="button"
+                disabled={actionLoading || !editContent.trim()}
+                onClick={() =>
+                  moderate("update", {
+                    content: editContent,
+                    publishedSummary:
+                      selected.status === "published"
+                        ? editPublishedSummary
+                        : undefined,
+                    sourceUrl: editSourceUrl || null,
+                  })
+                }
+                className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm font-semibold hover:bg-stone-50 disabled:opacity-60"
+              >
+                Save changes
+              </button>
+            </div>
+
             {selected.fileUrl ? (
               <div>
                 <p className="font-medium">Uploaded file</p>
@@ -208,7 +282,11 @@ export default function SummitAdminContributions({ summitSlug }: Props) {
                 <button
                   type="button"
                   disabled={actionLoading}
-                  onClick={() => moderate("publish")}
+                  onClick={() =>
+                    moderate("publish", {
+                      publishedSummary: editPublishedSummary || editContent,
+                    })
+                  }
                   className="rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-60"
                 >
                   Publish
@@ -221,6 +299,86 @@ export default function SummitAdminContributions({ summitSlug }: Props) {
                 className="rounded-xl border border-rose-300 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60"
               >
                 Reject
+              </button>
+              <button
+                type="button"
+                disabled={actionLoading}
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      "Delete this contribution permanently? This cannot be undone."
+                    )
+                  ) {
+                    moderate("delete");
+                  }
+                }}
+                className="rounded-xl border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-60"
+              >
+                Delete
+              </button>
+            </div>
+          ) : null}
+
+          {selected.status === "published" ? (
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={actionLoading}
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      "Remove this from Community Insights? It will stay in admin as approved."
+                    )
+                  ) {
+                    moderate("unpublish");
+                  }
+                }}
+                className="rounded-xl border border-amber-300 px-4 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-50 disabled:opacity-60"
+              >
+                Unpublish
+              </button>
+              <button
+                type="button"
+                disabled={actionLoading}
+                onClick={() => moderate("reject")}
+                className="rounded-xl border border-rose-300 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60"
+              >
+                Reject
+              </button>
+              <button
+                type="button"
+                disabled={actionLoading}
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      "Delete this contribution permanently? Published knowledge graph entities are not removed."
+                    )
+                  ) {
+                    moderate("delete");
+                  }
+                }}
+                className="rounded-xl border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-60"
+              >
+                Delete
+              </button>
+            </div>
+          ) : null}
+
+          {selected.status === "rejected" ? (
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={actionLoading}
+                onClick={() => {
+                  if (
+                    window.confirm("Delete this rejected contribution permanently?")
+                  ) {
+                    moderate("delete");
+                  }
+                }}
+                className="rounded-xl border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-60"
+              >
+                Delete
               </button>
             </div>
           ) : null}

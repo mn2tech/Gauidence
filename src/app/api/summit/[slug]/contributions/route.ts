@@ -10,6 +10,7 @@ import {
   type SummitCommunityContributionRow,
 } from "@/lib/summit-space/contributions";
 import { publishCommunityContribution } from "@/lib/summit-space/publishContribution";
+import { buildContributionUpdatePayload } from "@/lib/summit-space/moderateContribution";
 import type { ApprovedEntitySpec } from "@/lib/summit-space/contributions";
 
 export const runtime = "nodejs";
@@ -71,10 +72,12 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 
   const body = (await request.json().catch(() => ({}))) as {
     contributionId?: string;
-    action?: "approve" | "reject" | "publish";
+    action?: "approve" | "reject" | "publish" | "update" | "unpublish" | "delete";
     approvedEntities?: ApprovedEntitySpec[];
     publishedSummary?: string;
     rejectionReason?: string;
+    content?: string;
+    sourceUrl?: string | null;
   };
 
   if (!body.contributionId || !body.action) {
@@ -172,6 +175,75 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       contribution: stripPrivateContributionFields(updated as SummitCommunityContributionRow),
       publishedEntityIds: result.entityIds,
     });
+  }
+
+  if (body.action === "update") {
+    const updates = buildContributionUpdatePayload({
+      content: body.content,
+      publishedSummary: body.publishedSummary,
+      sourceUrl: body.sourceUrl,
+    });
+
+    if (!updates) {
+      return NextResponse.json({ error: "No changes provided" }, { status: 400 });
+    }
+
+    if (
+      typeof updates.content === "string" &&
+      !updates.content.trim()
+    ) {
+      return NextResponse.json(
+        { error: "Contribution text cannot be empty" },
+        { status: 400 }
+      );
+    }
+
+    const { data: updated } = await admin
+      .from("summit_community_contributions")
+      .update(updates)
+      .eq("id", body.contributionId)
+      .select("*")
+      .single();
+
+    return NextResponse.json({
+      contribution: stripPrivateContributionFields(updated as SummitCommunityContributionRow),
+    });
+  }
+
+  if (body.action === "unpublish") {
+    const { data: updated } = await admin
+      .from("summit_community_contributions")
+      .update({
+        status: "approved",
+        published_at: null,
+        reviewed_by: auth.userId,
+        reviewed_at: now,
+        updated_at: now,
+      })
+      .eq("id", body.contributionId)
+      .select("*")
+      .single();
+
+    return NextResponse.json({
+      contribution: stripPrivateContributionFields(updated as SummitCommunityContributionRow),
+    });
+  }
+
+  if (body.action === "delete") {
+    if (row.file_path) {
+      await admin.storage.from("summit-contributions").remove([row.file_path]);
+    }
+
+    const { error: deleteError } = await admin
+      .from("summit_community_contributions")
+      .delete()
+      .eq("id", body.contributionId);
+
+    if (deleteError) {
+      return NextResponse.json({ error: deleteError.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true, deletedId: body.contributionId });
   }
 
   return NextResponse.json({ error: "Invalid action" }, { status: 400 });
