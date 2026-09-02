@@ -21,6 +21,8 @@ import {
   setStartSplashScrollLock,
   writeStartSplashSeen,
 } from "@/lib/branding/startSplash";
+import { isPublicSharePath } from "@/lib/routes";
+import { usePathname } from "next/navigation";
 
 const STAR_MS = 12;
 const FADE_MS = 900;
@@ -28,6 +30,7 @@ const FADE_MS = 900;
 type Phase = "pending" | "draw" | "fade" | "gone";
 
 export default function GuardianStartSplash() {
+  const pathname = usePathname();
   const [phase, setPhase] = useState<Phase>("pending");
   const [revealed, setRevealed] = useState(0);
   const [brandVisible, setBrandVisible] = useState(false);
@@ -64,7 +67,7 @@ export default function GuardianStartSplash() {
 
   useLayoutEffect(() => {
     setMounted(true);
-    if (readStartSplashSeen()) {
+    if (isPublicSharePath(pathname) || readStartSplashSeen()) {
       clearStartSplashBoot();
       unlock();
       setPhase("gone");
@@ -72,7 +75,7 @@ export default function GuardianStartSplash() {
     }
     setStartSplashScrollLock(true);
     setPhase("draw");
-  }, [unlock]);
+  }, [pathname, unlock]);
 
   useLayoutEffect(() => {
     if (phase === "draw" || phase === "fade") {
