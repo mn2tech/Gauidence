@@ -33,7 +33,7 @@ export function filterSummitEntitiesForCategory(
     case "takeaways":
       return entities.filter(
         (e) =>
-          e.entity_type === "action_item" ||
+          e.entity_type === "action_item" &&
           (e.properties as Record<string, string>).category === "takeaway"
       );
     default:

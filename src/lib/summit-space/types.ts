@@ -126,5 +126,43 @@ export type OrganizationPageData = {
   organization: SummitEntityRow;
   speakers: SummitEntityRow[];
   sessions: SummitEntityRow[];
+  opportunities: SummitEntityRow[];
+  agencies: SummitEntityRow[];
+  resources: SummitEntityRow[];
   relatedEntities: SummitEntityRow[];
+};
+
+export type OpportunityPageData = {
+  opportunity: SummitEntityRow;
+  organization: SummitEntityRow | null;
+  sessions: SummitEntityRow[];
+  agencies: SummitEntityRow[];
+  resources: SummitEntityRow[];
+};
+
+export type AgencyPageData = {
+  agency: SummitEntityRow;
+  sessions: SummitEntityRow[];
+  organizations: SummitEntityRow[];
+  opportunities: SummitEntityRow[];
+  resources: SummitEntityRow[];
+};
+
+export type ResourcePageData = {
+  resource: SummitEntityRow;
+  agencies: SummitEntityRow[];
+  opportunities: SummitEntityRow[];
+};
+
+export type TakeawayPageData = {
+  takeaway: SummitEntityRow;
+  sessions: SummitEntityRow[];
+  organizations: SummitEntityRow[];
+};
+
+export type SessionPageData = {
+  session: SummitEntityRow;
+  speakers: SummitEntityRow[];
+  organizations: SummitEntityRow[];
+  opportunities: SummitEntityRow[];
 };

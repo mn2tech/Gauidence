@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { renderGideonText } from "@/components/gideonText";
 import { SUMMIT_SUGGESTED_QUESTIONS } from "@/lib/summit-space/constants";
 
@@ -9,6 +9,16 @@ type Props = {
   placeholder?: string;
   onAnswered?: () => void;
 };
+
+function scrollResponseIntoView(node: HTMLElement | null) {
+  if (!node) return;
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      node.scrollIntoView({ behavior: "smooth", block: "center" });
+      node.focus({ preventScroll: true });
+    });
+  });
+}
 
 export default function SummitAskGideon({
   summitSlug,
@@ -19,8 +29,19 @@ export default function SummitAskGideon({
   const [answer, setAnswer] = useState("");
   const [sources, setSources] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const responseRef = useRef<HTMLDivElement>(null);
+
+  const scrollToResponse = useCallback(() => {
+    scrollResponseIntoView(responseRef.current);
+  }, []);
+
+  useEffect(() => {
+    if (!loading && !answer) return;
+    scrollToResponse();
+  }, [loading, answer, scrollToResponse]);
 
   async function ask(value: string) {
+    setQuestion(value);
     setLoading(true);
     setAnswer("");
     setSources([]);
@@ -30,9 +51,9 @@ export default function SummitAskGideon({
       body: JSON.stringify({ question: value }),
     });
     const json = await res.json();
-    setLoading(false);
     setAnswer(json.answer || json.error || "I couldn't answer that.");
     setSources(json.sources || []);
+    setLoading(false);
     onAnswered?.();
   }
 
@@ -42,25 +63,11 @@ export default function SummitAskGideon({
   }
 
   const answerHasSource = /\bSource:\s*/i.test(answer);
+  const showResponse = loading || Boolean(answer);
 
   return (
-    <section id="ask-gideon" className="scroll-mt-4">
-      <div className="flex flex-wrap gap-2">
-        {SUMMIT_SUGGESTED_QUESTIONS.map((s) => (
-          <button
-            key={s}
-            type="button"
-            onClick={() => {
-              setQuestion(s);
-              void ask(s);
-            }}
-            className="rounded-full border border-stone-200 bg-white px-3 py-2 text-left text-sm hover:bg-stone-50"
-          >
-            {s}
-          </button>
-        ))}
-      </div>
-      <form onSubmit={submit} className="mt-4 flex gap-2">
+    <section id="ask-gideon" className="scroll-mt-20">
+      <form onSubmit={submit} className="flex gap-2">
         <input
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
@@ -76,18 +83,50 @@ export default function SummitAskGideon({
           {loading ? "Thinking…" : "Ask Gideon"}
         </button>
       </form>
-      {answer ? (
-        <div className="mt-5 rounded-2xl bg-stone-50 p-5">
-          <div className="whitespace-pre-wrap leading-7">
-            {renderGideonText(answer)}
-          </div>
-          {sources.length > 0 && !answerHasSource ? (
-            <div className="mt-4 border-t border-stone-200 pt-3 text-xs text-ink-muted">
-              Source: {renderGideonText(sources.join(", "))}
-            </div>
-          ) : null}
+
+      {showResponse ? (
+        <div
+          ref={responseRef}
+          tabIndex={-1}
+          className="mt-4 min-h-[4rem] scroll-mt-24 rounded-2xl bg-stone-50 p-5 outline-none"
+          aria-live="polite"
+          aria-busy={loading}
+        >
+          {loading ? (
+            <p className="text-ink-muted">Thinking…</p>
+          ) : (
+            <>
+              <div className="whitespace-pre-wrap leading-7">
+                {renderGideonText(answer)}
+              </div>
+              {sources.length > 0 && !answerHasSource ? (
+                <div className="mt-4 border-t border-stone-200 pt-3 text-xs text-ink-muted">
+                  Source: {renderGideonText(sources.join(", "))}
+                </div>
+              ) : null}
+            </>
+          )}
         </div>
       ) : null}
+
+      <div className="mt-5">
+        <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
+          Suggested questions
+        </p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {SUMMIT_SUGGESTED_QUESTIONS.map((s) => (
+            <button
+              key={s}
+              type="button"
+              disabled={loading}
+              onClick={() => void ask(s)}
+              className="rounded-full border border-stone-200 bg-white px-3 py-2 text-left text-sm hover:bg-stone-50 disabled:opacity-60"
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      </div>
     </section>
   );
 }

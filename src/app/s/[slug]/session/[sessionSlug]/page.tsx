@@ -1,33 +1,30 @@
 import { notFound } from "next/navigation";
 import { createAnonServerClient } from "@/lib/supabase/anon";
 import { createClient } from "@/lib/supabase/server";
-import SummitOrganizationPage from "@/components/summit-space/SummitOrganizationPage";
+import SummitSessionPage from "@/components/summit-space/SummitSessionPage";
 import {
-  buildOrganizationPageData,
+  buildSessionPageData,
   loadPublishedSummitKnowledge,
 } from "@/lib/summit-space/retrieve";
 
 type PageProps = {
-  params: Promise<{ slug: string; orgSlug: string }>;
+  params: Promise<{ slug: string; sessionSlug: string }>;
 };
 
-export default async function SummitOrganizationRoute({ params }: PageProps) {
-  const { slug, orgSlug } = await params;
+export default async function SummitSessionRoute({ params }: PageProps) {
+  const { slug, sessionSlug } = await params;
   const supabase = createAnonServerClient() ?? (await createClient());
   if (!supabase) notFound();
 
   const knowledge = await loadPublishedSummitKnowledge(supabase, slug);
   if (!knowledge) notFound();
 
-  const pageData = buildOrganizationPageData(knowledge, orgSlug);
+  const pageData = buildSessionPageData(knowledge, sessionSlug);
   if (!pageData) notFound();
 
   return (
     <main className="min-h-screen bg-[var(--background)] px-4 py-8 sm:px-6 sm:py-12">
-      <SummitOrganizationPage
-        summitSlug={slug}
-        data={pageData}
-      />
+      <SummitSessionPage summitSlug={slug} {...pageData} />
     </main>
   );
 }
