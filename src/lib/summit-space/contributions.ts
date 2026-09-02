@@ -113,6 +113,42 @@ export type ApprovedEntitySpec = {
   create: boolean;
 };
 
+export function resolveContributionMimeType(file: File): string | null {
+  const fromType = file.type?.trim();
+  if (fromType && ALLOWED_CONTRIBUTION_MIME_TYPES.has(fromType)) {
+    return fromType;
+  }
+
+  const name = file.name.toLowerCase();
+  if (name.endsWith(".heic")) return "image/heic";
+  if (name.endsWith(".heif")) return "image/heif";
+  if (name.endsWith(".png")) return "image/png";
+  if (name.endsWith(".webp")) return "image/webp";
+  if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return "image/jpeg";
+  if (name.endsWith(".pdf")) return "application/pdf";
+  if (fromType?.startsWith("image/")) return fromType;
+  return null;
+}
+
+export function contributionFileExtension(mime: string): string {
+  switch (mime) {
+    case "image/jpeg":
+      return "jpg";
+    case "image/png":
+      return "png";
+    case "image/webp":
+      return "webp";
+    case "image/heic":
+      return "heic";
+    case "image/heif":
+      return "heif";
+    case "application/pdf":
+      return "pdf";
+    default:
+      return mime.split("/")[1]?.replace("jpeg", "jpg") ?? "jpg";
+  }
+}
+
 export function slugifyEntityName(name: string): string {
   return name
     .toLowerCase()
@@ -175,11 +211,13 @@ export type PublicContributionView = {
   sourceType: "community";
   publishedAt: string;
   hasImage: boolean;
+  imageUrl: string | null;
 };
 
 export function toPublicContributionView(
   row: SummitCommunityContributionRow,
-  entities: SummitEntityRow[]
+  entities: SummitEntityRow[],
+  imageUrl: string | null = null
 ): PublicContributionView {
   const entityMap = new Map(entities.map((e) => [e.id, e]));
 
@@ -215,6 +253,7 @@ export function toPublicContributionView(
     sourceType: "community",
     publishedAt: row.published_at ?? row.created_at,
     hasImage: Boolean(row.file_path),
+    imageUrl,
   };
 }
 

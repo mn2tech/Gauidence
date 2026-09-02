@@ -10,6 +10,7 @@ import {
   CONTRIBUTION_TYPES,
   type ContributionType,
 } from "@/lib/summit-space/contributions";
+import { summitCommunityPath } from "@/lib/summit-space/constants";
 
 type Props = {
   summitSlug: string;
@@ -129,10 +130,17 @@ export default function SummitContributionForm({
       <div className="rounded-2xl border border-brand/30 bg-brand-light/20 p-6 text-center">
         <p className="text-lg font-semibold">Thanks for contributing!</p>
         <p className="mt-2 text-sm text-ink-muted">
-          Your insight has been submitted for review. Once approved, Guardian can
-          connect it with the Summit Knowledge Hub so other attendees can discover
-          it through search and Gideon.
+          Your insight has been submitted for review. It will not appear on
+          Community Insights until a summit admin publishes it. Once approved,
+          Guardian can connect it with the Summit Knowledge Hub so other
+          attendees can discover it through search and Gideon.
         </p>
+        <Link
+          href={summitCommunityPath(summitSlug)}
+          className="mt-4 inline-block text-sm font-semibold text-brand hover:underline"
+        >
+          Go to Community Insights
+        </Link>
         <div className="mt-6 rounded-xl border border-stone-200 bg-white p-4">
           <p className="text-sm font-medium">
             Want Guardian to organize knowledge for your organization?

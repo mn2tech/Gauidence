@@ -3,14 +3,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
-  CONTRIBUTION_TYPE_ICONS,
-  CONTRIBUTION_TYPE_LABELS,
   type ContributionType,
   type PublicContributionView,
 } from "@/lib/summit-space/contributions";
-import { summitCommunityPath, summitPublicPath } from "@/lib/summit-space/constants";
+import { summitPublicPath } from "@/lib/summit-space/constants";
 import SummitContributionForm from "./SummitContributionForm";
-import SummitSourceBadge from "./SummitSourceBadge";
+import SummitContributionCard from "./SummitContributionCard";
 import type { SummitEntityRow } from "@/lib/summit-space/types";
 
 type Props = {
@@ -62,6 +60,7 @@ export default function SummitCommunityPage({
         <h1 className="text-2xl font-bold">Community Insights</h1>
         <p className="mt-2 text-sm text-ink-muted">
           See what attendees are adding to the {summitName} Knowledge Hub.
+          Submissions are reviewed before they appear here.
         </p>
       </header>
 
@@ -106,55 +105,31 @@ export default function SummitCommunityPage({
         {loading ? (
           <p className="text-center text-sm text-ink-muted">Loading…</p>
         ) : contributions.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-stone-200 p-8 text-center text-sm text-ink-muted">
-            No published community insights yet. Be the first to share what you
-            learned!
-          </p>
+          <div className="rounded-2xl border border-dashed border-stone-200 p-8 text-center text-sm text-ink-muted">
+            <p className="font-medium text-ink">No published insights yet</p>
+            <p className="mt-2">
+              If you just shared something, it is in the review queue. Guardian
+              publishes approved contributions here for other attendees to
+              discover.
+            </p>
+            <p className="mt-2">
+              Summit admins can review pending submissions at{" "}
+              <Link
+                href={`/s/${summitSlug}/admin`}
+                className="text-brand hover:underline"
+              >
+                Summit Admin
+              </Link>
+              .
+            </p>
+          </div>
         ) : (
           contributions.map((c) => (
-            <article
+            <SummitContributionCard
               key={c.id}
-              className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm"
-            >
-              <div className="flex items-center gap-2">
-                <span>{CONTRIBUTION_TYPE_ICONS[c.contributionType]}</span>
-                <span className="text-xs font-medium text-ink-muted">
-                  {CONTRIBUTION_TYPE_LABELS[c.contributionType]}
-                </span>
-              </div>
-              <p className="mt-2 text-sm leading-relaxed">{c.content}</p>
-              {c.session ? (
-                <p className="mt-2 text-xs text-ink-muted">
-                  Session:{" "}
-                  <Link
-                    href={`/s/${summitSlug}/session/${c.session.slug}`}
-                    className="text-brand hover:underline"
-                  >
-                    {c.session.name}
-                  </Link>
-                </p>
-              ) : null}
-              {c.organization ? (
-                <p className="mt-1 text-xs text-ink-muted">
-                  Organization:{" "}
-                  <Link
-                    href={`/s/${summitSlug}/organization/${c.organization.slug}`}
-                    className="text-brand hover:underline"
-                  >
-                    {c.organization.name}
-                  </Link>
-                </p>
-              ) : null}
-              {(c.contributorName || c.contributorCompany) && (
-                <p className="mt-2 text-xs text-ink-muted">
-                  Shared by{" "}
-                  {[c.contributorName, c.contributorCompany]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
-              )}
-              <SummitSourceBadge sourceType="community" className="mt-2" />
-            </article>
+              summitSlug={summitSlug}
+              contribution={c}
+            />
           ))
         )}
       </div>

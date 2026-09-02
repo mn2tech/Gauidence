@@ -80,6 +80,16 @@ export default function SummitAdminContributions({ summitSlug }: Props) {
   return (
     <section className="mt-8">
       <h2 className="text-lg font-semibold">Community Contributions</h2>
+      <p className="mt-1 text-sm text-ink-muted">
+        Review attendee submissions below. Tap a pending item, then Publish to
+        make it visible on Community Insights.
+      </p>
+      {counts && counts.pending > 0 ? (
+        <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">
+          {counts.pending} submission{counts.pending === 1 ? "" : "s"} waiting
+          for review.
+        </p>
+      ) : null}
       {counts ? (
         <div className="mt-3 flex flex-wrap gap-3 text-sm">
           <span className="rounded-full bg-amber-100 px-3 py-1">

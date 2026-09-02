@@ -181,6 +181,7 @@ describe("community page filtering", () => {
       sourceType: "community",
       publishedAt: "2026-01-01T00:00:00Z",
       hasImage: true,
+      imageUrl: null,
     },
     {
       id: "2",
@@ -196,6 +197,7 @@ describe("community page filtering", () => {
       sourceType: "community",
       publishedAt: "2026-01-01T00:00:00Z",
       hasImage: false,
+      imageUrl: null,
     },
   ];
 

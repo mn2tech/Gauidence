@@ -11,10 +11,11 @@ import {
   hashSubmissionIp,
 } from "@/lib/summit-space/contributionRateLimit";
 import {
-  ALLOWED_CONTRIBUTION_MIME_TYPES,
   CONTRIBUTION_TYPES,
+  contributionFileExtension,
   isValidContributionEmail,
   MAX_CONTRIBUTION_FILE_BYTES,
+  resolveContributionMimeType,
   sanitizeContributionText,
   sanitizeContributionUrl,
   sanitizeContributorField,
@@ -113,8 +114,8 @@ export async function POST(request: Request, { params }: RouteParams) {
           { status: 400 }
         );
       }
-      const mime = file.type || "image/jpeg";
-      if (!ALLOWED_CONTRIBUTION_MIME_TYPES.has(mime)) {
+      const mime = resolveContributionMimeType(file);
+      if (!mime) {
         return NextResponse.json(
           { error: "Unsupported file type" },
           { status: 400 }
@@ -122,7 +123,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       }
 
       const buffer = Buffer.from(await file.arrayBuffer());
-      const ext = mime.split("/")[1]?.replace("jpeg", "jpg") ?? "jpg";
+      const ext = contributionFileExtension(mime);
       filePath = `${slug}/${crypto.randomUUID()}.${ext}`;
       const { error: uploadError } = await admin.storage
         .from("summit-contributions")
@@ -311,7 +312,18 @@ export async function GET(request: Request, { params }: RouteParams) {
     entities = (data ?? []) as SummitEntityRow[];
   }
 
-  let views = contributions.map((row) => toPublicContributionView(row, entities));
+  let views = await Promise.all(
+    contributions.map(async (row) => {
+      let imageUrl: string | null = null;
+      if (row.file_path && row.file_mime_type !== "application/pdf") {
+        const { data } = await admin.storage
+          .from("summit-contributions")
+          .createSignedUrl(row.file_path, 3600);
+        imageUrl = data?.signedUrl ?? null;
+      }
+      return toPublicContributionView(row, entities, imageUrl);
+    })
+  );
 
   if (filter !== "all") {
     views = views.filter((v) => {
