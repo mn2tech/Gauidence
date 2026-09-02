@@ -27,8 +27,12 @@ export default function SummitAdminSetup({ summitSlug }: Props) {
         const rows = (json.profiles ?? json ?? []) as ProfileOption[];
         const list = Array.isArray(rows) ? rows : [];
         setProfiles(list);
+        const summitProfile = list.find(
+          (p) =>
+            p.display_name?.includes("Small Business Government Contracting Summit")
+        );
         const eventProfile = list.find((p) => p.profile_type === "event");
-        setSelectedId(eventProfile?.id ?? list[0]?.id ?? "");
+        setSelectedId(summitProfile?.id ?? eventProfile?.id ?? list[0]?.id ?? "");
         setLoading(false);
       })
       .catch(() => setLoading(false));

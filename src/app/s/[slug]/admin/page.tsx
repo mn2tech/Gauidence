@@ -4,6 +4,7 @@ import {
   canAccessSummitAdmin,
   isSummitLinked,
 } from "@/lib/summit-space/adminAccess";
+import { repairSummitProfileLink } from "@/lib/summit-space/linkProfile";
 import { loadPublishedSummitKnowledge } from "@/lib/summit-space/retrieve";
 import SummitAdminCapture from "@/components/summit-space/SummitAdminCapture";
 import SummitAdminContributions from "@/components/summit-space/SummitAdminContributions";
@@ -36,7 +37,11 @@ export default async function SummitAdminPage({ params }: PageProps) {
     redirect(`/s/${slug}`);
   }
 
-  const linked = await isSummitLinked(supabase, slug);
+  let linked = await isSummitLinked(supabase, slug);
+  if (!linked) {
+    const repaired = await repairSummitProfileLink(slug, user.id);
+    linked = repaired.ok;
+  }
   const knowledge = await loadPublishedSummitKnowledge(supabase, slug);
 
   return (

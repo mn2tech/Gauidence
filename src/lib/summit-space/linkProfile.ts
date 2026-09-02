@@ -28,6 +28,17 @@ export async function linkSummitToProfile(
     return { ok: false, error: "Guardian is not configured" };
   }
 
+  // Only one profile may claim a summit public slug.
+  const { error: clearSlugError } = await admin
+    .from("guardian_profiles")
+    .update({ public_slug: null, updated_at: new Date().toISOString() })
+    .eq("public_slug", summitSlug)
+    .neq("id", profileId);
+
+  if (clearSlugError) {
+    return { ok: false, error: clearSlugError.message };
+  }
+
   const { error: profileError } = await admin
     .from("guardian_profiles")
     .update({
@@ -55,6 +66,45 @@ export async function linkSummitToProfile(
   }
 
   return { ok: true };
+}
+
+/**
+ * Repair a partial link where the profile already has the summit slug but
+ * summit_spaces.profile_id was never set.
+ */
+export async function repairSummitProfileLink(
+  summitSlug: string,
+  ownerUserId: string
+): Promise<{ ok: boolean; profileId?: string; error?: string }> {
+  const admin = createAdminClient();
+  if (!admin) {
+    return { ok: false, error: "Guardian is not configured" };
+  }
+
+  const { data: profile } = await admin
+    .from("guardian_profiles")
+    .select("id")
+    .eq("public_slug", summitSlug)
+    .eq("owner_user_id", ownerUserId)
+    .maybeSingle();
+
+  if (!profile) {
+    return { ok: false };
+  }
+
+  const { error: spaceError } = await admin
+    .from("summit_spaces")
+    .update({
+      profile_id: profile.id,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("slug", summitSlug);
+
+  if (spaceError) {
+    return { ok: false, error: spaceError.message };
+  }
+
+  return { ok: true, profileId: profile.id };
 }
 
 export async function isSummitOwner(
