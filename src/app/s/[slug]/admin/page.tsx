@@ -1,9 +1,13 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { isSummitOwner } from "@/lib/summit-space/linkProfile";
+import {
+  canAccessSummitAdmin,
+  isSummitLinked,
+} from "@/lib/summit-space/adminAccess";
 import { loadPublishedSummitKnowledge } from "@/lib/summit-space/retrieve";
 import SummitAdminCapture from "@/components/summit-space/SummitAdminCapture";
 import SummitAdminContributions from "@/components/summit-space/SummitAdminContributions";
+import SummitAdminSetup from "@/components/summit-space/SummitAdminSetup";
 import SummitKnowledgeCoverage from "@/components/summit-space/SummitKnowledgeCoverage";
 
 type PageProps = { params: Promise<{ slug: string }> };
@@ -22,11 +26,17 @@ export default async function SummitAdminPage({ params }: PageProps) {
     redirect(`/login?next=/s/${slug}/admin`);
   }
 
-  const owner = await isSummitOwner(supabase, slug, user.id);
-  if (!owner) {
+  const allowed = await canAccessSummitAdmin(
+    supabase,
+    slug,
+    user.id,
+    user.email
+  );
+  if (!allowed) {
     redirect(`/s/${slug}`);
   }
 
+  const linked = await isSummitLinked(supabase, slug);
   const knowledge = await loadPublishedSummitKnowledge(supabase, slug);
 
   return (
@@ -37,10 +47,11 @@ export default async function SummitAdminPage({ params }: PageProps) {
           Rapid capture for summit intelligence. All uploads require review
           before becoming publicly visible.
         </p>
-        {knowledge ? <SummitKnowledgeCoverage knowledge={knowledge} /> : null}
-        <SummitAdminContributions summitSlug={slug} />
+        {!linked ? <SummitAdminSetup summitSlug={slug} /> : null}
+        {linked && knowledge ? <SummitKnowledgeCoverage knowledge={knowledge} /> : null}
+        {linked ? <SummitAdminContributions summitSlug={slug} /> : null}
       </div>
-      <SummitAdminCapture summitSlug={slug} />
+      {linked ? <SummitAdminCapture summitSlug={slug} /> : null}
     </main>
   );
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { requireSummitAdmin } from "@/lib/summit-space/adminAccess";
 import { buildDefaultApprovedEntities } from "@/lib/summit-space/communityExtract";
 import {
   contributionStatusCounts,
@@ -15,48 +16,14 @@ export const runtime = "nodejs";
 
 type RouteParams = { params: Promise<{ slug: string }> };
 
-async function requireSummitOwner(slug: string) {
-  const supabase = await createClient();
-  if (!supabase) {
-    return { error: "Guardian is not configured", status: 503 as const };
-  }
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return { error: "Sign in required", status: 401 as const };
-  }
-
-  const { data: space } = await supabase
-    .from("summit_spaces")
-    .select("profile_id")
-    .eq("slug", slug)
-    .maybeSingle();
-
-  if (!space?.profile_id) {
-    return { error: "Summit space not linked to a Guardian profile", status: 403 as const };
-  }
-
-  const { data: profile } = await supabase
-    .from("guardian_profiles")
-    .select("owner_user_id")
-    .eq("id", space.profile_id)
-    .maybeSingle();
-
-  if (!profile || profile.owner_user_id !== user.id) {
-    return { error: "Not authorized", status: 403 as const };
-  }
-
-  return { user, profileId: space.profile_id };
-}
-
 /**
  * Owner/admin — list all contributions with counts.
  */
 export async function GET(_request: Request, { params }: RouteParams) {
   const { slug } = await params;
-  const auth = await requireSummitOwner(slug);
-  if ("error" in auth) {
+  const supabase = await createClient();
+  const auth = await requireSummitAdmin(supabase, slug);
+  if (!auth.ok) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
@@ -96,8 +63,9 @@ export async function GET(_request: Request, { params }: RouteParams) {
  */
 export async function PATCH(request: Request, { params }: RouteParams) {
   const { slug } = await params;
-  const auth = await requireSummitOwner(slug);
-  if ("error" in auth) {
+  const supabase = await createClient();
+  const auth = await requireSummitAdmin(supabase, slug);
+  if (!auth.ok) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
@@ -141,7 +109,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       .update({
         status: "rejected",
         rejection_reason: body.rejectionReason ?? null,
-        reviewed_by: auth.user.id,
+        reviewed_by: auth.userId,
         reviewed_at: now,
         updated_at: now,
       })
@@ -165,7 +133,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       .update({
         status: "approved",
         approved_entities: approvedEntities,
-        reviewed_by: auth.user.id,
+        reviewed_by: auth.userId,
         reviewed_at: now,
         updated_at: now,
       })
@@ -191,7 +159,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       contribution: row,
       approvedEntities,
       publishedSummary: body.publishedSummary,
-      reviewedBy: auth.user.id,
+      reviewedBy: auth.userId,
     });
 
     const { data: updated } = await admin

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { createAnonServerClient } from "@/lib/supabase/anon";
 import { createClient } from "@/lib/supabase/server";
 import { loadPublishedSummitKnowledge } from "@/lib/summit-space/retrieve";
-import { isSummitOwner } from "@/lib/summit-space/linkProfile";
+import { canAccessSummitAdmin } from "@/lib/summit-space/adminAccess";
 import SummitHub from "@/components/summit-space/SummitHub";
 
 type PageProps = { params: Promise<{ slug: string }> };
@@ -45,7 +45,12 @@ export default async function SummitPublicPage({ params }: PageProps) {
       data: { user },
     } = await serverClient.auth.getUser();
     if (user) {
-      isOwner = await isSummitOwner(serverClient, slug, user.id);
+      isOwner = await canAccessSummitAdmin(
+        serverClient,
+        slug,
+        user.id,
+        user.email
+      );
     }
   }
 
