@@ -1,6 +1,7 @@
 import { registerAction, getAction } from "./registry";
 import { registerCoreActions } from "./actions/core";
 import { payrollClockAction } from "./actions/payrollClock";
+import { timesheetRemoteAction } from "./actions/timesheetRemote";
 import { leadsAction } from "./actions/leads";
 import { recruitAction } from "./actions/recruit";
 import {
@@ -24,6 +25,8 @@ export function registerAllActions(): void {
   registerClientRequestActions();
   registerDailyLogActions();
   registerSpaceCreateActions();
+  // Before payroll so remote timesheet hours questions win when configured.
+  if (!getAction("timesheet_remote")) registerAction(timesheetRemoteAction);
   if (!getAction("payroll_clock")) registerAction(payrollClockAction);
   if (!getAction("leads")) registerAction(leadsAction);
   if (!getAction("recruit")) registerAction(recruitAction);
