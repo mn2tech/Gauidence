@@ -1,10 +1,14 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 import SecuritySection from "@/components/SecuritySection";
 import MeetGideonSection from "@/components/MeetGideonSection";
 import GuardianLogo from "@/components/brand/GuardianLogo";
+import { createClient } from "@/lib/supabase/server";
+import { getActiveGuardianProfile } from "@/lib/profiles/server";
+import { signedInLandingPath } from "@/lib/simple-home/routing";
 
 export default async function Home({
   searchParams,
@@ -13,6 +17,19 @@ export default async function Home({
 }) {
   const params = await searchParams;
   const showDeleted = params.deleted === "1";
+
+  if (!showDeleted) {
+    const supabase = await createClient();
+    if (supabase) {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        const active = await getActiveGuardianProfile(supabase, user);
+        redirect(signedInLandingPath(active, { email: user.email }));
+      }
+    }
+  }
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -78,19 +95,46 @@ export default async function Home({
             <p className="text-lg font-bold tracking-tight text-foreground sm:text-xl">
               Today&apos;s priorities
             </p>
-            <div className="mt-4 flex items-start gap-3">
-              <span
-                className="landing-hero-dot mt-2 h-2.5 w-2.5 shrink-0 rounded-full bg-amber-500"
-                aria-hidden
-              />
-              <div className="min-w-0 text-left">
-                <p className="text-xl font-bold leading-snug tracking-tight text-foreground sm:text-2xl">
-                  Auto insurance renews in 11 days
+            <div className="mt-5 space-y-6 text-left">
+              <div>
+                <p className="text-sm font-semibold tracking-tight text-foreground">
+                  Personal
                 </p>
-                <p className="mt-1.5 text-[15px] leading-relaxed text-stone-800 sm:text-base">
-                  Your State Farm policy ends May 14. Review coverage before it
-                  lapses.
+                <div className="mt-2.5 flex items-start gap-3">
+                  <span
+                    className="landing-hero-dot mt-2 h-2.5 w-2.5 shrink-0 rounded-full bg-amber-500"
+                    aria-hidden
+                  />
+                  <div className="min-w-0">
+                    <p className="text-xl font-bold leading-snug tracking-tight text-foreground sm:text-2xl">
+                      Auto insurance renews in 11 days
+                    </p>
+                    <p className="mt-1.5 text-[15px] leading-relaxed text-stone-800 sm:text-base">
+                      Your State Farm policy ends May 14. Review coverage before
+                      it lapses.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-semibold tracking-tight text-foreground">
+                  Business
                 </p>
+                <div className="mt-2.5 flex items-start gap-3">
+                  <span
+                    className="landing-hero-dot mt-2 h-2.5 w-2.5 shrink-0 rounded-full bg-red-500"
+                    aria-hidden
+                  />
+                  <div className="min-w-0">
+                    <p className="text-xl font-bold leading-snug tracking-tight text-foreground sm:text-2xl">
+                      Proposal deadline in 4 days
+                    </p>
+                    <p className="mt-1.5 text-[15px] leading-relaxed text-stone-800 sm:text-base">
+                      Treasury opportunity closes Friday. Confirm eligibility and
+                      submit before the window ends.
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
