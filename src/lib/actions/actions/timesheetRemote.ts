@@ -3,7 +3,7 @@ import "server-only";
 import {
   answerTimesheetHoursQuestion,
   isTimesheetRemoteConfigured,
-  parseTimesheetHoursQuery,
+  parseTimesheetRemoteQuery,
 } from "@/lib/timesheet-remote/answer";
 import type { ActionContext, ActionDefinition } from "../types";
 
@@ -14,7 +14,7 @@ export const timesheetRemoteAction: ActionDefinition = {
     "Answer English questions about hours from the remote timesheet Supabase project.",
   matches: (question) => {
     if (!isTimesheetRemoteConfigured()) return false;
-    return parseTimesheetHoursQuery(question) != null;
+    return parseTimesheetRemoteQuery(question) != null;
   },
   requiresConfirmation: false,
   thinkingSteps: [

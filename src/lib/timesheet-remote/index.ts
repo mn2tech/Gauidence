@@ -2,9 +2,26 @@ export {
   answerTimesheetHoursQuestion,
   isTimesheetRemoteConfigured,
   parseTimesheetHoursQuery,
+  parseTimesheetRemoteQuery,
   wantsTimesheetHoursQuery,
 } from "./answer";
-export { formatTimesheetHoursAnswer } from "./format";
-export { fetchEmployeeHours, findTimesheetUser } from "./query";
-export type { TimesheetHoursResult, TimesheetDayRow } from "./query";
-export type { TimesheetHoursQuery } from "./parse";
+export {
+  formatTimesheetHoursAnswer,
+  formatTimesheetPeriodAnswer,
+} from "./format";
+export {
+  fetchEmployeeHours,
+  fetchPeriodSummary,
+  findTimesheetUser,
+} from "./query";
+export type {
+  TimesheetHoursResult,
+  TimesheetDayRow,
+  TimesheetPeriodResult,
+  TimesheetPeriodEmployeeRow,
+} from "./query";
+export type {
+  TimesheetHoursQuery,
+  TimesheetPeriodQuery,
+  TimesheetRemoteQuery,
+} from "./parse";
