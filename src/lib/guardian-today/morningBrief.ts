@@ -84,6 +84,7 @@ function detailForItem(args: {
   const { effectiveDate, today } = args;
   if (effectiveDate == null) return "Needs attention";
   const days = daysBetween(today, effectiveDate);
+  if (days === null) return "Needs attention";
   if (days < 0) {
     return `${Math.abs(days)} day${Math.abs(days) === 1 ? "" : "s"} overdue`;
   }
