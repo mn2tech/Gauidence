@@ -5,6 +5,7 @@ import type {
   GuardianIntelligenceItem,
   GuardianTodayCoverage,
   GuardianTodayResult,
+  GuardianTodaySpaceGroup,
   WhatChangedEntry,
 } from "@/lib/guardian-today/types";
 
@@ -23,6 +24,9 @@ const EMPTY_COVERAGE: GuardianTodayCoverage = {
 
 const EMPTY: GuardianTodayResult = {
   priorities: [],
+  groups: [],
+  scopeSpaceId: null,
+  scopeSpaceName: null,
   whatChanged: [],
   caughtUp: false,
   coverage: EMPTY_COVERAGE,
@@ -30,13 +34,51 @@ const EMPTY: GuardianTodayResult = {
   backfillRecommended: false,
 };
 
+const SCOPE_STORAGE_KEY = "guardian:today-space-id";
+
+function readStoredScope(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(SCOPE_STORAGE_KEY);
+    return raw?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredScope(spaceId: string | null) {
+  if (typeof window === "undefined") return;
+  try {
+    if (spaceId) sessionStorage.setItem(SCOPE_STORAGE_KEY, spaceId);
+    else sessionStorage.removeItem(SCOPE_STORAGE_KEY);
+  } catch {
+    /* quota */
+  }
+}
+
 function normalizeToday(
   body: Partial<GuardianTodayResult> | null
 ): GuardianTodayResult {
+  const priorities = Array.isArray(body?.priorities) ? body!.priorities! : [];
+  const groups: GuardianTodaySpaceGroup[] = Array.isArray(body?.groups)
+    ? body!.groups!
+    : priorities.length
+      ? [
+          {
+            spaceId: "all",
+            spaceName: "All spaces",
+            profileType: null,
+            priorities,
+          },
+        ]
+      : [];
   return {
     ...EMPTY,
     ...body,
-    priorities: Array.isArray(body?.priorities) ? body!.priorities! : [],
+    priorities,
+    groups,
+    scopeSpaceId: body?.scopeSpaceId ?? null,
+    scopeSpaceName: body?.scopeSpaceName ?? null,
     whatChanged: Array.isArray(body?.whatChanged) ? body!.whatChanged! : [],
     coverage: body?.coverage ?? EMPTY_COVERAGE,
     caughtUp: Boolean(body?.caughtUp),
@@ -51,6 +93,8 @@ export function useGuardianToday() {
   const [retrying, setRetrying] = useState(false);
   const [actionNote, setActionNote] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [scopeSpaceId, setScopeSpaceIdState] = useState<string | null>(null);
+  const scopeRef = useRef<string | null>(null);
   const backfillStarted = useRef(false);
   const mounted = useRef(true);
   const noteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -76,7 +120,9 @@ export function useGuardianToday() {
   const refresh = useCallback(async (opts?: { quiet?: boolean }) => {
     if (!opts?.quiet) setLoading(true);
     try {
-      const res = await fetch("/api/guardian/today");
+      const scope = scopeRef.current;
+      const qs = scope ? `?spaceId=${encodeURIComponent(scope)}` : "";
+      const res = await fetch(`/api/guardian/today${qs}`);
       if (!res.ok) {
         if (mounted.current && !opts?.quiet) setData(EMPTY);
         return EMPTY;
@@ -92,6 +138,17 @@ export function useGuardianToday() {
       if (mounted.current && !opts?.quiet) setLoading(false);
     }
   }, []);
+
+  const setScope = useCallback(
+    (spaceId: string | null) => {
+      const next = spaceId?.trim() || null;
+      scopeRef.current = next;
+      setScopeSpaceIdState(next);
+      writeStoredScope(next);
+      void refresh();
+    },
+    [refresh]
+  );
 
   /** Queue only — cron / upload flows drain jobs. Never kick process-jobs from Home. */
   const runBackfill = useCallback(async () => {
@@ -113,6 +170,11 @@ export function useGuardianToday() {
     let cancelled = false;
 
     void (async () => {
+      const stored = readStoredScope();
+      if (stored) {
+        scopeRef.current = stored;
+        setScopeSpaceIdState(stored);
+      }
       const result = await refresh();
       if (cancelled || !result) return;
 
@@ -161,9 +223,16 @@ export function useGuardianToday() {
     setData((prev) => {
       snapshot = prev;
       const priorities = prev.priorities.filter((p) => p.id !== id);
+      const groups = prev.groups
+        .map((g) => ({
+          ...g,
+          priorities: g.priorities.filter((p) => p.id !== id),
+        }))
+        .filter((g) => g.priorities.length > 0);
       return {
         ...prev,
         priorities,
+        groups,
         caughtUp: priorities.length === 0 ? true : prev.caughtUp,
       };
     });
@@ -260,6 +329,8 @@ export function useGuardianToday() {
     actionNote,
     actionError,
     clearActionError: () => setActionError(null),
+    scopeSpaceId,
+    setScope,
     refresh,
     runBackfill,
     complete,

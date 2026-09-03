@@ -25,6 +25,7 @@ const ITEM_SELECT = `
 
 export type GetGuardianWatchOptions = {
   spaceId?: string;
+  spaceIds?: string[];
   horizonDays?: number;
   now?: Date;
 };
@@ -32,24 +33,24 @@ export type GetGuardianWatchOptions = {
 async function loadAccessibleSpaceIds(
   supabase: SupabaseClient,
   userId: string,
-  spaceId?: string
+  filter?: { spaceId?: string; spaceIds?: string[] }
 ): Promise<string[]> {
-  if (spaceId) {
-    const { data } = await supabase
-      .from("guardian_profile_members")
-      .select("profile_id")
-      .eq("user_id", userId)
-      .eq("profile_id", spaceId)
-      .maybeSingle();
-    return data?.profile_id ? [data.profile_id] : [];
-  }
-
   const { data } = await supabase
     .from("guardian_profile_members")
     .select("profile_id")
     .eq("user_id", userId);
+  const authorized = [
+    ...new Set((data ?? []).map((r) => r.profile_id as string)),
+  ];
 
-  return [...new Set((data ?? []).map((r) => r.profile_id as string))];
+  if (filter?.spaceIds?.length) {
+    const allowed = new Set(authorized);
+    return filter.spaceIds.filter((id) => allowed.has(id));
+  }
+  if (filter?.spaceId) {
+    return authorized.includes(filter.spaceId) ? [filter.spaceId] : [];
+  }
+  return authorized;
 }
 
 /**
@@ -61,11 +62,10 @@ export async function getGuardianWatch(
   userId: string,
   options: GetGuardianWatchOptions = {}
 ): Promise<GuardianWatchResult> {
-  const spaceIds = await loadAccessibleSpaceIds(
-    supabase,
-    userId,
-    options.spaceId
-  );
+  const spaceIds = await loadAccessibleSpaceIds(supabase, userId, {
+    spaceId: options.spaceId,
+    spaceIds: options.spaceIds,
+  });
 
   const empty: GuardianWatchResult = {
     today: [],

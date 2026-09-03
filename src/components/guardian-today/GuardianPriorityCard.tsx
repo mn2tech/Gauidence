@@ -55,6 +55,7 @@ export function GuardianPriorityCard({
   onAskGideon,
   onReview,
   onWhy,
+  showSpaceName = true,
 }: {
   item: GuardianIntelligenceItem;
   onComplete: (id: string) => void;
@@ -64,6 +65,7 @@ export function GuardianPriorityCard({
   onAskGideon: (item: GuardianIntelligenceItem) => void;
   onReview: (item: GuardianIntelligenceItem) => void;
   onWhy: (item: GuardianIntelligenceItem) => void;
+  showSpaceName?: boolean;
 }) {
   const dot = PRIORITY_DOT[item.priority] ?? PRIORITY_DOT.medium;
   const when = formatWhen(item.effectiveDate);
@@ -151,7 +153,7 @@ export function GuardianPriorityCard({
           ) : when ? (
             <p className="mt-2 text-sm font-medium text-stone-700">{when}</p>
           ) : null}
-          {item.spaceName ? (
+          {showSpaceName && item.spaceName ? (
             <p className="mt-1.5 text-sm font-semibold text-brand">
               {item.spaceName}
             </p>

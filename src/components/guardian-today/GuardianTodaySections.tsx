@@ -8,6 +8,36 @@ import type {
 } from "@/lib/guardian-today/types";
 import { ASK_GIDEON_PATH } from "@/lib/simple-home/routing";
 
+export function GuardianTodaySpaceFilter({
+  spaces,
+  value,
+  onChange,
+}: {
+  spaces: { id: string; display_name: string }[];
+  value: string | null;
+  onChange: (spaceId: string | null) => void;
+}) {
+  if (spaces.length < 2) return null;
+  return (
+    <label className="flex min-w-0 items-center gap-2">
+      <span className="shrink-0 text-xs font-medium text-ink-muted">Show</span>
+      <select
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value || null)}
+        className="max-w-[12rem] truncate rounded-lg border border-stone-300 bg-white px-2 py-1 text-sm font-medium text-foreground"
+        aria-label="Space to show on Guardian Today"
+      >
+        <option value="">All spaces</option>
+        {spaces.map((space) => (
+          <option key={space.id} value={space.id}>
+            {space.display_name}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function CoverageLine({
   coverage,
   summary,
@@ -35,6 +65,8 @@ export function GuardianIntelligenceEmptyState({
   onRetry,
   retrying,
   showRecentActivity,
+  scopeName,
+  framed = true,
   children,
 }: {
   coverage: GuardianTodayCoverage;
@@ -42,19 +74,23 @@ export function GuardianIntelligenceEmptyState({
   onRetry?: () => void;
   retrying?: boolean;
   showRecentActivity?: boolean;
+  scopeName?: string | null;
+  framed?: boolean;
   children?: React.ReactNode;
 }) {
   const status = coverage.status;
+  const box = framed ? "simple-home-card p-4 sm:p-5" : "";
 
   if (status === "never_scanned") {
     return (
-      <div className="simple-home-card p-4 sm:p-5">
+      <div className={box}>
         <p className="text-sm font-semibold text-foreground">
           Guardian is getting to know your Spaces.
         </p>
         <p className="mt-2 text-sm text-ink-muted">
           Checking documents and Daily Logs for deadlines, events, and things
-          that may need your attention.
+          that may need your attention
+          {scopeName ? ` in ${scopeName}` : ""}.
         </p>
         <CoverageLine coverage={coverage} summary={coverageSummary} />
         {onRetry ? (
@@ -82,13 +118,16 @@ export function GuardianIntelligenceEmptyState({
 
   if (status === "processing") {
     return (
-      <div className="simple-home-card p-4 sm:p-5">
+      <div className={box}>
         <p className="text-sm font-semibold text-foreground">
           Guardian is checking your Spaces…
         </p>
         <p className="mt-2 text-sm text-ink-muted">
-          Looking for deadlines, commitments, changes, and follow-ups across
-          the Spaces you can access.
+          Looking for deadlines, commitments, changes, and follow-ups
+          {scopeName
+            ? ` in ${scopeName}`
+            : " across the Spaces you can access"}
+          .
         </p>
         <CoverageLine coverage={coverage} summary={coverageSummary} />
       </div>
@@ -97,7 +136,7 @@ export function GuardianIntelligenceEmptyState({
 
   if (status === "failed") {
     return (
-      <div className="simple-home-card p-4 sm:p-5">
+      <div className={box}>
         <p className="text-sm font-semibold text-foreground">
           Guardian couldn&apos;t finish checking some of your information.
         </p>
@@ -125,13 +164,15 @@ export function GuardianIntelligenceEmptyState({
 
   if (status === "no_sources") {
     return (
-      <div className="simple-home-card p-4 sm:p-5">
+      <div className={box}>
         <p className="text-sm font-semibold text-foreground">
           Guardian is ready when you are.
         </p>
         <p className="mt-2 text-sm text-ink-muted">
-          Add documents or notes to your Spaces and Guardian will watch for
-          deadlines, commitments, and things that may need your attention.
+          Add documents or notes
+          {scopeName ? ` to ${scopeName}` : " to your Spaces"} and Guardian
+          will watch for deadlines, commitments, and things that may need your
+          attention.
         </p>
         <Link
           href={ASK_GIDEON_PATH}
@@ -146,7 +187,7 @@ export function GuardianIntelligenceEmptyState({
 
   if (status === "partial") {
     return (
-      <div className="simple-home-card p-4 sm:p-5">
+      <div className={box}>
         <p className="text-sm font-semibold text-foreground">
           Guardian is still checking some of your information.
         </p>
@@ -175,13 +216,15 @@ export function GuardianIntelligenceEmptyState({
 
   /* ready only — true empty after evaluation */
   return (
-    <div className="simple-home-card p-4 sm:p-5">
+    <div className={box}>
       <p className="text-sm font-semibold text-foreground">
-        Nothing needs your attention right now.
+        Nothing needs your attention
+        {scopeName ? ` in ${scopeName}` : ""} right now.
       </p>
       <p className="mt-2 text-sm text-ink-muted">
-        Guardian checked your Spaces and found no urgent deadlines, unresolved
-        commitments, important changes, or follow-ups.
+        Guardian checked
+        {scopeName ? ` ${scopeName}` : " your Spaces"} and found no urgent
+        deadlines, unresolved commitments, important changes, or follow-ups.
       </p>
       <CoverageLine coverage={coverage} summary={coverageSummary} />
       <Link

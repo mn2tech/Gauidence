@@ -176,5 +176,5 @@ export function rankPriorities(
       return true;
     });
 
-  return ranked.slice(0, Math.min(limit, 5));
+  return ranked.slice(0, Math.max(0, limit));
 }

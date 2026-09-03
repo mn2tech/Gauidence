@@ -9,7 +9,7 @@ import SimpleHomeScreen from "@/components/simple-home/SimpleHomeScreen";
 
 export const metadata: Metadata = {
   title: "Guardian Today — Guardian",
-  description: "What needs your attention today across all your Spaces.",
+  description: "What needs your attention today in Personal, Business, and your other Spaces.",
 };
 
 export default async function SimpleHomePage() {

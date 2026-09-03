@@ -13,8 +13,21 @@ import {
   needsIntelligenceBackfill,
 } from "./coverage";
 import { toIntelligenceItem } from "./mapItem";
-import { rankPriorities, scoreWatchItem } from "./scoring";
-import type { GuardianTodayCoverage, GuardianTodayResult } from "./types";
+import { scoreWatchItem } from "./scoring";
+import {
+  TODAY_GROUP_LIMIT,
+  TODAY_SCOPE_LIMIT,
+  groupScoredByRootSpace,
+  restrictToAuthorized,
+  spaceIdsUnderRoot,
+  spaceScopeMap,
+  type SpaceScopeProfile,
+} from "./spaceScope";
+import type {
+  GuardianTodayCoverage,
+  GuardianTodayResult,
+  GuardianTodaySpaceGroup,
+} from "./types";
 
 async function loadSourceTitles(
   supabase: SupabaseClient,
@@ -41,6 +54,23 @@ async function loadAccessibleSpaceIds(
     .select("profile_id")
     .eq("user_id", userId);
   return [...new Set((data ?? []).map((r) => r.profile_id as string))];
+}
+
+async function loadSpaceScopeProfiles(
+  supabase: SupabaseClient,
+  spaceIds: string[]
+): Promise<SpaceScopeProfile[]> {
+  if (spaceIds.length === 0) return [];
+  const { data } = await supabase
+    .from("guardian_profiles")
+    .select("id, display_name, profile_type, parent_profile_id")
+    .in("id", spaceIds);
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    display_name: (row.display_name as string) ?? "Space",
+    profile_type: (row.profile_type as string) ?? "other",
+    parent_profile_id: (row.parent_profile_id as string | null) ?? null,
+  }));
 }
 
 async function countActiveGuardianItems(
@@ -76,23 +106,53 @@ function emptyCoverage(spaceCount = 0): GuardianTodayCoverage {
   };
 }
 
+function coverageSummaryForScope(
+  coverage: GuardianTodayCoverage,
+  scopeName: string | null
+): string {
+  if (scopeName) {
+    const n = coverage.processedSourceCount;
+    return `Guardian checked ${scopeName} · ${n} source${n === 1 ? "" : "s"} analyzed`;
+  }
+  return formatCoverageSummary(coverage);
+}
+
 /**
- * Guardian Today — cross-space prioritized intelligence from precomputed items.
+ * Guardian Today — prioritized intelligence from precomputed items.
+ * All Spaces stay combined in one home view, grouped by Personal / Business / etc.
  * Empty priorities alone do NOT mean "caught up" — coverage must be ready.
  */
 export async function getGuardianToday(
   supabase: SupabaseClient,
   userId: string,
-  options: { now?: Date } = {}
+  options: { now?: Date; spaceId?: string | null } = {}
 ): Promise<GuardianTodayResult> {
   const now = options.now ?? new Date();
   const timeZone = await getUserTimeZone(supabase, userId);
   const today = calendarDateInUserZone(now, timeZone);
   const evaluatedAt = now.toISOString();
 
-  const spaceIds = await loadAccessibleSpaceIds(supabase, userId);
+  const authorizedIds = await loadAccessibleSpaceIds(supabase, userId);
+  const profiles = await loadSpaceScopeProfiles(supabase, authorizedIds);
+  const byId = spaceScopeMap(profiles);
+
+  const requestedId = options.spaceId?.trim() || null;
+  const scoped =
+    requestedId && authorizedIds.includes(requestedId) ? requestedId : null;
+  const spaceIds = scoped
+    ? restrictToAuthorized(
+        (() => {
+          const nested = spaceIdsUnderRoot(scoped, byId);
+          return nested.length > 0 ? nested : [scoped];
+        })(),
+        authorizedIds
+      )
+    : authorizedIds;
+  const scopeProfile = scoped ? byId.get(scoped) ?? null : null;
+  const scopeSpaceName = scopeProfile?.display_name ?? null;
+
   const [watch, sources, activeItemCount, dailyLogCount] = await Promise.all([
-    getGuardianWatch(supabase, userId, { now }),
+    getGuardianWatch(supabase, userId, { now, spaceIds }),
     loadEligibleSourceStatuses(supabase, spaceIds),
     countActiveGuardianItems(supabase, spaceIds),
     countDailyLogSources(supabase, spaceIds),
@@ -107,26 +167,38 @@ export async function getGuardianToday(
   const scored = candidates.map((item) =>
     scoreWatchItem({ item, today, now })
   );
-  const top = rankPriorities(scored);
+  const grouped = groupScoredByRootSpace(
+    scored,
+    byId,
+    scoped ? TODAY_SCOPE_LIMIT : TODAY_GROUP_LIMIT
+  );
 
+  const rankedItems = grouped.flatMap((g) => g.items);
   const docIds = [
     ...new Set(
-      top
+      rankedItems
         .map((i) => i.source_document_id)
         .filter((id): id is string => Boolean(id))
     ),
   ];
   const sourceTitles = await loadSourceTitles(supabase, docIds);
 
-  const priorities = top.map((item) =>
-    toIntelligenceItem(
-      item,
-      item.source_document_id
-        ? sourceTitles[item.source_document_id] ?? null
-        : null
-    )
-  );
+  const groups: GuardianTodaySpaceGroup[] = grouped.map((g) => ({
+    spaceId: g.rootId,
+    spaceName:
+      g.profile?.display_name ?? g.items[0]?.space_name ?? "Space",
+    profileType: g.profile?.profile_type ?? null,
+    priorities: g.items.map((item) =>
+      toIntelligenceItem(
+        item,
+        item.source_document_id
+          ? sourceTitles[item.source_document_id] ?? null
+          : null
+      )
+    ),
+  }));
 
+  const priorities = groups.flatMap((g) => g.priorities);
   const whatChanged = await getWhatChanged(supabase, spaceIds);
 
   // Synthetic source rows so Daily Logs count toward coverage / never_scanned.
@@ -149,11 +221,14 @@ export async function getGuardianToday(
   const caughtUp = isTrulyCaughtUp(coverage, priorities.length);
   const coverageSummary =
     coverage.status === "ready" || coverage.status === "partial"
-      ? formatCoverageSummary(coverage)
+      ? coverageSummaryForScope(coverage, scopeSpaceName)
       : null;
 
   return {
     priorities,
+    groups,
+    scopeSpaceId: scoped,
+    scopeSpaceName,
     whatChanged,
     caughtUp,
     coverage,

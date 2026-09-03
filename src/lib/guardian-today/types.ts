@@ -117,8 +117,20 @@ export type GuardianTodayCoverage = {
   status: GuardianIntelligencePipelineStatus;
 };
 
+export type GuardianTodaySpaceGroup = {
+  spaceId: string;
+  spaceName: string;
+  profileType: string | null;
+  priorities: GuardianIntelligenceItem[];
+};
+
 export type GuardianTodayResult = {
   priorities: GuardianIntelligenceItem[];
+  /** Priorities grouped by top-level Space (Personal, Business, …). */
+  groups: GuardianTodaySpaceGroup[];
+  /** When set, Today is scoped to that Space and its nested Spaces. */
+  scopeSpaceId: string | null;
+  scopeSpaceName: string | null;
   whatChanged: WhatChangedEntry[];
   /**
    * True ONLY when accessible Spaces were evaluated, sources processed,

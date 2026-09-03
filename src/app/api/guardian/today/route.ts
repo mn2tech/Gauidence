@@ -5,7 +5,7 @@ import { getGuardianToday } from "@/lib/guardian-today/today";
 
 export const runtime = "nodejs";
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createClient();
   if (!supabase) {
     return NextResponse.json({ error: "Not configured." }, { status: 503 });
@@ -27,6 +27,8 @@ export async function GET() {
     await repairFamilyCascadeForUser(admin, user.id);
   }
 
-  const today = await getGuardianToday(supabase, user.id);
+  const url = new URL(request.url);
+  const spaceId = url.searchParams.get("spaceId")?.trim() || null;
+  const today = await getGuardianToday(supabase, user.id, { spaceId });
   return NextResponse.json(today);
 }

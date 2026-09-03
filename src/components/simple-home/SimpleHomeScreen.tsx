@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, FolderPlus } from "lucide-react";
@@ -18,31 +19,84 @@ import {
   GuardianIntelligenceEmptyState,
   GuardianPartialBanner,
   GuardianProvenancePanel,
+  GuardianTodaySpaceFilter,
   GuardianWhatChanged,
 } from "@/components/guardian-today/GuardianTodaySections";
 import { GuardianSourcePanel } from "@/hooks/useGuardianWatchHome";
 import { formatActivityWhen } from "@/lib/simple-home/helpers";
 import { VAULTS_PATH } from "@/lib/simple-home/routing";
 import { documentsHref } from "@/lib/routes";
+import type { GuardianIntelligenceItem } from "@/lib/guardian-today/types";
 import { getContainerLabel, topLevelProfiles } from "@/lib/profiles/types";
 import { PERSONAL_SPACE_DISPLAY_NAME } from "@/lib/personal-space/types";
 import { isPersonalSpaceProfile } from "@/lib/personal-space/welcome";
 
 function Section({
   title,
+  action,
   children,
 }: {
   title: string;
+  action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <section className="simple-home-card p-4 sm:p-5">
-      <h2 className="text-lg font-bold tracking-tight text-foreground sm:text-xl">
-        {title}
-      </h2>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <h2 className="text-lg font-bold tracking-tight text-foreground sm:text-xl">
+          {title}
+        </h2>
+        {action}
+      </div>
       <div className="mt-3.5">{children}</div>
     </section>
   );
+}
+
+function PriorityList({
+  items,
+  groupName,
+  today,
+}: {
+  items: GuardianIntelligenceItem[];
+  groupName?: string | null;
+  today: ReturnType<typeof useGuardianToday>;
+}) {
+  return (
+    <ul className="space-y-3">
+      {items.map((item) => (
+        <GuardianPriorityCard
+          key={item.id}
+          item={item}
+          showSpaceName={Boolean(
+            item.spaceName && item.spaceName !== groupName
+          )}
+          onComplete={(id) => void today.complete(id)}
+          onDismiss={(id) => void today.dismiss(id)}
+          onSnooze={(id) => void today.snooze(id)}
+          onViewSource={(i) => void today.viewSource(i)}
+          onAskGideon={(i) => today.askGideon(i)}
+          onReview={(i) => today.review(i)}
+          onWhy={(i) => today.setProvenanceOpen(i)}
+        />
+      ))}
+    </ul>
+  );
+}
+
+function emptyCoverage() {
+  return {
+    spaceCount: 0,
+    sourceCount: 0,
+    processedSourceCount: 0,
+    pendingSourceCount: 0,
+    processingSourceCount: 0,
+    failedSourceCount: 0,
+    activeItemCount: 0,
+    lastExtractionAt: null,
+    lastWatchEvaluationAt: null,
+    status: "never_scanned" as const,
+  };
 }
 
 export default function SimpleHomeScreen() {
@@ -53,7 +107,29 @@ export default function SimpleHomeScreen() {
   const today = useGuardianToday();
   const { openUpgrade } = useUpgradeModal();
 
-  const spaces = topLevelProfiles(profiles);
+  const spaces = [...topLevelProfiles(profiles)].sort((a, b) => {
+    const order: Record<string, number> = {
+      personal: 0,
+      family: 1,
+      business: 2,
+      non_profit: 3,
+    };
+    const oa = order[a.profile_type] ?? 8;
+    const ob = order[b.profile_type] ?? 8;
+    if (oa !== ob) return oa - ob;
+    return a.display_name.localeCompare(b.display_name);
+  });
+  const spaceIdsKey = spaces.map((s) => s.id).join(",");
+
+  useEffect(() => {
+    if (profilesLoading || !spaceIdsKey) return;
+    if (!today.scopeSpaceId) return;
+    if (!spaces.some((s) => s.id === today.scopeSpaceId)) {
+      today.setScope(null);
+    }
+    // spaces identity is represented by spaceIdsKey
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profilesLoading, spaceIdsKey, today.scopeSpaceId, today.setScope]);
   const personal =
     profiles.find((p) => isPersonalSpaceProfile(p) && p.is_default) ??
     profiles.find((p) => isPersonalSpaceProfile(p)) ??
@@ -110,6 +186,27 @@ export default function SimpleHomeScreen() {
   }
 
   const showPersonalWelcome = isPersonalActive && knowledgeEmpty;
+  const spaceFilter = (
+    <GuardianTodaySpaceFilter
+      spaces={spaces}
+      value={today.scopeSpaceId}
+      onChange={today.setScope}
+    />
+  );
+  const groups =
+    today.data.groups.length > 0
+      ? today.data.groups
+      : today.data.priorities.length > 0
+        ? [
+            {
+              spaceId: "all",
+              spaceName: today.data.scopeSpaceName ?? "All spaces",
+              profileType: null,
+              priorities: today.data.priorities,
+            },
+          ]
+        : [];
+  const showGroupHeadings = !today.scopeSpaceId && groups.length > 1;
 
   return (
     <div className="simple-home-page mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-6 sm:gap-7 sm:py-8">
@@ -146,40 +243,40 @@ export default function SimpleHomeScreen() {
       ) : null}
 
       {today.loading ? (
-        <Section title="Today's priorities">
+        <Section title="Today's priorities" action={spaceFilter}>
           <p className="text-sm text-ink-muted">Loading…</p>
         </Section>
       ) : today.data.priorities.length > 0 ? (
-        <Section title="Today's priorities">
+        <Section title="Today's priorities" action={spaceFilter}>
           <GuardianPartialBanner
-            coverage={today.data.coverage ?? {
-              spaceCount: 0,
-              sourceCount: 0,
-              processedSourceCount: 0,
-              pendingSourceCount: 0,
-              processingSourceCount: 0,
-              failedSourceCount: 0,
-              activeItemCount: 0,
-              lastExtractionAt: null,
-              lastWatchEvaluationAt: null,
-              status: "never_scanned",
-            }}
+            coverage={today.data.coverage ?? emptyCoverage()}
           />
-          <ul className="space-y-3">
-            {today.data.priorities.map((item) => (
-              <GuardianPriorityCard
-                key={item.id}
-                item={item}
-                onComplete={(id) => void today.complete(id)}
-                onDismiss={(id) => void today.dismiss(id)}
-                onSnooze={(id) => void today.snooze(id)}
-                onViewSource={(i) => void today.viewSource(i)}
-                onAskGideon={(i) => today.askGideon(i)}
-                onReview={(i) => today.review(i)}
-                onWhy={(i) => today.setProvenanceOpen(i)}
-              />
-            ))}
-          </ul>
+          {showGroupHeadings ? (
+            <div className="space-y-6">
+              {groups.map((group) => (
+                <div key={group.spaceId}>
+                  <h3 className="mb-2.5 text-sm font-semibold tracking-tight text-foreground">
+                    {group.spaceName}
+                  </h3>
+                  <PriorityList
+                    items={group.priorities}
+                    groupName={group.spaceName}
+                    today={today}
+                  />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <PriorityList
+              items={groups[0]?.priorities ?? today.data.priorities}
+              groupName={
+                today.scopeSpaceId
+                  ? today.data.scopeSpaceName ?? groups[0]?.spaceName
+                  : null
+              }
+              today={today}
+            />
+          )}
           {today.data.coverageSummary ? (
             <div className="mt-4 border-t border-border-subtle pt-3">
               <GuardianCoverageFooter summary={today.data.coverageSummary} />
@@ -187,46 +284,37 @@ export default function SimpleHomeScreen() {
           ) : null}
         </Section>
       ) : (
-        <GuardianIntelligenceEmptyState
-          coverage={
-            today.data.coverage ?? {
-              spaceCount: 0,
-              sourceCount: 0,
-              processedSourceCount: 0,
-              pendingSourceCount: 0,
-              processingSourceCount: 0,
-              failedSourceCount: 0,
-              activeItemCount: 0,
-              lastExtractionAt: null,
-              lastWatchEvaluationAt: null,
-              status: "never_scanned",
+        <Section title="Today's priorities" action={spaceFilter}>
+          <GuardianIntelligenceEmptyState
+            coverage={today.data.coverage ?? emptyCoverage()}
+            coverageSummary={today.data.coverageSummary}
+            scopeName={today.data.scopeSpaceName}
+            framed={false}
+            onRetry={() => void today.runBackfill()}
+            retrying={today.retrying}
+            showRecentActivity={
+              today.data.caughtUp && homeData.recentActivity.length > 0
             }
-          }
-          coverageSummary={today.data.coverageSummary}
-          onRetry={() => void today.runBackfill()}
-          retrying={today.retrying}
-          showRecentActivity={
-            today.data.caughtUp && homeData.recentActivity.length > 0
-          }
-        >
-          <ul className="space-y-1">
-            {homeData.recentActivity.slice(0, 5).map((item) => (
-              <li key={item.id}>
-                <Link
-                  href={item.href}
-                  className="flex items-start justify-between gap-3 rounded-xl px-2 py-2.5 text-sm transition hover:bg-brand-light/35"
-                >
-                  <span className="min-w-0 font-medium text-foreground">
-                    {item.title}
-                  </span>
-                  <span className="shrink-0 text-xs text-ink-muted">
-                    {formatActivityWhen(item.occurredAt)}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </GuardianIntelligenceEmptyState>
+          >
+            <ul className="space-y-1">
+              {homeData.recentActivity.slice(0, 5).map((item) => (
+                <li key={item.id}>
+                  <Link
+                    href={item.href}
+                    className="flex items-start justify-between gap-3 rounded-xl px-2 py-2.5 text-sm transition hover:bg-brand-light/35"
+                  >
+                    <span className="min-w-0 font-medium text-foreground">
+                      {item.title}
+                    </span>
+                    <span className="shrink-0 text-xs text-ink-muted">
+                      {formatActivityWhen(item.occurredAt)}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </GuardianIntelligenceEmptyState>
+        </Section>
       )}
 
       <GuardianWhatChanged entries={today.data.whatChanged} />
