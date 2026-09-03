@@ -21,6 +21,7 @@ type Props = {
   initialCompanyName: string;
   avatarUrl: string | null;
   initialRemindersEnabled: boolean;
+  initialMorningBriefEnabled?: boolean;
   initialWeeklyBriefEnabled?: boolean;
   initialTipsEnabled: boolean;
   initialVaultActivityEnabled?: boolean;
@@ -37,6 +38,7 @@ export default function SettingsForm({
   initialCompanyName,
   avatarUrl,
   initialRemindersEnabled,
+  initialMorningBriefEnabled = true,
   initialWeeklyBriefEnabled = true,
   initialTipsEnabled,
   initialVaultActivityEnabled = true,
@@ -84,6 +86,14 @@ export default function SettingsForm({
   const [remindersEnabled, setRemindersEnabled] = useState(initialRemindersEnabled);
   const [savingReminders, setSavingReminders] = useState(false);
   const [remindersError, setRemindersError] = useState<string | null>(null);
+
+  const [morningBriefEnabled, setMorningBriefEnabled] = useState(
+    initialMorningBriefEnabled
+  );
+  const [savingMorningBrief, setSavingMorningBrief] = useState(false);
+  const [morningBriefError, setMorningBriefError] = useState<string | null>(
+    null
+  );
 
   const [weeklyBriefEnabled, setWeeklyBriefEnabled] = useState(
     initialWeeklyBriefEnabled
@@ -188,6 +198,26 @@ export default function SettingsForm({
       setRemindersError("We couldn't save that change. Please try again.");
     }
     setSavingReminders(false);
+  }
+
+  async function handleToggleMorningBrief() {
+    if (!supabase || savingMorningBrief) return;
+    const next = !morningBriefEnabled;
+    setMorningBriefError(null);
+    setMorningBriefEnabled(next);
+    setSavingMorningBrief(true);
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        morning_brief_enabled: next,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", userId);
+    if (error) {
+      setMorningBriefEnabled(!next);
+      setMorningBriefError("We couldn't save that change. Please try again.");
+    }
+    setSavingMorningBrief(false);
   }
 
   async function handleToggleWeeklyBrief() {
@@ -653,6 +683,62 @@ export default function SettingsForm({
             <span
               className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
                 remindersEnabled ? "translate-x-[22px]" : "translate-x-0.5"
+              }`}
+            />
+          </button>
+        </div>
+      </section>
+
+      {/* Morning Brief */}
+      <section className="rounded-2xl border border-stone-200 bg-white p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <Mail className="h-5 w-5 text-brand" />
+              <h2 className="text-base font-semibold">Morning Brief</h2>
+            </div>
+            <p className="mt-2 text-sm leading-relaxed text-ink-muted">
+              Each morning around 7&nbsp;am in your timezone, Gideon checks your
+              Spaces and emails {email} what needs attention today.
+            </p>
+            {!outboundDigestsIncluded ? (
+              <p className="mt-2 text-sm font-medium text-brand">
+                Included with Guardian Pro.{" "}
+                <button
+                  type="button"
+                  onClick={() =>
+                    openUpgrade({
+                      plan: "personal",
+                      reason:
+                        "Guardian Pro includes Gideon's Morning Brief so you start the day knowing what needs you.",
+                    })
+                  }
+                  className="underline hover:text-brand-dark"
+                >
+                  Upgrade to Pro
+                </button>
+              </p>
+            ) : null}
+            {morningBriefError && (
+              <p role="alert" className="mt-2 text-sm text-red-700">
+                {morningBriefError}
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={morningBriefEnabled}
+            aria-label="Morning Brief"
+            onClick={handleToggleMorningBrief}
+            disabled={savingMorningBrief}
+            className={`relative mt-1 inline-flex h-6 w-11 shrink-0 items-center rounded-full transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-60 ${
+              morningBriefEnabled ? "bg-brand" : "bg-stone-300"
+            }`}
+          >
+            <span
+              className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
+                morningBriefEnabled ? "translate-x-[22px]" : "translate-x-0.5"
               }`}
             />
           </button>

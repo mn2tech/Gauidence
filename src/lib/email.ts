@@ -266,6 +266,99 @@ export async function sendWeeklyBriefEmail(
   return true;
 }
 
+export type MorningBriefLine = {
+  title: string;
+  detail: string;
+  url: string;
+};
+
+export type MorningBriefEmailArgs = {
+  to: string;
+  greetName?: string | null;
+  priorities: MorningBriefLine[];
+  homeUrl: string;
+  todayLabel: string;
+};
+
+export function renderMorningBriefEmail(args: MorningBriefEmailArgs) {
+  const name = args.greetName?.trim() || "there";
+  const count = args.priorities.length;
+  const priorityRows = args.priorities
+    .map(
+      (item) => `
+        <tr>
+          <td style="padding:10px 16px;border-bottom:1px solid #e7e5e4;">
+            <a href="${escapeHtml(item.url)}" style="font-weight:600;color:#0f766e;text-decoration:underline;">${escapeHtml(item.title)}</a>
+            <div style="margin-top:2px;font-size:13px;color:#57534e;">${escapeHtml(item.detail)}</div>
+          </td>
+        </tr>`
+    )
+    .join("");
+
+  const subject =
+    count === 1
+      ? `Good morning · 1 priority`
+      : `Good morning · ${count} priorities`;
+
+  const lead = `Gideon checked your Spaces for <strong>${escapeHtml(args.todayLabel)}</strong>. ${count} thing${count === 1 ? "" : "s"} need${count === 1 ? "s" : ""} you today.`;
+
+  const html = `
+  <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#fafaf9;padding:32px 16px;">
+    <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e7e5e4;border-radius:16px;overflow:hidden;">
+      <div style="padding:24px 24px 8px;">
+        ${brandHeaderHtml()}
+        <p style="margin:16px 0 4px;font-size:18px;font-weight:600;color:#1c1917;">Good morning, ${escapeHtml(name)}</p>
+        <p style="margin:0 0 8px;font-size:15px;color:#1c1917;line-height:1.5;">${lead}</p>
+      </div>
+      <div style="padding:8px 24px 0;"><p style="margin:0;font-size:13px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#57534e;">Today&apos;s priorities</p></div>
+      <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;">${priorityRows}</table>
+      <div style="padding:24px;">
+        <a href="${escapeHtml(args.homeUrl)}" style="display:inline-block;padding:12px 18px;border-radius:12px;background:#0f766e;color:#ffffff;font-weight:600;font-size:14px;text-decoration:none;">Open Today's priorities</a>
+        <p style="margin:16px 0 0;font-size:12px;color:#78716c;line-height:1.4;">You're getting this because Morning Brief is on in Settings. Manage email preferences anytime.</p>
+      </div>
+    </div>
+  </div>`;
+
+  const textParts = [
+    `Good morning, ${name}`,
+    `Gideon checked your Spaces for ${args.todayLabel}. ${count} thing(s) need you today.`,
+    "",
+    "Today's priorities:",
+  ];
+  for (const item of args.priorities) {
+    textParts.push(`- ${item.title} (${item.detail})`);
+  }
+  textParts.push("");
+  textParts.push(`Open Today's priorities: ${args.homeUrl}`);
+
+  return { subject, html, text: textParts.join("\n") };
+}
+
+export async function sendMorningBriefEmail(
+  args: MorningBriefEmailArgs
+): Promise<boolean> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return false;
+
+  const from =
+    process.env.REMINDER_FROM_EMAIL ?? "Guardian <onboarding@resend.dev>";
+  const resend = new Resend(apiKey);
+  const { subject, html, text } = renderMorningBriefEmail(args);
+
+  const { error } = await resend.emails.send({
+    from,
+    to: args.to,
+    subject,
+    html,
+    text,
+  });
+  if (error) {
+    console.error("Morning brief email failed:", args.to, error.message);
+    return false;
+  }
+  return true;
+}
+
 export type VaultInviteEmailArgs = {
   to: string;
   vaultName: string;

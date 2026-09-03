@@ -98,3 +98,17 @@ export function calendarDateInUserZone(
     day: "2-digit",
   }).format(instant);
 }
+
+/** Local hour 0–23 in an IANA timezone (for morning brief windows). */
+export function hourInUserZone(
+  instant: Date = new Date(),
+  timeZone: string = GUARDIAN_TIME_ZONE
+): number {
+  const raw = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour: "numeric",
+    hourCycle: "h23",
+  }).formatToParts(instant);
+  const hour = Number(raw.find((p) => p.type === "hour")?.value);
+  return Number.isFinite(hour) ? hour : 0;
+}
