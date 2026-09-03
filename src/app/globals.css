@@ -124,6 +124,43 @@ html {
   animation: welcome-fade-up 0.4s ease-out both;
 }
 
+/* Marketing landing hero */
+.landing-hero {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--brand-light) 70%, var(--background)) 0%,
+    var(--background) 72%
+  );
+}
+
+.landing-hero-fade {
+  animation: welcome-fade-up 0.55s ease-out both;
+}
+
+.landing-hero-dot {
+  animation: landing-hero-dot-in 0.6s ease-out 0.55s both;
+}
+
+@keyframes landing-hero-dot-in {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-hero-fade,
+  .landing-hero-dot,
+  .welcome-strip,
+  .welcome-chip {
+    animation: none;
+  }
+}
+
 /*
   SSR boot cover — present in the first HTML paint so the landing page
   never blinks before the start splash. Hidden when html has

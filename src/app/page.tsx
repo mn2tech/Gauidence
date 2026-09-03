@@ -1,29 +1,10 @@
 import Link from "next/link";
-import { ArrowRight, BellRing, FileText, ShieldCheck } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 import SecuritySection from "@/components/SecuritySection";
 import MeetGideonSection from "@/components/MeetGideonSection";
 import GuardianLogo from "@/components/brand/GuardianLogo";
-import { GUARDIAN_BRAND_TAGLINE } from "@/lib/branding";
-
-const features = [
-  {
-    icon: FileText,
-    title: "Understand every document",
-    body: "Upload insurance policies, IDs, leases, and letters. Guardian extracts the facts that matter and explains them in plain language.",
-  },
-  {
-    icon: BellRing,
-    title: "Never miss a deadline",
-    body: "Guardian tracks renewal dates, expirations, and required actions, and alerts you before they become problems.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Keep it all in one safe place",
-    body: "Your documents live in one private, organized vault — tied to your account and visible only to you.",
-  },
-];
 
 export default async function Home({
   searchParams,
@@ -47,32 +28,33 @@ export default async function Home({
           </div>
         ) : null}
 
-        {/* Hero */}
-        <section className="relative overflow-hidden">
-          <div className="absolute inset-0 -z-10 bg-gradient-to-b from-brand-light via-background to-background" />
-          <div className="mx-auto max-w-6xl px-6 pb-20 pt-16 text-center sm:pb-28 sm:pt-20">
-            <GuardianLogo
-              variant="lockup"
-              size="lg"
-              priority
-              className="mx-auto"
-            />
-            <p className="mt-4 text-[11px] font-medium uppercase tracking-[0.18em] text-ink-muted sm:text-xs">
-              {GUARDIAN_BRAND_TAGLINE}
-            </p>
-            <p className="mx-auto mt-8 inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white px-4 py-1.5 text-sm font-medium text-foreground">
-              <ShieldCheck className="h-4 w-4" />
-              Private by default
-            </p>
-            <h1 className="mx-auto mt-6 max-w-3xl text-4xl font-bold tracking-tight text-foreground sm:text-6xl">
+        <section className="landing-hero relative overflow-hidden">
+          <div className="mx-auto max-w-3xl px-6 pb-12 pt-14 text-center sm:pb-14 sm:pt-20">
+            <div className="landing-hero-fade" style={{ animationDelay: "0ms" }}>
+              <GuardianLogo
+                variant="lockup"
+                size="lg"
+                priority
+                className="mx-auto"
+              />
+            </div>
+            <h1
+              className="landing-hero-fade mx-auto mt-8 max-w-2xl text-3xl font-bold tracking-tight text-foreground sm:text-5xl"
+              style={{ animationDelay: "80ms" }}
+            >
               The documents that run your life, finally under control.
             </h1>
-            <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-ink-muted">
-              Guardian remembers what matters — documents, notes, deadlines —
-              so you can ask instead of search. Private by default, explained in
-              plain language.
+            <p
+              className="landing-hero-fade mx-auto mt-5 max-w-xl text-lg leading-relaxed text-ink-muted"
+              style={{ animationDelay: "160ms" }}
+            >
+              Guardian reads what you store and puts the next deadline in front
+              of you.
             </p>
-            <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
+            <div
+              className="landing-hero-fade mt-8 flex flex-wrap items-center justify-center gap-4"
+              style={{ animationDelay: "240ms" }}
+            >
               <Link
                 href="/signup"
                 className="inline-flex items-center gap-2 rounded-full bg-brand px-6 py-3 font-semibold text-white transition hover:bg-brand-dark"
@@ -87,31 +69,30 @@ export default async function Home({
                 See pricing
               </Link>
             </div>
-            <p className="mt-4 text-sm text-ink-muted">
-              <Link href="/security" className="underline-offset-2 hover:underline">
-                Read our Security Principles
-              </Link>
-            </p>
           </div>
-        </section>
 
-        {/* Features */}
-        <section className="mx-auto max-w-6xl px-6 pb-20 sm:pb-28">
-          <div className="grid gap-6 sm:grid-cols-3">
-            {features.map(({ icon: Icon, title, body }) => (
-              <div
-                key={title}
-                className="rounded-2xl border border-stone-200 bg-white p-6"
-              >
-                <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-light text-brand">
-                  <Icon className="h-5 w-5" />
-                </span>
-                <h3 className="mt-4 text-base font-semibold">{title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-                  {body}
+          <div
+            className="landing-hero-fade landing-hero-moment mx-auto w-full max-w-2xl px-6 pb-20 sm:pb-28"
+            style={{ animationDelay: "400ms" }}
+          >
+            <p className="text-lg font-bold tracking-tight text-foreground sm:text-xl">
+              Today&apos;s priorities
+            </p>
+            <div className="mt-4 flex items-start gap-3">
+              <span
+                className="landing-hero-dot mt-2 h-2.5 w-2.5 shrink-0 rounded-full bg-amber-500"
+                aria-hidden
+              />
+              <div className="min-w-0 text-left">
+                <p className="text-xl font-bold leading-snug tracking-tight text-foreground sm:text-2xl">
+                  Auto insurance renews in 11 days
+                </p>
+                <p className="mt-1.5 text-[15px] leading-relaxed text-stone-800 sm:text-base">
+                  Your State Farm policy ends May 14. Review coverage before it
+                  lapses.
                 </p>
               </div>
-            ))}
+            </div>
           </div>
         </section>
 
