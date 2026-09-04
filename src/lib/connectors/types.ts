@@ -13,7 +13,8 @@ export type ConnectedSourceType =
   | "android_storage"
   | "guardian"
   | "trello"
-  | "google_drive";
+  | "google_drive"
+  | "gmail";
 
 export type SourceItemProcessingStatus =
   | "discovered"

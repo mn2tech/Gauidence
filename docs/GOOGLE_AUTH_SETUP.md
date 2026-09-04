@@ -155,3 +155,22 @@ GOOGLE_DRIVE_CLIENT_SECRET
 
 Also run `supabase/migrations/0085_google_drive_connected_source.sql` in the
 Supabase SQL Editor if that migration has not been applied yet.
+
+## 7. Google Gmail connector (Inbox)
+
+Gmail uses the **same** `GOOGLE_DRIVE_CLIENT_*` OAuth client as Drive, with a
+separate callback and `gmail.readonly` scope. Connections store a distinct
+`connected_sources` row (`source_type = gmail`).
+
+1. [Enable the Gmail API](https://console.cloud.google.com/apis/library/gmail.googleapis.com).
+2. Consent screen scopes: add `https://www.googleapis.com/auth/gmail.readonly`.
+3. Same OAuth client — add redirect URIs:
+   - `http://localhost:3000/api/connections/gmail/callback`
+   - `http://localhost:3001/api/connections/gmail/callback`
+   - `https://guardian.nm2tech.com/api/connections/gmail/callback`
+4. Apply `supabase/migrations/0115_gmail_inbox.sql` (adds `gmail` source type +
+   `inbox_messages`).
+
+Connect from **Inbox → Connect Gmail** or **Settings → Connections → Gmail**,
+then Sync. Mail is read-only; filters suggest Spaces (Bills / School / etc.).
+

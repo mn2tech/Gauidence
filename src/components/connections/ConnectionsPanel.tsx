@@ -9,6 +9,7 @@ import {
   HardDrive,
   LayoutGrid,
   Loader2,
+  Mail,
   RefreshCw,
   Shield,
 } from "lucide-react";
@@ -177,6 +178,7 @@ export default function ConnectionsPanel() {
   );
   const [driveNote, setDriveNote] = useState<string | null>(null);
   const [confirmDriveDisconnect, setConfirmDriveDisconnect] = useState(false);
+  const [confirmGmailDisconnect, setConfirmGmailDisconnect] = useState(false);
   const [drivePickerPending, setDrivePickerPending] = useState(false);
 
   const phoneSource = useMemo(
@@ -202,6 +204,13 @@ export default function ConnectionsPanel() {
   const driveSource = useMemo(
     () => connectionForSpace(sources, "google_drive", active?.id),
     [sources, active?.id]
+  );
+  const gmailSource = useMemo(
+    () =>
+      sources.find(
+        (s) => s.sourceType === "gmail" && s.status !== "disconnected"
+      ) ?? null,
+    [sources]
   );
 
   const load = useCallback(async () => {
@@ -298,7 +307,8 @@ export default function ConnectionsPanel() {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     const drive = params.get("drive");
-    if (!drive) return;
+    const gmail = params.get("gmail");
+    if (!drive && !gmail) return;
     if (drive === "connected") {
       setDrivePickerPending(true);
     } else if (drive === "not_configured") {
@@ -310,8 +320,20 @@ export default function ConnectionsPanel() {
     } else if (drive === "error") {
       setError("Couldn't connect Google Drive. Try again.");
     }
+    if (gmail === "connected") {
+      setDriveNote("Gmail connected. Open Inbox to sync your recent mail.");
+    } else if (gmail === "not_configured") {
+      setError(
+        "Gmail isn't configured. Enable the Gmail API and add the Gmail callback URI to the same Google OAuth client as Drive."
+      );
+    } else if (gmail === "denied") {
+      setError("Gmail access was cancelled or denied.");
+    } else if (gmail === "error") {
+      setError("Couldn't connect Gmail. Try again.");
+    }
     const url = new URL(window.location.href);
     url.searchParams.delete("drive");
+    url.searchParams.delete("gmail");
     const next = `${url.pathname}${url.search}${url.hash}`;
     window.history.replaceState({}, "", next);
   }, []);
@@ -1226,6 +1248,29 @@ export default function ConnectionsPanel() {
     }
   }, [driveSource, load]);
 
+  const disconnectGmail = useCallback(async () => {
+    if (!gmailSource) return;
+    setBusy("gmail-disconnect");
+    setError(null);
+    try {
+      const res = await fetch(`/api/connections/${gmailSource.id}`, {
+        method: "DELETE",
+      });
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        throw new Error(body.error ?? "Couldn't disconnect Gmail.");
+      }
+      setConfirmGmailDisconnect(false);
+      await load();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Couldn't disconnect Gmail."
+      );
+    } finally {
+      setBusy(null);
+    }
+  }, [gmailSource, load]);
+
   const folderName = String(
     phoneSource?.settings?.folderName ?? "Selected folder"
   );
@@ -1260,6 +1305,10 @@ export default function ConnectionsPanel() {
   const driveCanManage = driveSource?.canManage ?? true;
   const driveCanUseSecrets = driveSource?.canUseSecrets ?? true;
   const driveIsShared = driveSource?.access === "shared";
+  const gmailConnected =
+    gmailSource?.status === "connected" || gmailSource?.status === "error";
+  const gmailRevoked = gmailSource?.status === "permission_revoked";
+  const gmailEmail = String(gmailSource?.settings?.email ?? "");
   return (
     <div className="space-y-6">
       <section className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
@@ -2014,6 +2063,119 @@ export default function ConnectionsPanel() {
             </div>
           </section>
 
+          {/* Gmail */}
+          <section className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-stone-100 text-ink-muted">
+                <Mail className="h-4 w-4" aria-hidden />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-base font-semibold text-foreground">
+                  Gmail
+                </h2>
+                {gmailRevoked ? (
+                  <>
+                    <p className="mt-1 flex items-center gap-2 text-sm text-amber-800">
+                      <AlertTriangle className="h-4 w-4" aria-hidden />
+                      Access Required
+                    </p>
+                    <p className="mt-2 text-sm text-ink-muted">
+                      Gmail rejected the saved access. Connect again to grant
+                      readonly inbox permission.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const q = new URLSearchParams({
+                          returnTo: "/settings/connections",
+                        });
+                        if (active?.id) q.set("profileId", active.id);
+                        window.location.href = `/api/connections/gmail/start?${q}`;
+                      }}
+                      disabled={busy !== null}
+                      className="mt-4 inline-flex items-center justify-center rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-60"
+                    >
+                      Reconnect Gmail
+                    </button>
+                  </>
+                ) : gmailConnected && gmailSource ? (
+                  <>
+                    <p className="mt-1 flex items-center gap-2 text-sm text-ink-muted">
+                      <StatusDot tone="ok" />
+                      Connected
+                    </p>
+                    <dl className="mt-4 grid gap-2 text-sm">
+                      <div className="flex justify-between gap-4">
+                        <dt className="text-ink-muted">Account</dt>
+                        <dd className="font-medium text-foreground">
+                          {gmailEmail || gmailSource.displayName || "Gmail"}
+                        </dd>
+                      </div>
+                      <div className="flex justify-between gap-4">
+                        <dt className="text-ink-muted">Last synced</dt>
+                        <dd className="font-medium text-foreground">
+                          {formatLastScanned(gmailSource.lastScanAt)}
+                        </dd>
+                      </div>
+                    </dl>
+                    <p className="mt-3 text-sm text-ink-muted">
+                      Open{" "}
+                      <Link
+                        href="/inbox"
+                        className="font-semibold text-brand hover:text-brand-dark"
+                      >
+                        Inbox
+                      </Link>{" "}
+                      to sync and filter mail into Spaces (Bills, School, and
+                      more). Read-only access.
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <Link
+                        href="/inbox"
+                        className="inline-flex items-center justify-center rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark"
+                      >
+                        Open Inbox
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmGmailDisconnect(true)}
+                        disabled={busy !== null}
+                        className="inline-flex items-center justify-center rounded-full border border-stone-300 px-4 py-2 text-sm font-semibold text-foreground hover:bg-stone-50 disabled:opacity-60"
+                      >
+                        Disconnect
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="mt-1 flex items-center gap-2 text-sm text-ink-muted">
+                      <StatusDot tone="off" />
+                      Not Connected
+                    </p>
+                    <p className="mt-2 text-sm text-ink-muted">
+                      Connect Gmail (read-only) so Guardian Inbox can surface
+                      bills, school mail, and follow-ups into your Spaces.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const q = new URLSearchParams({
+                          returnTo: "/settings/connections",
+                        });
+                        if (active?.id) q.set("profileId", active.id);
+                        window.location.href = `/api/connections/gmail/start?${q}`;
+                      }}
+                      disabled={busy !== null || !profiles.length}
+                      className="mt-4 inline-flex items-center justify-center rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-60"
+                    >
+                      Connect Gmail
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </section>
+
           {/* Coming soon */}
           {[
             { name: "Microsoft 365", soon: true },
@@ -2286,6 +2448,46 @@ export default function ConnectionsPanel() {
                 className="rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
               >
                 {busy === "drive-disconnect" ? "Disconnecting…" : "Disconnect"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {confirmGmailDisconnect ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="gmail-disconnect-title"
+        >
+          <div className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-lg">
+            <h3
+              id="gmail-disconnect-title"
+              className="text-lg font-semibold text-foreground"
+            >
+              Disconnect Gmail?
+            </h3>
+            <p className="mt-2 text-sm text-ink-muted">
+              Guardian will stop syncing your inbox. Saved Gmail access is
+              removed from this connection. Previously synced message rows stay
+              until you clear them.
+            </p>
+            <div className="mt-6 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmGmailDisconnect(false)}
+                className="rounded-full border border-stone-200 px-4 py-2 text-sm font-semibold text-foreground hover:bg-stone-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void disconnectGmail()}
+                disabled={busy !== null}
+                className="rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+              >
+                {busy === "gmail-disconnect" ? "Disconnecting…" : "Disconnect"}
               </button>
             </div>
           </div>

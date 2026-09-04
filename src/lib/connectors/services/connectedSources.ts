@@ -85,7 +85,10 @@ export function mapConnectedSourceForClient(
         ),
       },
     };
-  } else if (source.sourceType === "google_drive") {
+  } else if (
+    source.sourceType === "google_drive" ||
+    source.sourceType === "gmail"
+  ) {
     const {
       accessToken: _a,
       refreshToken: _r,

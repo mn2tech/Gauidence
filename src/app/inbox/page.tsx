@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveGuardianProfile } from "@/lib/profiles/server";
@@ -32,7 +33,11 @@ export default async function InboxPage() {
 
   return (
     <SimpleAppShell>
-      <InboxScreen />
+      <Suspense
+        fallback={<p className="p-6 text-sm text-ink-muted">Loading inbox…</p>}
+      >
+        <InboxScreen />
+      </Suspense>
     </SimpleAppShell>
   );
 }

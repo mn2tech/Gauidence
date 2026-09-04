@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Inbox, Mail, Sparkles } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { Inbox, Loader2, Mail, RefreshCw, Sparkles } from "lucide-react";
 import ProfileSetupHub from "@/components/ProfileSetupHub";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import {
@@ -105,7 +106,7 @@ function MessageRow({
           <button
             type="button"
             disabled
-            title="Filing to Spaces arrives with live email sync"
+            title="One-tap filing arrives next"
             className="rounded-lg border border-border-subtle px-3 py-1.5 text-xs font-semibold text-ink-muted opacity-70"
           >
             File to {message.suggestedSpaceLabel}
@@ -117,12 +118,23 @@ function MessageRow({
 }
 
 export default function InboxScreen() {
-  const { profiles, loading: profilesLoading } = useActiveProfile();
+  const { profiles, active, loading: profilesLoading } = useActiveProfile();
+  const searchParams = useSearchParams();
   const [filter, setFilter] = useState<InboxFilterId>("all");
+  const [connected, setConnected] = useState(false);
+  const [gmailEmail, setGmailEmail] = useState<string | null>(null);
+  const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
+  const [liveMessages, setLiveMessages] = useState<InboxMockMessage[] | null>(
+    null
+  );
+  const [loadingMail, setLoadingMail] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [banner, setBanner] = useState<string | null>(null);
 
   const spaces = useMemo(() => topLevelProfiles(profiles), [profiles]);
 
-  const messages = useMemo(
+  const mockMessages = useMemo(
     () =>
       buildInboxMockMessages(
         spaces.map((s) => ({
@@ -134,10 +146,111 @@ export default function InboxScreen() {
     [spaces]
   );
 
-  const visible = useMemo(
-    () => filterInboxMessages(messages, filter),
-    [messages, filter]
-  );
+  const loadMessages = useCallback(async () => {
+    setLoadingMail(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/inbox/messages?filter=${encodeURIComponent(filter)}`
+      );
+      const body = (await res.json().catch(() => ({}))) as {
+        connected?: boolean;
+        email?: string | null;
+        lastSyncAt?: string | null;
+        messages?: InboxMockMessage[];
+        error?: string;
+      };
+      if (!res.ok) {
+        throw new Error(body.error ?? "Couldn't load inbox.");
+      }
+      setConnected(Boolean(body.connected));
+      setGmailEmail(body.email ?? null);
+      setLastSyncAt(body.lastSyncAt ?? null);
+      setLiveMessages(body.connected ? body.messages ?? [] : null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't load inbox.");
+      setLiveMessages(null);
+      setConnected(false);
+    } finally {
+      setLoadingMail(false);
+    }
+  }, [filter]);
+
+  useEffect(() => {
+    void loadMessages();
+  }, [loadMessages]);
+
+  useEffect(() => {
+    const gmail = searchParams.get("gmail");
+    if (!gmail) return;
+    if (gmail === "connected") {
+      setBanner("Gmail connected. Syncing your recent mail…");
+      void (async () => {
+        setSyncing(true);
+        try {
+          const res = await fetch("/api/inbox/sync", { method: "POST" });
+          const body = (await res.json().catch(() => ({}))) as {
+            error?: string;
+            upserted?: number;
+          };
+          if (!res.ok) throw new Error(body.error ?? "Sync failed.");
+          setBanner(
+            `Synced ${body.upserted ?? 0} recent messages from Gmail.`
+          );
+          await loadMessages();
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "Sync failed.");
+          setBanner(null);
+        } finally {
+          setSyncing(false);
+        }
+      })();
+    } else if (gmail === "denied") {
+      setError("Gmail access was cancelled or denied.");
+    } else if (gmail === "not_configured") {
+      setError(
+        "Gmail isn’t configured on this deployment. Enable the Gmail API and add the Gmail callback URI to your Google OAuth client."
+      );
+    } else if (gmail === "error") {
+      setError("Couldn't connect Gmail. Try again.");
+    }
+  }, [searchParams, loadMessages]);
+
+  const syncNow = async () => {
+    setSyncing(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/inbox/sync", { method: "POST" });
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        upserted?: number;
+        code?: string;
+      };
+      if (!res.ok) {
+        throw new Error(body.error ?? "Sync failed.");
+      }
+      setBanner(`Synced ${body.upserted ?? 0} recent messages.`);
+      await loadMessages();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Sync failed.");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const connectGmail = () => {
+    const profileId = active?.id ?? "";
+    const q = new URLSearchParams({ returnTo: "/inbox" });
+    if (profileId) q.set("profileId", profileId);
+    window.location.href = `/api/connections/gmail/start?${q.toString()}`;
+  };
+
+  const usingLive = connected && liveMessages != null;
+  const messages = usingLive
+    ? liveMessages
+    : !loadingMail
+      ? filterInboxMessages(mockMessages, filter)
+      : [];
 
   const spaceNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -159,32 +272,82 @@ export default function InboxScreen() {
 
   return (
     <div className="simple-home-page mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-6 sm:py-8">
-      <header>
-        <div className="flex items-center gap-2">
-          <Inbox className="h-5 w-5 text-brand" aria-hidden />
-          <h1 className="text-xl font-semibold text-foreground">Inbox</h1>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <Inbox className="h-5 w-5 text-brand" aria-hidden />
+            <h1 className="text-xl font-semibold text-foreground">Inbox</h1>
+          </div>
+          <p className="mt-1 text-sm text-ink-muted">
+            {usingLive
+              ? gmailEmail
+                ? `Mail from ${gmailEmail}`
+                : "Your connected Gmail"
+              : "Connect Gmail to replace sample mail with your real inbox."}
+          </p>
         </div>
-        <p className="mt-1 text-sm text-ink-muted">
-          Preview how mail will route into your Spaces — Bills, School, and more.
-        </p>
+        <div className="flex flex-wrap gap-2">
+          {usingLive ? (
+            <button
+              type="button"
+              onClick={() => void syncNow()}
+              disabled={syncing}
+              className="inline-flex items-center gap-1.5 rounded-full border border-border-subtle bg-surface px-3 py-1.5 text-xs font-semibold text-foreground transition hover:bg-surface-elevated disabled:opacity-60"
+            >
+              {syncing ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+              ) : (
+                <RefreshCw className="h-3.5 w-3.5" aria-hidden />
+              )}
+              Sync
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={connectGmail}
+              className="inline-flex items-center gap-1.5 rounded-full bg-brand px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-dark"
+            >
+              <Mail className="h-3.5 w-3.5" aria-hidden />
+              Connect Gmail
+            </button>
+          )}
+        </div>
       </header>
 
-      <div
-        role="status"
-        className="rounded-xl border border-border-subtle bg-surface px-4 py-3 text-sm text-ink-muted"
-      >
-        <p className="font-medium text-foreground">Sample mail</p>
-        <p className="mt-0.5">
-          Live inbox sync isn&apos;t connected yet. These threads show how filters
-          will work.{" "}
-          <Link
-            href={CONNECTIONS_PATH}
-            className="font-semibold text-brand hover:text-brand-dark"
-          >
-            Connections
-          </Link>
+      {error ? (
+        <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+          {error}
         </p>
-      </div>
+      ) : null}
+      {banner ? (
+        <p className="rounded-xl border border-brand/25 bg-brand-light/40 px-4 py-3 text-sm text-foreground">
+          {banner}
+        </p>
+      ) : null}
+
+      {!usingLive ? (
+        <div
+          role="status"
+          className="rounded-xl border border-border-subtle bg-surface px-4 py-3 text-sm text-ink-muted"
+        >
+          <p className="font-medium text-foreground">Sample mail</p>
+          <p className="mt-0.5">
+            Showing preview threads until Gmail is connected. You can also
+            manage connections in{" "}
+            <Link
+              href={CONNECTIONS_PATH}
+              className="font-semibold text-brand hover:text-brand-dark"
+            >
+              Settings → Connections
+            </Link>
+            .
+          </p>
+        </div>
+      ) : lastSyncAt ? (
+        <p className="text-xs text-ink-muted">
+          Last synced {new Date(lastSyncAt).toLocaleString()}
+        </p>
+      ) : null}
 
       <div
         className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1"
@@ -229,17 +392,26 @@ export default function InboxScreen() {
         })}
       </div>
 
-      {visible.length === 0 ? (
+      {loadingMail ? (
+        <p className="flex items-center gap-2 text-sm text-ink-muted">
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+          Loading mail…
+        </p>
+      ) : messages.length === 0 ? (
         <div className="simple-home-card flex flex-col items-center gap-2 px-4 py-10 text-center">
           <Mail className="h-8 w-8 text-ink-muted" aria-hidden />
-          <p className="text-sm font-medium text-foreground">Nothing in this view</p>
+          <p className="text-sm font-medium text-foreground">
+            Nothing in this view
+          </p>
           <p className="text-sm text-ink-muted">
-            Try All, or another Space filter.
+            {usingLive
+              ? "Try Sync, or another filter."
+              : "Try All, or another Space filter."}
           </p>
         </div>
       ) : (
         <ul className="flex flex-col gap-3">
-          {visible.map((message) => {
+          {messages.map((message) => {
             const spaceId =
               message.assignedSpaceId ?? message.suggestedSpaceId;
             const spaceName =
