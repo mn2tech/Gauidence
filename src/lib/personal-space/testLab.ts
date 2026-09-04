@@ -15,6 +15,16 @@ import { routeGideonOrchestration } from "@/lib/gideon/request-router";
 import { resolveGuardianKnowledge } from "@/lib/gideon/knowledge-resolver";
 import { composeGideonResponse } from "@/lib/gideon/response-composer";
 import { buildOrchestrationDebugSnapshot } from "@/lib/gideon/orchestration-observability";
+import {
+  applyRetrievalGuard,
+  buildGroundingDebugSnapshot,
+  createArtifactIdentity,
+  extractEmailThread,
+  formatWhyGideonUsedContext,
+  looksLikeEmailThread,
+  mayClaimAttachmentView,
+} from "@/lib/artifacts";
+import type { GuardableChunk } from "@/lib/artifacts/retrievalGuard";
 
 export type TestLabCase = {
   id: string;
@@ -31,7 +41,8 @@ export type TestLabCase = {
     | "Permissions"
     | "Sources"
     | "Knowledge Health"
-    | "Gideon Orchestration";
+    | "Gideon Orchestration"
+    | "Context Grounding";
   name: string;
   input: string;
   expected: string;
@@ -50,6 +61,7 @@ export type TestLabCase = {
       knowledgeSource?: string;
       space?: string;
     };
+    groundingDebug?: string;
   };
 };
 
@@ -756,6 +768,197 @@ export function buildTestLabCases(): TestLabCase[] {
       },
     },
     ...buildGideonOrchestrationLabCases(),
+    ...buildContextGroundingLabCases(),
+  ];
+}
+
+const OLNEY_LAB_EMAIL = `From: Jaime Costolo <jaime@olneychamber.org>
+To: Michael Kola <michael@nm2tech.com>
+Cc: Terri Hogan <terri@olneychamber.org>
+Subject: Re: Chamber email security follow-up
+
+Hi Michael,
+Quick question before Thursday's security session at 11:30 PM — does Sarah also need to attend the office meeting, or can the same security work be completed on Sarah's computer later?
+Jaime Costolo
+Olney Chamber of Commerce
+
+From: Michael Kola <michael@nm2tech.com>
+To: Jaime Costolo <jaime@olneychamber.org>
+Subject: Chamber email security follow-up
+
+Jaime — confirming Thursday at 11:30 PM. Michael Kola, NM2TECH
+`;
+
+function buildContextGroundingLabCases(): TestLabCase[] {
+  function groundCase(
+    id: string,
+    name: string,
+    input: string,
+    expected: string,
+    run: TestLabCase["run"]
+  ): TestLabCase {
+    return {
+      id,
+      tab: "Context Grounding",
+      name,
+      input,
+      expected,
+      run,
+    };
+  }
+
+  const emailChunk: GuardableChunk = {
+    id: "c1",
+    document_id: "art-email",
+    file_name: "Email thread - Olney Chamber.txt",
+    content: OLNEY_LAB_EMAIL,
+    chunk_index: 0,
+    similarity: 1,
+    fusion_score: 1,
+    source_type: "email_thread",
+    profile_id: "nm2tech",
+  };
+  const wedding: GuardableChunk = {
+    id: "c2",
+    document_id: "art-wedding",
+    file_name: "wedding-invitation.jpg",
+    content: "Wedding invitation for Jordan and Alex at Grace Chapel.",
+    chunk_index: 0,
+    similarity: 0.9,
+    fusion_score: 0.9,
+    profile_id: "nm2tech",
+  };
+  const license: GuardableChunk = {
+    id: "c3",
+    document_id: "art-license",
+    file_name: "maryland-drivers-license.jpg",
+    content: "Maryland Driver's License DLN M123 DOB 01/01/1980",
+    chunk_index: 0,
+    similarity: 0.94,
+    fusion_score: 0.94,
+    document_type: "drivers_license",
+    profile_id: "nm2tech",
+  };
+  const prior: GuardableChunk = {
+    id: "c4",
+    document_id: "art-prior",
+    file_name: "olney-chamber-gmail-incident.txt",
+    content:
+      "Olney Chamber of Commerce compromised Gmail. Jaime Costolo and Terri Hogan. NM2TECH remediation.",
+    chunk_index: 0,
+    similarity: 0.7,
+    fusion_score: 0.7,
+    profile_id: "nm2tech",
+  };
+
+  const current = createArtifactIdentity({
+    artifactId: "art-email",
+    spaceId: "nm2tech",
+    content: OLNEY_LAB_EMAIL,
+    sourceName: "Email thread - Olney Chamber.txt",
+    sourceType: "email_thread",
+  });
+
+  return [
+    groundCase(
+      "cg.1",
+      "Email paste ignores unrelated images",
+      "Paste Olney Chamber email while wedding/ministry images exist",
+      "only email artifact included",
+      () => {
+        const guard = applyRetrievalGuard({
+          currentArtifact: current,
+          currentContent: OLNEY_LAB_EMAIL,
+          userQuery: "What is Jaime asking?",
+          analyzingCurrentArtifact: true,
+          chunks: [emailChunk, wedding],
+        });
+        const snap = buildGroundingDebugSnapshot({
+          currentArtifact: current,
+          groups: guard.groups,
+          evidenceRulesApplied: guard.evidenceRulesApplied,
+          emailThread: extractEmailThread(OLNEY_LAB_EMAIL),
+        });
+        const why = formatWhyGideonUsedContext(snap);
+        const pass =
+          looksLikeEmailThread(OLNEY_LAB_EMAIL) &&
+          snap.finalContextArtifactIds.includes("art-email") &&
+          !snap.finalContextArtifactIds.includes("art-wedding");
+        return {
+          actual: why.slice(0, 500),
+          pass,
+          sources: snap.finalContextArtifactIds,
+          groundingDebug: why,
+        };
+      }
+    ),
+    groundCase(
+      "cg.2",
+      "Driver's license zero exposure",
+      "Chamber email + MD license in Space",
+      "license excluded",
+      () => {
+        const guard = applyRetrievalGuard({
+          currentArtifact: current,
+          currentContent: OLNEY_LAB_EMAIL,
+          userQuery: "Summarize this email",
+          analyzingCurrentArtifact: true,
+          chunks: [emailChunk, license],
+        });
+        const snap = buildGroundingDebugSnapshot({
+          currentArtifact: current,
+          groups: guard.groups,
+          evidenceRulesApplied: guard.evidenceRulesApplied,
+        });
+        return {
+          actual: formatWhyGideonUsedContext(snap),
+          pass: !snap.finalContextArtifactIds.includes("art-license"),
+          sources: snap.finalContextArtifactIds,
+          groundingDebug: formatWhyGideonUsedContext(snap),
+        };
+      }
+    ),
+    groundCase(
+      "cg.3",
+      "Related Chamber history allowed",
+      "Current email + prior Chamber Gmail incident",
+      "prior included, wedding excluded",
+      () => {
+        const guard = applyRetrievalGuard({
+          currentArtifact: current,
+          currentContent: OLNEY_LAB_EMAIL,
+          userQuery: "Relate this to the earlier Chamber Gmail incident",
+          analyzingCurrentArtifact: true,
+          chunks: [emailChunk, prior, wedding],
+        });
+        const ids = new Set(
+          guard.includedChunks.map((c) => c.document_id)
+        );
+        return {
+          actual: [...ids].join(","),
+          pass: ids.has("art-email") && ids.has("art-prior") && !ids.has("art-wedding"),
+          sources: [...ids],
+        };
+      }
+    ),
+    groundCase(
+      "cg.6",
+      "No attachment claim without source",
+      "No images in validated context",
+      "mayClaimAttachments=false",
+      () => {
+        const ok = !mayClaimAttachmentView({
+          hasAttachedDocument: false,
+          hasVisionImages: false,
+          currentArtifactInContext: false,
+          validatedAttachmentNames: [],
+        });
+        return {
+          actual: `mayClaim=${!ok}`,
+          pass: ok,
+        };
+      }
+    ),
   ];
 }
 
@@ -1127,6 +1330,7 @@ export type TestLabRunResult = {
     knowledgeSource?: string;
     space?: string;
   };
+  groundingDebug?: string;
   latencyMs: number;
 };
 
@@ -1155,6 +1359,7 @@ export function runAllTestLabCases(): {
         sources: out.sources,
         errors: out.errors,
         orchestration: out.orchestration,
+        groundingDebug: out.groundingDebug,
         latencyMs: Date.now() - start,
       });
     } catch (err) {

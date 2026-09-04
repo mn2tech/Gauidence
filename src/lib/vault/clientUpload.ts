@@ -33,6 +33,8 @@ import {
   scheduleDocumentAnalysis,
   type VaultUploadResult,
 } from "@/lib/documents/clientProcessing";
+import { classifySourceType } from "@/lib/artifacts/classify";
+import { classifyArtifactSensitivity } from "@/lib/artifacts/sensitivity";
 
 export type { VaultUploadResult };
 
@@ -92,19 +94,79 @@ export async function uploadAndAnalyzeToVault(args: {
     );
   }
 
-  const { data: inserted, error: insertError } = await supabase
+  let textPreview = "";
+  if (
+    mimeType.startsWith("text/") ||
+    /\.(txt|md|csv|html?)$/i.test(args.file.name)
+  ) {
+    try {
+      textPreview = (await args.file.text()).slice(0, 50_000);
+    } catch {
+      textPreview = "";
+    }
+  }
+  const artifactSourceType = classifySourceType({
+    content: textPreview,
+    fileName: args.file.name,
+    mimeType,
+  });
+  const sensitivity = classifyArtifactSensitivity({
+    sourceType: artifactSourceType,
+    content: textPreview,
+    fileName: args.file.name,
+  });
+  let contentHash: string | null = null;
+  if (textPreview) {
+    try {
+      const digest = await crypto.subtle.digest(
+        "SHA-256",
+        new TextEncoder().encode(textPreview.trim())
+      );
+      contentHash = Array.from(new Uint8Array(digest))
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("")
+        .slice(0, 32);
+    } catch {
+      contentHash = null;
+    }
+  }
+
+  const baseRow = {
+    user_id: args.userId,
+    profile_id: args.profileId,
+    file_name: args.file.name,
+    file_path: path,
+    mime_type: mimeType,
+    size_bytes: args.file.size,
+    analysis_status: "uploaded",
+  };
+  const artifactRow = {
+    ...baseRow,
+    artifact_source_type: artifactSourceType,
+    sensitivity,
+    ...(contentHash ? { content_hash: contentHash } : {}),
+  };
+
+  let { data: inserted, error: insertError } = await supabase
     .from("documents")
-    .insert({
-      user_id: args.userId,
-      profile_id: args.profileId,
-      file_name: args.file.name,
-      file_path: path,
-      mime_type: mimeType,
-      size_bytes: args.file.size,
-      analysis_status: "uploaded",
-    })
+    .insert(artifactRow)
     .select("id, file_name")
     .single();
+
+  if (
+    insertError &&
+    /artifact_source_type|content_hash|sensitivity|column/i.test(
+      insertError.message ?? ""
+    )
+  ) {
+    const retry = await supabase
+      .from("documents")
+      .insert(baseRow)
+      .select("id, file_name")
+      .single();
+    inserted = retry.data;
+    insertError = retry.error;
+  }
 
   if (insertError || !inserted) {
     await supabase.storage.from("documents").remove([path]);

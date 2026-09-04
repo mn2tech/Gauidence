@@ -502,12 +502,12 @@ export function preferFullerListAnswer(
 }
 
 export const GIDEON_ATTACHED_DOCUMENT_NOTE = `Attached document:
-- The user attached a specific file to this message (see ATTACHED DOCUMENT below and/or the image in their message).
-- The original image is available to you in this request. Look at it directly.
+- The user attached a specific file to this message (see ATTACHED DOCUMENT / CURRENT ARTIFACT below and/or the image in their message).
 - That attachment is the primary source for this turn. Answer from it first.
 - Put facts from the attachment under ## FROM YOUR DOCUMENTS (an attached photo or scan of a worksheet is still a document). Never put those facts under ## FROM YOUR DAILY LOG.
 - When the user attached one image, describe ONLY that attachment. Do not invent a multi-image review (Image 1 / Image 2 / Image 3) from other Space files or RETRIEVED EXCERPTS.
-- RETRIEVED EXCERPTS may include other similar files (for example an old summer calendar). Do not lead with those when the user attached a different file. Mention them only if they still answer the question and label the other file's name and year.
+- When the attachment is text (pasted email, .txt, PDF text), do NOT say you can see attached images unless an image is actually in this request.
+- RETRIEVED EXCERPTS may include other files only when the retrieval guard marked them relevant. Do not lead with unrelated historical files. Mention them only if they still answer the question and label the other file's name.
 - Do not say the image or file is missing.
 - Never ask the user to re-upload a file Guardian already has.
 - For photos: describe what you see first (setting, people, objects). Read printed text, receipts, screenshots, handwritten notes, and vehicle documents when asked.
@@ -537,7 +537,8 @@ export const GIDEON_TRANSCRIPTION_NOTE = `Transcription mode:
 export const GIDEON_VISION_NOTE = `Guardian Vision:
 - When images are attached to this request, you can see them. Use the pixels, not only extracted text.
 - If ATTACHED DOCUMENT says no extracted text yet, still inspect the attached image and answer.
-- Never say you cannot see an image that is attached or already stored in this space.
+- Never say you cannot see an image that is attached to THIS request.
+- Never claim to see images that are only listed in SPACE FILE INVENTORY or unrelated RETRIEVED EXCERPTS.
 - Never ask the user to re-upload a file Guardian already has. If analysis is incomplete, work from the image you have.
 - Do not mention OCR unless there was a genuine technical failure and the original file is missing.`;
 

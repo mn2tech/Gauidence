@@ -35,6 +35,8 @@ export type WorkspaceContextBlocks = {
   excerpts: string;
   fileInventory: string;
   attachedDocument: string;
+  /** Priority-0 current artifact (paste / upload / email thread) with identity. */
+  currentArtifact: string;
   dailyLogs: string;
   clientRequests: string;
   proposals: string;
@@ -62,6 +64,10 @@ export type WorkspacePromptOptions = {
   hasAttachedDocument: boolean;
   /** True when one or more images are attached to the multimodal request. */
   hasVisionImages?: boolean;
+  /** True when this turn is analyzing a Priority-0 current artifact. */
+  analyzingCurrentArtifact?: boolean;
+  /** Grounding / evidence notes (context priority, no-source-no-claim). */
+  groundingNotes?: string;
   allVaultsNote: string;
   vaultEmptyNote: string;
   focusedWorkMemory: boolean;
@@ -85,4 +91,6 @@ export type WorkspaceContextData = WorkspaceContextMeta & {
   promptOptions: WorkspacePromptOptions;
   /** Structured claims for persistence / evidence follow-ups (Business Pack). */
   businessClaims?: import("@/lib/gideon/business").GideonClaim[];
+  /** Admin / Test Lab grounding diagnostics — not for ordinary user replies. */
+  groundingDebug?: import("@/lib/artifacts").GroundingDebugSnapshot;
 };

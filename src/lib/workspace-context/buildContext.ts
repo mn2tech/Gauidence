@@ -92,6 +92,21 @@ import { PROPOSAL_SELECT } from "@/lib/proposals/types";
 import { mapProposalRow } from "@/lib/proposals/server";
 import type { AttachedVaultDocument } from "@/lib/vault/attachedDocument";
 import {
+  applyRetrievalGuard,
+  buildGroundingDebugSnapshot,
+  contextPrioritySystemNote,
+  createArtifactIdentity,
+  createCurrentInputArtifact,
+  currentArtifactBlock,
+  evidenceClaimSystemNote,
+  extractEmailThread,
+  formatEmailThreadSemantics,
+  formatGroupedArtifactContext,
+  looksLikeEmailThread,
+  looksLikeSingleEmail,
+  mayClaimAttachmentView,
+} from "@/lib/artifacts";
+import {
   resolveExplicitSpaceScope,
   resolveNamedSpaceOutsideSearch,
 } from "@/lib/vault/detectVaultScope";
@@ -303,15 +318,69 @@ export async function loadWorkspaceContext(
       (activeProfile.profile_type as GuardianProfileType),
   }));
 
+  // Current-artifact-first: understand attached / pasted input before broad RAG.
+  const attachedContent =
+    attachedDoc?.sourceText?.trim() ||
+    attachedDoc?.visionSummary?.trim() ||
+    attachedDoc?.chunks.map((c) => c.content).join("\n") ||
+    "";
+  const questionLooksLikeEmail =
+    looksLikeEmailThread(question) || looksLikeSingleEmail(question);
+  const analyzingCurrentArtifact = Boolean(
+    attachedDoc || (questionLooksLikeEmail && question.trim().length >= 80)
+  );
+
+  const currentArtifact = attachedDoc
+    ? createArtifactIdentity({
+        artifactId: attachedDoc.documentId,
+        spaceId: attachedDoc.profileId,
+        content: attachedContent || attachedDoc.fileName,
+        sourceName: attachedDoc.fileName,
+        mimeType: attachedDoc.mimeType,
+      })
+    : questionLooksLikeEmail
+      ? createCurrentInputArtifact({
+          spaceId: activeProfile.id,
+          content: question,
+          sourceName: "Current pasted input",
+        })
+      : null;
+
+  const currentContentForGuard =
+    attachedContent ||
+    (questionLooksLikeEmail ? question : "") ||
+    question;
+
+  const emailThread = currentArtifact
+    ? extractEmailThread(
+        attachedContent.length >= 40 ? attachedContent : question
+      )
+    : null;
+  const emailSemantics = emailThread
+    ? formatEmailThreadSemantics(emailThread)
+    : null;
+
+  // When analyzing a substantial current artifact, keep historical retrieval
+  // optional/supportive — do not let vector search dominate the answer.
+  const skipBroadRetrievalForCurrent =
+    analyzingCurrentArtifact &&
+    Boolean(attachedDoc) &&
+    !forceDocumentSearch &&
+    !transcriptionMode &&
+    !showPictures &&
+    !songListOnly &&
+    attachedContent.length >= 120;
+
   let retrievedChunks: RetrievedChunk[] = [];
-  if (queryEmbedding) {
+  if (queryEmbedding && !skipBroadRetrievalForCurrent) {
     const retrievalStarted = Date.now();
     const hybrid = await hybridRetrieveVaultChunks({
       supabase,
       query: documentRetrievalQuery,
       queryEmbedding,
       scopes: rollupScopes,
-      finalTopK: matchCount,
+      // Fetch a slightly larger pool so the guard can filter by relevance.
+      finalTopK: analyzingCurrentArtifact ? Math.max(matchCount, 12) : matchCount,
     });
     retrievalDurationMs = Date.now() - retrievalStarted;
     vectorCandidateCount = hybrid.vectorCount;
@@ -325,10 +394,13 @@ export async function loadWorkspaceContext(
         { maxDocuments: 3, maxChunks: 80 }
       );
     }
+  } else if (skipBroadRetrievalForCurrent) {
+    // Supporting retrieval only when the current artifact is thin — skipped here.
+    mergedCandidateCount = 0;
   }
 
   const disclosurePins =
-    runDocumentSearch && !songListOnly
+    runDocumentSearch && !songListOnly && !analyzingCurrentArtifact
       ? await loadRegulatoryDisclosureChunks(supabase, {
           question,
           profileIds: effectiveSearchIds,
@@ -336,17 +408,33 @@ export async function loadWorkspaceContext(
         })
       : [];
 
-  const chunks = mergePinnedChunks(
+  const pinnedThenRetrieved = mergePinnedChunks(
     [...(attachedDoc?.chunks ?? []), ...disclosurePins],
     retrievedChunks
   );
-  const formatted = formatRetrievalContext(chunks, {
-    maxChunkChars: transcriptionMode
-      ? 8000
-      : forceDocumentSearch
-        ? 2800
-        : undefined,
+
+  const guard = applyRetrievalGuard({
+    currentArtifact,
+    currentContent: currentContentForGuard,
+    userQuery: question,
+    chunks: pinnedThenRetrieved,
+    analyzingCurrentArtifact,
   });
+
+  const chunks = guard.includedChunks as RetrievedChunk[];
+  const maxChunkChars = transcriptionMode
+    ? 8000
+    : forceDocumentSearch
+      ? 2800
+      : undefined;
+  const grouped = formatGroupedArtifactContext(guard.groups, {
+    maxChunkChars,
+    onlyIncluded: true,
+  });
+  const formatted =
+    analyzingCurrentArtifact && guard.groups.length > 0
+      ? grouped
+      : formatRetrievalContext(chunks, { maxChunkChars });
 
   const ontologySpaceId =
     explicitSpace?.id ??
@@ -732,9 +820,13 @@ Active space in the UI: ${activeProfile.display_name}. Document search includes 
   const attachedContext = attachedDoc
     ? [
         `File: ${attachedDoc.fileName}`,
+        `artifact_id: ${attachedDoc.documentId}`,
+        currentArtifact
+          ? `source_type: ${currentArtifact.sourceType}`
+          : null,
         attachedDoc.isImage
           ? "This is an image already stored in Guardian. The original file is attached to this request — inspect it directly. Cite what you read from it under FROM YOUR DOCUMENTS, not Daily Logs."
-          : "Cite this file under FROM YOUR DOCUMENTS, not Daily Logs.",
+          : "Cite this file under FROM YOUR DOCUMENTS, not Daily Logs. This is not an image — do not claim to see attached images.",
         attachedDoc.visionSummary
           ? `Vision summary:\n${attachedDoc.visionSummary.slice(0, 4_000)}`
           : "",
@@ -743,10 +835,57 @@ Active space in the UI: ${activeProfile.display_name}. Document search includes 
           : attachedDoc.isImage
             ? "(No extracted text yet — use the attached image. Do not ask the user to re-upload it.)"
             : "(no extracted text)",
+        emailSemantics ? `Email thread semantics:\n${emailSemantics}` : "",
       ]
         .filter(Boolean)
         .join("\n\n")
     : "";
+
+  const currentArtifactContext =
+    currentArtifact && !attachedDoc && questionLooksLikeEmail
+      ? currentArtifactBlock({
+          artifact: currentArtifact,
+          contentPreview: question.slice(0, attachedTextLimit),
+          semantics: emailSemantics,
+        })
+      : currentArtifact && attachedDoc
+        ? currentArtifactBlock({
+            artifact: currentArtifact,
+            contentPreview: (
+              attachedContent || attachedDoc.fileName
+            ).slice(0, Math.min(4000, attachedTextLimit)),
+            semantics: emailSemantics,
+          })
+        : "";
+
+  const validatedSourceNames = guard.groups
+    .filter((g) => g.included)
+    .map((g) => g.artifact.sourceName)
+    .filter((n): n is string => Boolean(n));
+  const mayClaim = mayClaimAttachmentView({
+    hasAttachedDocument: Boolean(attachedDoc),
+    hasVisionImages: Boolean(attachedDoc?.isImage && attachedDoc.imageBase64),
+    currentArtifactInContext: Boolean(currentArtifact),
+    validatedAttachmentNames: validatedSourceNames,
+  });
+  const groundingNotes = [
+    contextPrioritySystemNote({
+      hasCurrentArtifact: analyzingCurrentArtifact,
+      sourceType: currentArtifact?.sourceType,
+    }),
+    evidenceClaimSystemNote({
+      mayClaimAttachments: mayClaim,
+      validatedSourceNames,
+    }),
+  ].join("\n\n");
+
+  const groundingDebug = buildGroundingDebugSnapshot({
+    currentArtifact,
+    groups: guard.groups,
+    evidenceRulesApplied: guard.evidenceRulesApplied,
+    emailThreadSummary: emailSemantics,
+    emailThread,
+  });
 
   const noDocumentExcerpts = !formatted.context.trim();
   const noMatchedLogs =
@@ -778,6 +917,7 @@ Active space in the UI: ${activeProfile.display_name}. Document search includes 
         : formatted.context.trim() || "(none)",
       fileInventory: fileInventoryContext,
       attachedDocument: attachedContext.trim() || "(none)",
+      currentArtifact: currentArtifactContext.trim() || "(none)",
       dailyLogs: logContext.trim() || "(none)",
       clientRequests: clientRequestContext.trim() || "(none)",
       proposals: proposalsContext.trim() || "(none)",
@@ -813,6 +953,8 @@ Active space in the UI: ${activeProfile.display_name}. Document search includes 
       transcriptionMode,
       hasAttachedDocument: Boolean(attachedDoc),
       hasVisionImages: Boolean(attachedDoc?.isImage && attachedDoc.imageBase64),
+      analyzingCurrentArtifact,
+      groundingNotes,
       allVaultsNote,
       vaultEmptyNote,
       focusedWorkMemory: Boolean(focusedWorkMemory),
@@ -826,6 +968,7 @@ Active space in the UI: ${activeProfile.display_name}. Document search includes 
       packSkillsNote: packSkillsNote || undefined,
     },
     businessClaims: businessIntelligenceBundle?.claims,
+    groundingDebug,
   };
 
   const contextBuildDurationMs = Date.now() - contextBuildStarted;

@@ -63,6 +63,8 @@ export function buildGideonSystemPrompt(
     transcriptionMode,
     hasAttachedDocument,
     hasVisionImages,
+    analyzingCurrentArtifact,
+    groundingNotes,
     allVaultsNote,
     vaultEmptyNote,
     agentMode,
@@ -110,8 +112,13 @@ export function buildGideonSystemPrompt(
   const agentNote = agentMode ? `\n${AGENT_MODE_SYSTEM_NOTE}\n` : "";
   const transcriptionNote = transcriptionMode ? GIDEON_TRANSCRIPTION_NOTE : "";
   const attachedNote = hasAttachedDocument ? GIDEON_ATTACHED_DOCUMENT_NOTE : "";
-  const visionNote =
-    hasVisionImages || hasAttachedDocument ? GIDEON_VISION_NOTE : "";
+  // Vision note only when actual images are in the multimodal request — never for text pastes.
+  const visionNote = hasVisionImages ? GIDEON_VISION_NOTE : "";
+  const groundingNote = (groundingNotes ?? "").trim()
+    ? `\n${groundingNotes!.trim()}\n`
+    : analyzingCurrentArtifact
+      ? `\nAnalyze the CURRENT ARTIFACT / ATTACHED DOCUMENT first. Do not invent attachments.\n`
+      : "";
   const fullLogNote =
     fullLogQuote && loaded.logs
       ? `The user asked for the full Daily Log or client request text. Quote the complete matching entry verbatim from RETRIEVED DAILY LOGS or CLIENT REQUESTS below. Do not paraphrase, shorten, or invent log content. If no matching entry is present in those blocks, say so clearly.`
@@ -155,11 +162,16 @@ export function buildGideonSystemPrompt(
     ? `\n${promptOptions.orchestrationNotes!.trim()}\n`
     : "";
   const retrievalBlocks = [
+    namedBlock(
+      "CURRENT ARTIFACT (Priority 0 — primary source of truth for this turn)",
+      blocks.currentArtifact,
+      Boolean(analyzingCurrentArtifact)
+    ),
     namedBlock("RETRIEVED EXCERPTS", blocks.excerpts, searchedKnowledge),
     namedBlock(
       "SPACE FILE INVENTORY (complete list of uploaded files in scope; use for \"what's uploaded\" questions)",
       blocks.fileInventory,
-      searchedKnowledge
+      searchedKnowledge && !analyzingCurrentArtifact
     ),
     namedBlock(
       "ATTACHED DOCUMENT (user sent with this message)",
@@ -246,6 +258,7 @@ ${agentNote}
 ${transcriptionNote}
 ${attachedNote}
 ${visionNote}
+${groundingNote}
 ${retrievalBlocks}`;
 }
 

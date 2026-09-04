@@ -17,6 +17,7 @@ const TABS = [
   "Sources",
   "Knowledge Health",
   "Gideon Orchestration",
+  "Context Grounding",
 ] as const;
 
 export default function KnowledgeTestLabPanel() {
@@ -134,6 +135,7 @@ export default function KnowledgeTestLabPanel() {
                 <th className="px-3 py-2">Rels</th>
                 <th className="px-3 py-2">Depth</th>
                 <th className="px-3 py-2">Orchestration</th>
+                <th className="px-3 py-2">Why this context?</th>
                 <th className="px-3 py-2">ms</th>
               </tr>
             </thead>
@@ -175,6 +177,17 @@ export default function KnowledgeTestLabPanel() {
                       <pre className="max-w-xs whitespace-pre-wrap break-words font-mono text-[10px]">
                         {JSON.stringify(r.orchestration, null, 0)}
                       </pre>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-xs text-ink-muted">
+                    {r.groundingDebug ? (
+                      <pre className="max-w-md max-h-64 overflow-auto whitespace-pre-wrap break-words font-mono text-[10px]">
+                        {r.groundingDebug}
+                      </pre>
+                    ) : tab === "Context Grounding" ? (
+                      <span className="text-ink-muted">—</span>
                     ) : (
                       "—"
                     )}
