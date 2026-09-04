@@ -209,11 +209,11 @@ import { practiceStatsListPrompt } from "@/lib/vault/askInventory";
 import type { WorkProject } from "@/lib/work-memory/types";
 import OnboardingProgressChip from "@/components/OnboardingProgressChip";
 import FirstWinCard from "@/components/FirstWinCard";
+import EmptyAskGuidanceChips from "@/components/EmptyAskGuidanceChips";
 import { useOnboardingProgress } from "@/hooks/useOnboardingProgress";
 import { useSimpleHomeEnabled } from "@/hooks/useSimpleHomeEnabled";
 import {
   autoQuestionForUpload,
-  uploadCtaForProfileKind,
 } from "@/lib/onboarding/intent";
 import {
   buildSampleDocumentFile,
@@ -4069,7 +4069,6 @@ export default function VaultChatPanel({
   const greetName = meta?.firstName;
   const hasOtherSpaces = topLevelProfiles(profiles).length > 1;
   const showCreateSpaceShortcuts = showExpandedWelcome || hasOtherSpaces;
-  const uploadCtaLabel = uploadCtaForProfileKind(active?.profile_type);
   const exampleUploads = (
     meta?.guidance?.suggestedUploads?.length
       ? meta.guidance.suggestedUploads
@@ -4113,8 +4112,13 @@ export default function VaultChatPanel({
 
   const welcomeBlock = welcome && (
     isPage && showMinimalWelcome && !emptyVault ? (
-      <div className="mx-auto max-w-xl px-1 py-4 sm:py-6">
+      <div className="mx-auto max-w-xl space-y-3 px-1 py-4 sm:py-6">
         <GideonWelcome showAskForm={false} />
+        <EmptyAskGuidanceChips
+          onUpload={openFilePicker}
+          onAddToToday={openReminderForm}
+          disabled={vaultBusy || sending || !profileId || !canEditVault}
+        />
       </div>
     ) : (
     <div
@@ -4146,6 +4150,13 @@ export default function VaultChatPanel({
               <p className="text-sm leading-relaxed text-ink-muted">
                 {GIDEON_RETURNING_PROMPT}
               </p>
+              <EmptyAskGuidanceChips
+                onUpload={openFilePicker}
+                onAddToToday={openReminderForm}
+                disabled={
+                  vaultBusy || sending || !profileId || !canEditVault
+                }
+              />
               {showPracticeStats ? (
                 <div className="rounded-xl border border-stone-200 bg-stone-50/80 px-3 py-2.5">
                   <button
@@ -4374,30 +4385,30 @@ export default function VaultChatPanel({
                 </p>
               </div>
 
+              <EmptyAskGuidanceChips
+                onUpload={openFilePicker}
+                onAddToToday={openReminderForm}
+                disabled={
+                  vaultBusy || sending || !profileId || !canEditVault
+                }
+              />
+
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
                   disabled={vaultBusy || sending || !profileId || !canEditVault}
-                  onClick={openFilePicker}
-                  className="inline-flex rounded-full bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark disabled:opacity-50"
-                >
-                  📄 {uploadCtaLabel}
-                </button>
-                <button
-                  type="button"
-                  disabled={vaultBusy || sending || !profileId || !canEditVault}
                   onClick={openCamera}
-                  className="inline-flex rounded-full border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-foreground transition hover:bg-stone-50 disabled:opacity-50"
+                  className="inline-flex rounded-full border border-border-subtle bg-surface px-3 py-2 text-xs font-semibold text-foreground transition hover:bg-surface-elevated disabled:opacity-50"
                 >
-                  📷 Scan with camera
+                  Scan with camera
                 </button>
                 <button
                   type="button"
                   disabled={vaultBusy || sending || !profileId || !canEditVault}
                   onClick={() => void runSampleDocument()}
-                  className="inline-flex rounded-full border border-brand/40 bg-brand-light/50 px-4 py-2.5 text-sm font-semibold text-brand-dark transition hover:bg-brand-light disabled:opacity-50"
+                  className="inline-flex rounded-full border border-brand/40 bg-brand-light/50 px-3 py-2 text-xs font-semibold text-brand-dark transition hover:bg-brand-light disabled:opacity-50"
                 >
-                  ✨ Try with a sample
+                  Try with a sample
                 </button>
               </div>
 
