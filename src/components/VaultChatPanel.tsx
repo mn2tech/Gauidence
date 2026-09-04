@@ -5500,31 +5500,22 @@ export default function VaultChatPanel({
                   chats.find((c) => c.id === activeChatId)?.title ?? "Ask Gideon"
                 }
               />
-              <button
-                type="button"
-                onClick={() => setWhyOpen((o) => !o)}
-                aria-label="About Gideon"
-                className="hidden shrink-0 rounded-full p-1 text-ink-muted hover:bg-surface-elevated hover:text-foreground sm:inline-flex"
-              >
-                <Info className="h-3.5 w-3.5" />
-              </button>
             </div>
-            <p className="hidden truncate text-[11px] text-ink-muted sm:block">
-              {GIDEON_CHIEF_OF_STAFF_TAGLINE}
-            </p>
           </div>
-          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+          <div className="flex shrink-0 items-center gap-1">
             <button
               type="button"
               onClick={() => void startNewChat()}
               disabled={sending}
               aria-label="New chat"
               title="New chat"
-              className="inline-flex items-center gap-1 rounded-full border border-border-subtle bg-surface p-2 text-xs font-semibold transition hover:bg-surface-elevated disabled:opacity-50 sm:hidden"
+              className="inline-flex items-center justify-center rounded-full border border-border-subtle bg-surface p-2 text-xs font-semibold transition hover:bg-surface-elevated disabled:opacity-50 lg:hidden"
             >
               <MessageSquarePlus className="h-4 w-4" />
             </button>
-            <div className="relative sm:hidden" ref={headerMoreRef}>
+            <GideonChatThemeToggle />
+            <AgentModeToggle compact className="hidden md:inline-flex" />
+            <div className="relative" ref={headerMoreRef}>
               <button
                 type="button"
                 onClick={() => setHeaderMoreOpen((o) => !o)}
@@ -5535,10 +5526,19 @@ export default function VaultChatPanel({
                 <MoreHorizontal className="h-4 w-4" />
               </button>
               {headerMoreOpen ? (
-                <div className="absolute right-0 top-full z-40 mt-1 w-48 rounded-xl border border-border-subtle bg-surface py-1 shadow-lg">
-                  <div className="px-2 py-1.5">
-                    <GideonChatThemeToggle className="w-full justify-start gap-2 rounded-lg border-0 px-2 py-2" />
-                  </div>
+                <div className="absolute right-0 top-full z-40 mt-1 w-52 rounded-xl border border-border-subtle bg-surface py-1 shadow-lg">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHeaderMoreOpen(false);
+                      void startNewChat();
+                    }}
+                    disabled={sending}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-foreground hover:bg-surface-elevated disabled:opacity-50"
+                  >
+                    <MessageSquarePlus className="h-4 w-4 text-ink-muted" />
+                    New chat
+                  </button>
                   <Link
                     href="/settings/connections"
                     onClick={() => setHeaderMoreOpen(false)}
@@ -5555,6 +5555,12 @@ export default function VaultChatPanel({
                     <FileText className="h-4 w-4 text-ink-muted" />
                     {VAULT_NAV_LABEL}
                   </Link>
+                  <div className="md:hidden">
+                    <AgentModeToggle
+                      compact
+                      className="m-1 w-[calc(100%-0.5rem)] justify-start"
+                    />
+                  </div>
                   <button
                     type="button"
                     onClick={() => {
@@ -5569,28 +5575,6 @@ export default function VaultChatPanel({
                 </div>
               ) : null}
             </div>
-            <GideonChatThemeToggle className="hidden sm:inline-flex" />
-            <AgentModeToggle compact className="hidden sm:inline-flex" />
-            <Link
-              href="/settings/connections"
-              aria-label="Connections"
-              title="Connections"
-              className="hidden items-center gap-1 rounded-full border border-border-subtle bg-surface px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-surface-elevated sm:inline-flex sm:px-3"
-            >
-              <FolderOpen className="h-3.5 w-3.5 text-ink-muted" aria-hidden />
-              <span className="hidden sm:inline">Connections</span>
-            </Link>
-            <Link
-              href={docsHref}
-              aria-label={VAULT_NAV_LABEL}
-              title={VAULT_NAV_LABEL}
-              className="hidden items-center gap-1 rounded-full border border-border-subtle bg-surface px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-surface-elevated sm:inline-flex sm:px-3"
-            >
-              <span className="text-ink-muted" aria-hidden>
-                ←
-              </span>
-              {VAULT_NAV_LABEL}
-            </Link>
           </div>
         </header>
 
