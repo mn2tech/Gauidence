@@ -35,6 +35,7 @@ import {
   X,
   ArrowRightLeft,
   PanelRightOpen,
+  MoreHorizontal,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import GideonAvatar from "@/components/GideonAvatar";
@@ -890,6 +891,7 @@ export default function VaultChatPanel({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [gideonWelcomeSeen, setGideonWelcomeSeen] = useState(readGideonWelcomeSeen);
+  const [headerMoreOpen, setHeaderMoreOpen] = useState(false);
   const [whyOpen, setWhyOpen] = useState(false);
   const [plusOpen, setPlusOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -989,6 +991,7 @@ export default function VaultChatPanel({
   const { theme: gideonChatTheme } = useGideonChatTheme();
   const bottomRef = useRef<HTMLDivElement>(null);
   const plusRef = useRef<HTMLDivElement>(null);
+  const headerMoreRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pendingAttachmentRef = useRef<PendingVaultAttachment | null>(null);
   const profileSwitchRef = useRef(false);
@@ -1640,6 +1643,24 @@ export default function VaultChatPanel({
       document.removeEventListener("keydown", onKey);
     };
   }, [plusOpen]);
+
+  useEffect(() => {
+    if (!headerMoreOpen) return;
+    const onDoc = (e: globalThis.MouseEvent) => {
+      if (!headerMoreRef.current?.contains(e.target as Node)) {
+        setHeaderMoreOpen(false);
+      }
+    };
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Escape") setHeaderMoreOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [headerMoreOpen]);
 
   useEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent) => {
@@ -4792,7 +4813,7 @@ export default function VaultChatPanel({
     <div
       className={
         isPage || isDrawer
-          ? "shrink-0 border-b border-stone-100 px-4 py-2 sm:px-8"
+          ? "shrink-0 border-b border-border-subtle px-2.5 py-1.5 sm:px-8 sm:py-2"
           : "mb-2 px-0.5"
       }
     >
@@ -5437,7 +5458,7 @@ export default function VaultChatPanel({
       )}
 
       <div className="flex min-w-0 flex-1 flex-col bg-background">
-        <header className="flex shrink-0 items-center gap-3 border-b border-border-subtle bg-background px-3 py-2.5 sm:px-4">
+        <header className="flex shrink-0 items-center gap-2 border-b border-border-subtle bg-background px-2.5 py-2 sm:gap-3 sm:px-4 sm:py-2.5">
           <button
             type="button"
             className="rounded-full p-2 text-ink-muted hover:bg-surface-elevated md:hidden"
@@ -5472,23 +5493,78 @@ export default function VaultChatPanel({
                 type="button"
                 onClick={() => setWhyOpen((o) => !o)}
                 aria-label="About Gideon"
-                className="shrink-0 rounded-full p-1 text-ink-muted hover:bg-surface-elevated hover:text-foreground"
+                className="hidden shrink-0 rounded-full p-1 text-ink-muted hover:bg-surface-elevated hover:text-foreground sm:inline-flex"
               >
                 <Info className="h-3.5 w-3.5" />
               </button>
             </div>
-            <p className="truncate text-[11px] text-ink-muted">
+            <p className="hidden truncate text-[11px] text-ink-muted sm:block">
               {GIDEON_CHIEF_OF_STAFF_TAGLINE}
             </p>
           </div>
-          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-            <GideonChatThemeToggle />
+          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+            <button
+              type="button"
+              onClick={() => void startNewChat()}
+              disabled={sending}
+              aria-label="New chat"
+              title="New chat"
+              className="inline-flex items-center gap-1 rounded-full border border-border-subtle bg-surface p-2 text-xs font-semibold transition hover:bg-surface-elevated disabled:opacity-50 sm:hidden"
+            >
+              <MessageSquarePlus className="h-4 w-4" />
+            </button>
+            <div className="relative sm:hidden" ref={headerMoreRef}>
+              <button
+                type="button"
+                onClick={() => setHeaderMoreOpen((o) => !o)}
+                aria-expanded={headerMoreOpen}
+                aria-label="More chat options"
+                className="inline-flex items-center justify-center rounded-full border border-border-subtle bg-surface p-2 text-ink-muted transition hover:bg-surface-elevated hover:text-foreground"
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </button>
+              {headerMoreOpen ? (
+                <div className="absolute right-0 top-full z-40 mt-1 w-48 rounded-xl border border-border-subtle bg-surface py-1 shadow-lg">
+                  <div className="px-2 py-1.5">
+                    <GideonChatThemeToggle className="w-full justify-start gap-2 rounded-lg border-0 px-2 py-2" />
+                  </div>
+                  <Link
+                    href="/settings/connections"
+                    onClick={() => setHeaderMoreOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-surface-elevated"
+                  >
+                    <FolderOpen className="h-4 w-4 text-ink-muted" />
+                    Connections
+                  </Link>
+                  <Link
+                    href={docsHref}
+                    onClick={() => setHeaderMoreOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-surface-elevated"
+                  >
+                    <FileText className="h-4 w-4 text-ink-muted" />
+                    {VAULT_NAV_LABEL}
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHeaderMoreOpen(false);
+                      setWhyOpen(true);
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-foreground hover:bg-surface-elevated"
+                  >
+                    <Info className="h-4 w-4 text-ink-muted" />
+                    About Gideon
+                  </button>
+                </div>
+              ) : null}
+            </div>
+            <GideonChatThemeToggle className="hidden sm:inline-flex" />
             <AgentModeToggle compact className="hidden sm:inline-flex" />
             <Link
               href="/settings/connections"
               aria-label="Connections"
               title="Connections"
-              className="inline-flex items-center gap-1 rounded-full border border-border-subtle bg-surface px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-surface-elevated sm:px-3"
+              className="hidden items-center gap-1 rounded-full border border-border-subtle bg-surface px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-surface-elevated sm:inline-flex sm:px-3"
             >
               <FolderOpen className="h-3.5 w-3.5 text-ink-muted" aria-hidden />
               <span className="hidden sm:inline">Connections</span>
@@ -5497,22 +5573,13 @@ export default function VaultChatPanel({
               href={docsHref}
               aria-label={VAULT_NAV_LABEL}
               title={VAULT_NAV_LABEL}
-              className="inline-flex items-center gap-1 rounded-full border border-border-subtle bg-surface px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-surface-elevated sm:px-3"
+              className="hidden items-center gap-1 rounded-full border border-border-subtle bg-surface px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-surface-elevated sm:inline-flex sm:px-3"
             >
               <span className="text-ink-muted" aria-hidden>
                 ←
               </span>
               {VAULT_NAV_LABEL}
             </Link>
-            <button
-              type="button"
-              onClick={() => void startNewChat()}
-              disabled={sending}
-              className="inline-flex items-center gap-1.5 rounded-full border border-border-subtle bg-surface px-3 py-1.5 text-xs font-semibold transition hover:bg-surface-elevated md:hidden"
-            >
-              <MessageSquarePlus className="h-3.5 w-3.5" />
-              New
-            </button>
           </div>
         </header>
 

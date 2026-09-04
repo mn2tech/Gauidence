@@ -119,7 +119,6 @@ export default function WorkspaceContextBar({
     return () => document.removeEventListener("mousedown", onDoc);
   }, [menuOpen]);
 
-  const heading = "Searching";
   const scopeLabel = showSearchScopeToggle
     ? searchScopeHeading(searchScope, display.primaryName)
     : display.primaryName;
@@ -133,18 +132,19 @@ export default function WorkspaceContextBar({
     setHintSeen(true);
   }
 
+  const returning = display.mode === "searching" && onReturnToWorkspace;
+
   return (
     <div
-      className={`flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border-subtle bg-surface-elevated/80 px-3 py-2 ${className}`}
+      className={`flex items-center gap-1.5 rounded-xl border border-border-subtle bg-surface-elevated/80 px-2 py-1.5 sm:flex-wrap sm:justify-between sm:gap-2 sm:px-3 sm:py-2 ${className}`}
     >
-      <div className="min-w-0">
+      {/* Desktop-only title block */}
+      <div className="hidden min-w-0 sm:block">
         <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-muted">
-          {heading}
+          Searching
         </p>
         <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-          <p className="text-sm font-semibold text-foreground">
-            {scopeLabel}
-          </p>
+          <p className="text-sm font-semibold text-foreground">{scopeLabel}</p>
           {display.secondaryLabel && searchScope !== "global" ? (
             <p className="text-xs text-ink-muted">{display.secondaryLabel}</p>
           ) : null}
@@ -168,9 +168,46 @@ export default function WorkspaceContextBar({
             </button>
           </div>
         ) : null}
+      </div>
+
+      <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:flex-none sm:justify-end">
+        {returning ? (
+          <button
+            type="button"
+            onClick={onReturnToWorkspace}
+            className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border-subtle bg-surface px-2 py-1.5 text-xs font-medium text-foreground hover:bg-surface-elevated sm:px-2.5"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            <span>Return</span>
+          </button>
+        ) : (
+          <div className="relative min-w-0" ref={rootRef}>
+            <button
+              type="button"
+              onClick={() => setMenuOpen((o) => !o)}
+              aria-expanded={menuOpen}
+              aria-haspopup="listbox"
+              title="Switch space"
+              className="inline-flex max-w-full items-center gap-1 rounded-lg border border-border-subtle bg-surface px-2 py-1.5 text-xs font-medium text-foreground hover:bg-surface-elevated sm:px-2.5"
+            >
+              <span className="truncate sm:hidden">{display.primaryName}</span>
+              <span className="hidden sm:inline">Switch</span>
+              <ChevronDown className="h-3.5 w-3.5 shrink-0 text-ink-muted" />
+            </button>
+            {menuOpen ? (
+              <WorkspaceMenu
+                profiles={profiles}
+                activeId={activeProfileId}
+                onPick={onSwitchWorkspace}
+                onClose={() => setMenuOpen(false)}
+              />
+            ) : null}
+          </div>
+        )}
+
         {showSearchScopeToggle && onSearchScopeChange ? (
           <div
-            className="mt-2 flex flex-wrap gap-1"
+            className="ml-auto flex shrink-0 gap-0.5 rounded-full bg-surface p-0.5 ring-1 ring-border-subtle sm:ml-0"
             role="group"
             aria-label="Search scope"
           >
@@ -184,60 +221,34 @@ export default function WorkspaceContextBar({
                   markHintSeen();
                   onSearchScopeChange(mode);
                 }}
-                className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition ${
+                className={`rounded-full px-2 py-1 text-[11px] font-medium transition sm:px-2.5 ${
                   searchScope === mode
                     ? "bg-brand text-white"
-                    : "bg-surface text-ink-muted ring-1 ring-border-subtle hover:bg-surface-elevated"
+                    : "text-ink-muted hover:text-foreground"
                 }`}
               >
-                {searchScopeLabel(mode)}
+                <span className="sm:hidden">
+                  {mode === "workspace" ? "Space" : "All"}
+                </span>
+                <span className="hidden sm:inline">
+                  {searchScopeLabel(mode)}
+                </span>
               </button>
             ))}
           </div>
-        ) : null}
-      </div>
-
-      <div className="flex shrink-0 items-center gap-1.5">
-        {display.mode === "searching" && onReturnToWorkspace ? (
-          <button
-            type="button"
-            onClick={onReturnToWorkspace}
-            className="inline-flex items-center gap-1 rounded-lg border border-border-subtle bg-surface px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-surface-elevated"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Return
-          </button>
         ) : (
-          <div className="relative" ref={rootRef}>
-            <button
-              type="button"
-              onClick={() => setMenuOpen((o) => !o)}
-              aria-expanded={menuOpen}
-              aria-haspopup="listbox"
-              className="inline-flex items-center gap-1 rounded-lg border border-border-subtle bg-surface px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-surface-elevated"
-            >
-              Switch
-              <ChevronDown className="h-3.5 w-3.5 text-ink-muted" />
-            </button>
-            {menuOpen ? (
-              <WorkspaceMenu
-                profiles={profiles}
-                activeId={activeProfileId}
-                onPick={onSwitchWorkspace}
-                onClose={() => setMenuOpen(false)}
-              />
-            ) : null}
-          </div>
+          <div className="ml-auto sm:hidden" />
         )}
+
         {onOpenSearch ? (
           <button
             type="button"
             onClick={onOpenSearch}
-            className="inline-flex items-center gap-1 rounded-lg border border-border-subtle bg-surface px-2.5 py-1.5 text-xs font-medium text-brand hover:bg-brand-light/40"
+            className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border-subtle bg-surface p-2 text-xs font-medium text-brand hover:bg-brand-light/40 sm:px-2.5 sm:py-1.5"
             aria-label="Search spaces and content"
           >
             <Search className="h-3.5 w-3.5" />
-            Search
+            <span className="hidden sm:inline">Search</span>
           </button>
         ) : null}
       </div>

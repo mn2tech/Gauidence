@@ -6,13 +6,17 @@ export const GIDEON_CHAT_THEME_STORAGE_KEY = "guardian.gideonChatTheme";
 
 export type GideonChatTheme = "light" | "dark";
 
+/** Ask Gideon defaults to dark (ChatGPT-style); light only when explicitly chosen. */
+function parseTheme(raw: string | null | undefined): GideonChatTheme {
+  return raw === "light" ? "light" : "dark";
+}
+
 function readStored(): GideonChatTheme {
-  if (typeof window === "undefined") return "light";
+  if (typeof window === "undefined") return "dark";
   try {
-    const raw = window.localStorage.getItem(GIDEON_CHAT_THEME_STORAGE_KEY);
-    return raw === "dark" ? "dark" : "light";
+    return parseTheme(window.localStorage.getItem(GIDEON_CHAT_THEME_STORAGE_KEY));
   } catch {
-    return "light";
+    return "dark";
   }
 }
 
@@ -26,7 +30,7 @@ function writeStored(theme: GideonChatTheme): void {
 
 /** Ask Gideon chat theme only — does not theme the rest of Guardian. */
 export function useGideonChatTheme() {
-  const [theme, setThemeState] = useState<GideonChatTheme>("light");
+  const [theme, setThemeState] = useState<GideonChatTheme>("dark");
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
@@ -43,7 +47,7 @@ export function useGideonChatTheme() {
     };
     const onStorage = (e: StorageEvent) => {
       if (e.key !== GIDEON_CHAT_THEME_STORAGE_KEY) return;
-      setThemeState(e.newValue === "dark" ? "dark" : "light");
+      setThemeState(parseTheme(e.newValue));
     };
     window.addEventListener("guardian:gideon-chat-theme-changed", onChanged);
     window.addEventListener("storage", onStorage);
