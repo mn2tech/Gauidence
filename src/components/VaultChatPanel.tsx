@@ -678,16 +678,24 @@ type Props = {
   startFreshChat?: boolean;
 };
 
+/* Tint against --surface so dark Ask theme keeps light text readable. */
 const SECTION_STYLES: Record<string, string> = {
   from_documents: "border-brand/30 bg-brand-light/40",
-  from_daily_log: "border-emerald-200 bg-emerald-50/80",
-  from_profiles: "border-teal-200 bg-teal-50/80",
-  from_work_memory: "border-indigo-200 bg-indigo-50/70",
-  from_ontology: "border-cyan-200 bg-cyan-50/70",
-  calculated: "border-sky-200 bg-sky-50/80",
-  general_knowledge: "border-stone-200 bg-stone-50/90",
-  suggestion: "border-violet-200 bg-violet-50/70",
-  needs_verification: "border-amber-200 bg-amber-50/80",
+  from_daily_log:
+    "border-emerald-500/30 bg-[color-mix(in_srgb,#10b981_14%,var(--surface))]",
+  from_profiles:
+    "border-teal-500/30 bg-[color-mix(in_srgb,#14b8a6_14%,var(--surface))]",
+  from_work_memory:
+    "border-indigo-500/30 bg-[color-mix(in_srgb,#6366f1_14%,var(--surface))]",
+  from_ontology:
+    "border-cyan-500/30 bg-[color-mix(in_srgb,#06b6d4_14%,var(--surface))]",
+  calculated:
+    "border-sky-500/30 bg-[color-mix(in_srgb,#0ea5e9_14%,var(--surface))]",
+  general_knowledge: "border-border-subtle bg-surface",
+  suggestion:
+    "border-violet-500/35 bg-[color-mix(in_srgb,#8b5cf6_16%,var(--surface))]",
+  needs_verification:
+    "border-amber-500/35 bg-[color-mix(in_srgb,#f59e0b_16%,var(--surface))]",
   body: "border-transparent bg-transparent",
 };
 

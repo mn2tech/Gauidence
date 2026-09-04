@@ -22,11 +22,11 @@ function kindAccent(kind: string): string {
   switch (kind) {
     case "deadline":
     case "renewal":
-      return "border-amber-200 bg-amber-50/80";
+      return "border-amber-500/35 bg-[color-mix(in_srgb,#f59e0b_16%,var(--surface))]";
     case "workspace_recommendation":
       return "border-brand/25 bg-brand-light/30";
     default:
-      return "border-stone-200 bg-stone-50/80";
+      return "border-border-subtle bg-surface";
   }
 }
 

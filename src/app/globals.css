@@ -246,3 +246,84 @@ html.guardian-splash-active body {
   --tw-shadow-color: rgb(0 0 0 / 0.35);
 }
 
+/*
+  Answer section cards (Gideon's suggestion, etc.) use pastel Tailwind fills
+  designed for light mode. Keep them dark so text-foreground stays readable.
+*/
+.gideon-chat[data-gideon-theme="dark"] .bg-violet-50,
+.gideon-chat[data-gideon-theme="dark"] .bg-violet-50\/70,
+.gideon-chat[data-gideon-theme="dark"] .bg-violet-50\/90 {
+  background-color: color-mix(in srgb, #5b21b6 28%, var(--surface));
+}
+.gideon-chat[data-gideon-theme="dark"] .border-violet-200 {
+  border-color: color-mix(in srgb, #7c3aed 45%, var(--border-subtle));
+}
+.gideon-chat[data-gideon-theme="dark"] .bg-emerald-50,
+.gideon-chat[data-gideon-theme="dark"] .bg-emerald-50\/80 {
+  background-color: color-mix(in srgb, #065f46 28%, var(--surface));
+}
+.gideon-chat[data-gideon-theme="dark"] .border-emerald-200 {
+  border-color: color-mix(in srgb, #10b981 40%, var(--border-subtle));
+}
+.gideon-chat[data-gideon-theme="dark"] .bg-teal-50,
+.gideon-chat[data-gideon-theme="dark"] .bg-teal-50\/80,
+.gideon-chat[data-gideon-theme="dark"] .bg-teal-50\/90 {
+  background-color: color-mix(in srgb, #115e59 28%, var(--surface));
+}
+.gideon-chat[data-gideon-theme="dark"] .border-teal-200 {
+  border-color: color-mix(in srgb, #14b8a6 40%, var(--border-subtle));
+}
+.gideon-chat[data-gideon-theme="dark"] .bg-indigo-50,
+.gideon-chat[data-gideon-theme="dark"] .bg-indigo-50\/70,
+.gideon-chat[data-gideon-theme="dark"] .bg-indigo-50\/90 {
+  background-color: color-mix(in srgb, #3730a3 28%, var(--surface));
+}
+.gideon-chat[data-gideon-theme="dark"] .border-indigo-200 {
+  border-color: color-mix(in srgb, #6366f1 40%, var(--border-subtle));
+}
+.gideon-chat[data-gideon-theme="dark"] .bg-cyan-50,
+.gideon-chat[data-gideon-theme="dark"] .bg-cyan-50\/70 {
+  background-color: color-mix(in srgb, #155e75 28%, var(--surface));
+}
+.gideon-chat[data-gideon-theme="dark"] .border-cyan-200 {
+  border-color: color-mix(in srgb, #06b6d4 40%, var(--border-subtle));
+}
+.gideon-chat[data-gideon-theme="dark"] .bg-sky-50,
+.gideon-chat[data-gideon-theme="dark"] .bg-sky-50\/80,
+.gideon-chat[data-gideon-theme="dark"] .bg-sky-50\/90 {
+  background-color: color-mix(in srgb, #075985 28%, var(--surface));
+}
+.gideon-chat[data-gideon-theme="dark"] .border-sky-200 {
+  border-color: color-mix(in srgb, #0ea5e9 40%, var(--border-subtle));
+}
+.gideon-chat[data-gideon-theme="dark"] .bg-amber-50,
+.gideon-chat[data-gideon-theme="dark"] .bg-amber-50\/80,
+.gideon-chat[data-gideon-theme="dark"] .bg-amber-50\/90 {
+  background-color: color-mix(in srgb, #92400e 30%, var(--surface));
+}
+.gideon-chat[data-gideon-theme="dark"] .border-amber-200 {
+  border-color: color-mix(in srgb, #f59e0b 40%, var(--border-subtle));
+}
+
+/* Dark titles on pastel proposal cards → light accents in dark mode */
+.gideon-chat[data-gideon-theme="dark"] .text-amber-900,
+.gideon-chat[data-gideon-theme="dark"] .text-amber-900\/70 {
+  color: color-mix(in srgb, #fbbf24 85%, white);
+}
+.gideon-chat[data-gideon-theme="dark"] .text-violet-900,
+.gideon-chat[data-gideon-theme="dark"] .text-violet-900\/70 {
+  color: color-mix(in srgb, #c4b5fd 90%, white);
+}
+.gideon-chat[data-gideon-theme="dark"] .text-indigo-900,
+.gideon-chat[data-gideon-theme="dark"] .text-indigo-900\/70 {
+  color: color-mix(in srgb, #a5b4fc 90%, white);
+}
+.gideon-chat[data-gideon-theme="dark"] .text-teal-900,
+.gideon-chat[data-gideon-theme="dark"] .text-teal-900\/70 {
+  color: color-mix(in srgb, #5eead4 85%, white);
+}
+.gideon-chat[data-gideon-theme="dark"] .text-sky-900,
+.gideon-chat[data-gideon-theme="dark"] .text-sky-900\/70 {
+  color: color-mix(in srgb, #7dd3fc 90%, white);
+}
+
