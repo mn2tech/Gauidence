@@ -123,9 +123,11 @@ export function formatWhyGideonUsedContext(
       `  relevance_score: ${g.maxRelevance.toFixed(3)}`,
       `  sensitivity: ${g.artifact.sensitivity}`,
       `  reason: ${g.reasonRetrieved}`,
-      `  included: ${g.included ? "yes" : "no"}`,
-      g.exclusionReason ? `  exclusion: ${g.exclusionReason}` : null
+      `  included: ${g.included ? "yes" : "no"}`
     );
+    if (g.exclusionReason) {
+      lines.push(`  exclusion: ${g.exclusionReason}`);
+    }
   }
 
   lines.push(
@@ -134,5 +136,5 @@ export function formatWhyGideonUsedContext(
     `Evidence rules: ${snapshot.evidenceRulesApplied.join(", ")}`
   );
 
-  return lines.filter((l) => l !== null).join("\n");
+  return lines.join("\n");
 }
