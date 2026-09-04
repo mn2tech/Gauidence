@@ -104,8 +104,9 @@ export default function SiteHeader() {
     pathname?.startsWith("/ask/") ||
     pathname === "/employee/ask" ||
     pathname?.startsWith("/employee/ask");
-  /** On Ask Gideon + simple home, bottom nav replaces the sticky header on phones. */
-  const hideHeaderOnMobileAsk = showSimpleNav && isAskRoute;
+  const hideHeaderOnAsk = isAskRoute;
+  /** On Ask Gideon, bottom nav is omitted — Ask is full-screen focus. */
+  const showBottomNav = showSimpleNav && !isAskRoute;
   const homeHref = simpleHomeEnabled ? SIMPLE_HOME_PATH : "/ask";
   const cameraHref = needsSetup
     ? "/ask"
@@ -125,7 +126,7 @@ export default function SiteHeader() {
     <>
       <header
         className={`sticky top-0 z-40 border-b border-stone-200 bg-white/80 backdrop-blur ${
-          hideHeaderOnMobileAsk ? "hidden sm:block" : ""
+          hideHeaderOnAsk ? "hidden" : ""
         }`}
       >
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 sm:h-16 sm:px-6">
@@ -465,7 +466,7 @@ export default function SiteHeader() {
           onClose={() => setSearchOpen(false)}
         />
       ) : null}
-      {showSimpleNav ? <SimpleNavigation /> : null}
+      {showBottomNav ? <SimpleNavigation /> : null}
     </>
   );
 }

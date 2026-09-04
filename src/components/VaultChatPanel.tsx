@@ -36,6 +36,7 @@ import {
   ArrowRightLeft,
   PanelRightOpen,
   MoreHorizontal,
+  Home,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import GideonAvatar from "@/components/GideonAvatar";
@@ -205,13 +206,16 @@ import {
   titleFromAssistantPlainText,
 } from "@/lib/vault/actionTitle";
 import { askSpaceHref, documentsHref, VAULT_NAV_LABEL } from "@/lib/routes";
+import {
+  SIMPLE_HOME_PATH,
+  VAULTS_PATH,
+} from "@/lib/simple-home/routing";
 import { practiceStatsListPrompt } from "@/lib/vault/askInventory";
 import type { WorkProject } from "@/lib/work-memory/types";
 import OnboardingProgressChip from "@/components/OnboardingProgressChip";
 import FirstWinCard from "@/components/FirstWinCard";
 import EmptyAskGuidanceChips from "@/components/EmptyAskGuidanceChips";
 import { useOnboardingProgress } from "@/hooks/useOnboardingProgress";
-import { useSimpleHomeEnabled } from "@/hooks/useSimpleHomeEnabled";
 import {
   autoQuestionForUpload,
 } from "@/lib/onboarding/intent";
@@ -816,11 +820,14 @@ function clearStaleChatPointer(
 const ASK_SIDEBAR_COLLAPSED_KEY = "guardian.askSidebarCollapsed";
 
 function readAskSidebarCollapsed(): boolean {
-  if (typeof window === "undefined") return false;
+  if (typeof window === "undefined") return true;
   try {
-    return localStorage.getItem(ASK_SIDEBAR_COLLAPSED_KEY) === "1";
+    const raw = localStorage.getItem(ASK_SIDEBAR_COLLAPSED_KEY);
+    // Focus Ask defaults to collapsed chrome.
+    if (raw === null) return true;
+    return raw === "1";
   } catch {
-    return false;
+    return true;
   }
 }
 
@@ -855,13 +862,9 @@ export default function VaultChatPanel({
     useActiveProfile();
   const { progress: onboardingProgress, refresh: refreshOnboarding } =
     useOnboardingProgress();
-  const { enabled: simpleHomeEnabled } = useSimpleHomeEnabled();
   const needsSetup = !profilesLoading && profiles.length === 0;
-  const reserveSimpleNav =
-    isPage &&
-    simpleHomeEnabled &&
-    !needsSetup &&
-    active?.profile_type !== "employee";
+  // Full-screen Ask Focus: no bottom-nav padding (Home lives in the ⋯ menu).
+  const reserveSimpleNav = false;
   const bootstrapTried = useRef(false);
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
@@ -889,7 +892,8 @@ export default function VaultChatPanel({
     else setErrorState(code ? { message, code } : { message });
   };
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const [scopeChromeOpen, setScopeChromeOpen] = useState(false);
   const [gideonWelcomeSeen, setGideonWelcomeSeen] = useState(readGideonWelcomeSeen);
   const [headerMoreOpen, setHeaderMoreOpen] = useState(false);
   const [whyOpen, setWhyOpen] = useState(false);
@@ -4820,7 +4824,8 @@ export default function VaultChatPanel({
     [effectiveProfile?.id, switchProfile, isDrawer, scopedProfileId, syncAskProfileUrl]
   );
 
-  const workspaceContextBar = workingInDisplay ? (
+  const workspaceContextBar =
+    workingInDisplay && (scopeChromeOpen || !isPage) ? (
     <div
       className={
         isPage || isDrawer
@@ -5469,7 +5474,7 @@ export default function VaultChatPanel({
       )}
 
       <div className="flex min-w-0 flex-1 flex-col bg-background">
-        <header className="flex shrink-0 items-center gap-2 border-b border-border-subtle bg-background px-2.5 py-2 sm:gap-3 sm:px-4 sm:py-2.5">
+        <header className="flex shrink-0 items-center gap-1.5 border-b border-border-subtle bg-background px-2 py-1.5 sm:gap-2 sm:px-3 sm:py-2">
           <button
             type="button"
             className="rounded-full p-2 text-ink-muted hover:bg-surface-elevated md:hidden"
@@ -5482,8 +5487,8 @@ export default function VaultChatPanel({
             <button
               type="button"
               className="hidden rounded-full p-2 text-ink-muted hover:bg-surface-elevated md:inline-flex"
-              aria-label="Expand sidebar"
-              title="Expand sidebar"
+              aria-label="Show chats"
+              title="Show chats"
               onClick={() => {
                 setSidebarCollapsed(false);
                 persistAskSidebarCollapsed(false);
@@ -5491,17 +5496,43 @@ export default function VaultChatPanel({
             >
               <PanelRightOpen className="h-5 w-5" />
             </button>
-          ) : null}
-          <GideonAvatar size={32} />
+          ) : (
+            <button
+              type="button"
+              className="hidden rounded-full p-2 text-ink-muted hover:bg-surface-elevated md:inline-flex"
+              aria-label="Hide chats"
+              title="Hide chats"
+              onClick={() => {
+                setSidebarCollapsed(true);
+                persistAskSidebarCollapsed(true);
+              }}
+            >
+              <PanelRightOpen className="h-5 w-5 rotate-180" />
+            </button>
+          )}
+          <GideonAvatar size={28} />
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5">
-              <AskTitleProfileSwitch
-                title={
-                  chats.find((c) => c.id === activeChatId)?.title ?? "Ask Gideon"
-                }
-              />
-            </div>
+            <AskTitleProfileSwitch
+              title={
+                chats.find((c) => c.id === activeChatId)?.title ?? "Ask Gideon"
+              }
+            />
           </div>
+          {workingInDisplay ? (
+            <button
+              type="button"
+              onClick={() => setScopeChromeOpen((o) => !o)}
+              aria-pressed={scopeChromeOpen}
+              title="Space and search scope"
+              className={`max-w-[7.5rem] truncate rounded-full border px-2.5 py-1 text-[11px] font-semibold transition sm:max-w-[10rem] ${
+                scopeChromeOpen
+                  ? "border-brand bg-brand-light/40 text-brand-dark"
+                  : "border-border-subtle bg-surface text-ink-muted hover:text-foreground"
+              }`}
+            >
+              {workingInDisplay.primaryName}
+            </button>
+          ) : null}
           <div className="flex shrink-0 items-center gap-1">
             <button
               type="button"
@@ -5509,36 +5540,38 @@ export default function VaultChatPanel({
               disabled={sending}
               aria-label="New chat"
               title="New chat"
-              className="inline-flex items-center justify-center rounded-full border border-border-subtle bg-surface p-2 text-xs font-semibold transition hover:bg-surface-elevated disabled:opacity-50 lg:hidden"
+              className="inline-flex items-center justify-center rounded-full border border-border-subtle bg-surface p-2 text-xs font-semibold transition hover:bg-surface-elevated disabled:opacity-50"
             >
               <MessageSquarePlus className="h-4 w-4" />
             </button>
-            <GideonChatThemeToggle />
-            <AgentModeToggle compact className="hidden md:inline-flex" />
             <div className="relative" ref={headerMoreRef}>
               <button
                 type="button"
                 onClick={() => setHeaderMoreOpen((o) => !o)}
                 aria-expanded={headerMoreOpen}
-                aria-label="More chat options"
+                aria-label="More"
                 className="inline-flex items-center justify-center rounded-full border border-border-subtle bg-surface p-2 text-ink-muted transition hover:bg-surface-elevated hover:text-foreground"
               >
                 <MoreHorizontal className="h-4 w-4" />
               </button>
               {headerMoreOpen ? (
-                <div className="absolute right-0 top-full z-40 mt-1 w-52 rounded-xl border border-border-subtle bg-surface py-1 shadow-lg">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setHeaderMoreOpen(false);
-                      void startNewChat();
-                    }}
-                    disabled={sending}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-foreground hover:bg-surface-elevated disabled:opacity-50"
+                <div className="absolute right-0 top-full z-40 mt-1 w-56 rounded-xl border border-border-subtle bg-surface py-1 shadow-lg">
+                  <Link
+                    href={SIMPLE_HOME_PATH}
+                    onClick={() => setHeaderMoreOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-surface-elevated"
                   >
-                    <MessageSquarePlus className="h-4 w-4 text-ink-muted" />
-                    New chat
-                  </button>
+                    <Home className="h-4 w-4 text-ink-muted" />
+                    Home
+                  </Link>
+                  <Link
+                    href={VAULTS_PATH}
+                    onClick={() => setHeaderMoreOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-surface-elevated"
+                  >
+                    <FileText className="h-4 w-4 text-ink-muted" />
+                    {VAULT_NAV_LABEL}
+                  </Link>
                   <Link
                     href="/settings/connections"
                     onClick={() => setHeaderMoreOpen(false)}
@@ -5547,18 +5580,13 @@ export default function VaultChatPanel({
                     <FolderOpen className="h-4 w-4 text-ink-muted" />
                     Connections
                   </Link>
-                  <Link
-                    href={docsHref}
-                    onClick={() => setHeaderMoreOpen(false)}
-                    className="flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-surface-elevated"
-                  >
-                    <FileText className="h-4 w-4 text-ink-muted" />
-                    {VAULT_NAV_LABEL}
-                  </Link>
-                  <div className="md:hidden">
+                  <div className="border-t border-border-subtle px-2 py-1.5">
+                    <GideonChatThemeToggle className="w-full justify-start gap-2 rounded-lg border-0 px-2 py-2" />
+                  </div>
+                  <div className="px-1 pb-1">
                     <AgentModeToggle
                       compact
-                      className="m-1 w-[calc(100%-0.5rem)] justify-start"
+                      className="w-full justify-start"
                     />
                   </div>
                   <button
