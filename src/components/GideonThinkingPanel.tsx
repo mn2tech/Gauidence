@@ -19,7 +19,7 @@ export default function GideonThinkingPanel({
   return (
     <div className={`flex items-start gap-2.5 ${className}`}>
       <GideonAvatar size={40} variant="portrait" pulse />
-      <div className="min-w-0 flex-1 rounded-2xl border border-stone-200 bg-white px-3.5 py-3 shadow-sm">
+      <div className="min-w-0 flex-1 rounded-2xl border border-border-subtle bg-surface px-3.5 py-3 shadow-sm">
         <p className="text-sm font-medium text-foreground">
           Gideon is thinking…
         </p>
@@ -35,7 +35,7 @@ export default function GideonThinkingPanel({
                     ? "text-ink-muted"
                     : active
                       ? "font-medium text-foreground"
-                      : "text-stone-400"
+                      : "text-ink-muted/70"
                 }`}
               >
                 <span
@@ -44,7 +44,7 @@ export default function GideonThinkingPanel({
                       ? "border-brand bg-brand text-white"
                       : active
                         ? "border-brand bg-brand/10"
-                        : "border-stone-300"
+                        : "border-border-subtle"
                   }`}
                   aria-hidden
                 >

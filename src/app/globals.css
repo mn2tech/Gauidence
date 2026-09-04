@@ -193,3 +193,56 @@ html.guardian-splash-active body {
   height: 100%;
   touch-action: none;
 }
+
+/*
+  Ask Gideon chat-only dark theme (ChatGPT-style cool near-black).
+  Scoped to .gideon-chat — never set on html/body.
+*/
+.gideon-chat[data-gideon-theme="dark"] {
+  --background: #212121;
+  --foreground: #ececec;
+  --surface: #2f2f2f;
+  --surface-elevated: #3a3a3a;
+  --ink-muted: #a8a29e;
+  --border-subtle: #3f3f46;
+  --brand-light: #134e4a;
+  --brand-glow: #115e59;
+  --accent-warm: #292524;
+  --accent-warm-border: #57534e;
+  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.35), 0 1px 2px -1px rgb(0 0 0 / 0.25);
+  --shadow-card-hover: 0 4px 12px -2px rgb(0 0 0 / 0.45), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+  color-scheme: dark;
+}
+
+/* Remap common hardcoded light Tailwind surfaces inside Ask Gideon dark mode. */
+.gideon-chat[data-gideon-theme="dark"] .bg-white {
+  background-color: var(--surface);
+}
+.gideon-chat[data-gideon-theme="dark"] .bg-stone-50,
+.gideon-chat[data-gideon-theme="dark"] .bg-stone-50\/80,
+.gideon-chat[data-gideon-theme="dark"] .bg-stone-50\/90,
+.gideon-chat[data-gideon-theme="dark"] .bg-stone-100 {
+  background-color: var(--surface-elevated);
+}
+.gideon-chat[data-gideon-theme="dark"] .hover\:bg-white:hover,
+.gideon-chat[data-gideon-theme="dark"] .hover\:bg-stone-50:hover,
+.gideon-chat[data-gideon-theme="dark"] .hover\:bg-stone-100:hover {
+  background-color: color-mix(in srgb, var(--surface-elevated) 80%, white 8%);
+}
+.gideon-chat[data-gideon-theme="dark"] .border-stone-200,
+.gideon-chat[data-gideon-theme="dark"] .border-stone-300 {
+  border-color: var(--border-subtle);
+}
+.gideon-chat[data-gideon-theme="dark"] .text-stone-600,
+.gideon-chat[data-gideon-theme="dark"] .text-stone-700,
+.gideon-chat[data-gideon-theme="dark"] .text-stone-800 {
+  color: var(--ink-muted);
+}
+.gideon-chat[data-gideon-theme="dark"] .bg-white\/95 {
+  background-color: color-mix(in srgb, var(--surface) 95%, transparent);
+}
+.gideon-chat[data-gideon-theme="dark"] .shadow-sm,
+.gideon-chat[data-gideon-theme="dark"] .shadow-md {
+  --tw-shadow-color: rgb(0 0 0 / 0.35);
+}
+

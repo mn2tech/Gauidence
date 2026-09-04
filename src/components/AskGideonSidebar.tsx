@@ -50,7 +50,7 @@ function CollapsibleSection({
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        className="flex w-full items-center gap-1 rounded-lg px-2 py-1.5 text-left transition hover:bg-white/60"
+        className="flex w-full items-center gap-1 rounded-lg px-2 py-1.5 text-left transition hover:bg-surface/60"
       >
         <ChevronDown
           className={`h-3.5 w-3.5 shrink-0 text-ink-muted transition-transform ${
@@ -95,8 +95,8 @@ function VaultRow({
         indented ? "pl-6 pr-2" : "px-2"
       } ${
         selected
-          ? "bg-white font-medium text-foreground ring-1 ring-brand/30"
-          : "text-foreground/90 hover:bg-white/80"
+          ? "bg-surface font-medium text-foreground ring-1 ring-brand/30"
+          : "text-foreground/90 hover:bg-surface/80"
       } ${className}`}
     >
       <ProfileAvatar profile={profile} size="sm" />
@@ -165,8 +165,8 @@ function VaultGroup({
         className={`flex items-stretch rounded-lg ${
           hasSubVaults
             ? selected && !activeChildId
-              ? "bg-white ring-1 ring-brand/30"
-              : "hover:bg-white/80"
+              ? "bg-surface ring-1 ring-brand/30"
+              : "hover:bg-surface/80"
             : ""
         }`}
       >
@@ -176,7 +176,7 @@ function VaultGroup({
             onClick={onToggleExpand}
             aria-expanded={expanded}
             aria-label={`${expanded ? "Collapse" : "Expand"} ${profile.display_name}`}
-            className="flex shrink-0 items-center self-stretch rounded-l-lg px-1.5 text-ink-muted transition hover:bg-white/60"
+            className="flex shrink-0 items-center self-stretch rounded-l-lg px-1.5 text-ink-muted transition hover:bg-surface/60"
           >
             <ChevronDown
               className={`h-3.5 w-3.5 transition-transform ${
@@ -330,7 +330,7 @@ function VaultList({ onPicked }: { onPicked?: () => void }) {
         <li className="pt-1">
           <Link
             href="/settings/profiles?add=1&return=%2Fask"
-            className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-brand hover:bg-white/80"
+            className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-brand hover:bg-surface/80"
           >
             <Plus className="h-3.5 w-3.5" />
             New space
@@ -374,7 +374,7 @@ export default function AskGideonSidebar({
 
   return (
     <>
-      <div className="shrink-0 border-b border-stone-200 px-3 py-3">
+      <div className="shrink-0 border-b border-border-subtle px-3 py-3">
         <div className="mb-3 flex items-start justify-between gap-2">
           <GuardianLogo variant="horizontal" size="sm" className="min-w-0" />
           {onToggleCollapsed ? (
@@ -383,7 +383,7 @@ export default function AskGideonSidebar({
               onClick={onToggleCollapsed}
               aria-label="Minimize sidebar"
               title="Minimize sidebar"
-              className="shrink-0 rounded-full p-1.5 text-ink-muted transition hover:bg-white hover:text-foreground"
+              className="shrink-0 rounded-full p-1.5 text-ink-muted transition hover:bg-surface hover:text-foreground"
             >
               <PanelLeftClose className="h-4 w-4" />
             </button>
@@ -409,7 +409,7 @@ export default function AskGideonSidebar({
               onSidebarAction?.();
             }}
             disabled={sending}
-            className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-full border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-stone-50 disabled:opacity-50"
+            className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-full border border-border-subtle bg-surface px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-surface-elevated disabled:opacity-50"
           >
             <Import className="h-4 w-4" />
             Import chats
@@ -418,7 +418,7 @@ export default function AskGideonSidebar({
       </div>
 
       <div
-        className={`shrink-0 overflow-y-auto border-b border-stone-200 p-2 ${
+        className={`shrink-0 overflow-y-auto border-b border-border-subtle p-2 ${
           vaultsOpen ? "max-h-[32%]" : ""
         }`}
       >
@@ -449,7 +449,7 @@ export default function AskGideonSidebar({
                   <div
                     className={`group flex items-center gap-1 rounded-lg ${
                       c.id === activeChatId
-                        ? "bg-white ring-1 ring-stone-200"
+                        ? "bg-surface ring-1 ring-border-subtle"
                         : ""
                     }`}
                   >
@@ -484,7 +484,7 @@ export default function AskGideonSidebar({
         </CollapsibleSection>
       </div>
 
-      <div className="shrink-0 space-y-1.5 border-t border-stone-200 p-3">
+      <div className="shrink-0 space-y-1.5 border-t border-border-subtle p-3">
         <Link
           href="/settings/connections"
           onClick={() => onSidebarAction?.()}

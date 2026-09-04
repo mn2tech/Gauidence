@@ -192,7 +192,9 @@ import { useGideonVoiceInput } from "@/hooks/useGideonVoiceInput";
 import { useGideonSpeechOutput } from "@/hooks/useGideonSpeechOutput";
 import GideonAssistantActions from "@/components/GideonAssistantActions";
 import AgentModeToggle from "@/components/AgentModeToggle";
+import GideonChatThemeToggle from "@/components/GideonChatThemeToggle";
 import { useAgentMode } from "@/hooks/useAgentMode";
+import { useGideonChatTheme } from "@/hooks/useGideonChatTheme";
 import {
   formatAssistantMessagePlainText,
   formatAssistantMessageSpeechText,
@@ -984,6 +986,7 @@ export default function VaultChatPanel({
   const [workProject, setWorkProject] = useState<WorkProject | null>(null);
   const [vaultSearchOpen, setVaultSearchOpen] = useState(false);
   const { enabled: agentModeEnabled } = useAgentMode();
+  const { theme: gideonChatTheme } = useGideonChatTheme();
   const bottomRef = useRef<HTMLDivElement>(null);
   const plusRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -4582,8 +4585,8 @@ export default function VaultChatPanel({
     <div
       className={
         isPage || isDrawer
-          ? "min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-8"
-          : "max-h-64 space-y-3 overflow-y-auto rounded-xl bg-stone-50 p-3 ring-1 ring-stone-200"
+          ? "min-h-0 flex-1 space-y-4 overflow-y-auto bg-background px-4 py-4 sm:px-8"
+          : "max-h-64 space-y-3 overflow-y-auto rounded-xl bg-surface-elevated p-3 ring-1 ring-border-subtle"
       }
     >
       {loadingHistory ? (
@@ -4623,7 +4626,7 @@ export default function VaultChatPanel({
                     />
                   ))}
                   {m.content.trim() ? (
-                    <div className="rounded-2xl bg-stone-100 px-3.5 py-2 text-sm text-foreground">
+                    <div className="rounded-2xl bg-surface-elevated px-3.5 py-2 text-sm text-foreground">
                       <span className="whitespace-pre-wrap">{m.content}</span>
                     </div>
                   ) : null}
@@ -4823,14 +4826,14 @@ export default function VaultChatPanel({
       onPaste={handleComposerPaste}
       className={
         isPage || isDrawer
-          ? `shrink-0 border-t border-stone-200 bg-white px-4 pt-3 sm:px-8 ${
+          ? `shrink-0 border-t border-border-subtle bg-background px-4 pt-3 sm:px-8 ${
               reserveSimpleNav ? "pb-simple-nav" : "pb-3"
             }`
           : "mt-3"
       }
     >
       <div className={isPage ? "mx-auto w-full max-w-3xl" : "w-full"}>
-        <div className="relative rounded-2xl border border-stone-200 bg-white shadow-sm focus-within:border-brand/40 focus-within:ring-2 focus-within:ring-brand/20">
+        <div className="relative rounded-2xl border border-border-subtle bg-surface shadow-sm focus-within:border-brand/40 focus-within:ring-2 focus-within:ring-brand/20">
           {pendingAttachment ? (
             <div className="px-3 pt-3">
               <div className="group relative inline-flex">
@@ -5290,7 +5293,10 @@ export default function VaultChatPanel({
       );
     }
     return (
-      <div className="flex h-full w-full items-center justify-center bg-white px-4">
+      <div
+        className="gideon-chat flex h-full w-full items-center justify-center bg-background px-4 text-foreground"
+        data-gideon-theme={gideonChatTheme}
+      >
         {setupBlock}
       </div>
     );
@@ -5298,7 +5304,10 @@ export default function VaultChatPanel({
 
   if (isDrawer) {
     return (
-      <div className="flex h-full min-h-0 flex-col">
+      <div
+        className="gideon-chat flex h-full min-h-0 flex-col bg-background text-foreground"
+        data-gideon-theme={gideonChatTheme}
+      >
         {messageList}
         {error && (
           <PlanLimitAlert
@@ -5355,9 +5364,12 @@ export default function VaultChatPanel({
 
   return (
     <>
-    <div className="flex h-full w-full overflow-hidden bg-white">
+    <div
+      className="gideon-chat flex h-full w-full overflow-hidden bg-background text-foreground"
+      data-gideon-theme={gideonChatTheme}
+    >
       <aside
-        className={`hidden h-full shrink-0 flex-col border-r border-stone-200 bg-stone-50 transition-[width] duration-200 md:flex ${
+        className={`hidden h-full shrink-0 flex-col border-r border-border-subtle bg-surface-elevated transition-[width] duration-200 md:flex ${
           sidebarCollapsed ? "w-14" : "w-64"
         }`}
       >
@@ -5407,14 +5419,14 @@ export default function VaultChatPanel({
             aria-label="Close sidebar"
             onClick={() => setSidebarOpen(false)}
           />
-          <div className="relative z-10 flex h-full w-72 max-w-[85vw] flex-col bg-stone-50 shadow-xl">
-            <div className="flex items-center justify-between border-b border-stone-200 px-3 py-2">
+          <div className="relative z-10 flex h-full w-72 max-w-[85vw] flex-col bg-surface-elevated shadow-xl">
+            <div className="flex items-center justify-between border-b border-border-subtle px-3 py-2">
               <span className="text-sm font-semibold">Vaults &amp; chats</span>
               <button
                 type="button"
                 onClick={() => setSidebarOpen(false)}
                 aria-label="Close"
-                className="rounded-full p-2 text-ink-muted hover:bg-stone-200"
+                className="rounded-full p-2 text-ink-muted hover:bg-surface"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -5424,11 +5436,11 @@ export default function VaultChatPanel({
         </div>
       )}
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex shrink-0 items-center gap-3 border-b border-stone-200 px-3 py-2.5 sm:px-4">
+      <div className="flex min-w-0 flex-1 flex-col bg-background">
+        <header className="flex shrink-0 items-center gap-3 border-b border-border-subtle bg-background px-3 py-2.5 sm:px-4">
           <button
             type="button"
-            className="rounded-full p-2 text-ink-muted hover:bg-stone-100 md:hidden"
+            className="rounded-full p-2 text-ink-muted hover:bg-surface-elevated md:hidden"
             aria-label="Open spaces and chats"
             onClick={() => setSidebarOpen(true)}
           >
@@ -5437,7 +5449,7 @@ export default function VaultChatPanel({
           {sidebarCollapsed ? (
             <button
               type="button"
-              className="hidden rounded-full p-2 text-ink-muted hover:bg-stone-100 md:inline-flex"
+              className="hidden rounded-full p-2 text-ink-muted hover:bg-surface-elevated md:inline-flex"
               aria-label="Expand sidebar"
               title="Expand sidebar"
               onClick={() => {
@@ -5460,7 +5472,7 @@ export default function VaultChatPanel({
                 type="button"
                 onClick={() => setWhyOpen((o) => !o)}
                 aria-label="About Gideon"
-                className="shrink-0 rounded-full p-1 text-ink-muted hover:bg-stone-100 hover:text-foreground"
+                className="shrink-0 rounded-full p-1 text-ink-muted hover:bg-surface-elevated hover:text-foreground"
               >
                 <Info className="h-3.5 w-3.5" />
               </button>
@@ -5470,12 +5482,13 @@ export default function VaultChatPanel({
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+            <GideonChatThemeToggle />
             <AgentModeToggle compact className="hidden sm:inline-flex" />
             <Link
               href="/settings/connections"
               aria-label="Connections"
               title="Connections"
-              className="inline-flex items-center gap-1 rounded-full border border-stone-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50 sm:px-3"
+              className="inline-flex items-center gap-1 rounded-full border border-border-subtle bg-surface px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-surface-elevated sm:px-3"
             >
               <FolderOpen className="h-3.5 w-3.5 text-ink-muted" aria-hidden />
               <span className="hidden sm:inline">Connections</span>
@@ -5484,7 +5497,7 @@ export default function VaultChatPanel({
               href={docsHref}
               aria-label={VAULT_NAV_LABEL}
               title={VAULT_NAV_LABEL}
-              className="inline-flex items-center gap-1 rounded-full border border-stone-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50 sm:px-3"
+              className="inline-flex items-center gap-1 rounded-full border border-border-subtle bg-surface px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-surface-elevated sm:px-3"
             >
               <span className="text-ink-muted" aria-hidden>
                 ←
@@ -5495,7 +5508,7 @@ export default function VaultChatPanel({
               type="button"
               onClick={() => void startNewChat()}
               disabled={sending}
-              className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold transition hover:bg-stone-50 md:hidden"
+              className="inline-flex items-center gap-1.5 rounded-full border border-border-subtle bg-surface px-3 py-1.5 text-xs font-semibold transition hover:bg-surface-elevated md:hidden"
             >
               <MessageSquarePlus className="h-3.5 w-3.5" />
               New
@@ -5515,7 +5528,7 @@ export default function VaultChatPanel({
         ) : null}
 
         {whyOpen && (
-          <div className="shrink-0 border-b border-stone-200 bg-stone-50 px-4 py-3 text-xs leading-relaxed text-ink-muted sm:px-8">
+          <div className="shrink-0 border-b border-border-subtle bg-surface-elevated px-4 py-3 text-xs leading-relaxed text-ink-muted sm:px-8">
             <p className="whitespace-pre-wrap">{GIDEON_WHY}</p>
             <p className="mt-2 font-medium text-foreground">{GIDEON_BRAND_LINE}</p>
           </div>

@@ -4,7 +4,9 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { ExternalLink, X } from "lucide-react";
 import GideonAvatar from "@/components/GideonAvatar";
+import GideonChatThemeToggle from "@/components/GideonChatThemeToggle";
 import VaultChatPanel from "@/components/VaultChatPanel";
+import { useGideonChatTheme } from "@/hooks/useGideonChatTheme";
 
 type Props = {
   profileId: string;
@@ -17,6 +19,8 @@ export default function VaultChatDrawer({
   profileName,
   onClose,
 }: Props) {
+  const { theme } = useGideonChatTheme();
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -46,9 +50,10 @@ export default function VaultChatDrawer({
         role="dialog"
         aria-modal="true"
         aria-label={`${profileName} vault chat`}
-        className="relative z-10 flex h-full w-full max-w-lg flex-col border-l border-stone-200 bg-white shadow-2xl"
+        className="gideon-chat relative z-10 flex h-full w-full max-w-lg flex-col border-l border-border-subtle bg-background text-foreground shadow-2xl"
+        data-gideon-theme={theme}
       >
-        <header className="flex shrink-0 items-center gap-2.5 border-b border-stone-200 px-3 py-2.5 sm:px-4">
+        <header className="flex shrink-0 items-center gap-2.5 border-b border-border-subtle bg-background px-3 py-2.5 sm:px-4">
           <GideonAvatar size={32} className="shrink-0" />
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-foreground">
@@ -58,9 +63,10 @@ export default function VaultChatDrawer({
               Ask Gideon here without leaving your current vault.
             </p>
           </div>
+          <GideonChatThemeToggle />
           <Link
             href={`/ask?profileId=${encodeURIComponent(profileId)}`}
-            className="hidden shrink-0 items-center gap-1 rounded-full border border-stone-300 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-brand transition hover:bg-stone-50 sm:inline-flex"
+            className="hidden shrink-0 items-center gap-1 rounded-full border border-border-subtle bg-surface px-2.5 py-1.5 text-[11px] font-semibold text-brand transition hover:bg-surface-elevated sm:inline-flex"
           >
             Full page
             <ExternalLink className="h-3 w-3" />
@@ -69,7 +75,7 @@ export default function VaultChatDrawer({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="shrink-0 rounded-full p-2 text-ink-muted transition hover:bg-stone-100 hover:text-foreground"
+            className="shrink-0 rounded-full p-2 text-ink-muted transition hover:bg-surface-elevated hover:text-foreground"
           >
             <X className="h-4 w-4" />
           </button>

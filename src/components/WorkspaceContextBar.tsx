@@ -46,7 +46,7 @@ function WorkspaceMenu({
   return (
     <div
       role="listbox"
-      className="absolute left-0 top-full z-50 mt-1 w-72 max-w-[calc(100vw-2rem)] rounded-xl border border-stone-200 bg-white py-1 shadow-lg"
+      className="absolute left-0 top-full z-50 mt-1 w-72 max-w-[calc(100vw-2rem)] rounded-xl border border-border-subtle bg-surface py-1 shadow-lg"
     >
       <ul className="max-h-64 overflow-y-auto py-1">
         {topLevel.map((p) => {
@@ -61,7 +61,7 @@ function WorkspaceMenu({
                   onPick(p.id);
                   onClose();
                 }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-stone-50"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-surface-elevated"
               >
                 <ProfileAvatar profile={p} size="sm" />
                 <span className="truncate font-medium">{p.display_name}</span>
@@ -76,7 +76,7 @@ function WorkspaceMenu({
                     onPick(child.id);
                     onClose();
                   }}
-                  className="flex w-full items-center gap-2 py-2 pl-8 pr-3 text-left text-sm hover:bg-stone-50"
+                  className="flex w-full items-center gap-2 py-2 pl-8 pr-3 text-left text-sm hover:bg-surface-elevated"
                 >
                   <ProfileAvatar profile={child} size="sm" />
                   <span className="truncate">{child.display_name}</span>
@@ -135,7 +135,7 @@ export default function WorkspaceContextBar({
 
   return (
     <div
-      className={`flex flex-wrap items-center justify-between gap-2 rounded-xl border border-stone-200 bg-stone-50/80 px-3 py-2 ${className}`}
+      className={`flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border-subtle bg-surface-elevated/80 px-3 py-2 ${className}`}
     >
       <div className="min-w-0">
         <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-muted">
@@ -155,7 +155,7 @@ export default function WorkspaceContextBar({
           <p className="mt-0.5 text-[11px] text-ink-muted">{display.scopeNote}</p>
         ) : null}
         {showFirstHint ? (
-          <div className="mt-2 rounded-lg bg-white px-2.5 py-2 ring-1 ring-stone-200">
+          <div className="mt-2 rounded-lg bg-surface px-2.5 py-2 ring-1 ring-border-subtle">
             <p className="text-[11px] leading-snug text-foreground">
               {SEARCH_SCOPE_FIRST_HINT}
             </p>
@@ -187,7 +187,7 @@ export default function WorkspaceContextBar({
                 className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition ${
                   searchScope === mode
                     ? "bg-brand text-white"
-                    : "bg-white text-ink-muted ring-1 ring-stone-200 hover:bg-stone-50"
+                    : "bg-surface text-ink-muted ring-1 ring-border-subtle hover:bg-surface-elevated"
                 }`}
               >
                 {searchScopeLabel(mode)}
@@ -202,7 +202,7 @@ export default function WorkspaceContextBar({
           <button
             type="button"
             onClick={onReturnToWorkspace}
-            className="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-stone-50"
+            className="inline-flex items-center gap-1 rounded-lg border border-border-subtle bg-surface px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-surface-elevated"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
             Return
@@ -214,7 +214,7 @@ export default function WorkspaceContextBar({
               onClick={() => setMenuOpen((o) => !o)}
               aria-expanded={menuOpen}
               aria-haspopup="listbox"
-              className="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-stone-50"
+              className="inline-flex items-center gap-1 rounded-lg border border-border-subtle bg-surface px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-surface-elevated"
             >
               Switch
               <ChevronDown className="h-3.5 w-3.5 text-ink-muted" />
@@ -233,7 +233,7 @@ export default function WorkspaceContextBar({
           <button
             type="button"
             onClick={onOpenSearch}
-            className="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-medium text-brand hover:bg-brand-light/40"
+            className="inline-flex items-center gap-1 rounded-lg border border-border-subtle bg-surface px-2.5 py-1.5 text-xs font-medium text-brand hover:bg-brand-light/40"
             aria-label="Search spaces and content"
           >
             <Search className="h-3.5 w-3.5" />

@@ -73,7 +73,7 @@ export default function GideonAssistantActions({
   };
 
   const actionClass =
-    "inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-ink-muted transition hover:bg-stone-100 hover:text-foreground disabled:opacity-50";
+    "inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-ink-muted transition hover:bg-surface-elevated hover:text-foreground disabled:opacity-50";
 
   return (
     <div className="flex flex-wrap items-center gap-0.5 pt-0.5">
