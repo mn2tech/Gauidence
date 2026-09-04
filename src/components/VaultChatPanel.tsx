@@ -37,6 +37,7 @@ import {
   PanelRightOpen,
   MoreHorizontal,
   Home,
+  Inbox,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import GideonAvatar from "@/components/GideonAvatar";
@@ -207,6 +208,7 @@ import {
 } from "@/lib/vault/actionTitle";
 import { askSpaceHref, documentsHref, VAULT_NAV_LABEL } from "@/lib/routes";
 import {
+  INBOX_PATH,
   SIMPLE_HOME_PATH,
   VAULTS_PATH,
 } from "@/lib/simple-home/routing";
@@ -5571,6 +5573,14 @@ export default function VaultChatPanel({
                   >
                     <Home className="h-4 w-4 text-ink-muted" />
                     Home
+                  </Link>
+                  <Link
+                    href={INBOX_PATH}
+                    onClick={() => setHeaderMoreOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-surface-elevated"
+                  >
+                    <Inbox className="h-4 w-4 text-ink-muted" />
+                    Inbox
                   </Link>
                   <Link
                     href={VAULTS_PATH}

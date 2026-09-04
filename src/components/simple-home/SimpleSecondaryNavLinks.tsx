@@ -9,6 +9,7 @@ import { employeeShowsPowerNav } from "@/lib/employee-hub/entitlements";
 import { isOrgStyleProfile } from "@/lib/profiles/types";
 import {
   COMMAND_CENTER_PATH,
+  INBOX_PATH,
   SIMPLE_HOME_PATH,
 } from "@/lib/simple-home/routing";
 import { LEADS_PATH, PROPOSALS_PATH } from "@/lib/routes";
@@ -135,6 +136,7 @@ export default function SimpleSecondaryNavLinks({
 
   const primaryLinks: NavLink[] = [
     { href: SIMPLE_HOME_PATH, label: "Guardian Today" },
+    { href: INBOX_PATH, label: "Inbox" },
   ];
 
   const isFamilyContext =
