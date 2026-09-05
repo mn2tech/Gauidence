@@ -7,6 +7,7 @@ import {
   wantsDailyLogCapture,
   isDailyLogConfirmationMessage,
 } from "../propose.ts";
+import { todayLogDate } from "../types.ts";
 
 describe("daily log capture propose helpers", () => {
   it("detects capture intent", () => {
@@ -16,6 +17,10 @@ describe("daily log capture propose helpers", () => {
     assert.equal(wantsDailyLogCapture("Add these to Nolan's vault"), true);
     assert.equal(wantsDailyLogCapture("Make them permanent"), true);
     assert.equal(wantsDailyLogCapture("Save what you just listed"), true);
+    assert.equal(wantsDailyLogCapture("Create a daily log with today's schedule"), true);
+    assert.equal(wantsDailyLogCapture("Make me a daily log for today"), true);
+    assert.equal(wantsDailyLogCapture("Write a daily log entry"), true);
+    assert.equal(wantsDailyLogCapture("Save this to my space"), true);
     assert.equal(wantsDailyLogCapture("Remind me about registration"), false);
     assert.equal(wantsDailyLogCapture("What did I log yesterday?"), false);
     assert.equal(wantsDailyLogCapture("Upload this photo"), false);
@@ -100,11 +105,12 @@ Confirm when ready.`;
   });
 
   it("builds a readable summary", () => {
+    const today = todayLogDate("America/New_York");
     const summary = proposedDailyLogSummary(
       {
         title: "Soccer practice",
         content: "Emma has soccer Tuesday at 4pm.",
-        logDate: "2026-08-03",
+        logDate: today,
       },
       "America/New_York"
     );
