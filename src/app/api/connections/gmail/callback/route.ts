@@ -61,6 +61,7 @@ export async function GET(request: Request) {
   if (providerError) {
     const response = redirectHome(request, returnTo, {
       gmail: providerError === "access_denied" ? "denied" : "error",
+      reason: providerError === "access_denied" ? "denied" : "provider",
     });
     clearOauthCookies(response);
     return response;
@@ -75,7 +76,10 @@ export async function GET(request: Request) {
     cookieStore.get(GMAIL_OAUTH_PROFILE_COOKIE)?.value?.trim() || null;
 
   if (!code || !state || !expectedState || state !== expectedState) {
-    const response = redirectHome(request, returnTo, { gmail: "error" });
+    const response = redirectHome(request, returnTo, {
+      gmail: "error",
+      reason: "state",
+    });
     clearOauthCookies(response);
     return response;
   }
@@ -142,13 +146,23 @@ export async function GET(request: Request) {
     clearOauthCookies(response);
     return response;
   } catch (err) {
-    console.error(
-      "Gmail OAuth callback failed:",
-      err instanceof Error ? err.message.slice(0, 200) : err
-    );
+    const message =
+      err instanceof Error ? err.message.slice(0, 200) : "unknown";
+    console.error("Gmail OAuth callback failed:", message);
+    const lower = message.toLowerCase();
+    let reason = "exchange";
+    if (
+      lower.includes("source_type") ||
+      lower.includes("check constraint") ||
+      lower.includes("inbox_messages")
+    ) {
+      reason = "migration";
+    } else if (err instanceof GmailApiError && err.status === 401) {
+      reason = "denied";
+    }
     const response = redirectHome(request, returnTo, {
-      gmail:
-        err instanceof GmailApiError && err.status === 401 ? "denied" : "error",
+      gmail: reason === "denied" ? "denied" : "error",
+      reason,
     });
     clearOauthCookies(response);
     return response;

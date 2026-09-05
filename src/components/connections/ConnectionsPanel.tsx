@@ -329,7 +329,20 @@ export default function ConnectionsPanel() {
     } else if (gmail === "denied") {
       setError("Gmail access was cancelled or denied.");
     } else if (gmail === "error") {
-      setError("Couldn't connect Gmail. Try again.");
+      const reason = params.get("reason");
+      if (reason === "migration") {
+        setError(
+          "Apply Supabase migration 0115_gmail_inbox.sql, then reconnect Gmail."
+        );
+      } else if (reason === "state") {
+        setError(
+          "Gmail sign-in expired or cookies were blocked. Try Connect Gmail again."
+        );
+      } else {
+        setError(
+          "Couldn't connect Gmail. Check callback URI, Gmail API, gmail.readonly scope, and migration 0115."
+        );
+      }
     }
     const url = new URL(window.location.href);
     url.searchParams.delete("drive");

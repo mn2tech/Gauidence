@@ -182,6 +182,7 @@ export default function InboxScreen() {
 
   useEffect(() => {
     const gmail = searchParams.get("gmail");
+    const reason = searchParams.get("reason");
     if (!gmail) return;
     if (gmail === "connected") {
       setBanner("Gmail connected. Syncing your recent mail…");
@@ -212,7 +213,23 @@ export default function InboxScreen() {
         "Gmail isn’t configured on this deployment. Enable the Gmail API and add the Gmail callback URI to your Google OAuth client."
       );
     } else if (gmail === "error") {
-      setError("Couldn't connect Gmail. Try again.");
+      if (reason === "migration") {
+        setError(
+          "Gmail connected source isn’t ready in the database. Apply migration 0115_gmail_inbox.sql in Supabase, then try again."
+        );
+      } else if (reason === "state") {
+        setError(
+          "Gmail sign-in expired or cookies were blocked. Try Connect Gmail again in the same browser tab."
+        );
+      } else if (reason === "provider") {
+        setError(
+          "Google rejected the request. Confirm the Gmail callback URI is listed on your OAuth client (redirect_uri_mismatch)."
+        );
+      } else {
+        setError(
+          "Couldn't connect Gmail. Check Google Cloud (Gmail API, gmail.readonly scope, callback URI) and that migration 0115 is applied."
+        );
+      }
     }
   }, [searchParams, loadMessages]);
 
