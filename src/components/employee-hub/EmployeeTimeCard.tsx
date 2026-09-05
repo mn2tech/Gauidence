@@ -87,6 +87,12 @@ export default function EmployeeTimeCard({
     return hoursForDay(entries, d) === 0 && !openEntry?.clock_in_at?.startsWith(d);
   });
 
+  const weekTotal = useMemo(() => {
+    let total = 0;
+    for (const d of days) total += hoursForDay(entries, d);
+    return Math.round(total * 100) / 100;
+  }, [days, entries]);
+
   async function clockIn() {
     setBusy(true);
     setError(null);
@@ -161,8 +167,6 @@ export default function EmployeeTimeCard({
     }
   }
 
-  const weekTotal = days.reduce((sum, d) => sum + hoursForDay(entries, d), 0);
-
   return (
     <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
       <div className="flex items-center gap-2">
@@ -172,7 +176,7 @@ export default function EmployeeTimeCard({
         <div>
           <h2 className="text-base font-semibold tracking-tight">Time</h2>
           <p className="text-xs text-ink-muted">
-            Week of {formatShortDate(weekStart)} — {weekTotal.toFixed(1)} hrs
+            Week of {formatShortDate(weekStart)} — {weekTotal} hrs
           </p>
         </div>
       </div>
@@ -234,7 +238,13 @@ export default function EmployeeTimeCard({
 
       {entitlements.manual_time_entry ? (
         <div className="mt-6 border-t border-stone-100 pt-4">
-          <p className="text-sm font-medium">This week</p>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-medium">This week</p>
+            <p className="text-sm font-semibold tabular-nums">
+              {weekTotal}{" "}
+              <span className="text-xs font-normal text-ink-muted">hrs total</span>
+            </p>
+          </div>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             {days.map((date) => (
               <label key={date} className="flex items-center gap-2 text-sm">

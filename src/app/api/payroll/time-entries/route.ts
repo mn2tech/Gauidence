@@ -46,18 +46,13 @@ export async function GET(request: Request) {
   }
 
   if (periodStart && periodEnd) {
-    if (employeeProfileId) {
-      query = query.or(
-        `and(clock_in_at.gte.${periodStart}T00:00:00.000Z,clock_in_at.lte.${periodEnd}T23:59:59.999Z),and(work_date.gte.${periodStart},work_date.lte.${periodEnd})`
-      );
-    } else {
-      query = query
-        .gte("clock_in_at", `${periodStart}T00:00:00.000Z`)
-        .lte("clock_in_at", `${periodEnd}T23:59:59.999Z`);
-    }
+    // Include punches (clock_in_at) and manual daily hours (work_date).
+    query = query.or(
+      `and(clock_in_at.gte.${periodStart}T00:00:00.000Z,clock_in_at.lte.${periodEnd}T23:59:59.999Z),and(work_date.gte.${periodStart},work_date.lte.${periodEnd})`
+    );
   }
 
-  const { data, error } = await query.limit(100);
+  const { data, error } = await query.limit(500);
   if (error) {
     return NextResponse.json({ error: "Couldn't load time entries." }, { status: 502 });
   }
