@@ -124,6 +124,17 @@ import {
   parseFocusBlockStart,
   type GideonFocusBlock,
 } from "@/lib/gideon/focusBlock";
+import {
+  prepareGideonTurn,
+  finalizeGideonTurn,
+  evidenceFromCitations,
+  formatRuntimeContextForPrompt,
+  createSupabaseStateStore,
+  initEmptyConversationState,
+  type GideonRuntimeContext,
+  type ConversationState,
+  type RuntimeDebugSnapshot,
+} from "@/lib/gideon/runtime";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -917,6 +928,14 @@ export async function PUT(request: Request) {
     );
   }
 
+  // Sprint 1: empty conversation working state (no entity inheritance).
+  void initEmptyConversationState(
+    supabase,
+    user.id,
+    (created as { id: string }).id,
+    active.id
+  ).catch(() => null);
+
   const chats = await listChats(supabase, user.id, active.id);
   return NextResponse.json({ chat: created as ChatSummary, chats });
 }
@@ -1117,6 +1136,9 @@ export async function POST(request: Request) {
     isNewChat = true;
     chatHomeProfileId = active.id;
     chatSearchScope = initialSearchScope;
+    void initEmptyConversationState(supabase, user.id, chatId, active.id).catch(
+      () => null
+    );
   }
 
   const setScopedProfile =
@@ -1277,6 +1299,59 @@ export async function POST(request: Request) {
   const isFirstExchange =
     !regenerateAssistantId && priorMessages.length === 0;
 
+  // --- Conversation Runtime v1: resolve references + working state ---
+  const runtimeStore = createSupabaseStateStore(supabase);
+  const userQuestion = question;
+  let runtimeContext: GideonRuntimeContext | null = null;
+  let runtimeState: ConversationState | null = null;
+  let runtimeDebug: RuntimeDebugSnapshot | null = null;
+  let runtimeFellBack = false;
+  let runtimeClarification: string | null = null;
+  try {
+    const prepared = await prepareGideonTurn({
+      userId: user.id,
+      conversationId: chatId,
+      message: userQuestion,
+      currentSpaceId: active.id,
+      recentMessages: history,
+      store: runtimeStore,
+    });
+    runtimeContext = prepared.context;
+    runtimeState = prepared.state;
+    runtimeFellBack = prepared.fellBack;
+    runtimeDebug = {
+      resolvedMessage: prepared.context.resolvedMessage,
+      activeGoal: prepared.state.active_goal,
+      activeEntities: prepared.state.active_entities,
+      lastIntent: prepared.context.lastIntent,
+      resolutionSuccess:
+        prepared.context.resolvedMessage !== prepared.context.userMessage,
+      ambiguous: prepared.context.needsClarification,
+    };
+
+    if (
+      prepared.context.needsClarification &&
+      prepared.context.clarificationPrompt
+    ) {
+      runtimeClarification = prepared.context.clarificationPrompt;
+    } else if (
+      prepared.context.resolvedMessage &&
+      prepared.context.resolvedMessage !== userQuestion
+    ) {
+      // Use resolved query for retrieval/LLM; original remains persisted above.
+      question = prepared.context.resolvedMessage;
+    }
+  } catch (err) {
+    runtimeFellBack = true;
+    console.warn(
+      JSON.stringify({
+        event: "gideon_runtime_fallback",
+        conversation_id: chatId,
+        reason: err instanceof Error ? err.message.slice(0, 120) : "unknown",
+      })
+    );
+  }
+
   if (!isNewChat && history.length === 0 && !regenerateAssistantId) {
     await supabase
       .from("vault_chats")
@@ -1351,6 +1426,10 @@ export async function POST(request: Request) {
     profileId: active.id,
     profileName: active.display_name,
   };
+
+  if (runtimeClarification) {
+    answer = runtimeClarification;
+  }
 
   const attachmentDocumentId =
     resolveGideonImageAttachmentId({
@@ -1700,6 +1779,9 @@ export async function POST(request: Request) {
       workspaceContext.promptOptions.orchestrationNotes = [
         composed.systemNotes,
         globalBriefingNote,
+        runtimeContext
+          ? formatRuntimeContextForPrompt(runtimeContext)
+          : "",
       ]
         .filter(Boolean)
         .join("\n");
@@ -1885,6 +1967,26 @@ export async function POST(request: Request) {
           connectorCitations,
           youtubeUrls,
           claims: businessClaims ?? workspaceContext.businessClaims ?? [],
+          onAnswerReady:
+            runtimeState && runtimeContext
+              ? async ({ answer: streamAnswer, citations: streamCitations }) => {
+                  await finalizeGideonTurn({
+                    store: runtimeStore,
+                    state: runtimeState!,
+                    context: runtimeContext!,
+                    userMessage: userQuestion,
+                    answer: streamAnswer,
+                    evidence: evidenceFromCitations(
+                      streamCitations ?? [],
+                      active.id
+                    ),
+                    spaceIds: [
+                      active.id,
+                      ...(runtimeContext!.candidateSpaceIds ?? []),
+                    ],
+                  });
+                }
+              : undefined,
         });
       }
     } catch (err) {
@@ -1895,15 +1997,62 @@ export async function POST(request: Request) {
   }
 
   const suggestedQuestions = buildSuggestedQuestions({
-    question,
+    question: userQuestion,
     answer,
     entityNames: [
-      ...extractBusinessEntityMentions(question),
+      ...extractBusinessEntityMentions(userQuestion),
       ...extractPeopleFromAnswer(answer),
     ],
     availableDocumentLabels: (citations ?? []).map((c) => c.fileName),
     evidenceTexts: [answer],
   });
+
+  // Persist conversation runtime working state (best-effort).
+  if (runtimeState && runtimeContext && answer) {
+    const pendingFromRuntime =
+      runtimeContext.lastIntent === "drafting" ||
+      /\b(help me respond|draft|submit)\b/i.test(userQuestion)
+        ? [
+            {
+              type: runtimeState.active_entities.some(
+                (e) => e.type === "solicitation"
+              )
+                ? "respond_to_solicitation"
+                : "draft_response",
+              status: "discussing" as const,
+              entity_id:
+                runtimeState.active_entities.find(
+                  (e) => e.type === "solicitation"
+                )?.canonical_id ??
+                runtimeState.active_entities.find(
+                  (e) => e.type === "solicitation"
+                )?.name,
+              target: runtimeState.active_entities.find(
+                (e) => e.type === "organization"
+              )?.name,
+            },
+          ]
+        : [];
+    runtimeState = await finalizeGideonTurn({
+      store: runtimeStore,
+      state: runtimeState,
+      context: runtimeContext,
+      userMessage: userQuestion,
+      answer,
+      evidence: evidenceFromCitations(citations ?? [], active.id),
+      pendingActions: pendingFromRuntime,
+      spaceIds: [active.id, ...(runtimeContext.candidateSpaceIds ?? [])],
+    });
+    runtimeDebug = {
+      resolvedMessage: runtimeContext.resolvedMessage,
+      activeGoal: runtimeState.active_goal,
+      activeEntities: runtimeState.active_entities,
+      lastIntent: runtimeState.last_intent,
+      resolutionSuccess:
+        runtimeContext.resolvedMessage !== runtimeContext.userMessage,
+      ambiguous: false,
+    };
+  }
 
   // Persist high-confidence personal facts from this turn (non-blocking).
   if (active.profile_type === "personal" && question.trim()) {
@@ -2036,5 +2185,20 @@ export async function POST(request: Request) {
     chatScopedProfile: persistedChatScopedProfile,
     searchScope: chatSearchScope,
     vaultScopeNote: workspaceMeta.vaultScopeNote,
+    // Dev / debug only — production UI should ignore.
+    ...(process.env.NODE_ENV !== "production" ||
+    new URL(request.url).searchParams.get("debugRuntime") === "1"
+      ? {
+          runtime: runtimeDebug
+            ? {
+                resolvedMessage: runtimeDebug.resolvedMessage,
+                activeGoal: runtimeDebug.activeGoal,
+                activeEntities: runtimeDebug.activeEntities,
+                lastIntent: runtimeDebug.lastIntent,
+                fellBack: runtimeFellBack,
+              }
+            : null,
+        }
+      : {}),
   });
 }

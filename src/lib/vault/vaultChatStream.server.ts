@@ -106,6 +106,11 @@ export type VaultChatStreamArgs = {
   youtubeUrls?: string[];
   /** Business Pack claim/evidence payload to persist with the assistant message. */
   claims?: unknown;
+  /** Optional post-answer hook (conversation runtime finalize). */
+  onAnswerReady?: (payload: {
+    answer: string;
+    citations: NonNullable<VaultChatStreamMessage["citations"]>;
+  }) => Promise<void>;
 };
 
 export function createVaultChatStreamResponse(
@@ -426,6 +431,17 @@ export function createVaultChatStreamResponse(
         }
 
         await recordChatEvent(args.supabase, args.userId, "chat");
+
+        if (args.onAnswerReady) {
+          try {
+            await args.onAnswerReady({ answer, citations });
+          } catch (err) {
+            console.warn(
+              "vault chat onAnswerReady failed:",
+              err instanceof Error ? err.message : err
+            );
+          }
+        }
 
         const chatUpdates: {
           updated_at: string;
