@@ -3,7 +3,7 @@
  * Separate from capability router intents in intent.ts.
  */
 
-import type { RuntimeIntent } from "./types.ts";
+import type { RuntimeIntent } from "./types";
 
 export function classifyRuntimeIntent(
   message: string,

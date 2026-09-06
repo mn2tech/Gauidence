@@ -2,12 +2,12 @@
  * In-memory ConversationStateStore for unit tests.
  */
 
-import { emptyConversationState } from "./loadConversationState.ts";
+import { emptyConversationState } from "./loadConversationState";
 import type {
   ChatTurn,
   ConversationState,
   ConversationStateStore,
-} from "./types.ts";
+} from "./types";
 
 export function createMemoryStore(seed?: {
   states?: ConversationState[];

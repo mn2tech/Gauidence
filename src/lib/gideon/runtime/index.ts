@@ -20,32 +20,32 @@ export type {
   RunGideonTurnArgs,
   RuntimeDebugSnapshot,
   RuntimeIntent,
-} from "./types.ts";
+} from "./types";
 
 export {
   RECENT_MESSAGE_WINDOW,
   MAX_ACTIVE_ENTITIES,
   MAX_RECENT_EVIDENCE,
   MAX_PENDING_ACTIONS,
-} from "./types.ts";
+} from "./types";
 
-export { runGideonTurn } from "./runGideonTurn.ts";
-export { prepareGideonTurn } from "./prepareGideonTurn.ts";
+export { runGideonTurn } from "./runGideonTurn";
+export { prepareGideonTurn } from "./prepareGideonTurn";
 export {
   finalizeGideonTurn,
   evidenceFromCitations,
-} from "./finalizeGideonTurn.ts";
+} from "./finalizeGideonTurn";
 export {
   emptyConversationState,
   loadConversationState,
   loadOrInitConversationState,
   assertConversationOwnedByUser,
   rowToConversationState,
-} from "./loadConversationState.ts";
+} from "./loadConversationState";
 export {
   updateConversationState,
   applyStatePatch,
-} from "./updateConversationState.ts";
+} from "./updateConversationState";
 export {
   extractEntitiesFromMessage,
   upsertActiveEntities,
@@ -54,21 +54,21 @@ export {
   inferImplicitOrganization,
   entitiesOfType,
   mostRecentEntity,
-} from "./entities.ts";
-export { resolveReferences } from "./resolveReferences.ts";
-export { classifyRuntimeIntent } from "./classifyRuntimeIntent.ts";
-export { inferActiveGoal } from "./inferActiveGoal.ts";
+} from "./entities";
+export { resolveReferences } from "./resolveReferences";
+export { classifyRuntimeIntent } from "./classifyRuntimeIntent";
+export { inferActiveGoal } from "./inferActiveGoal";
 export {
   summarizeConversation,
   shouldRefreshSummary,
-} from "./summarizeConversation.ts";
+} from "./summarizeConversation";
 export {
   buildRuntimeContext,
   formatRuntimeContextForPrompt,
-} from "./buildRuntimeContext.ts";
-export { createMemoryStore, ensureState } from "./memoryStore.ts";
+} from "./buildRuntimeContext";
+export { createMemoryStore, ensureState } from "./memoryStore";
 export {
   createSupabaseStateStore,
   initEmptyConversationState,
-} from "./supabaseStore.ts";
-export { logRuntimeEvent } from "./log.ts";
+} from "./supabaseStore";
+export { logRuntimeEvent } from "./log";

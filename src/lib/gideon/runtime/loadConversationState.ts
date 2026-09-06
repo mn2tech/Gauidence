@@ -10,7 +10,7 @@ import type {
   EvidenceRef,
   PendingAction,
   RuntimeIntent,
-} from "./types.ts";
+} from "./types";
 
 function asEntityArray(raw: unknown): ActiveEntity[] {
   if (!Array.isArray(raw)) return [];

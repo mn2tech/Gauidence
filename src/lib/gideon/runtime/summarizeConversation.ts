@@ -2,7 +2,7 @@
  * Compact rolling conversation summary — preserves goals, entities, decisions.
  */
 
-import type { ActiveEntity, ChatTurn, PendingAction } from "./types.ts";
+import type { ActiveEntity, ChatTurn, PendingAction } from "./types";
 
 const MAX_SUMMARY_CHARS = 900;
 

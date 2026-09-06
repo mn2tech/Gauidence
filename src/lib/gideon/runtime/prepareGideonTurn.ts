@@ -3,25 +3,25 @@
  * Does not call the LLM/retrieval pipeline.
  */
 
-import { classifyRuntimeIntent } from "./classifyRuntimeIntent.ts";
-import { buildRuntimeContext } from "./buildRuntimeContext.ts";
+import { classifyRuntimeIntent } from "./classifyRuntimeIntent";
+import { buildRuntimeContext } from "./buildRuntimeContext";
 import {
   extractEntitiesFromMessage,
   inferImplicitOrganization,
   upsertActiveEntities,
-} from "./entities.ts";
-import { inferActiveGoal } from "./inferActiveGoal.ts";
-import { emptyConversationState } from "./loadConversationState.ts";
-import { logRuntimeEvent } from "./log.ts";
-import { resolveReferences } from "./resolveReferences.ts";
-import { applyStatePatch } from "./updateConversationState.ts";
+} from "./entities";
+import { inferActiveGoal } from "./inferActiveGoal";
+import { emptyConversationState } from "./loadConversationState";
+import { logRuntimeEvent } from "./log";
+import { resolveReferences } from "./resolveReferences";
+import { applyStatePatch } from "./updateConversationState";
 import type {
   ChatTurn,
   ConversationState,
   ConversationStateStore,
   GideonRuntimeContext,
-} from "./types.ts";
-import { RECENT_MESSAGE_WINDOW } from "./types.ts";
+} from "./types";
+import { RECENT_MESSAGE_WINDOW } from "./types";
 
 export type PrepareTurnResult = {
   context: GideonRuntimeContext;

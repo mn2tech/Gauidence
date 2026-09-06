@@ -2,19 +2,19 @@
  * Primary entry: run one Gideon conversational turn with working-state continuity.
  */
 
-import { prepareGideonTurn } from "./prepareGideonTurn.ts";
-import { logRuntimeEvent } from "./log.ts";
+import { prepareGideonTurn } from "./prepareGideonTurn";
+import { logRuntimeEvent } from "./log";
 import {
   shouldRefreshSummary,
   summarizeConversation,
-} from "./summarizeConversation.ts";
-import { applyStatePatch } from "./updateConversationState.ts";
+} from "./summarizeConversation";
+import { applyStatePatch } from "./updateConversationState";
 import type {
   ConversationState,
   GideonTurnResult,
   PendingAction,
   RunGideonTurnArgs,
-} from "./types.ts";
+} from "./types";
 
 function inferPendingActions(
   message: string,

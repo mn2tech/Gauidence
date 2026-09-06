@@ -9,7 +9,7 @@ import type {
   GideonRuntimeContext,
   ReferenceResolution,
   RuntimeIntent,
-} from "./types.ts";
+} from "./types";
 
 export function buildRuntimeContext(args: {
   userMessage: string;

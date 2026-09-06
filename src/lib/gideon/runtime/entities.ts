@@ -2,8 +2,8 @@
  * Pure helpers for active entity tracking (dedupe, aliases, merge).
  */
 
-import type { ActiveEntity, ActiveEntityType } from "./types.ts";
-import { MAX_ACTIVE_ENTITIES } from "./types.ts";
+import type { ActiveEntity, ActiveEntityType } from "./types";
+import { MAX_ACTIVE_ENTITIES } from "./types";
 
 function norm(s: string): string {
   return s.trim().toLowerCase().replace(/\s+/g, " ");

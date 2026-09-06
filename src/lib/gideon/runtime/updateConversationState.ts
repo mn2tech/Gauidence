@@ -8,14 +8,14 @@ import type {
   ConversationState,
   EvidenceRef,
   PendingAction,
-} from "./types.ts";
+} from "./types";
 import {
   MAX_ACTIVE_ENTITIES,
   MAX_PENDING_ACTIONS,
   MAX_RECENT_EVIDENCE,
-} from "./types.ts";
-import { upsertActiveEntities } from "./entities.ts";
-import { logRuntimeEvent } from "./log.ts";
+} from "./types";
+import { upsertActiveEntities } from "./entities";
+import { logRuntimeEvent } from "./log";
 
 function dedupeEvidence(items: EvidenceRef[]): EvidenceRef[] {
   const seen = new Set<string>();

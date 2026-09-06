@@ -7,13 +7,13 @@ import {
   entitiesOfType,
   findEntitiesByPhrase,
   mostRecentEntity,
-} from "./entities.ts";
+} from "./entities";
 import type {
   ActiveEntity,
   ActiveEntityType,
   ChatTurn,
   ReferenceResolution,
-} from "./types.ts";
+} from "./types";
 
 const PRONOUN_PATTERNS: Array<{
   re: RegExp;

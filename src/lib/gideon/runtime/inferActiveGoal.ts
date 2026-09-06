@@ -3,7 +3,7 @@
  * Follow-ups keep the existing goal; clear goal shifts replace it.
  */
 
-import type { RuntimeIntent } from "./types.ts";
+import type { RuntimeIntent } from "./types";
 
 export function inferActiveGoal(args: {
   message: string;

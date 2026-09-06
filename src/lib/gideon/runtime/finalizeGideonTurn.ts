@@ -5,20 +5,20 @@
 import {
   extractEntitiesFromMessage,
   upsertActiveEntities,
-} from "./entities.ts";
+} from "./entities";
 import {
   shouldRefreshSummary,
   summarizeConversation,
-} from "./summarizeConversation.ts";
-import { applyStatePatch } from "./updateConversationState.ts";
-import { logRuntimeEvent } from "./log.ts";
+} from "./summarizeConversation";
+import { applyStatePatch } from "./updateConversationState";
+import { logRuntimeEvent } from "./log";
 import type {
   ConversationState,
   ConversationStateStore,
   EvidenceRef,
   GideonRuntimeContext,
   PendingAction,
-} from "./types.ts";
+} from "./types";
 
 export async function finalizeGideonTurn(args: {
   store: ConversationStateStore;

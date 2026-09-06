@@ -6,10 +6,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   loadConversationState,
   emptyConversationState,
-} from "./loadConversationState.ts";
-import { updateConversationState } from "./updateConversationState.ts";
-import type { ChatTurn, ConversationStateStore } from "./types.ts";
-import { RECENT_MESSAGE_WINDOW } from "./types.ts";
+} from "./loadConversationState";
+import { updateConversationState } from "./updateConversationState";
+import type { ChatTurn, ConversationStateStore } from "./types";
+import { RECENT_MESSAGE_WINDOW } from "./types";
 
 export function createSupabaseStateStore(
   supabase: SupabaseClient
