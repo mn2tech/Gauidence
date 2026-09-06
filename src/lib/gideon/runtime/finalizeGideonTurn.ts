@@ -105,18 +105,19 @@ export function evidenceFromCitations(
   }>,
   spaceId?: string | null
 ): EvidenceRef[] {
-  return citations
-    .map((c, i) => {
-      const source_id =
-        c.documentId || c.sourceId || c.itemId || `citation-${i}`;
-      if (!source_id) return null;
-      return {
-        source_type: c.sourceType || (c.documentId ? "document" : "citation"),
-        source_id,
-        title: c.fileName,
-        space_id: spaceId ?? null,
-        relevance: Math.max(0.5, 1 - i * 0.05),
-      } satisfies EvidenceRef;
-    })
-    .filter((e): e is EvidenceRef => Boolean(e));
+  const out: EvidenceRef[] = [];
+  for (let i = 0; i < citations.length; i++) {
+    const c = citations[i]!;
+    const source_id =
+      c.documentId || c.sourceId || c.itemId || `citation-${i}`;
+    if (!source_id) continue;
+    out.push({
+      source_type: c.sourceType || (c.documentId ? "document" : "citation"),
+      source_id,
+      title: c.fileName,
+      space_id: spaceId ?? null,
+      relevance: Math.max(0.5, 1 - i * 0.05),
+    });
+  }
+  return out;
 }
