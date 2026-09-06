@@ -44,6 +44,7 @@ export function buildRuntimeContext(args: {
     lastIntent: intent,
     needsClarification: Boolean(resolution.ambiguous && resolution.clarificationPrompt),
     clarificationPrompt: resolution.clarificationPrompt,
+    preferConversationContinuity: Boolean(resolution.conversationContinuity),
   };
 }
 
@@ -67,6 +68,11 @@ export function formatRuntimeContextForPrompt(ctx: GideonRuntimeContext): string
   }
   if (ctx.resolvedMessage !== ctx.userMessage) {
     lines.push(`Resolved question: ${ctx.resolvedMessage}`);
+  }
+  if (ctx.preferConversationContinuity) {
+    lines.push(
+      "CONTINUITY: The user sent a short reply to your previous question. Continue that conversation. Do not treat the short reply as a Space/document search."
+    );
   }
   if (!lines.length) return "";
   return [

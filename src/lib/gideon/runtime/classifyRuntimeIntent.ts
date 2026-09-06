@@ -110,5 +110,14 @@ export function classifyRuntimeIntent(
     return "follow_up";
   }
 
+  // Bare metrics / affirmations with prior chat are follow-ups
+  if (
+    opts?.hadPriorContext &&
+    (/^\d+(\.\d+)?%?$/.test(q) ||
+      /^(yes|yeah|yep|no|nope|ok|okay|sure)[.!]?$/i.test(q))
+  ) {
+    return "follow_up";
+  }
+
   return "general_question";
 }

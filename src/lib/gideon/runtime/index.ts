@@ -56,6 +56,10 @@ export {
   mostRecentEntity,
 } from "./entities";
 export { resolveReferences } from "./resolveReferences";
+export {
+  isShortConversationalReply,
+  expandShortReplyFromHistory,
+} from "./shortReplies";
 export { classifyRuntimeIntent } from "./classifyRuntimeIntent";
 export { inferActiveGoal } from "./inferActiveGoal";
 export {

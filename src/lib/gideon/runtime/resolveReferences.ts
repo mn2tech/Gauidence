@@ -8,6 +8,7 @@ import {
   findEntitiesByPhrase,
   mostRecentEntity,
 } from "./entities";
+import { expandShortReplyFromHistory } from "./shortReplies";
 import type {
   ActiveEntity,
   ActiveEntityType,
@@ -144,7 +145,7 @@ export function resolveReferences(args: {
   activeEntities: ActiveEntity[];
   recentMessages?: ChatTurn[];
 }): ReferenceResolution {
-  const { message, activeEntities } = args;
+  const { message, activeEntities, recentMessages = [] } = args;
   const bindings: ReferenceResolution["bindings"] = [];
   let ambiguous = false;
   let clarificationPrompt: string | null = null;
@@ -155,6 +156,20 @@ export function resolveReferences(args: {
       success: false,
       ambiguous: false,
       clarificationPrompt: null,
+      conversationContinuity: false,
+      bindings: [],
+    };
+  }
+
+  // Short answers like "20%" / "yes" to the assistant's last question
+  const shortExpanded = expandShortReplyFromHistory(message, recentMessages);
+  if (shortExpanded) {
+    return {
+      resolvedMessage: shortExpanded,
+      success: true,
+      ambiguous: false,
+      clarificationPrompt: null,
+      conversationContinuity: true,
       bindings: [],
     };
   }
@@ -277,6 +292,7 @@ export function resolveReferences(args: {
       success: false,
       ambiguous: true,
       clarificationPrompt,
+      conversationContinuity: false,
       bindings,
     };
   }
@@ -294,6 +310,7 @@ export function resolveReferences(args: {
         success: false,
         ambiguous: false,
         clarificationPrompt: null,
+        conversationContinuity: false,
         bindings: [],
       };
     }
@@ -395,6 +412,7 @@ export function resolveReferences(args: {
     success: resolved !== message.trim() || bindings.length > 0,
     ambiguous: false,
     clarificationPrompt: null,
+    conversationContinuity: false,
     bindings,
   };
 }

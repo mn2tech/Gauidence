@@ -1655,13 +1655,23 @@ export async function POST(request: Request) {
         knownEntityNames: [active.display_name].filter(Boolean),
       });
 
+      // Short replies like "20%" must stay conversational — not Space searches.
+      if (runtimeContext?.preferConversationContinuity) {
+        orchestrationRoute.intent = "conversation";
+        orchestrationRoute.guardianKnowledgeRequired = false;
+        orchestrationRoute.generalKnowledgeAllowed = true;
+        orchestrationRoute.knowledgeSource = "general";
+        orchestrationRoute.reasoning = "conversation_continuity_short_reply";
+      }
+
       const gideonRoute = routeGideonRequest({
         question,
         history,
         hasAttachment: Boolean(attachedDoc),
         // Knowledge search only when orchestration says the user's world is involved.
         forceKnowledge:
-          orchestrationRoute.guardianKnowledgeRequired || Boolean(attachedDoc),
+          !runtimeContext?.preferConversationContinuity &&
+          (orchestrationRoute.guardianKnowledgeRequired || Boolean(attachedDoc)),
       });
       const loadFlags = resolveGideonLoadWithOrchestration({
         capabilityRoute: gideonRoute,
@@ -1967,6 +1977,9 @@ export async function POST(request: Request) {
           connectorCitations,
           youtubeUrls,
           claims: businessClaims ?? workspaceContext.businessClaims ?? [],
+          conversationContinuity: Boolean(
+            runtimeContext?.preferConversationContinuity
+          ),
           onAnswerReady:
             runtimeState && runtimeContext
               ? async ({ answer: streamAnswer, citations: streamCitations }) => {

@@ -93,6 +93,8 @@ export type ReferenceResolution = {
   success: boolean;
   ambiguous: boolean;
   clarificationPrompt: string | null;
+  /** Short reply to assistant (e.g. "20%") expanded from chat history. */
+  conversationContinuity?: boolean;
   bindings: Array<{
     phrase: string;
     entityName: string;
@@ -111,6 +113,8 @@ export type GideonRuntimeContext = {
   lastIntent: RuntimeIntent | null;
   needsClarification: boolean;
   clarificationPrompt: string | null;
+  /** Prefer chat continuity over Guardian document search. */
+  preferConversationContinuity: boolean;
 };
 
 export type RuntimeDebugSnapshot = {

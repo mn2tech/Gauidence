@@ -111,6 +111,8 @@ export type VaultChatStreamArgs = {
     answer: string;
     citations: NonNullable<VaultChatStreamMessage["citations"]>;
   }) => Promise<void>;
+  /** When true, blank model replies should not say "nothing in your spaces". */
+  conversationContinuity?: boolean;
 };
 
 export function createVaultChatStreamResponse(
@@ -234,10 +236,12 @@ export function createVaultChatStreamResponse(
               peopleOnly: wantsPeopleRoster(args.question),
             }) ??
             buildOntologyAnswerFallback(args.ontologyBlock ?? "") ??
-            buildGideonEmptyAnswerFallback({
-              chunks: args.chunks,
-              explicitSpaceName: args.explicitSpaceName,
-            });
+            (args.conversationContinuity
+              ? "I still have our previous question in mind — could you say a bit more so I can continue from there?"
+              : buildGideonEmptyAnswerFallback({
+                  chunks: args.chunks,
+                  explicitSpaceName: args.explicitSpaceName,
+                }));
         } else if (wantsTranscription(args.question)) {
           answer = preferFullerListAnswer(answer, args.chunks, {
             peopleOnly: wantsPeopleRoster(args.question),

@@ -446,6 +446,26 @@ describe("Conversation Runtime — scenarios", () => {
 });
 
 describe("resolveReferences — unit", () => {
+  it("short reply 20% continues assistant battery question (not a Space search)", () => {
+    const history = [
+      {
+        role: "assistant" as const,
+        content:
+          "If you tell me your current battery %, I can help you decide whether to skip the stop and go straight to the island.",
+      },
+    ];
+    const r = resolveReferences({
+      message: "20%",
+      activeEntities: [],
+      recentMessages: history,
+    });
+    assert.equal(r.success, true);
+    assert.equal(r.conversationContinuity, true);
+    assert.match(r.resolvedMessage, /20%/);
+    assert.match(r.resolvedMessage, /battery|island|previous/i);
+    assert.match(r.resolvedMessage, /Do not search Spaces/i);
+  });
+
   it("builds qualification query from org + solicitation", () => {
     const entities: ActiveEntity[] = [
       {
