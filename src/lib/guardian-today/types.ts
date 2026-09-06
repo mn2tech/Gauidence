@@ -128,7 +128,7 @@ export type GuardianTodayResult = {
   priorities: GuardianIntelligenceItem[];
   /** Priorities grouped by top-level Space (Personal, Business, …). */
   groups: GuardianTodaySpaceGroup[];
-  /** When set, Today is scoped to that Space and its nested Spaces. */
+  /** When set, Today is scoped to that Space only (no nested expansion). */
   scopeSpaceId: string | null;
   scopeSpaceName: string | null;
   whatChanged: WhatChangedEntry[];

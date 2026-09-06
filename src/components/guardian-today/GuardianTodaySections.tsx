@@ -24,7 +24,7 @@ export function GuardianTodaySpaceFilter({
       <select
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value || null)}
-        className="max-w-[12rem] truncate rounded-lg border border-stone-300 bg-white px-2 py-1 text-sm font-medium text-foreground"
+        className="max-w-[16rem] truncate rounded-lg border border-stone-300 bg-white px-2 py-1 text-sm font-medium text-foreground"
         aria-label="Space to show on Guardian Today"
       >
         <option value="">All spaces</option>

@@ -28,6 +28,7 @@ import { VAULTS_PATH } from "@/lib/simple-home/routing";
 import { documentsHref } from "@/lib/routes";
 import type { GuardianIntelligenceItem } from "@/lib/guardian-today/types";
 import { getContainerLabel, topLevelProfiles } from "@/lib/profiles/types";
+import { todaySpaceFilterOptions } from "@/lib/guardian-today/spaceScope";
 import { PERSONAL_SPACE_DISPLAY_NAME } from "@/lib/personal-space/types";
 import { isPersonalSpaceProfile } from "@/lib/personal-space/welcome";
 
@@ -107,7 +108,7 @@ export default function SimpleHomeScreen() {
   const today = useGuardianToday();
   const { openUpgrade } = useUpgradeModal();
 
-  const spaces = [...topLevelProfiles(profiles)].sort((a, b) => {
+  const topLevelSpaces = [...topLevelProfiles(profiles)].sort((a, b) => {
     const order: Record<string, number> = {
       personal: 0,
       family: 1,
@@ -119,12 +120,20 @@ export default function SimpleHomeScreen() {
     if (oa !== ob) return oa - ob;
     return a.display_name.localeCompare(b.display_name);
   });
-  const spaceIdsKey = spaces.map((s) => s.id).join(",");
+  const filterSpaces = todaySpaceFilterOptions(
+    profiles.map((p) => ({
+      id: p.id,
+      display_name: p.display_name,
+      profile_type: p.profile_type,
+      parent_profile_id: p.parent_profile_id,
+    }))
+  );
+  const spaceIdsKey = filterSpaces.map((s) => s.id).join(",");
 
   useEffect(() => {
     if (profilesLoading || !spaceIdsKey) return;
     if (!today.scopeSpaceId) return;
-    if (!spaces.some((s) => s.id === today.scopeSpaceId)) {
+    if (!filterSpaces.some((s) => s.id === today.scopeSpaceId)) {
       today.setScope(null);
     }
     // spaces identity is represented by spaceIdsKey
@@ -154,7 +163,10 @@ export default function SimpleHomeScreen() {
         limits?: { spacesPerAccount?: number };
       };
       const limit = body.limits?.spacesPerAccount ?? 1;
-      if ((body.plan === "free" || !body.plan) && spaces.length >= limit) {
+      if (
+        (body.plan === "free" || !body.plan) &&
+        topLevelSpaces.length >= limit
+      ) {
         openUpgrade({
           reason:
             "You've used your Free Space. Upgrade to Guardian Pro to create more Spaces — your existing knowledge stays available.",
@@ -188,7 +200,7 @@ export default function SimpleHomeScreen() {
   const showPersonalWelcome = isPersonalActive && knowledgeEmpty;
   const spaceFilter = (
     <GuardianTodaySpaceFilter
-      spaces={spaces}
+      spaces={filterSpaces}
       value={today.scopeSpaceId}
       onChange={today.setScope}
     />
@@ -321,7 +333,7 @@ export default function SimpleHomeScreen() {
 
       <Section title="Your Spaces">
         <ul className="space-y-1">
-          {spaces.slice(0, 5).map((space) => (
+          {topLevelSpaces.slice(0, 5).map((space) => (
             <li key={space.id}>
               <button
                 type="button"

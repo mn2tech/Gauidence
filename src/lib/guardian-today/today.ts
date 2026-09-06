@@ -19,7 +19,6 @@ import {
   TODAY_SCOPE_LIMIT,
   groupScoredByRootSpace,
   restrictToAuthorized,
-  spaceIdsUnderRoot,
   spaceScopeMap,
   type SpaceScopeProfile,
 } from "./spaceScope";
@@ -120,6 +119,7 @@ function coverageSummaryForScope(
 /**
  * Guardian Today — prioritized intelligence from precomputed items.
  * All Spaces stay combined in one home view, grouped by Personal / Business / etc.
+ * A selected spaceId scopes to that space only (no parent/child expansion).
  * Empty priorities alone do NOT mean "caught up" — coverage must be ready.
  */
 export async function getGuardianToday(
@@ -140,13 +140,7 @@ export async function getGuardianToday(
   const scoped =
     requestedId && authorizedIds.includes(requestedId) ? requestedId : null;
   const spaceIds = scoped
-    ? restrictToAuthorized(
-        (() => {
-          const nested = spaceIdsUnderRoot(scoped, byId);
-          return nested.length > 0 ? nested : [scoped];
-        })(),
-        authorizedIds
-      )
+    ? restrictToAuthorized([scoped], authorizedIds)
     : authorizedIds;
   const scopeProfile = scoped ? byId.get(scoped) ?? null : null;
   const scopeSpaceName = scopeProfile?.display_name ?? null;

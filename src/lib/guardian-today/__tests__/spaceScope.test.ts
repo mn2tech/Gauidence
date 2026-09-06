@@ -9,6 +9,7 @@ import {
   rootSpaceId,
   spaceIdsUnderRoot,
   spaceScopeMap,
+  todaySpaceFilterOptions,
   type SpaceScopeProfile,
 } from "../spaceScope";
 
@@ -107,6 +108,32 @@ describe("Guardian Today space scope", () => {
     assert.ok(ids.includes("business"));
     assert.ok(ids.includes("client"));
     assert.ok(!ids.includes("personal"));
+  });
+
+  it("lists nested spaces as individual Today filter options", () => {
+    const options = todaySpaceFilterOptions([
+      profile({
+        id: "family",
+        display_name: "Family",
+        profile_type: "family",
+      }),
+      profile({
+        id: "vacation",
+        display_name: "Vacation",
+        profile_type: "other",
+        parent_profile_id: "family",
+      }),
+      profile({
+        id: "personal",
+        display_name: "Personal",
+        profile_type: "personal",
+      }),
+    ]);
+    assert.deepEqual(options, [
+      { id: "personal", display_name: "Personal" },
+      { id: "family", display_name: "Family" },
+      { id: "vacation", display_name: "Family › Vacation" },
+    ]);
   });
 
   it("does not leak unauthorized space ids", () => {

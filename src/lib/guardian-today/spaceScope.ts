@@ -47,6 +47,52 @@ export function spaceIdsUnderRoot(
   return ids;
 }
 
+const ROOT_TYPE_ORDER: Record<string, number> = {
+  personal: 0,
+  family: 1,
+  business: 2,
+  non_profit: 3,
+};
+
+/**
+ * Flat filter options for Guardian Today: every accessible space as its own
+ * choice (nested spaces listed under their root with "Root › Name" labels).
+ */
+export function todaySpaceFilterOptions(
+  profiles: SpaceScopeProfile[]
+): { id: string; display_name: string }[] {
+  const byId = spaceScopeMap(profiles);
+  const roots = profiles
+    .filter((p) => {
+      if (!p.parent_profile_id) return true;
+      return !byId.has(p.parent_profile_id);
+    })
+    .sort((a, b) => {
+      const oa = ROOT_TYPE_ORDER[a.profile_type] ?? 8;
+      const ob = ROOT_TYPE_ORDER[b.profile_type] ?? 8;
+      if (oa !== ob) return oa - ob;
+      return a.display_name.localeCompare(b.display_name);
+    });
+
+  const rootIds = new Set(roots.map((r) => r.id));
+  const out: { id: string; display_name: string }[] = [];
+
+  for (const root of roots) {
+    out.push({ id: root.id, display_name: root.display_name });
+    const children = profiles
+      .filter((p) => !rootIds.has(p.id) && rootSpaceId(p.id, byId) === root.id)
+      .sort((a, b) => a.display_name.localeCompare(b.display_name));
+    for (const child of children) {
+      out.push({
+        id: child.id,
+        display_name: `${root.display_name} › ${child.display_name}`,
+      });
+    }
+  }
+
+  return out;
+}
+
 export function restrictToAuthorized(
   requested: string[],
   authorized: string[]
