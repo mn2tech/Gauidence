@@ -5,6 +5,7 @@ export type RuntimeLogEvent =
   | "gideon_runtime_turn_completed"
   | "gideon_runtime_resolution"
   | "gideon_runtime_state_update"
+  | "gideon_runtime_state_save_soft_fail"
   | "gideon_runtime_fallback"
   | "gideon_runtime_access_denied";
 
