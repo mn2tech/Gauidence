@@ -54,7 +54,7 @@ const BUSINESS_KNOWLEDGE =
 
 /** Advisory / prioritization questions (facts + recommendations). */
 const BUSINESS_ADVISORY =
-  /\b(what should i (follow up|focus|do|prioritize)|what needs (my )?attention|which proposals? have not|follow[- ]?up on|focus on next)\b/i;
+  /\b(what should i (follow up|focus|do|prioritize)|what(?:\s+\w+){0,2}\s+needs (my )?attention|which proposals? have not|follow[- ]?up on|focus on next)\b/i;
 
 /** Dental practice knowledge questions. */
 const DENTAL_KNOWLEDGE =

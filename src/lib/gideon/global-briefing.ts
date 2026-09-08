@@ -41,7 +41,7 @@ export type GlobalBriefingResult = {
 };
 
 export function isGlobalBriefingQuestion(question: string): boolean {
-  return /\b(what do i need to (know|focus on|do) today|what needs (my )?attention( today)?|brief me( today)?|today'?s (brief|priorities|overview))\b/i.test(
+  return /\b(what do i need to (know|focus on|do) today|what(?:\s+\w+){0,2}\s+needs (my )?attention( today)?|brief me( today)?|today'?s (brief|priorities|overview))\b/i.test(
     question.trim()
   );
 }

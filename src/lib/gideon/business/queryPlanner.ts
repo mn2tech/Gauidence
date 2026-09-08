@@ -27,7 +27,7 @@ const KNOWLEDGE_GAP =
   /\b(what (information |info )?(is |are )?(missing|unavailable|not (currently )?available)|what (can'?t|cannot) .{0,24}answer|what document should i add|what('s| is) missing|what would .{0,40} tell us)\b/i;
 
 const ADVISORY =
-  /\b(what should i (focus|follow up|do|prioritize)|what needs (my )?attention|priorit(y|ies)|focus on next|what('s| is) (most )?important (next|now)|chief of staff)\b/i;
+  /\b(what should i (focus|follow up|do|prioritize)|what(?:\s+\w+){0,2}\s+needs (my )?attention|priorit(y|ies)|focus on next|what('s| is) (most )?important (next|now)|chief of staff)\b/i;
 
 const BUSINESS_STATUS =
   /\b(business status|how is (the )?business|pipeline status|overview of (our )?clients)\b/i;

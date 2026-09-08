@@ -93,7 +93,7 @@ const CONVERSATION_ADVICE =
   /\b(how should i (approach|prepare|handle|think)|what should i (say|do|ask)|advice|thinking partner|help me (think|prepare|decide))\b/i;
 
 const GLOBAL_TODAY =
-  /\b(what do i need to (know|focus on|do) today|what needs (my )?attention( today)?|brief me( today)?|today'?s (brief|priorities|overview))\b/i;
+  /\b(what do i need to (know|focus on|do) today|what(?:\s+\w+){0,2}\s+needs (my )?attention( today)?|brief me( today)?|today'?s (brief|priorities|overview))\b/i;
 
 const DEICTIC_SPACE =
   /\b(they|them|their|this (client|firm|practice|company|space)|the (client|firm|practice))\b/i;

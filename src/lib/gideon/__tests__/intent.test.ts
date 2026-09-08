@@ -164,6 +164,21 @@ describe("Gideon intent router — follow-ups and tools", () => {
     assert.ok(route.statusSteps.includes("Searching Guardian..."));
   });
 
+  it("treats attention questions with optional adverbs as knowledge search", () => {
+    for (const question of [
+      "What needs my attention?",
+      "What currently needs my attention?",
+      "What else needs attention?",
+    ]) {
+      const route = classifyGideonIntent({ question });
+      assert.equal(
+        shouldSearchGuardianKnowledge(route),
+        true,
+        question
+      );
+    }
+  });
+
   it("searches Guardian for launch-event detail questions", () => {
     const route = classifyGideonIntent({
       question: "give me details about the launch event",

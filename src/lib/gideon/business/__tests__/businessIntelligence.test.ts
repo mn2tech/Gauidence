@@ -56,6 +56,10 @@ describe("business query planner", () => {
       detectBusinessQueryIntent("What should I focus on next?"),
       "ADVISORY"
     );
+    assert.equal(
+      detectBusinessQueryIntent("What currently needs my attention?"),
+      "ADVISORY"
+    );
   });
 
   it("builds intent-specific retrieval flags", () => {

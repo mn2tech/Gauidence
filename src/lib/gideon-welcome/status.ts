@@ -203,7 +203,7 @@ function buildBusinessActions(
     {
       id: "attention",
       label: "What needs my attention?",
-      href: askHref("What currently needs my attention?", profileId),
+      href: askHref("What needs my attention?", profileId),
     },
   ];
 
@@ -270,7 +270,7 @@ function buildGeneralActions(
     {
       id: "attention",
       label: "What needs my attention?",
-      href: askHref("What currently needs my attention?", profileId),
+      href: askHref("What needs my attention?", profileId),
     },
     {
       id: "new",

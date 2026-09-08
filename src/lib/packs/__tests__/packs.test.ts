@@ -127,6 +127,10 @@ describe("gideon business pack routing", () => {
 
   it("detects advisory questions", () => {
     assert.equal(isBusinessAdvisoryQuestion("What should I follow up on?"), true);
+    assert.equal(
+      isBusinessAdvisoryQuestion("What currently needs my attention?"),
+      true
+    );
     assert.equal(isBusinessAdvisoryQuestion("What is the weather?"), false);
   });
 

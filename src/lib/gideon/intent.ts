@@ -63,7 +63,7 @@ const KNOWLEDGE_SUMMARIZE =
   /\b(summarize|summarise)\b.{0,40}\b(document|file|contract|handbook|invoice|log|notes?|proposal)\b/i;
 
 const KNOWLEDGE_ATTENTION =
-  /\b(what needs (my )?attention|which (invoices?|contracts?) (are |need )|how many (employees|clients) are linked)\b/i;
+  /\b(what(?:\s+\w+){0,2}\s+needs (my )?attention|which (invoices?|contracts?) (are |need )|how many (employees|clients) are linked)\b/i;
 
 const KNOWLEDGE_FIND =
   /\b(find|search|look\s+for|where\s+is|show\s+me|locate)\b.{0,40}\b(my|the|our)\b/i;
@@ -104,7 +104,7 @@ const KNOWLEDGE_PRACTICE_FACTS =
   /\b(office hours|hours of operation|when .{0,30}\bopen\b|what (are|is) (the )?(office )?hours|where (is|are) .{0,40}\b(located|address)\b|what services? (does|do|are)|membership plan|contact (info|information|details)|phone number for)\b/i;
 
 const BUSINESS_ADVISORY =
-  /\b(what should i (follow up|focus|do|prioritize)|what needs (my )?attention|which proposals? have not|follow[- ]?up on|focus on next)\b/i;
+  /\b(what should i (follow up|focus|do|prioritize)|what(?:\s+\w+){0,2}\s+needs (my )?attention|which proposals? have not|follow[- ]?up on|focus on next)\b/i;
 
 const CALENDAR_READ =
   /\b((what|which|any) (meetings?|events?|appointments?) (do i have|are there)|meetings? (do i have|today|tomorrow)|today'?s (meetings?|calendar|schedule)|what(?:'s| is) on my (calendar|schedule)|show me my (calendar|meetings?)|check my (calendar|meetings?)|my calendar)\b/i;
