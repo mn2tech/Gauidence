@@ -121,10 +121,9 @@ export default function WorkspaceContextBar({
 
   const showFirstHint = showSearchScopeToggle && !hintSeen;
   const returning = display.mode === "searching" && onReturnToWorkspace;
-  const scopeTitle =
-    searchScope === "global"
-      ? "All spaces"
-      : display.primaryName;
+  const isGlobal = searchScope === "global";
+  /** Left control switches file home — never the answer scope. */
+  const homeTitle = display.primaryName;
 
   function markHintSeen() {
     writeSearchScopeHintSeen(true);
@@ -150,14 +149,20 @@ export default function WorkspaceContextBar({
               onClick={() => setMenuOpen((o) => !o)}
               aria-expanded={menuOpen}
               aria-haspopup="listbox"
+              aria-label={`File home: ${homeTitle}. Change where new files save.`}
               title={
-                display.scopeNote ||
-                searchScopeHint(searchScope, display.primaryName)
+                isGlobal
+                  ? `New files save to ${homeTitle}. Answers still come from all spaces.`
+                  : display.scopeNote ||
+                    searchScopeHint(searchScope, homeTitle)
               }
-              className="inline-flex max-w-[14rem] items-center gap-1 rounded-lg border border-border-subtle bg-surface px-2.5 py-1.5 text-xs font-semibold text-foreground hover:bg-surface-elevated sm:max-w-[18rem]"
+              className="inline-flex max-w-[16rem] items-center gap-1 rounded-lg border border-border-subtle bg-surface px-2.5 py-1.5 text-xs font-semibold text-foreground hover:bg-surface-elevated sm:max-w-[20rem]"
             >
-              <span className="truncate">{scopeTitle}</span>
-              {display.secondaryLabel && searchScope !== "global" ? (
+              <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-ink-muted">
+                Save to
+              </span>
+              <span className="truncate">{homeTitle}</span>
+              {display.secondaryLabel && !isGlobal ? (
                 <span className="hidden shrink-0 rounded-full bg-surface-elevated px-1.5 py-0.5 text-[10px] font-medium text-ink-muted sm:inline">
                   {display.secondaryLabel}
                 </span>
@@ -179,9 +184,9 @@ export default function WorkspaceContextBar({
           <div
             className="ml-auto flex shrink-0 gap-0.5 rounded-full bg-surface p-0.5 ring-1 ring-border-subtle"
             role="group"
-            aria-label="Search scope"
+            aria-label="Answer scope"
           >
-            {(["workspace", "global"] as const).map((mode) => (
+            {(["global", "workspace"] as const).map((mode) => (
               <button
                 key={mode}
                 type="button"
@@ -197,7 +202,7 @@ export default function WorkspaceContextBar({
                     : "text-ink-muted hover:text-foreground"
                 }`}
               >
-                {mode === "workspace" ? "This space" : "All"}
+                {mode === "global" ? "All spaces" : "This home"}
               </button>
             ))}
           </div>

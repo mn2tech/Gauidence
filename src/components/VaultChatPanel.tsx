@@ -5545,14 +5545,21 @@ export default function VaultChatPanel({
               type="button"
               onClick={() => setScopeChromeOpen((o) => !o)}
               aria-pressed={scopeChromeOpen}
-              title="Space and search scope"
-              className={`max-w-[7.5rem] truncate rounded-full border px-2.5 py-1 text-[11px] font-semibold transition sm:max-w-[10rem] ${
+              title={
+                (meta?.searchScope ?? DEFAULT_SEARCH_SCOPE) === "global"
+                  ? `Asking across all spaces. Files save to ${workingInDisplay.primaryName}. Tap to change.`
+                  : `Answers from ${workingInDisplay.primaryName} only. Tap to change scope.`
+              }
+              className={`max-w-[9rem] truncate rounded-full border px-2.5 py-1 text-[11px] font-semibold transition sm:max-w-[12rem] ${
                 scopeChromeOpen
                   ? "border-brand bg-brand-light/40 text-brand-dark"
                   : "border-border-subtle bg-surface text-ink-muted hover:text-foreground"
               }`}
             >
-              {workingInDisplay.primaryName}
+              {/* Answer scope only — never the file-home name while All is on. */}
+              {(meta?.searchScope ?? DEFAULT_SEARCH_SCOPE) === "global"
+                ? "All spaces"
+                : workingInDisplay.primaryName}
             </button>
           ) : null}
           <div className="flex shrink-0 items-center gap-1">

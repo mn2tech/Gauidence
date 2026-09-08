@@ -284,13 +284,13 @@ function VaultList({ onPicked }: { onPicked?: () => void }) {
   };
 
   if (loading && !active) {
-    return <p className="px-2 py-1 text-xs text-ink-muted">Loading spaces…</p>;
+    return <p className="px-2 py-1 text-xs text-ink-muted">Loading homes…</p>;
   }
 
   if (topLevel.length === 0) {
     return (
       <p className="px-2 py-1 text-xs text-ink-muted">
-        No spaces yet.{" "}
+        No homes yet.{" "}
         <Link
           href="/history?tell=1"
           className="font-medium text-brand hover:text-brand-dark"
@@ -302,7 +302,7 @@ function VaultList({ onPicked }: { onPicked?: () => void }) {
           href="/settings/profiles?add=1&return=%2Fask"
           className="font-medium text-brand hover:text-brand-dark"
         >
-          Add a Space
+          Add a home
         </Link>
       </p>
     );
@@ -375,8 +375,8 @@ export default function AskGideonSidebar({
   onSidebarAction,
   onToggleCollapsed,
 }: Props) {
-  const vaultLabel = activeVaultName?.trim() || "this space";
-  const [vaultsOpen, setVaultsOpen] = useState(true);
+  const vaultLabel = activeVaultName?.trim() || "your home";
+  const [vaultsOpen, setVaultsOpen] = useState(false);
   const [chatsOpen, setChatsOpen] = useState(true);
 
   return (
@@ -430,12 +430,13 @@ export default function AskGideonSidebar({
         }`}
       >
         <CollapsibleSection
-          title="Spaces"
+          title="File home"
           open={vaultsOpen}
           onToggle={() => setVaultsOpen((o) => !o)}
         >
-          <p className="mb-1 px-2 text-[10px] text-ink-muted">
-            Right-click a vault to add a sub-vault.
+          <p className="mb-1 px-2 text-[10px] leading-snug text-ink-muted">
+            Where new uploads save. Ask still searches all your spaces by
+            default — pick a home only when you need one.
           </p>
           <VaultList onPicked={onSidebarAction} />
         </CollapsibleSection>

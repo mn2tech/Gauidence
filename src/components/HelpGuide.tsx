@@ -65,7 +65,7 @@ const HOW_TO = [
   {
     icon: MessageCircle,
     title: "Ask Gideon",
-    body: "Ask across all your spaces by default. Use This space only when you want to narrow. New files still save in the space you're in. Say “remind me…” to propose a reminder — you confirm before it is saved. Always verify important decisions against the original file.",
+    body: "Ask across all your spaces by default. Use This home only when you want to narrow. New files still save to your file home. Say “remind me…” to propose a reminder — you confirm before it is saved. Always verify important decisions against the original file.",
     href: "/ask",
     linkLabel: "Ask Gideon",
   },
