@@ -71,7 +71,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: listed.error }, { status: listed.status });
   }
 
-  const profiles = await listGuardianProfiles(supabase, user);
+  const profiles = await listGuardianProfiles(supabase, user.id);
   const spaceMeta = new Map(
     profiles.map((p) => [p.id, { profile_type: p.profile_type }])
   );
@@ -132,7 +132,7 @@ export async function POST(request: Request) {
       ? body.spaceId.trim()
       : null;
 
-  const profiles = await listGuardianProfiles(supabase, user);
+  const profiles = await listGuardianProfiles(supabase, user.id);
   let spaceId = explicitSpaceId;
   let confidence: number | null = explicitSpaceId ? 1 : null;
 

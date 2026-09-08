@@ -58,7 +58,7 @@ export async function GET(_request: Request, ctx: Ctx) {
     return NextResponse.json({ error: "Event not found." }, { status: 404 });
   }
 
-  const profiles = await listGuardianProfiles(supabase, user);
+  const profiles = await listGuardianProfiles(supabase, user.id);
   const space = result.data.space_id
     ? profiles.find((p) => p.id === result.data!.space_id)
     : null;
