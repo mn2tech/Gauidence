@@ -32,7 +32,7 @@ export default function GideonWelcome({
         <p className="text-2xl font-semibold tracking-tight text-foreground sm:text-[1.75rem]">
           {greeting} 👋
         </p>
-        <p className="mt-2 text-sm text-ink-muted">Loading your Space…</p>
+        <p className="mt-2 text-sm text-ink-muted">Getting ready…</p>
       </div>
     );
   }

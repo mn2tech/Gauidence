@@ -31,17 +31,17 @@ export default function GreetingHeader({
         <div className="space-y-1 text-sm text-ink-muted">
           <p className="font-medium text-foreground">Welcome to Guardian</p>
           <p>
-            Your Personal Space is where Guardian learns what matters to you
-            and helps you remember, organize, and act.
+            Tell Gideon what matters, upload a file, or ask across everything
+            you&apos;ve shared — no need to pick a Space first.
           </p>
         </div>
       ) : (
         <p className="text-sm text-ink-muted">
-          Here&apos;s what&apos;s happening across your Guardian
+          Ask across all your spaces
           {spaceName ? (
             <>
               {" "}
-              — starting with{" "}
+              · file home{" "}
               <span className="font-semibold text-foreground">{spaceName}</span>
             </>
           ) : null}

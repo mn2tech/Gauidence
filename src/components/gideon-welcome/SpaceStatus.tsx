@@ -11,7 +11,7 @@ export default function SpaceStatus({ view }: SpaceStatusProps) {
   if (statusUnavailable) {
     return (
       <div className="space-y-1">
-        <p className="text-sm font-medium text-foreground">Your Space is ready.</p>
+        <p className="text-sm font-medium text-foreground">You&apos;re ready to ask.</p>
         <p className="text-sm text-ink-muted">What would you like to do?</p>
       </div>
     );
@@ -21,7 +21,7 @@ export default function SpaceStatus({ view }: SpaceStatusProps) {
     return (
       <div className="space-y-1">
         <p className="text-sm font-medium text-foreground">
-          Your Space is ready. Let&apos;s add something useful.
+          Ready when you are — upload, remember, or just ask.
         </p>
         {view.isNewUser ? (
           <p className="text-sm text-ink-muted">What would you like to add first?</p>
@@ -39,7 +39,7 @@ export default function SpaceStatus({ view }: SpaceStatusProps) {
   }
 
   const title = spaceName
-    ? `Here's what's happening in ${spaceName}:`
+    ? `Snapshot from ${spaceName}:`
     : "Here's what's happening:";
 
   return (
