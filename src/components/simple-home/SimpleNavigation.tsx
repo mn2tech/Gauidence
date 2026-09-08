@@ -68,21 +68,6 @@ export default function SimpleNavigation() {
           <span className="truncate text-[10px] font-semibold">Ask Gideon</span>
         </Link>
         <Link
-          href={HISTORY_PATH}
-          className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-0.5 transition ${
-            historyActive ? "text-brand" : "text-ink-muted hover:text-foreground"
-          }`}
-        >
-          <span
-            className={`flex h-8 w-12 items-center justify-center rounded-2xl transition sm:w-14 ${
-              historyActive ? "bg-brand-light" : ""
-            }`}
-          >
-            <History className="h-5 w-5" aria-hidden />
-          </span>
-          <span className="truncate text-[10px] font-semibold">History</span>
-        </Link>
-        <Link
           href={WORLD_PATH}
           className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-0.5 transition ${
             worldActive ? "text-brand" : "text-ink-muted hover:text-foreground"
@@ -98,6 +83,21 @@ export default function SimpleNavigation() {
           <span className="truncate text-[10px] font-semibold">
             {MY_WORLD_NAV_LABEL}
           </span>
+        </Link>
+        <Link
+          href={HISTORY_PATH}
+          className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-0.5 transition ${
+            historyActive ? "text-brand" : "text-ink-muted hover:text-foreground"
+          }`}
+        >
+          <span
+            className={`flex h-8 w-12 items-center justify-center rounded-2xl transition sm:w-14 ${
+              historyActive ? "bg-brand-light" : ""
+            }`}
+          >
+            <History className="h-5 w-5" aria-hidden />
+          </span>
+          <span className="truncate text-[10px] font-semibold">History</span>
         </Link>
       </div>
     </nav>

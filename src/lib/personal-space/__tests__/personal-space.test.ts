@@ -17,7 +17,7 @@ import {
 } from "../index";
 
 describe("Personal Space — onboarding", () => {
-  it("1.1 shows welcome with three actions and no create form", () => {
+  it("1.1 shows welcome with four remember-first actions and no create form", () => {
     const w = buildPersonalSpaceWelcome({
       hasPersonalSpace: true,
       isEmptySpace: true,
@@ -26,8 +26,10 @@ describe("Personal Space — onboarding", () => {
     });
     assert.equal(w.showWelcome, true);
     assert.equal(w.skipCreateSpaceForm, true);
-    assert.equal(w.actions.length, 3);
+    assert.equal(w.actions.length, 4);
     assert.ok(w.actions.some((a) => a.label === "Ask Gideon"));
+    assert.ok(w.actions.some((a) => a.id === "tell-guardian"));
+    assert.ok(w.actions.some((a) => a.id === "connect-something"));
   });
 
   it("1.2 does not imply duplicate creation for returning users", () => {

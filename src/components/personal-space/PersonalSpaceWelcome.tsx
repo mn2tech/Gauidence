@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { MessageCircle, Plus, UserRound } from "lucide-react";
+import { Link2, MessageCircle, MessageSquarePlus, Plus } from "lucide-react";
 import {
   PERSONAL_SPACE_ACTIONS,
   PERSONAL_SPACE_WELCOME,
@@ -10,7 +10,8 @@ import {
 const ICONS = {
   "ask-gideon": MessageCircle,
   "add-something": Plus,
-  "tell-about-me": UserRound,
+  "tell-guardian": MessageSquarePlus,
+  "connect-something": Link2,
 } as const;
 
 export default function PersonalSpaceWelcome({
@@ -32,10 +33,10 @@ export default function PersonalSpaceWelcome({
         </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         {PERSONAL_SPACE_ACTIONS.map((action) => {
           const Icon = ICONS[action.id];
-          const primary = action.id === "ask-gideon";
+          const primary = action.id === "tell-guardian";
           return (
             <Link
               key={action.id}

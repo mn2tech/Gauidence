@@ -145,26 +145,32 @@ export const PERSONAL_SPACE_DISPLAY_NAME = "My Personal Space";
 
 export const PERSONAL_SPACE_WELCOME = {
   title: "Welcome to Guardian",
-  body: "Your Personal Space is where Guardian learns what matters to you and helps you remember, organize, and act.",
+  body: "What would you like Guardian to remember? Add something, tell Gideon a note, connect a source, or just ask — Guardian organizes the rest.",
 } as const;
 
 export const PERSONAL_SPACE_ACTIONS = [
   {
-    id: "ask-gideon",
-    label: "Ask Gideon",
-    description: "Talk to Gideon right away",
-    href: "/ask",
-  },
-  {
     id: "add-something",
-    label: "Add Something",
+    label: "Add something",
     description: "Upload files, notes, receipts, and more",
     href: "/add",
   },
   {
-    id: "tell-about-me",
-    label: "Tell Guardian About Me",
-    description: "Introduce yourself conversationally",
-    href: "/ask?mode=about-me&draft=My+name+is+",
+    id: "tell-guardian",
+    label: "Tell Guardian",
+    description: "Save a quick note to History — no Space required",
+    href: "/history?tell=1",
+  },
+  {
+    id: "connect-something",
+    label: "Connect something",
+    description: "Link Drive, email, or other sources",
+    href: "/settings/connections",
+  },
+  {
+    id: "ask-gideon",
+    label: "Ask Gideon",
+    description: "Ask across what Guardian already knows",
+    href: "/ask",
   },
 ] as const;

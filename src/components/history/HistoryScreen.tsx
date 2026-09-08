@@ -204,6 +204,16 @@ export default function HistoryScreen() {
     void openDetail(eventId);
   }, [searchParams]);
 
+  useEffect(() => {
+    const tell = searchParams.get("tell");
+    if (tell === "1" || tell === "true") {
+      setTellOpen(true);
+      setTellSaved(false);
+      setTellAlreadyHad(false);
+      setTellError(null);
+    }
+  }, [searchParams]);
+
   async function markComplete(id: string) {
     await fetch(`/api/guardian/events/${id}`, {
       method: "PATCH",

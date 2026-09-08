@@ -496,10 +496,11 @@ export default function ActivationFlow({ onComplete }: Props) {
                   Welcome to Guardian.
                 </p>
                 <p className="mt-4 text-base font-semibold text-foreground">
-                  Let&apos;s give Guardian something useful to remember.
+                  What would you like Guardian to remember?
                 </p>
                 <p className="mt-2 text-sm text-ink-muted">
-                  What would you like Guardian to help you manage?
+                  Pick a starting focus — Guardian can organize contexts for you.
+                  You only need a separate Space for sharing or clear boundaries.
                 </p>
               </div>
               <ul className="grid gap-2.5 sm:grid-cols-2">
@@ -573,16 +574,16 @@ export default function ActivationFlow({ onComplete }: Props) {
             <div className="space-y-5">
               <div>
                 <h1 className="text-2xl font-bold tracking-tight">
-                  Let&apos;s create your {categoryLabel} Space.
+                  Name this part of your world
                 </h1>
                 <p className="mt-2 text-sm text-ink-muted">
-                  A Space gives Guardian a place to understand one part of your
-                  life or work.
+                  Optional organization — useful when you share with others or
+                  keep work and life separate. You can rename it anytime.
                 </p>
               </div>
               <label className="block space-y-1.5">
                 <span className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
-                  Space name
+                  Name
                 </span>
                 <input
                   value={spaceName}
@@ -615,7 +616,7 @@ export default function ActivationFlow({ onComplete }: Props) {
                 {saving ? (
                   <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
                 ) : null}
-                Create Space
+                Continue
               </button>
             </div>
           ) : null}

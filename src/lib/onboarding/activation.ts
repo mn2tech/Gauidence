@@ -1,5 +1,5 @@
 /**
- * First-session activation steps — Create Space → Add Knowledge → Ask Gideon.
+ * First-session activation — remember-first, then organize into Spaces as needed.
  */
 
 export const ACTIVATION_STEPS = [
@@ -22,10 +22,10 @@ export function isActivationStep(value: unknown): value is ActivationStep {
 
 /** Minimal progress shown during onboarding (3 user-facing milestones). */
 export const ACTIVATION_PROGRESS = [
-  { id: "space", label: "Create Space", steps: ["welcome", "create_space"] },
+  { id: "space", label: "Get started", steps: ["welcome", "create_space"] },
   {
     id: "knowledge",
-    label: "Add Knowledge",
+    label: "Add something",
     steps: ["add_knowledge", "first_value"],
   },
   { id: "gideon", label: "Ask Gideon", steps: ["ask_gideon", "completed"] },

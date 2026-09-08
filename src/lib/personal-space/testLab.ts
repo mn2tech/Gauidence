@@ -97,8 +97,9 @@ export function buildTestLabCases(): TestLabCase[] {
             a.includes("welcome") &&
             a.includes("no-create-form") &&
             a.includes("Ask Gideon") &&
-            a.includes("Add Something") &&
-            a.includes("Tell Guardian About Me")
+            a.includes("Add something") &&
+            a.includes("Tell Guardian") &&
+            a.includes("Connect something")
         );
       },
     },

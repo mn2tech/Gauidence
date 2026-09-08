@@ -50,10 +50,10 @@ const HOW_TO = [
   },
   {
     icon: NotebookPen,
-    title: "Daily Logs",
-    body: "Jot notes and events. Use Remember Today from Home, or the Daily Log inside a space. Search can jump you straight to a matching memory.",
-    href: DOCUMENTS_PATH,
-    linkLabel: "Open Daily Log",
+    title: "History",
+    body: "Tell Guardian something — notes, meetings, and follow-ups land in History. Legacy Daily Logs still appear there with their original source.",
+    href: "/history?tell=1",
+    linkLabel: "Tell Guardian",
   },
   {
     icon: Search,

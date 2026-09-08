@@ -2,7 +2,7 @@
  * Getting-started checklist helpers (pure — safe for unit tests).
  */
 
-import { DOCUMENTS_PATH, dailyLogHref } from "@/lib/routes";
+import { DOCUMENTS_PATH } from "@/lib/routes";
 
 export const GETTING_STARTED_DISMISS_KEY = "guardian:getting-started-dismissed";
 
@@ -54,11 +54,11 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
   },
   {
     id: "daily_log",
-    title: "Write a Daily Log",
+    title: "Tell Guardian something",
     description:
-      "Optional — capture a quick note, event, or observation in that vault’s timeline.",
-    href: (profileId) => dailyLogHref(profileId),
-    cta: "Open Daily Log",
+      "Optional — save a quick note to History. Guardian organizes it without a formal Daily Log.",
+    href: () => "/history?tell=1",
+    cta: "Tell Guardian",
     done: (p) => p.hasDailyLog,
   },
 ];

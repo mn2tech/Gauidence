@@ -292,10 +292,17 @@ function VaultList({ onPicked }: { onPicked?: () => void }) {
       <p className="px-2 py-1 text-xs text-ink-muted">
         No spaces yet.{" "}
         <Link
+          href="/history?tell=1"
+          className="font-medium text-brand hover:text-brand-dark"
+        >
+          Tell Guardian
+        </Link>
+        {" · "}
+        <Link
           href="/settings/profiles?add=1&return=%2Fask"
           className="font-medium text-brand hover:text-brand-dark"
         >
-          Create your first Space
+          Add a Space
         </Link>
       </p>
     );

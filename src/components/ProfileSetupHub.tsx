@@ -31,10 +31,25 @@ export default function ProfileSetupHub({
   return (
     <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm sm:p-8">
       <h2 className="text-xl font-bold tracking-tight">
-        What would you like to create?
+        Organize a Space when you need one
       </h2>
       <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-        Choose a space to get started. You can add more anytime from{" "}
+        Spaces are for sharing, clients, or keeping areas of life separate. You
+        can also{" "}
+        <Link
+          href="/history?tell=1"
+          className="font-semibold text-brand hover:text-brand-dark"
+        >
+          Tell Guardian
+        </Link>{" "}
+        or{" "}
+        <Link
+          href="/ask"
+          className="font-semibold text-brand hover:text-brand-dark"
+        >
+          Ask Gideon
+        </Link>{" "}
+        without creating one first. Manage Spaces anytime from{" "}
         <Link
           href="/settings/profiles"
           className="font-semibold text-brand hover:text-brand-dark"
@@ -53,7 +68,7 @@ export default function ProfileSetupHub({
         </Link>
       </p>
       <p className="mt-3 text-sm text-ink-muted">
-        Create your first space to get started.
+        Prefer to start with a Space? Choose a type below.
       </p>
       <ul className="mt-6 grid gap-3 sm:grid-cols-2">
         {PROFILE_CREATE_GROUPS.map((g) => {

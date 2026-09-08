@@ -197,11 +197,11 @@ export default function SimpleVaultsScreen() {
       <div className="mx-auto max-w-2xl px-4 py-8">
         <div className="mb-6 text-center">
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            Create your first Space.
+            Organize your Spaces
           </h1>
           <p className="mt-2 text-sm text-ink-muted">
-            A Space gives Guardian a place to understand one part of your life
-            or work.
+            Spaces are optional boundaries for sharing and organization. You can
+            also Tell Guardian or Ask Gideon without creating one first.
           </p>
         </div>
         <ProfileSetupHub returnTo="/vaults" />

@@ -16,7 +16,7 @@ export type PersonalSpaceWelcomeModel = {
 
 /**
  * First-login welcome for Personal Space.
- * No complicated wizard — three actions and immediate Gideon access.
+ * No complicated wizard — four remember-first actions and immediate Gideon access.
  */
 export function buildPersonalSpaceWelcome(options: {
   hasPersonalSpace: boolean;
