@@ -52,12 +52,35 @@ describe("gideon welcome status", () => {
     });
 
     assert.ok(
-      view.actions.some((a) =>
+      view.actions.some((a) => /What services are described/i.test(a.label))
+    );
+    assert.ok(
+      !view.actions.some((a) =>
         /What do we know about Kendall Capital/i.test(a.label)
       )
     );
-    assert.ok(!view.actions.some((a) => /Follow up on leads/i.test(a.label)));
     assert.ok(view.actions.some((a) => a.label === "Ask Gideon"));
+  });
+
+  it("falls back to attention chips when questions only echo the Space name", () => {
+    const view = buildGideonWelcomeView({
+      greetName: "Michael",
+      spaceName: "NM2TECH - Next Move",
+      isNewUser: false,
+      stats: {
+        ...businessStats,
+        documentQuestions: [
+          "What do we know about NM2TECH - Next Move?",
+          "What do we know about NM2TECH?",
+          "What do we know about Next Move?",
+        ],
+      },
+      statusUnavailable: false,
+      profileId: "profile-1",
+    });
+
+    assert.ok(view.actions.some((a) => a.label === "What needs my attention?"));
+    assert.ok(!view.actions.some((a) => /What do we know about/i.test(a.label)));
   });
 
   it("shows empty-space messaging without zero-filled stats", () => {

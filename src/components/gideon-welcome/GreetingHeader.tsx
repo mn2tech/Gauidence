@@ -3,7 +3,7 @@ import type { GideonWelcomeViewModel } from "@/lib/gideon-welcome/types";
 type GreetingHeaderProps = {
   greeting: string;
   view: GideonWelcomeViewModel;
-  mode?: "default" | "today";
+  mode?: "default" | "today" | "ask";
 };
 
 export default function GreetingHeader({
@@ -26,6 +26,10 @@ export default function GreetingHeader({
       {mode === "today" ? (
         <p className="text-sm text-ink-muted">
           Here&apos;s what needs your attention today.
+        </p>
+      ) : mode === "ask" ? (
+        <p className="text-sm text-ink-muted">
+          Ask across all your spaces — uploads still save to your file home.
         </p>
       ) : isNewUser && isEmptySpace ? (
         <div className="space-y-1 text-sm text-ink-muted">

@@ -97,6 +97,18 @@ function matchesCurrentSpace(
   return refersToNamedSpace(text, spaceName);
 }
 
+/** True when label is just a token of a compound Space name (e.g. "Next Move"). */
+function isSpaceNameFragment(label: string, spaceName: string): boolean {
+  if (namesMatch(label, spaceName)) return true;
+  // Only split Brand — Tagline style names; keep "Kendall Capital" org chips.
+  if (!/[-–—|]/.test(spaceName)) return false;
+  const tokens = spaceName
+    .split(/[\s\-–—,/|]+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length >= 2);
+  return tokens.some((token) => namesMatch(label, token));
+}
+
 function pushUnique(out: string[], seen: Set<string>, candidate: string): void {
   const q = normalizeQuestion(candidate);
   if (!q || wordCount(q) > MAX_WORDS) return;
@@ -140,16 +152,8 @@ export function buildQuestionsFromDocuments(
     .filter((n) => !spaceName || !namesMatch(n, spaceName));
   const combined = docs.map(blobFor).join(" ");
 
-  // 0) Prefer the active Space itself when we have content here.
-  if (spaceName) {
-    pushUnique(
-      out,
-      seen,
-      `What do we know about ${shortLabel(spaceName, 4)}?`
-    );
-  }
-
-  // 1) Organization-centric — only orgs that match this Space (not siblings).
+  // 1) Organization-centric — only orgs that match this Space (not siblings),
+  // and not mere fragments of the Space display name ("NM2TECH", "Next Move").
   const orgs = [
     ...new Set(
       docs
@@ -159,6 +163,7 @@ export function buildQuestionsFromDocuments(
     ),
   ].filter((org) => {
     if (refersToOtherSpace(org, otherSpaceNames)) return false;
+    if (spaceName && isSpaceNameFragment(org, spaceName)) return false;
     // If we know the Space name, skip unrelated third-party orgs in the chips.
     if (spaceName && !matchesCurrentSpace(org, spaceName)) return false;
     return true;

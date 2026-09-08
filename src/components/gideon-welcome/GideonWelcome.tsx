@@ -18,7 +18,7 @@ export default function GideonWelcome({
 }: {
   showAskForm?: boolean;
   className?: string;
-  mode?: "default" | "today";
+  mode?: "default" | "today" | "ask";
 }) {
   const router = useRouter();
   const { active } = useActiveProfile();
@@ -53,6 +53,8 @@ export default function GideonWelcome({
     );
   }
 
+  const showStatus = mode === "default" || mode === "ask";
+  const showActions = mode === "default" || mode === "ask";
   const showActionPrompt =
     !view.isEmptySpace && view.statusItems.length > 0 && !view.statusUnavailable;
 
@@ -61,8 +63,8 @@ export default function GideonWelcome({
       className={`gideon-welcome simple-home-card welcome-strip space-y-4 p-4 sm:space-y-5 sm:p-5 ${className}`.trim()}
     >
       <GreetingHeader greeting={greeting} view={view} mode={mode} />
-      {mode === "default" ? <SpaceStatus view={view} /> : null}
-      {mode === "default" ? (
+      {showStatus ? <SpaceStatus view={view} mode={mode} /> : null}
+      {showActions ? (
         <SuggestedActions actions={view.actions} showPrompt={showActionPrompt} />
       ) : null}
 

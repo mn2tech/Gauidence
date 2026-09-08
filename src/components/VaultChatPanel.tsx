@@ -4139,7 +4139,7 @@ export default function VaultChatPanel({
   const welcomeBlock = welcome && (
     isPage && showMinimalWelcome && !emptyVault ? (
       <div className="mx-auto max-w-xl space-y-3 px-1 py-4 sm:py-6">
-        <GideonWelcome showAskForm={false} />
+        <GideonWelcome showAskForm={false} mode="ask" />
         <EmptyAskGuidanceChips
           onUpload={openFilePicker}
           onAddToToday={openReminderForm}

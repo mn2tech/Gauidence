@@ -53,7 +53,7 @@ describe("buildQuestionsFromDocuments", () => {
         otherSpaceNames: ["Kendall Capital", "Crossroadsconnect"],
       }
     );
-    assert.ok(qs.some((q) => /What do we know about NM2TECH/i.test(q)));
+    assert.ok(!qs.some((q) => /What do we know about NM2TECH/i.test(q)));
     assert.ok(!qs.some((q) => /Kendall Capital/i.test(q)));
     assert.ok(qs.some((q) => /Form CRS|fees|services|missing/i.test(q)));
   });

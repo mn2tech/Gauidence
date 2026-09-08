@@ -29,6 +29,35 @@ function askHref(question: string, profileId?: string): string {
   return `${ASK_GIDEON_PATH}?${params.toString()}`;
 }
 
+/** Drop chips that only echo the Space / brand name ("What do we know about X?"). */
+function actionableDocumentQuestions(
+  questions: string[],
+  spaceName?: string | null
+): string[] {
+  const space = spaceName?.trim() || "";
+  const tokens = space
+    ? [
+        ...space.split(/\s*[-–—|]\s*/).map((t) => t.trim()),
+        ...space.split(/[\s\-–—,/|]+/).map((t) => t.trim()),
+      ].filter((t) => t.length >= 2)
+    : [];
+  return questions.filter((q) => {
+    const text = q.trim();
+    if (!text) return false;
+    if (!/^what do we know about\b/i.test(text)) return true;
+    if (!space) return true;
+    const about = text
+      .replace(/^what do we know about\s+/i, "")
+      .replace(/\?+$/, "")
+      .trim();
+    if (!about) return false;
+    const aboutLower = about.toLowerCase();
+    if (aboutLower === space.toLowerCase()) return false;
+    if (tokens.some((t) => t.toLowerCase() === aboutLower)) return false;
+    return true;
+  });
+}
+
 function buildBusinessStatus(stats: GideonWelcomeSpaceStats): GideonWelcomeStatusItem[] {
   const items: GideonWelcomeStatusItem[] = [];
 
@@ -116,7 +145,7 @@ function buildEmptyActions(profileId?: string): GideonWelcomeAction[] {
     {
       id: "ask",
       label: "Ask Gideon",
-      href: profileId ? askHref("Help me get started in this Space.", profileId) : ASK_GIDEON_PATH,
+      href: profileId ? askHref("Help me get started.", profileId) : ASK_GIDEON_PATH,
     },
   ];
 }
@@ -135,9 +164,13 @@ function buildDocumentAskActions(
 
 function buildBusinessActions(
   stats: GideonWelcomeSpaceStats,
-  profileId?: string
+  profileId?: string,
+  spaceName?: string | null
 ): GideonWelcomeAction[] {
-  const docQuestions = (stats.documentQuestions ?? []).filter(Boolean);
+  const docQuestions = actionableDocumentQuestions(
+    stats.documentQuestions ?? [],
+    spaceName
+  );
   if (docQuestions.length > 0) {
     const actions = buildDocumentAskActions(docQuestions, profileId);
     actions.push({
@@ -155,7 +188,7 @@ function buildBusinessActions(
     {
       id: "attention",
       label: "What needs my attention?",
-      href: askHref("What currently needs my attention in this Space?", profileId),
+      href: askHref("What currently needs my attention?", profileId),
     },
     {
       id: "leads",
@@ -182,9 +215,13 @@ function buildBusinessActions(
 
 function buildGeneralActions(
   stats: GideonWelcomeSpaceStats,
-  profileId?: string
+  profileId?: string,
+  spaceName?: string | null
 ): GideonWelcomeAction[] {
-  const docQuestions = (stats.documentQuestions ?? []).filter(Boolean);
+  const docQuestions = actionableDocumentQuestions(
+    stats.documentQuestions ?? [],
+    spaceName
+  );
   if (docQuestions.length > 0) {
     const actions = buildDocumentAskActions(docQuestions, profileId);
     actions.push({
@@ -202,12 +239,12 @@ function buildGeneralActions(
     {
       id: "attention",
       label: "What needs my attention?",
-      href: askHref("What currently needs my attention in this Space?", profileId),
+      href: askHref("What currently needs my attention?", profileId),
     },
     {
       id: "new",
       label: "What's new?",
-      href: askHref("What's new in this Space?", profileId),
+      href: askHref("What's new across my spaces?", profileId),
     },
     {
       id: "ask",
@@ -251,9 +288,9 @@ export function buildGideonWelcomeView(args: {
   if (isEmptySpace || isNewUser) {
     actions = buildEmptyActions(profileId);
   } else if (stats.category === "business") {
-    actions = buildBusinessActions(stats, profileId);
+    actions = buildBusinessActions(stats, profileId, spaceName);
   } else {
-    actions = buildGeneralActions(stats, profileId);
+    actions = buildGeneralActions(stats, profileId, spaceName);
   }
 
   return {
