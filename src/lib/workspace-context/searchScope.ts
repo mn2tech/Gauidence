@@ -5,8 +5,11 @@ import type { WorkspaceContextMeta } from "./types";
 export const SEARCH_SCOPE_MODES = ["workspace", "global"] as const;
 export type SearchScopeMode = (typeof SEARCH_SCOPE_MODES)[number];
 
+/** Ask Gideon default — cross-space answers without switching Spaces first. */
+export const DEFAULT_SEARCH_SCOPE: SearchScopeMode = "global";
+
 export function parseSearchScope(raw: unknown): SearchScopeMode {
-  return raw === "global" ? "global" : "workspace";
+  return raw === "workspace" ? "workspace" : "global";
 }
 
 export function isSearchScopeMode(value: unknown): value is SearchScopeMode {
@@ -101,7 +104,7 @@ export function searchScopeHint(
 }
 
 export const SEARCH_SCOPE_FIRST_HINT =
-  "You have more than one space. Stay in this one, or search all of them? New files always save here.";
+  "Searching all your spaces by default. Narrow to this space anytime — new files still save here.";
 
 export function formatSearchConfidence(score: number): string {
   const pct = Math.round(Math.max(0, Math.min(100, score)));

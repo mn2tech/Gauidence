@@ -298,6 +298,7 @@ describe("buildVaultChatRetrievalScopes", () => {
         accessibleProfiles: accessible,
         chatHomeProfileId: "personal",
         scopedProfileId: "nolan",
+        searchScope: "workspace",
       }),
       [
         { id: "personal", display_name: "Kola", profile_type: "personal" },

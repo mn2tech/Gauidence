@@ -10,6 +10,7 @@ import {
   GUARDIAN_TIME_ZONE,
 } from "@/lib/timezone";
 import type { SearchScopeMode } from "@/lib/workspace-context/searchScope";
+import { DEFAULT_SEARCH_SCOPE } from "@/lib/workspace-context/searchScope";
 import {
   isMusicPracticeChatContext,
   looksLikeMusicPracticeSpace,
@@ -1081,7 +1082,7 @@ export function buildVaultScopeNote(args: {
   searchVaultNames?: string[];
   searchScope?: SearchScopeMode;
 }): string {
-  const searchScope = args.searchScope ?? "workspace";
+  const searchScope = args.searchScope ?? DEFAULT_SEARCH_SCOPE;
   const isGlobal = searchScope === "global";
   const accessibleNames = (args.allVaultNames ?? [])
     .map((n) => n.trim())

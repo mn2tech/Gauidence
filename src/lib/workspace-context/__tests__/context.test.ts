@@ -73,17 +73,28 @@ describe("resolveWorkspaceScopes", () => {
     assert.equal(meta.searchProfileIds.length, accessible.length);
   });
 
-  it("narrows scope when chat is scoped to a child vault", () => {
+  it("narrows scope when chat is scoped to a child vault in workspace mode", () => {
     const meta = resolveWorkspaceScopes({
       accessibleProfiles: accessible,
       activeProfile: accessible[0]!,
       chatHomeProfileId: "p1",
       chatScopedProfileId: "p2",
+      searchScope: "workspace",
     });
     assert.equal(meta.scopedProfile?.id, "p2");
     assert.equal(meta.searchProfileIds.length, 2);
     assert.ok(meta.searchProfileIds.includes("p1"));
     assert.ok(meta.searchProfileIds.includes("p2"));
+  });
+
+  it("defaults to global search across accessible spaces", () => {
+    const meta = resolveWorkspaceScopes({
+      accessibleProfiles: accessible,
+      activeProfile: accessible[0]!,
+      chatHomeProfileId: "p1",
+    });
+    assert.equal(meta.searchScope, "global");
+    assert.equal(meta.searchProfileIds.length, accessible.length);
   });
 });
 

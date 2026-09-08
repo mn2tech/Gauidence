@@ -1,6 +1,7 @@
 import type { GuardianProfileType } from "@/lib/profiles/types";
 import { PROFILE_TYPE_LABELS } from "@/lib/profiles/types";
 import type { SearchScopeMode } from "@/lib/workspace-context/searchScope";
+import { DEFAULT_SEARCH_SCOPE } from "@/lib/workspace-context/searchScope";
 
 export type VaultScopeCandidate = {
   id: string;
@@ -373,7 +374,7 @@ export function buildVaultChatRetrievalScopes(args: {
     typeof args.scopedProfileId === "string" && args.scopedProfileId.trim()
       ? args.scopedProfileId.trim()
       : null;
-  const searchScope = args.searchScope ?? "workspace";
+  const searchScope = args.searchScope ?? DEFAULT_SEARCH_SCOPE;
   const byId = new Map(args.accessibleProfiles.map((p) => [p.id, p]));
 
   if (searchScope === "global") {

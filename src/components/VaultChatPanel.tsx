@@ -133,7 +133,10 @@ import SmartUploadSuggestionCard from "@/components/SmartUploadSuggestionCard";
 import WorkspaceContextBar from "@/components/WorkspaceContextBar";
 import GlobalVaultSearch from "@/components/GlobalVaultSearch";
 import { buildWorkingInDisplay } from "@/lib/workspace-context/client";
-import type { SearchScopeMode } from "@/lib/workspace-context/client";
+import {
+  DEFAULT_SEARCH_SCOPE,
+  type SearchScopeMode,
+} from "@/lib/workspace-context/client";
 import {
   buildSmartUploadPresentation,
   shouldPromptSmartUpload,
@@ -2884,7 +2887,7 @@ export default function VaultChatPanel({
             ? { workProjectId: requestedWorkProjectId }
             : {}),
           ...(agentModeEnabled ? { agentMode: true } : {}),
-          searchScope: meta?.searchScope ?? "workspace",
+          searchScope: meta?.searchScope ?? DEFAULT_SEARCH_SCOPE,
           ...(blockForRequest ? { focusBlock: blockForRequest } : {}),
         },
         vaultProfileId ?? profileId
@@ -4835,7 +4838,7 @@ export default function VaultChatPanel({
           ? {
               ...prev,
               chatScopedProfile: null,
-              searchScope: "workspace",
+              searchScope: DEFAULT_SEARCH_SCOPE,
             }
           : prev
       );
@@ -4866,7 +4869,7 @@ export default function VaultChatPanel({
           onOpenSearch={
             isPage ? () => setVaultSearchOpen(true) : undefined
           }
-          searchScope={meta?.searchScope ?? "workspace"}
+          searchScope={meta?.searchScope ?? DEFAULT_SEARCH_SCOPE}
           showSearchScopeToggle={
             profiles.length > 1 && workingInDisplay.mode !== "searching"
           }

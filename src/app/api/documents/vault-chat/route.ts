@@ -95,6 +95,7 @@ import {
   isSearchScopeMode,
   resolveWorkspaceScopes,
   suggestionKindFrom,
+  DEFAULT_SEARCH_SCOPE,
   type SearchScopeMode,
 } from "@/lib/workspace-context";
 import { answerFromPersonalKnowledge } from "@/lib/personal-space/answers";
@@ -316,7 +317,7 @@ async function loadVaultChatById(
         ok: true,
         chat: {
           ...(withoutScope.data as VaultChatRow),
-          search_scope: "workspace",
+          search_scope: DEFAULT_SEARCH_SCOPE,
         },
       };
     }
@@ -339,7 +340,7 @@ async function loadVaultChatById(
     if (!base.data) return { ok: false, reason: "not_found" };
     return {
       ok: true,
-      chat: { ...base.data, scoped_profile_id: null, search_scope: "workspace" },
+      chat: { ...base.data, scoped_profile_id: null, search_scope: DEFAULT_SEARCH_SCOPE },
     };
   }
 
@@ -790,7 +791,7 @@ export async function GET(request: Request) {
         askContextLabel: askGideonContextLabel(active),
         chatContextLabel: scopeMeta.chatContextLabel,
         vaultScopeNote: scopeMeta.vaultScopeNote,
-        searchScope: "workspace" as const,
+        searchScope: DEFAULT_SEARCH_SCOPE,
         templateLabel: template.label,
         templateBadge: template.badge,
         actionTimeline,
@@ -1069,7 +1070,7 @@ export async function POST(request: Request) {
   let isNewChat = false;
   let chatHomeProfileId = active.id;
   let chatScopedProfileId: string | null = null;
-  let chatSearchScope: SearchScopeMode = "workspace";
+  let chatSearchScope: SearchScopeMode = DEFAULT_SEARCH_SCOPE;
   const requestedId =
     typeof chatIdRaw === "string" && chatIdRaw.trim() ? chatIdRaw.trim() : null;
 
@@ -1116,7 +1117,7 @@ export async function POST(request: Request) {
     }
     const initialSearchScope = isSearchScopeMode(setSearchScopeRaw)
       ? setSearchScopeRaw
-      : "workspace";
+      : DEFAULT_SEARCH_SCOPE;
     const { data: created, error: chatError } = await supabase
       .from("vault_chats")
       .insert({

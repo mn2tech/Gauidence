@@ -10,6 +10,7 @@ export {
   formatSearchConfidence,
   SEARCH_SCOPE_MODES,
   SEARCH_SCOPE_FIRST_HINT,
+  DEFAULT_SEARCH_SCOPE,
   type SearchScopeMode,
   type WorkingInDisplay,
 } from "./searchScope";

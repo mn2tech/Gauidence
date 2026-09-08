@@ -7,6 +7,7 @@ import type { WorkingInDisplay } from "@/lib/workspace-context/client";
 import {
   SEARCH_SCOPE_FIRST_HINT,
   searchScopeHint,
+  DEFAULT_SEARCH_SCOPE,
   type SearchScopeMode,
 } from "@/lib/workspace-context/client";
 import type { GuardianProfile } from "@/lib/profiles/types";
@@ -96,7 +97,7 @@ export default function WorkspaceContextBar({
   onSwitchWorkspace,
   onReturnToWorkspace,
   onOpenSearch,
-  searchScope = "workspace",
+  searchScope = DEFAULT_SEARCH_SCOPE,
   showSearchScopeToggle = false,
   onSearchScopeChange,
   className = "",

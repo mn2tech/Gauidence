@@ -53,7 +53,7 @@ type Props = {
 export default function GlobalVaultSearch({
   open,
   onClose,
-  defaultScope = "workspace",
+  defaultScope = "global",
 }: Props) {
   const router = useRouter();
   const { switchProfile, active } = useActiveProfile();

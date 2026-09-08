@@ -37,13 +37,14 @@ describe("buildWorkingInDisplay", () => {
 });
 
 describe("parseSearchScope", () => {
-  it("defaults to workspace", () => {
-    assert.equal(parseSearchScope(undefined), "workspace");
-    assert.equal(parseSearchScope("workspace"), "workspace");
+  it("defaults to global (cross-space Ask Gideon)", () => {
+    assert.equal(parseSearchScope(undefined), "global");
+    assert.equal(parseSearchScope(null), "global");
+    assert.equal(parseSearchScope("global"), "global");
   });
 
-  it("accepts global", () => {
-    assert.equal(parseSearchScope("global"), "global");
+  it("accepts workspace when explicitly set", () => {
+    assert.equal(parseSearchScope("workspace"), "workspace");
   });
 });
 

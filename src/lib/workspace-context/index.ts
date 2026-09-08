@@ -29,6 +29,7 @@ export {
   isSearchScopeMode,
   formatSearchConfidence,
   SEARCH_SCOPE_MODES,
+  DEFAULT_SEARCH_SCOPE,
   type SearchScopeMode,
   type WorkingInDisplay,
 } from "./searchScope";
