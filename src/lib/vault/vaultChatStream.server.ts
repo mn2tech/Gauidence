@@ -30,6 +30,7 @@ import {
   chatScopedProfilePayload,
   defaultGideonWriteProfileId,
   resolveGideonWriteVault,
+  shouldPersistChatScopeToWriteVault,
   type VaultScopeCandidate,
 } from "@/lib/vault/detectVaultScope";
 import type { AttachedVaultDocument } from "@/lib/vault/attachedDocument";
@@ -391,6 +392,18 @@ export function createVaultChatStreamResponse(
             display_name: args.active.display_name,
           },
         });
+        const persistChatScope =
+          Boolean(responseVaultScope) &&
+          shouldPersistChatScopeToWriteVault({
+            question: args.question,
+            writeVaultId: resolvedWriteVault.id,
+            activeProfileId: args.active.id,
+            accessibleProfiles: args.accessibleProfiles,
+          });
+        // Show a one-turn vault tip only when we actually pin the chat elsewhere.
+        const scopedResponseVaultScope = persistChatScope
+          ? responseVaultScope
+          : null;
 
         const claimsPayload = Array.isArray(args.claims) ? args.claims : [];
         const baseInsert = {
@@ -509,9 +522,9 @@ export function createVaultChatStreamResponse(
         }
 
         let persistedScopedProfileId = args.chatScopedProfileId;
-        if (responseVaultScope) {
-          chatUpdates.scoped_profile_id = responseVaultScope.profileId;
-          persistedScopedProfileId = responseVaultScope.profileId;
+        if (scopedResponseVaultScope) {
+          chatUpdates.scoped_profile_id = scopedResponseVaultScope.profileId;
+          persistedScopedProfileId = scopedResponseVaultScope.profileId;
         }
 
         await args.updateVaultChatRow(args.supabase, args.chatId, chatUpdates);
@@ -572,7 +585,7 @@ export function createVaultChatStreamResponse(
             args.userMsg,
             {
               ...assistantMsg,
-              vaultScope: responseVaultScope,
+              vaultScope: scopedResponseVaultScope,
               suggestedQuestions:
                 suggestedQuestions.length > 0
                   ? suggestedQuestions
@@ -581,7 +594,7 @@ export function createVaultChatStreamResponse(
           ],
           proposedReminder,
           newlyGranted,
-          vaultScope: responseVaultScope,
+          vaultScope: scopedResponseVaultScope,
           writeProfile: {
             profileId: resolvedWriteVault.id,
             profileName: resolvedWriteVault.display_name,

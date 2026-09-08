@@ -9,6 +9,7 @@ import {
   resolveExplicitSpaceScope,
   resolveGideonWriteVault,
   resolveNamedSpaceOutsideSearch,
+  shouldPersistChatScopeToWriteVault,
 } from "../detectVaultScope";
 
 const profiles = [
@@ -257,6 +258,58 @@ describe("resolveGideonWriteVault", () => {
         retrievedChunks: [],
       }),
       { id: "personal", display_name: "Kola" }
+    );
+  });
+
+  it("does not jump to a dominant Space for what's in this space", () => {
+    assert.deepEqual(
+      resolveGideonWriteVault({
+        question: "what's in this space?",
+        activeProfileId: "crossroads",
+        accessibleProfiles: [
+          ...profiles,
+          { id: "crossroads", display_name: "Crossroadsconnect" },
+          { id: "belachew", display_name: "Belachew" },
+        ],
+        retrievedChunks: [
+          { profile_id: "belachew" },
+          { profile_id: "belachew" },
+          { profile_id: "belachew" },
+        ],
+      }),
+      { id: "crossroads", display_name: "Crossroadsconnect" }
+    );
+  });
+});
+
+describe("shouldPersistChatScopeToWriteVault", () => {
+  it("does not pin chat when inventory answer came from another Space", () => {
+    assert.equal(
+      shouldPersistChatScopeToWriteVault({
+        question: "what in this space?",
+        writeVaultId: "belachew",
+        activeProfileId: "crossroads",
+        accessibleProfiles: [
+          { id: "crossroads", display_name: "Crossroadsconnect" },
+          { id: "belachew", display_name: "Belachew" },
+        ],
+      }),
+      false
+    );
+  });
+
+  it("pins chat when the user explicitly named another Space", () => {
+    assert.equal(
+      shouldPersistChatScopeToWriteVault({
+        question: "What do we know about Belachew?",
+        writeVaultId: "belachew",
+        activeProfileId: "crossroads",
+        accessibleProfiles: [
+          { id: "crossroads", display_name: "Crossroadsconnect" },
+          { id: "belachew", display_name: "Belachew" },
+        ],
+      }),
+      true
     );
   });
 });

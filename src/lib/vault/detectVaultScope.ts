@@ -1,4 +1,5 @@
 import type { GuardianProfileType } from "@/lib/profiles/types";
+import { wantsVaultFileInventory } from "@/lib/vault/askInventory";
 import { PROFILE_TYPE_LABELS } from "@/lib/profiles/types";
 import type { SearchScopeMode } from "@/lib/workspace-context/searchScope";
 import { DEFAULT_SEARCH_SCOPE } from "@/lib/workspace-context/searchScope";
@@ -16,6 +17,49 @@ function escapeRegex(value: string): string {
 /** Matches possessive forms: Nolan, Nolan's, Nolans (no apostrophe). */
 function possessiveSuffixPattern(): string {
   return "(?:'s|s(?=\\s|$))";
+}
+
+/**
+ * "What's in this space?" must stay on the active home — never jump the chat
+ * to whichever Space happened to dominate All-spaces retrieval.
+ */
+export function shouldKeepChatOnActiveSpace(question: string): boolean {
+  const q = question.trim();
+  if (!q) return false;
+  if (wantsVaultFileInventory(q)) return true;
+  if (
+    /\bwhat(?:'s| is| are)?\s+in\s+this\s+(?:space|vault|workspace)\b/i.test(q)
+  ) {
+    return true;
+  }
+  if (
+    /\b(?:list|show|browse)\s+(?:(?:all|my|the)\s+)?(?:files?|documents?|uploads?)\s+in\s+this\s+(?:space|vault|workspace)\b/i.test(
+      q
+    )
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Only pin Ask to another Space when the user named it — not when retrieval
+ * merely ranked that Space's files highest under All spaces.
+ */
+export function shouldPersistChatScopeToWriteVault(args: {
+  question: string;
+  writeVaultId: string;
+  activeProfileId: string;
+  accessibleProfiles: VaultScopeCandidate[];
+}): boolean {
+  if (args.writeVaultId === args.activeProfileId) return false;
+  if (shouldKeepChatOnActiveSpace(args.question)) return false;
+  const mentioned = detectMentionedVault({
+    question: args.question,
+    accessibleProfiles: args.accessibleProfiles,
+    preferProfileId: args.activeProfileId,
+  });
+  return Boolean(mentioned && mentioned.id === args.writeVaultId);
 }
 
 /**
@@ -427,10 +471,14 @@ export function resolveGideonWriteVault(args: {
   });
   if (mentioned) return mentioned;
 
-  const dominantId = dominantRetrievalProfileId(args.retrievedChunks ?? []);
-  if (dominantId) {
-    const match = args.accessibleProfiles.find((p) => p.id === dominantId);
-    if (match) return match;
+  // Inventory / "this space" questions stay on the active home even when All
+  // spaces retrieval is dominated by another Space's files.
+  if (!shouldKeepChatOnActiveSpace(args.question)) {
+    const dominantId = dominantRetrievalProfileId(args.retrievedChunks ?? []);
+    if (dominantId) {
+      const match = args.accessibleProfiles.find((p) => p.id === dominantId);
+      if (match) return match;
+    }
   }
 
   const active =

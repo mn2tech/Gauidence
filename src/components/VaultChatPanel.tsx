@@ -38,6 +38,7 @@ import {
   MoreHorizontal,
   Home,
   Inbox,
+  Lock,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import GideonAvatar from "@/components/GideonAvatar";
@@ -5550,16 +5551,21 @@ export default function VaultChatPanel({
                   ? `Asking across all spaces. Files save to ${workingInDisplay.primaryName}. Tap to change.`
                   : `Answers from ${workingInDisplay.primaryName} only. Tap to change scope.`
               }
-              className={`max-w-[9rem] truncate rounded-full border px-2.5 py-1 text-[11px] font-semibold transition sm:max-w-[12rem] ${
+              className={`inline-flex max-w-[9rem] items-center gap-1 truncate rounded-full border px-2.5 py-1 text-[11px] font-semibold transition sm:max-w-[12rem] ${
                 scopeChromeOpen
                   ? "border-brand bg-brand-light/40 text-brand-dark"
                   : "border-border-subtle bg-surface text-ink-muted hover:text-foreground"
               }`}
             >
               {/* Answer scope only — never the file-home name while All is on. */}
-              {(meta?.searchScope ?? DEFAULT_SEARCH_SCOPE) === "global"
-                ? "All spaces"
-                : workingInDisplay.primaryName}
+              {(meta?.searchScope ?? DEFAULT_SEARCH_SCOPE) === "global" ? (
+                "All spaces"
+              ) : (
+                <>
+                  <Lock className="h-3 w-3 shrink-0 opacity-90" aria-hidden />
+                  <span className="truncate">{workingInDisplay.primaryName}</span>
+                </>
+              )}
             </button>
           ) : null}
           <div className="flex shrink-0 items-center gap-1">
