@@ -59,6 +59,7 @@ import {
 import type { GuardianProfile } from "@/lib/profiles/types";
 import { askGideonContextLabel } from "@/lib/profiles/types";
 import { parseProposedReminder, wantsReminderAgent } from "@/lib/reminders/propose";
+import { wantsDailyLogCapture } from "@/lib/logs/propose";
 import { withLlmUsage } from "@/lib/usage/record";
 import { assertBillingQuota, recordChatEvent } from "@/lib/billing/quota";
 import { refreshUserAwards } from "@/lib/awards/grant";
@@ -1980,6 +1981,8 @@ export async function POST(request: Request) {
           conversationContinuity: Boolean(
             runtimeContext?.preferConversationContinuity
           ),
+          originalUserQuestion: userQuestion,
+          dailyLogCapture: wantsDailyLogCapture(userQuestion, history),
           onAnswerReady:
             runtimeState && runtimeContext
               ? async ({ answer: streamAnswer, citations: streamCitations }) => {

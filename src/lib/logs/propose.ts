@@ -19,10 +19,13 @@ const DAILY_LOG_QUERY =
   /\b(what|when|where|who|which|how|did|do|does|have|has|had|show|list|find|search|tell\s+me\s+about|recall|look\s+up)\b.{0,48}\b(log|logs|note|notes|daily\s+log|vault)\b/i;
 
 const DAILY_LOG_CONFIRM_ACK =
-  /^(yes|yeah|yep|yup|ok(?:ay)?|sure|go ahead|do it|confirm|please do|that'?s? (?:right|correct|good)|sounds good|perfect|add it|save it|save that|log it|put it in(?: the vault)?)\.?$/i;
+  /^(yes|yeah|yep|yup|ok(?:ay)?|sure|go ahead|do it|confirm(?:ed)?|please do|that'?s? (?:right|correct|good)|sounds good|perfect|add it|save it|save that|log it|put it in(?: the vault)?)\.?$/i;
 
 const DAILY_LOG_SHORT_VAULT_CONFIRM =
   /^(?:please\s+)?(?:add|save|log|put)\s+(?:it|that|this)(?:\s+to\s+(?:the\s+)?(?:\w+(?:'s)?\s+)?vault)?\.?$/i;
+
+const WRONG_DAILY_LOG_UI =
+  /\b(\+?\s*Add Daily Log|Daily Log\s*[→\-–]\s*New Entry|open Daily Logs?|paste (?:or type|it) into|cannot actually create|don'?t have (?:the )?(?:permission|ability) to (?:write|create|save)|only \*?propose\*?.{0,80}cannot|no (?:technical )?permission to write)\b/i;
 
 /** Short affirmations after Gideon already proposed a Daily Log (user should use Save to vault). */
 export function isDailyLogConfirmationMessage(question: string): boolean {
@@ -31,8 +34,8 @@ export function isDailyLogConfirmationMessage(question: string): boolean {
   if (DAILY_LOG_CONFIRM_ACK.test(q)) return true;
   if (DAILY_LOG_SHORT_VAULT_CONFIRM.test(q)) return true;
   return (
-    /\b(yes|yeah|yep|ok(?:ay)?|sure|go ahead|please|confirm)\b/i.test(q) &&
-    /\b(save|add|log|vault|it|that|this)\b/i.test(q)
+    /\b(yes|yeah|yep|ok(?:ay)?|sure|go ahead|please|confirm(?:ed)?)\b/i.test(q) &&
+    /\b(save|add|log|vault|space|it|that|this)\b/i.test(q)
   );
 }
 
@@ -44,6 +47,27 @@ function lastAssistantProposedDailyLog(history: ChatTurn[]): boolean {
     }
   }
   return false;
+}
+
+function lastAssistantSavableContent(history: ChatTurn[]): string | null {
+  for (let i = history.length - 1; i >= 0; i--) {
+    const turn = history[i];
+    if (turn?.role !== "assistant") continue;
+    if (parseProposedDailyLog(turn.content)) return null;
+    const body = stripProposedDailyLogSection(turn.content).trim();
+    if (body.length < 40) return null;
+    // Schedule / list-like content the user may want saved after "confirmed".
+    if (
+      /\b\d{1,2}:\d{2}\b/.test(body) ||
+      /^[-*•]\s+/m.test(body) ||
+      /^\d+\.\s+/m.test(body) ||
+      /\b(schedule|today|morning|afternoon|evening)\b/i.test(body)
+    ) {
+      return body.slice(0, 8000);
+    }
+    return null;
+  }
+  return null;
 }
 
 /** True when the user wants Gideon to propose saving a Daily Log from chat. */
@@ -65,13 +89,21 @@ export function wantsDailyLogCapture(
     return false;
   }
   if (DAILY_LOG_CAPTURE_INTENT.test(q)) return true;
-  return SAVE_CHAT_CONTENT_FOLLOWUP.test(q);
+  if (SAVE_CHAT_CONTENT_FOLLOWUP.test(q)) return true;
+  // "confirmed" / "yes" after an unsaved schedule in chat → propose a log
+  if (
+    isDailyLogConfirmationMessage(q) &&
+    lastAssistantSavableContent(chatHistory)
+  ) {
+    return true;
+  }
+  return false;
 }
 
 export const DAILY_LOG_CAPTURE_SYSTEM_NOTE = `Daily log capture mode:
 The user wants to save a note to their space (Daily Log). Acknowledge briefly, then propose what to save.
 
-If they refer to "this", "that", "the list", "today's schedule", or something from the current chat, use the relevant content from the conversation (including your previous reply) as the note body — do not ask them to paste it again.
+If they refer to "this", "that", "the list", "today's schedule", "confirmed", or something from the current chat, use the relevant content from the conversation (including your previous reply) as the note body — do not ask them to paste it again.
 
 You MUST end with exactly this block (required — without it, nothing is saved):
 
@@ -82,7 +114,7 @@ log_date: YYYY-MM-DD
 
 Use today's date if no date is given. Never invent facts not in the user's message or this conversation. If you cannot determine what to save, omit the PROPOSED DAILY LOG section and ask what to remember.
 
-Confirmation happens in this chat: after your reply, the app shows Save to space / Edit first. Tell the user to tap Save to space under your proposal. Never say you cannot create Daily Logs. Never tell them to click + Add Daily Log, open Daily Log / New Entry, or copy-paste into a form.
+Confirmation happens in this chat: after your reply, the app shows Save to space / Edit first under your message. Tell the user to tap Save to space there. Do not claim you lack permission to create Daily Logs. Do not send them to another screen or form to create the log.
 
 If RETRIEVED DAILY LOGS already contains this note, or you already proposed a Daily Log in this thread and the user affirmed or saved it, acknowledge it is saved in their space — do NOT emit another PROPOSED DAILY LOG. The app has Save to space / Edit first buttons; the user does not need a second proposal.`;
 
@@ -180,6 +212,93 @@ export function stripProposedDailyLogSection(content: string): string {
     out.push(line);
   }
   return out.join("\n").trim();
+}
+
+function scrubWrongDailyLogUiCopy(text: string): string {
+  return text
+    .replace(
+      /I can only \*?propose\*?.{0,220}?(?:myself|database|app)\.?/gi,
+      ""
+    )
+    .replace(
+      /(?:please\s+)?(?:click|tap|use|open).{0,60}?(?:\+?\s*)?Add Daily Log.{0,120}?\./gi,
+      ""
+    )
+    .replace(
+      /(?:please\s+)?(?:go to|open).{0,40}?Daily Log.{0,80}?(?:New Entry|form).{0,40}?\./gi,
+      ""
+    )
+    .replace(
+      /Paste or type.{0,80}?(?:schedule|note|log).{0,40}?\./gi,
+      ""
+    )
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+/**
+ * Repair model refusals that send users to the wrong Daily Log UI.
+ * Ensures a ## PROPOSED DAILY LOG block exists when capture was requested.
+ */
+export function repairDailyLogCaptureAnswer(
+  answer: string,
+  args: {
+    history?: ChatTurn[];
+    userQuestion?: string;
+    defaultLogDate?: string;
+  } = {}
+): string {
+  const history = args.history ?? [];
+  const logDate = args.defaultLogDate ?? todayLogDate();
+  const existing = parseProposedDailyLog(answer, logDate);
+  if (existing) {
+    const visible = scrubWrongDailyLogUiCopy(
+      stripProposedDailyLogSection(answer)
+    );
+    const intro =
+      visible ||
+      "Ready to save this as a Daily Log — tap **Save to space** under this message.";
+    return [
+      intro,
+      "",
+      "## PROPOSED DAILY LOG",
+      existing.title ? `title: ${existing.title}` : "title: Daily Log",
+      "content:",
+      existing.content,
+      `log_date: ${existing.logDate}`,
+    ].join("\n");
+  }
+
+  if (!WRONG_DAILY_LOG_UI.test(answer) && !/cannot create Daily Logs?/i.test(answer)) {
+    return answer;
+  }
+
+  const fromHistory = lastAssistantSavableContent(history);
+  const cleaned = scrubWrongDailyLogUiCopy(answer);
+  const body =
+    fromHistory ||
+    (cleaned.length >= 40 ? cleaned : null) ||
+    args.userQuestion?.trim() ||
+    null;
+
+  if (!body || body.length < 8) {
+    return [
+      "I can save this from chat. Once I have the note content, tap **Save to space** under the proposal — no need to create it on another screen.",
+      "",
+      "What should I put in today's Daily Log?",
+    ].join("\n");
+  }
+
+  return [
+    "Here's a Daily Log proposal from our chat. Tap **Save to space** under this message to create it.",
+    "",
+    "## PROPOSED DAILY LOG",
+    "title: Daily Log",
+    "content:",
+    body.slice(0, 8000),
+    `log_date: ${logDate}`,
+  ].join("\n");
 }
 
 export function proposedDailyLogSummary(

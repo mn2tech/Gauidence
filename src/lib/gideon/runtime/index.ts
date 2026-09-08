@@ -59,6 +59,7 @@ export { resolveReferences } from "./resolveReferences";
 export {
   isShortConversationalReply,
   expandShortReplyFromHistory,
+  shouldPreferContinuityEmptyFallback,
 } from "./shortReplies";
 export { classifyRuntimeIntent } from "./classifyRuntimeIntent";
 export { inferActiveGoal } from "./inferActiveGoal";

@@ -128,6 +128,21 @@ export async function PATCH(request: Request, ctx: Ctx) {
       })
   );
 
+  void import("@/lib/guardian-events/syncFromDailyLog").then(
+    ({ syncGuardianEventsFromDailyLogBestEffort }) =>
+      syncGuardianEventsFromDailyLogBestEffort(supabase, {
+        userId: user.id,
+        log: {
+          id: data.id,
+          profile_id: data.profile_id,
+          title: data.title,
+          content: data.content,
+          log_date: data.log_date,
+          owner_user_id: data.owner_user_id,
+        },
+      })
+  );
+
   return NextResponse.json({ log: data });
 }
 

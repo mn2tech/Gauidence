@@ -32,7 +32,7 @@ export function isShortConversationalReply(message: string): boolean {
   return false;
 }
 
-function assistantInvitedReply(content: string): boolean {
+export function assistantInvitedReply(content: string): boolean {
   const t = content.trim();
   if (!t) return false;
   return (
@@ -50,23 +50,39 @@ function compactAssistantContext(content: string, max = 360): string {
   return cleaned.slice(-max);
 }
 
+function lastInvitingAssistant(
+  recentMessages: ChatTurn[],
+  fallbackAssistantContent?: string | null
+): ChatTurn | null {
+  const fromHistory = [...recentMessages]
+    .reverse()
+    .find((m) => m.role === "assistant" && m.content.trim());
+  if (fromHistory && assistantInvitedReply(fromHistory.content)) {
+    return fromHistory;
+  }
+  const fallback = fallbackAssistantContent?.trim();
+  if (fallback && assistantInvitedReply(fallback)) {
+    return { role: "assistant", content: fallback };
+  }
+  return null;
+}
+
 /**
  * Expand "20%" / "yes" into an explicit continuity prompt using the last
  * assistant turn. Returns null when not applicable.
  */
 export function expandShortReplyFromHistory(
   message: string,
-  recentMessages: ChatTurn[]
+  recentMessages: ChatTurn[],
+  fallbackAssistantContent?: string | null
 ): string | null {
   if (!isShortConversationalReply(message)) return null;
-  if (!recentMessages.length) return null;
 
-  const lastAssistant = [...recentMessages]
-    .reverse()
-    .find((m) => m.role === "assistant" && m.content.trim());
-  if (!lastAssistant || !assistantInvitedReply(lastAssistant.content)) {
-    return null;
-  }
+  const lastAssistant = lastInvitingAssistant(
+    recentMessages,
+    fallbackAssistantContent
+  );
+  if (!lastAssistant) return null;
 
   const answer = message.trim();
   const prior = compactAssistantContext(lastAssistant.content);
@@ -76,4 +92,22 @@ export function expandShortReplyFromHistory(
     `Interpret "${answer}" as their answer to that message and continue helpfully.`,
     `Do not search Spaces or documents for the literal text "${answer}" alone.`,
   ].join(" ");
+}
+
+/** True when a blank model reply should stay conversational, not a Space miss. */
+export function shouldPreferContinuityEmptyFallback(args: {
+  conversationContinuity?: boolean;
+  userMessage?: string | null;
+  recentMessages?: ChatTurn[];
+  fallbackAssistantContent?: string | null;
+}): boolean {
+  if (args.conversationContinuity) return true;
+  const userMessage = args.userMessage?.trim();
+  if (!userMessage || !isShortConversationalReply(userMessage)) return false;
+  return Boolean(
+    lastInvitingAssistant(
+      args.recentMessages ?? [],
+      args.fallbackAssistantContent
+    )
+  );
 }

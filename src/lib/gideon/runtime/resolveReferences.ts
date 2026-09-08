@@ -144,8 +144,15 @@ export function resolveReferences(args: {
   message: string;
   activeEntities: ActiveEntity[];
   recentMessages?: ChatTurn[];
+  /** Fallback when chat history is empty/stale (from gideon_conversation_state). */
+  lastAssistantMessage?: string | null;
 }): ReferenceResolution {
-  const { message, activeEntities, recentMessages = [] } = args;
+  const {
+    message,
+    activeEntities,
+    recentMessages = [],
+    lastAssistantMessage = null,
+  } = args;
   const bindings: ReferenceResolution["bindings"] = [];
   let ambiguous = false;
   let clarificationPrompt: string | null = null;
@@ -162,7 +169,11 @@ export function resolveReferences(args: {
   }
 
   // Short answers like "20%" / "yes" to the assistant's last question
-  const shortExpanded = expandShortReplyFromHistory(message, recentMessages);
+  const shortExpanded = expandShortReplyFromHistory(
+    message,
+    recentMessages,
+    lastAssistantMessage
+  );
   if (shortExpanded) {
     return {
       resolvedMessage: shortExpanded,

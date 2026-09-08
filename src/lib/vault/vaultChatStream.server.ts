@@ -44,6 +44,8 @@ import { withLlmUsage } from "@/lib/usage/record";
 import { recordChatEvent } from "@/lib/billing/quota";
 import { refreshUserAwards } from "@/lib/awards/grant";
 import { formatVaultChatError, buildGideonEmptyAnswerFallback } from "@/lib/vault/vaultChatErrors";
+import { shouldPreferContinuityEmptyFallback } from "@/lib/gideon/runtime/shortReplies";
+import { repairDailyLogCaptureAnswer } from "@/lib/logs/propose";
 import { buildListAnswerFromChunks, preferFullerListAnswer, wantsTranscription, wantsPeopleRoster, countNumberedListItems, looksLikePersonListItem } from "@/lib/vault/gideon";
 import { buildOntologyAnswerFallback } from "@/lib/ontology/formatForGideon";
 import { buildSuggestedQuestions, parseSuggestedQuestions, extractPeopleFromAnswer } from "@/lib/gideon/suggestedQuestions";
@@ -113,6 +115,10 @@ export type VaultChatStreamArgs = {
   }) => Promise<void>;
   /** When true, blank model replies should not say "nothing in your spaces". */
   conversationContinuity?: boolean;
+  /** Raw user text (before continuity rewrite) for empty-answer continuity checks. */
+  originalUserQuestion?: string;
+  /** When true, rewrite wrong Add Daily Log refusals into in-chat Save to space. */
+  dailyLogCapture?: boolean;
 };
 
 export function createVaultChatStreamResponse(
@@ -231,21 +237,39 @@ export function createVaultChatStreamResponse(
         }
 
         if (!answer.trim()) {
+          const continuityEmpty = shouldPreferContinuityEmptyFallback({
+            conversationContinuity: args.conversationContinuity,
+            userMessage: args.originalUserQuestion ?? args.question,
+            recentMessages: args.history,
+          });
           answer =
             buildListAnswerFromChunks(args.chunks, {
               peopleOnly: wantsPeopleRoster(args.question),
             }) ??
             buildOntologyAnswerFallback(args.ontologyBlock ?? "") ??
-            (args.conversationContinuity
+            (continuityEmpty
               ? "I still have our previous question in mind — could you say a bit more so I can continue from there?"
               : buildGideonEmptyAnswerFallback({
                   chunks: args.chunks,
                   explicitSpaceName: args.explicitSpaceName,
                 }));
+          if (answer.trim()) {
+            write({ type: "delta", text: answer });
+          }
         } else if (wantsTranscription(args.question)) {
           answer = preferFullerListAnswer(answer, args.chunks, {
             peopleOnly: wantsPeopleRoster(args.question),
           });
+        }
+
+        if (args.dailyLogCapture) {
+          const repaired = repairDailyLogCaptureAnswer(answer, {
+            history: args.history,
+            userQuestion: args.originalUserQuestion ?? args.question,
+          });
+          if (repaired !== answer) {
+            answer = repaired;
+          }
         }
 
         if (args.youtubeUrls?.length) {

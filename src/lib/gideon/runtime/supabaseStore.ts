@@ -29,14 +29,15 @@ export function createSupabaseStateStore(
       }
     },
     async loadRecentMessages(userId, conversationId, limit = RECENT_MESSAGE_WINDOW) {
+      // Newest-first so long threads still include the last assistant turn.
       const { data, error } = await supabase
         .from("vault_chat_messages")
         .select("role, content")
         .eq("chat_id", conversationId)
         .eq("user_id", userId)
         .in("role", ["user", "assistant"])
-        .order("created_at", { ascending: true })
-        .limit(Math.max(limit * 2, limit));
+        .order("created_at", { ascending: false })
+        .limit(Math.max(limit, 1));
 
       if (error || !data) return [];
       const turns: ChatTurn[] = data
@@ -45,7 +46,7 @@ export function createSupabaseStateStore(
           role: r.role as "user" | "assistant",
           content: String(r.content ?? "").slice(0, 1200),
         }));
-      return turns.slice(-limit);
+      return turns.reverse();
     },
   };
 }

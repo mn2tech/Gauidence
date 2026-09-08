@@ -62,7 +62,7 @@ describe("Guardian Action Engine", () => {
     );
     assert.match(note, /PROPOSED DAILY LOG/i);
     assert.match(note, /Save to space/i);
-    assert.match(note, /\+ Add Daily Log/i);
+    assert.doesNotMatch(note, /\+ Add Daily Log/i);
   });
 
   it("builds thinking steps for search", () => {

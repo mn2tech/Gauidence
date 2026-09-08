@@ -11,6 +11,7 @@ import {
   emptyConversationState,
   extractEntitiesFromMessage,
   inferActiveGoal,
+  prepareGideonTurn,
   resolveReferences,
   runGideonTurn,
   summarizeConversation,
@@ -464,6 +465,65 @@ describe("resolveReferences — unit", () => {
     assert.match(r.resolvedMessage, /20%/);
     assert.match(r.resolvedMessage, /battery|island|previous/i);
     assert.match(r.resolvedMessage, /Do not search Spaces/i);
+  });
+
+  it("short reply 20% uses last_assistant_message when history is empty", () => {
+    const r = resolveReferences({
+      message: "20%",
+      activeEntities: [],
+      recentMessages: [],
+      lastAssistantMessage:
+        "If you tell me your current battery %, I can help you decide whether to skip the stop and go straight to the island.",
+    });
+    assert.equal(r.conversationContinuity, true);
+    assert.match(r.resolvedMessage, /20%/);
+    assert.match(r.resolvedMessage, /battery|island|previous/i);
+  });
+
+  it("prepareGideonTurn keeps continuity when state save fails", async () => {
+    const store = createMemoryStore();
+    store.save = async () => {
+      throw new Error("simulated save failure");
+    };
+    const prepared = await prepareGideonTurn({
+      userId: "u",
+      conversationId: "c",
+      message: "20%",
+      recentMessages: [
+        {
+          role: "assistant",
+          content:
+            "If you tell me your current battery %, I can help you decide whether to skip the stop and go straight to the island.",
+        },
+      ],
+      store,
+    });
+    assert.equal(prepared.fellBack, false);
+    assert.equal(prepared.context.preferConversationContinuity, true);
+    assert.match(prepared.context.resolvedMessage, /20%/);
+  });
+
+  it("prepareGideonTurn preserves short-reply continuity on load failure", async () => {
+    const store = createMemoryStore();
+    store.load = async () => {
+      throw new Error("simulated state load failure");
+    };
+    const prepared = await prepareGideonTurn({
+      userId: "u",
+      conversationId: "c",
+      message: "20%",
+      recentMessages: [
+        {
+          role: "assistant",
+          content:
+            "If you tell me your current battery %, I can help you decide whether to skip the stop and go straight to the island.",
+        },
+      ],
+      store,
+    });
+    assert.equal(prepared.fellBack, true);
+    assert.equal(prepared.context.preferConversationContinuity, true);
+    assert.match(prepared.context.resolvedMessage, /Do not search Spaces/i);
   });
 
   it("builds qualification query from org + solicitation", () => {

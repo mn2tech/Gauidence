@@ -36,6 +36,9 @@ export const ADD_ANYTHING_PATH = "/add";
 /** Daily memory capture — "Remember Today". */
 export const REMEMBER_TODAY_PATH = "/remember";
 
+/** History timeline (replaces Daily Log as primary historical experience). */
+export const HISTORY_PATH = "/history";
+
 export function documentsHref(profileId?: string | null): string {
   if (!profileId) return DOCUMENTS_PATH;
   return `${DOCUMENTS_PATH}#documents-${profileId}`;
@@ -71,10 +74,10 @@ export function vaultSwitchHref(
   return `/dashboard?${params.toString()}#documents-${profileId}`;
 }
 
+/** History is the primary destination; dashboard Daily Log panel remains available. */
 export function dailyLogHref(profileId?: string | null): string {
-  if (!profileId) return DOCUMENTS_PATH;
-  const q = new URLSearchParams({ docs: "1", profileId });
-  return `/dashboard?${q.toString()}#daily-log-${profileId}`;
+  if (!profileId) return HISTORY_PATH;
+  return `${HISTORY_PATH}?spaceId=${encodeURIComponent(profileId)}`;
 }
 
 export function conversationHref(profileId?: string | null): string {

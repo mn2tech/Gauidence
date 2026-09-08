@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   parseProposedDailyLog,
   proposedDailyLogSummary,
+  repairDailyLogCaptureAnswer,
   stripProposedDailyLogSection,
   wantsDailyLogCapture,
   isDailyLogConfirmationMessage,
@@ -24,6 +25,20 @@ describe("daily log capture propose helpers", () => {
     assert.equal(wantsDailyLogCapture("Remind me about registration"), false);
     assert.equal(wantsDailyLogCapture("What did I log yesterday?"), false);
     assert.equal(wantsDailyLogCapture("Upload this photo"), false);
+  });
+
+  it("treats confirmed after an unsaved schedule as capture", () => {
+    const history = [
+      {
+        role: "assistant" as const,
+        content: `Here's today's plan:
+- 9:00 Drop-off
+- 12:30 Lunch
+- 4:00 Island ferry`,
+      },
+    ];
+    assert.equal(wantsDailyLogCapture("confirmed", history), true);
+    assert.equal(isDailyLogConfirmationMessage("confirmed"), true);
   });
 
   it("does not re-trigger capture when affirming an existing proposal", () => {
@@ -51,6 +66,29 @@ log_date: 2026-08-06`,
     assert.equal(isDailyLogConfirmationMessage("Remember that"), false);
   });
 
+  it("repairs wrong Add Daily Log refusals into an in-chat proposal", () => {
+    const history = [
+      {
+        role: "assistant" as const,
+        content: `Today's schedule:
+9:00 coffee
+12:00 lunch
+4:00 ferry`,
+      },
+    ];
+    const refusal =
+      "I can only propose Daily Logs to you in this chat — I cannot actually create them in the app myself. Click the teal + Add Daily Log button and paste or type today's schedule.";
+    const repaired = repairDailyLogCaptureAnswer(refusal, {
+      history,
+      defaultLogDate: "2026-09-07",
+    });
+    assert.match(repaired, /PROPOSED DAILY LOG/i);
+    assert.match(repaired, /Save to space/i);
+    assert.match(repaired, /9:00 coffee/);
+    assert.doesNotMatch(repaired, /\+ Add Daily Log/i);
+    assert.doesNotMatch(repaired, /cannot actually create/i);
+  });
+
   it("parses a valid proposed daily log block", () => {
     const content = `Got it — I'll keep that on file.
 
@@ -73,7 +111,10 @@ content: Met with John about Q3 goals.
 He will send the deck Friday.
 log_date: 2026-08-03`;
     const proposal = parseProposedDailyLog(content, "2026-08-03");
-    assert.equal(proposal?.content, "Met with John about Q3 goals.\nHe will send the deck Friday.");
+    assert.equal(
+      proposal?.content,
+      "Met with John about Q3 goals.\nHe will send the deck Friday."
+    );
   });
 
   it("defaults log date when missing or invalid", () => {

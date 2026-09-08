@@ -14,6 +14,7 @@ import { inferActiveGoal } from "./inferActiveGoal";
 import { emptyConversationState } from "./loadConversationState";
 import { logRuntimeEvent } from "./log";
 import { resolveReferences } from "./resolveReferences";
+import { expandShortReplyFromHistory } from "./shortReplies";
 import { applyStatePatch } from "./updateConversationState";
 import type {
   ChatTurn,
@@ -29,6 +30,32 @@ export type PrepareTurnResult = {
   fellBack: boolean;
 };
 
+function continuityFallbackContext(args: {
+  message: string;
+  recentMessages: ChatTurn[];
+  lastAssistantMessage?: string | null;
+  currentSpaceId?: string | null;
+}): GideonRuntimeContext {
+  const shortExpanded = expandShortReplyFromHistory(
+    args.message,
+    args.recentMessages,
+    args.lastAssistantMessage
+  );
+  return {
+    userMessage: args.message,
+    resolvedMessage: shortExpanded ?? args.message,
+    activeGoal: null,
+    activeEntities: [],
+    conversationSummary: null,
+    recentMessages: args.recentMessages,
+    candidateSpaceIds: args.currentSpaceId ? [args.currentSpaceId] : [],
+    lastIntent: null,
+    needsClarification: false,
+    clarificationPrompt: null,
+    preferConversationContinuity: Boolean(shortExpanded),
+  };
+}
+
 export async function prepareGideonTurn(args: {
   userId: string;
   conversationId: string;
@@ -38,6 +65,7 @@ export async function prepareGideonTurn(args: {
   store: ConversationStateStore;
 }): Promise<PrepareTurnResult> {
   const { userId, conversationId, message, currentSpaceId, store } = args;
+  let recentMessages = args.recentMessages ?? [];
 
   try {
     let state =
@@ -49,25 +77,16 @@ export async function prepareGideonTurn(args: {
         conversation_id: conversationId,
       });
       return {
-        context: {
-          userMessage: message,
-          resolvedMessage: message,
-          activeGoal: null,
-          activeEntities: [],
-          conversationSummary: null,
-          recentMessages: args.recentMessages ?? [],
-          candidateSpaceIds: currentSpaceId ? [currentSpaceId] : [],
-          lastIntent: null,
-          needsClarification: false,
-          clarificationPrompt: null,
-          preferConversationContinuity: false,
-        },
+        context: continuityFallbackContext({
+          message,
+          recentMessages,
+          currentSpaceId,
+        }),
         state: emptyConversationState(userId, conversationId),
         fellBack: true,
       };
     }
 
-    let recentMessages = args.recentMessages ?? [];
     if (!recentMessages.length && store.loadRecentMessages) {
       recentMessages = await store.loadRecentMessages(
         userId,
@@ -102,13 +121,15 @@ export async function prepareGideonTurn(args: {
     const hadPriorContext =
       state.active_entities.length > 0 ||
       Boolean(state.active_goal) ||
-      recentMessages.length > 0;
+      recentMessages.length > 0 ||
+      Boolean(state.last_assistant_message);
 
     const intent = classifyRuntimeIntent(message, { hadPriorContext });
     const resolution = resolveReferences({
       message,
       activeEntities: state.active_entities,
       recentMessages,
+      lastAssistantMessage: state.last_assistant_message,
     });
 
     logRuntimeEvent("gideon_runtime_resolution", {
@@ -117,6 +138,7 @@ export async function prepareGideonTurn(args: {
       success: resolution.success,
       ambiguous: resolution.ambiguous,
       entity_count: state.active_entities.length,
+      continuity: Boolean(resolution.conversationContinuity),
     });
 
     const goal = inferActiveGoal({
@@ -136,8 +158,19 @@ export async function prepareGideonTurn(args: {
       nowIso
     );
 
-    // Persist mid-turn working state so reload keeps entities/goal even if LLM fails
-    await store.save(state);
+    // Persist mid-turn working state so reload keeps entities/goal even if LLM fails.
+    // Never discard a successful short-reply resolution if save fails.
+    try {
+      await store.save(state);
+    } catch (saveErr) {
+      logRuntimeEvent("gideon_runtime_state_save_soft_fail", {
+        conversation_id: conversationId,
+        reason:
+          saveErr instanceof Error
+            ? saveErr.message.slice(0, 120)
+            : "unknown",
+      });
+    }
 
     const context = buildRuntimeContext({
       userMessage: message,
@@ -154,20 +187,15 @@ export async function prepareGideonTurn(args: {
       conversation_id: conversationId,
       reason: err instanceof Error ? err.message.slice(0, 120) : "unknown",
     });
+    // Preserve short-reply continuity even when state load/save blew up.
     return {
-      context: {
-        userMessage: message,
-        resolvedMessage: message,
-        activeGoal: null,
-        activeEntities: [],
-        conversationSummary: null,
-        recentMessages: args.recentMessages ?? [],
-        candidateSpaceIds: currentSpaceId ? [currentSpaceId] : [],
-        lastIntent: null,
-        needsClarification: false,
-        clarificationPrompt: null,
-        preferConversationContinuity: false,
-      },
+      context: continuityFallbackContext({
+        message,
+        recentMessages: recentMessages.length
+          ? recentMessages
+          : (args.recentMessages ?? []),
+        currentSpaceId,
+      }),
       state: emptyConversationState(userId, conversationId),
       fellBack: true,
     };

@@ -25,6 +25,7 @@ export function spacesViewFromParam(
 export const COMMAND_CENTER_PATH = "/command-center";
 export const ADD_ANYTHING_PATH = "/add";
 export const REMEMBER_TODAY_PATH = "/remember";
+export const HISTORY_PATH = "/history";
 export const INBOX_PATH = "/inbox";
 
 /** Default signed-in landing page when simple home is enabled. */
