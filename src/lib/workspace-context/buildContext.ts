@@ -231,6 +231,7 @@ export async function loadWorkspaceContext(
     question: retrievalQuestion,
     accessibleProfiles: scopeCandidates,
     currentSearchProfileIds: searchProfileIds,
+    searchScope: meta.searchScope,
   });
 
   let effectiveSearchIds = searchProfileIds;

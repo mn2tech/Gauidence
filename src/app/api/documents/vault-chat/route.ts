@@ -1959,6 +1959,7 @@ export async function POST(request: Request) {
           active: { id: active.id, display_name: active.display_name },
           chatHomeProfileId,
           chatScopedProfileId,
+          searchScope: chatSearchScope,
           userMsg: hydrateVaultChatMessage(userMsg as ChatMessageRow),
           question,
           history,

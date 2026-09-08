@@ -45,21 +45,31 @@ export function shouldKeepChatOnActiveSpace(question: string): boolean {
 /**
  * Only pin Ask to another Space when the user named it — not when retrieval
  * merely ranked that Space's files highest under All spaces.
+ * When This home is locked (workspace scope), never auto-jump.
  */
 export function shouldPersistChatScopeToWriteVault(args: {
   question: string;
   writeVaultId: string;
   activeProfileId: string;
   accessibleProfiles: VaultScopeCandidate[];
+  /** Locked This home — do not pin the chat elsewhere. */
+  searchScope?: SearchScopeMode;
 }): boolean {
   if (args.writeVaultId === args.activeProfileId) return false;
+  if (args.searchScope === "workspace") return false;
   if (shouldKeepChatOnActiveSpace(args.question)) return false;
   const mentioned = detectMentionedVault({
     question: args.question,
     accessibleProfiles: args.accessibleProfiles,
     preferProfileId: args.activeProfileId,
   });
-  return Boolean(mentioned && mentioned.id === args.writeVaultId);
+  // Require an unambiguous full/compact name match — not a weak first token
+  // like "Wednesday" from "Wednesday Practice".
+  if (!mentioned || mentioned.id !== args.writeVaultId) return false;
+  return (
+    fullNameMentioned(args.question, mentioned.display_name) ||
+    compactNameMentionedInQuestion(args.question, mentioned.display_name)
+  );
 }
 
 /**
@@ -78,21 +88,29 @@ const WEAK_MENTION_TOKENS = new Set([
   "event",
   "for",
   "from",
+  "friday",
   "group",
   "home",
   "in",
+  "monday",
   "my",
   "new",
   "of",
   "on",
   "our",
+  "practice",
   "project",
   "roads",
+  "saturday",
   "space",
+  "sunday",
   "team",
   "the",
   "this",
+  "thursday",
   "to",
+  "tuesday",
+  "wednesday",
   "with",
   "workspace",
 ]);
@@ -391,17 +409,32 @@ export function resolveNamedSpaceOutsideSearch(args: {
   question: string;
   accessibleProfiles: VaultScopeCandidate[];
   currentSearchProfileIds: string[];
+  /** Locked This home — do not expand retrieval into another Space. */
+  searchScope?: SearchScopeMode;
 }): VaultScopeCandidate | null {
+  if (args.searchScope === "workspace") return null;
+
   const inSearch = new Set(
     args.currentSearchProfileIds.filter((id) => typeof id === "string" && id)
   );
   const outside = args.accessibleProfiles.filter((p) => !inSearch.has(p.id));
   if (outside.length === 0) return null;
 
-  return detectMentionedVault({
+  const mentioned = detectMentionedVault({
     question: args.question,
     accessibleProfiles: outside,
   });
+  if (!mentioned) return null;
+  // Same bar as chat pin: full/compact name only (not "Wednesday" alone).
+  if (
+    !(
+      fullNameMentioned(args.question, mentioned.display_name) ||
+      compactNameMentionedInQuestion(args.question, mentioned.display_name)
+    )
+  ) {
+    return null;
+  }
+  return mentioned;
 }
 
 /**
@@ -463,12 +496,25 @@ export function resolveGideonWriteVault(args: {
   activeProfileId: string;
   accessibleProfiles: VaultScopeCandidate[];
   retrievedChunks?: { profile_id?: string }[];
+  /** When locked to This home, never follow retrieval into another Space. */
+  searchScope?: SearchScopeMode;
 }): VaultScopeCandidate {
   const mentioned = detectMentionedVault({
     question: args.question,
     accessibleProfiles: args.accessibleProfiles,
     preferProfileId: args.activeProfileId,
   });
+  // Locked This home: ignore other-Space mentions and retrieval dominance.
+  if (args.searchScope === "workspace") {
+    const active =
+      args.accessibleProfiles.find((p) => p.id === args.activeProfileId) ?? null;
+    if (active) return active;
+    return {
+      id: args.activeProfileId,
+      display_name: "This vault",
+    };
+  }
+
   if (mentioned) return mentioned;
 
   // Inventory / "this space" questions stay on the active home even when All

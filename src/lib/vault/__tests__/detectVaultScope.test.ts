@@ -280,6 +280,25 @@ describe("resolveGideonWriteVault", () => {
       { id: "crossroads", display_name: "Crossroadsconnect" }
     );
   });
+
+  it("stays on locked Matthew space even when Wednesday Practice dominates", () => {
+    assert.deepEqual(
+      resolveGideonWriteVault({
+        question: "What songs are we practicing Wednesday?",
+        activeProfileId: "matthew",
+        searchScope: "workspace",
+        accessibleProfiles: [
+          { id: "matthew", display_name: "Matthew" },
+          { id: "wednesday", display_name: "Wednesday Practice" },
+        ],
+        retrievedChunks: [
+          { profile_id: "wednesday" },
+          { profile_id: "wednesday" },
+        ],
+      }),
+      { id: "matthew", display_name: "Matthew" }
+    );
+  });
 });
 
 describe("shouldPersistChatScopeToWriteVault", () => {
@@ -298,15 +317,47 @@ describe("shouldPersistChatScopeToWriteVault", () => {
     );
   });
 
-  it("pins chat when the user explicitly named another Space", () => {
+  it("does not pin from a weak day-name token like Wednesday", () => {
     assert.equal(
       shouldPersistChatScopeToWriteVault({
-        question: "What do we know about Belachew?",
-        writeVaultId: "belachew",
-        activeProfileId: "crossroads",
+        question: "What are we practicing Wednesday?",
+        writeVaultId: "wednesday",
+        activeProfileId: "matthew",
         accessibleProfiles: [
-          { id: "crossroads", display_name: "Crossroadsconnect" },
-          { id: "belachew", display_name: "Belachew" },
+          { id: "matthew", display_name: "Matthew" },
+          { id: "wednesday", display_name: "Wednesday Practice" },
+        ],
+      }),
+      false
+    );
+  });
+
+  it("does not pin when This home is locked", () => {
+    assert.equal(
+      shouldPersistChatScopeToWriteVault({
+        question: "Tell me about Wednesday Practice",
+        writeVaultId: "wednesday",
+        activeProfileId: "matthew",
+        searchScope: "workspace",
+        accessibleProfiles: [
+          { id: "matthew", display_name: "Matthew" },
+          { id: "wednesday", display_name: "Wednesday Practice" },
+        ],
+      }),
+      false
+    );
+  });
+
+  it("pins chat when the user explicitly named another Space (All spaces)", () => {
+    assert.equal(
+      shouldPersistChatScopeToWriteVault({
+        question: "What do we know about Wednesday Practice?",
+        writeVaultId: "wednesday",
+        activeProfileId: "matthew",
+        searchScope: "global",
+        accessibleProfiles: [
+          { id: "matthew", display_name: "Matthew" },
+          { id: "wednesday", display_name: "Wednesday Practice" },
         ],
       }),
       true

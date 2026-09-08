@@ -33,6 +33,8 @@ import {
   shouldPersistChatScopeToWriteVault,
   type VaultScopeCandidate,
 } from "@/lib/vault/detectVaultScope";
+import type { SearchScopeMode } from "@/lib/workspace-context/searchScope";
+import { DEFAULT_SEARCH_SCOPE } from "@/lib/workspace-context/searchScope";
 import type { AttachedVaultDocument } from "@/lib/vault/attachedDocument";
 import type { RetrievedChunk } from "@/lib/vault/retrieve";
 import {
@@ -65,6 +67,8 @@ export type VaultChatStreamArgs = {
   active: { id: string; display_name: string };
   chatHomeProfileId: string;
   chatScopedProfileId: string | null;
+  /** Ask search scope — workspace lock must not auto-jump Spaces. */
+  searchScope?: SearchScopeMode;
   userMsg: VaultChatStreamMessage;
   question: string;
   history: { role: "user" | "assistant"; content: string }[];
@@ -384,6 +388,7 @@ export function createVaultChatStreamResponse(
           }),
           accessibleProfiles: args.accessibleProfiles,
           retrievedChunks: args.chunks,
+          searchScope: args.searchScope ?? DEFAULT_SEARCH_SCOPE,
         });
         const responseVaultScope = buildVaultScopePayload({
           writeVault: resolvedWriteVault,
@@ -399,6 +404,7 @@ export function createVaultChatStreamResponse(
             writeVaultId: resolvedWriteVault.id,
             activeProfileId: args.active.id,
             accessibleProfiles: args.accessibleProfiles,
+            searchScope: args.searchScope ?? DEFAULT_SEARCH_SCOPE,
           });
         // Show a one-turn vault tip only when we actually pin the chat elsewhere.
         const scopedResponseVaultScope = persistChatScope
