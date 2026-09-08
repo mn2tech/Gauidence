@@ -41,19 +41,18 @@ describe("gideon welcome status", () => {
         ...businessStats,
         leadsNeedFollowUp: 0,
         proposalsAwaitingResponse: 0,
+        upcomingAlertsCount: 0,
         documentQuestions: [
           "What do we know about Kendall Capital?",
-          "What services are described?",
-          "What does this say about fees?",
+          "Summarize Form CRS",
+          "What does the cybersecurity policy require?",
         ],
       },
       statusUnavailable: false,
       profileId: "profile-1",
     });
 
-    assert.ok(
-      view.actions.some((a) => /What services are described/i.test(a.label))
-    );
+    assert.ok(view.actions.some((a) => /Summarize Form CRS/i.test(a.label)));
     assert.ok(
       !view.actions.some((a) =>
         /What do we know about Kendall Capital/i.test(a.label)
@@ -81,6 +80,32 @@ describe("gideon welcome status", () => {
 
     assert.ok(view.actions.some((a) => a.label === "What needs my attention?"));
     assert.ok(!view.actions.some((a) => /What do we know about/i.test(a.label)));
+  });
+
+  it("prefers leads and proposals over generic PDF theme chips", () => {
+    const view = buildGideonWelcomeView({
+      greetName: "Michael",
+      spaceName: "NM2TECH - Next Move",
+      isNewUser: false,
+      stats: {
+        ...businessStats,
+        leadsNeedFollowUp: 96,
+        proposalsAwaitingResponse: 3,
+        upcomingAlertsCount: 5,
+        documentQuestions: [
+          "What services are described?",
+          "What are the key terms?",
+        ],
+      },
+      statusUnavailable: false,
+      profileId: "profile-1",
+    });
+
+    assert.ok(view.actions.some((a) => a.label === "What needs my attention?"));
+    assert.ok(view.actions.some((a) => a.label === "Review leads"));
+    assert.ok(view.actions.some((a) => a.label === "Review proposals"));
+    assert.ok(!view.actions.some((a) => /services are described/i.test(a.label)));
+    assert.ok(!view.actions.some((a) => /key terms/i.test(a.label)));
   });
 
   it("shows empty-space messaging without zero-filled stats", () => {

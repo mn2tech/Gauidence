@@ -29,6 +29,10 @@ function askHref(question: string, profileId?: string): string {
   return `${ASK_GIDEON_PATH}?${params.toString()}`;
 }
 
+/** Generic PDF theme chips — weak on Ask welcome when real work is pending. */
+const GENERIC_DOC_THEME_QUESTION =
+  /^(what services are described|what does this say about fees|what conflicts are disclosed|what does this policy require|what are the key terms|what amounts are listed|what information is missing|what does the form crs cover)\??$/i;
+
 /** Drop chips that only echo the Space / brand name ("What do we know about X?"). */
 function actionableDocumentQuestions(
   questions: string[],
@@ -44,6 +48,7 @@ function actionableDocumentQuestions(
   return questions.filter((q) => {
     const text = q.trim();
     if (!text) return false;
+    if (GENERIC_DOC_THEME_QUESTION.test(text)) return false;
     if (!/^what do we know about\b/i.test(text)) return true;
     if (!space) return true;
     const about = text
@@ -56,6 +61,15 @@ function actionableDocumentQuestions(
     if (tokens.some((t) => t.toLowerCase() === aboutLower)) return false;
     return true;
   });
+}
+
+function hasPendingBusinessWork(stats: GideonWelcomeSpaceStats): boolean {
+  return (
+    stats.leadsNeedFollowUp > 0 ||
+    stats.proposalsAwaitingResponse > 0 ||
+    stats.upcomingAlertsCount > 0 ||
+    stats.openRequestCount > 0
+  );
 }
 
 function buildBusinessStatus(stats: GideonWelcomeSpaceStats): GideonWelcomeStatusItem[] {
@@ -171,7 +185,8 @@ function buildBusinessActions(
     stats.documentQuestions ?? [],
     spaceName
   );
-  if (docQuestions.length > 0) {
+  // When leads/proposals/alerts are pending, those beat vague PDF theme chips.
+  if (docQuestions.length > 0 && !hasPendingBusinessWork(stats)) {
     const actions = buildDocumentAskActions(docQuestions, profileId);
     actions.push({
       id: "ask",
@@ -190,15 +205,31 @@ function buildBusinessActions(
       label: "What needs my attention?",
       href: askHref("What currently needs my attention?", profileId),
     },
-    {
-      id: "leads",
-      label: stats.leadsNeedFollowUp > 0 ? "Review leads" : "Follow up on leads",
-      href: LEADS_PATH,
-    },
   ];
+
+  if (stats.leadsNeedFollowUp > 0) {
+    actions.push({
+      id: "leads",
+      label: "Review leads",
+      href: LEADS_PATH,
+    });
+  }
 
   if (stats.proposalsAwaitingResponse > 0) {
     actions.push({ id: "proposals", label: "Review proposals", href: PROPOSALS_PATH });
+  }
+
+  if (stats.upcomingAlertsCount > 0) {
+    actions.push({
+      id: "commitments",
+      label: "What's coming up?",
+      href: askHref("What upcoming commitments should I know about?", profileId),
+    });
+  }
+
+  // One specific doc chip is fine as a secondary option when work is pending.
+  if (docQuestions.length > 0 && actions.length < 3) {
+    actions.push(...buildDocumentAskActions(docQuestions.slice(0, 1), profileId));
   }
 
   actions.push(
