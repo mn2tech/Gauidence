@@ -87,6 +87,7 @@ export type VaultChatStreamEvent =
     }
   | { type: "thinking"; steps: string[]; activeIndex: number }
   | { type: "delta"; text: string }
+  | { type: "replace"; text: string }
   | VaultChatStreamDone
   | { type: "error"; error: string; code?: string };
 
@@ -114,6 +115,8 @@ export async function consumeVaultChatStream(
       event: Extract<VaultChatStreamEvent, { type: "thinking" }>
     ) => void;
     onDelta?: (text: string) => void;
+    /** Replace the full assistant draft (e.g. after Daily Log proposal repair). */
+    onReplace?: (text: string) => void;
     onDone?: (event: VaultChatStreamDone) => void;
     onError?: (error: string, code?: string) => void;
   }
@@ -144,6 +147,8 @@ export async function consumeVaultChatStream(
         handlers.onThinking?.(event);
       } else if (event.type === "delta") {
         handlers.onDelta?.(event.text);
+      } else if (event.type === "replace") {
+        handlers.onReplace?.(event.text);
       } else if (event.type === "done") {
         doneEvent = event;
         handlers.onDone?.(event);

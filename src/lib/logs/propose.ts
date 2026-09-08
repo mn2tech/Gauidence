@@ -10,7 +10,7 @@ export type ProposedDailyLog = {
 };
 
 const DAILY_LOG_CAPTURE_INTENT =
-  /\b(remember\s+(?:that|this|for\s+me)\b|log\s+this|add\s+(?:this|that|these|them|it)\s+to\s+(?:the\s+)?(?:\w+(?:'s)?\s+)?(?:vault|space)|save\s+(?:this|that|these|them|it|the\s+list)\b(?:\s+to\s+(?:the\s+)?(?:\w+(?:'s)?\s+)?(?:vault|space))?|add\s+to\s+(?:the\s+)?(?:\w+(?:'s)?\s+)?(?:vault|space)\b|note\s+that|write\s+(?:this|that|these|them)\s+down|jot\s+(?:this|that|these|them)\s+down|keep\s+(?:this|that|these|them)\s+in\s+mind|don'?t\s+forget\s+that|capture\s+this|store\s+(?:this|that|these|them|it)\b|make\s+(?:this|that|these|them|it)\s+permanent|make\s+(?:them|these)\s+permanent|put\s+(?:this|that|these|them|it)\s+in\s+(?:the\s+)?(?:vault|space)|(?:create|make|write|start|add)\s+(?:me\s+)?(?:a\s+)?(?:daily\s+)?log(?:\s+entry)?|new\s+(?:daily\s+)?log\s+entry|make\s+a\s+note(?:\s+that)?|save\s+(?:as|to)\s+(?:a\s+)?(?:daily\s+)?log)\b/i;
+  /\b(remember\s+(?:that|this|to|for\s+me)\b|don'?t\s+forget(?:\s+to|\s+that)?\b|log\s+this|add\s+(?:this|that|these|them|it)\s+to\s+(?:the\s+)?(?:\w+(?:'s)?\s+)?(?:vault|space)|save\s+(?:this|that|these|them|it|the\s+list)\b(?:\s+to\s+(?:the\s+)?(?:\w+(?:'s)?\s+)?(?:vault|space))?|add\s+to\s+(?:the\s+)?(?:\w+(?:'s)?\s+)?(?:vault|space)\b|note\s+(?:that|to\s+(?:self|me))\b|write\s+(?:this|that|these|them)\s+down|jot\s+(?:this|that|these|them)\s+down|keep\s+(?:this|that|these|them)\s+in\s+mind|capture\s+this|store\s+(?:this|that|these|them|it)\b|make\s+(?:this|that|these|them|it)\s+permanent|make\s+(?:them|these)\s+permanent|put\s+(?:this|that|these|them|it)\s+in\s+(?:the\s+)?(?:vault|space)|(?:create|make|write|start|add)\s+(?:me\s+)?(?:a\s+)?(?:daily\s+)?log(?:\s+entry)?|new\s+(?:daily\s+)?log\s+entry|make\s+a\s+note(?:\s+that)?|save\s+(?:as|to)\s+(?:a\s+)?(?:daily\s+)?log)\b/i;
 
 const SAVE_CHAT_CONTENT_FOLLOWUP =
   /\b(save|store|keep|add)\s+(?:this|that|it|these|them|the\s+list|what\s+you\s+(?:just\s+)?(?:said|listed|wrote))\b/i;
@@ -23,9 +23,6 @@ const DAILY_LOG_CONFIRM_ACK =
 
 const DAILY_LOG_SHORT_VAULT_CONFIRM =
   /^(?:please\s+)?(?:add|save|log|put)\s+(?:it|that|this)(?:\s+to\s+(?:the\s+)?(?:\w+(?:'s)?\s+)?vault)?\.?$/i;
-
-const WRONG_DAILY_LOG_UI =
-  /\b(\+?\s*Add Daily Log|Daily Log\s*[→\-–]\s*New Entry|open Daily Logs?|paste (?:or type|it) into|cannot actually create|don'?t have (?:the )?(?:permission|ability) to (?:write|create|save)|only \*?propose\*?.{0,80}cannot|no (?:technical )?permission to write)\b/i;
 
 /** Short affirmations after Gideon already proposed a Daily Log (user should use Save to vault). */
 export function isDailyLogConfirmationMessage(question: string): boolean {
@@ -237,9 +234,23 @@ function scrubWrongDailyLogUiCopy(text: string): string {
     .trim();
 }
 
+function titleFromCaptureQuestion(question: string | undefined): string {
+  if (!question?.trim()) return "Daily Log";
+  const cleaned = question
+    .trim()
+    .replace(
+      /^(please\s+)?(remember\s+(?:that|this|to|for\s+me)\s+|don'?t\s+forget(?:\s+to|\s+that)?\s+|note\s+(?:that|to\s+(?:self|me))\s+)/i,
+      ""
+    )
+    .replace(/[.!?]+$/, "")
+    .trim();
+  if (!cleaned) return "Daily Log";
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1).slice(0, 199);
+}
+
 /**
- * Repair model refusals that send users to the wrong Daily Log UI.
- * Ensures a ## PROPOSED DAILY LOG block exists when capture was requested.
+ * Ensure a ## PROPOSED DAILY LOG block exists whenever capture mode ran.
+ * Without the block, Save to space / Edit first never appear.
  */
 export function repairDailyLogCaptureAnswer(
   answer: string,
@@ -270,19 +281,16 @@ export function repairDailyLogCaptureAnswer(
     ].join("\n");
   }
 
-  if (!WRONG_DAILY_LOG_UI.test(answer) && !/cannot create Daily Logs?/i.test(answer)) {
-    return answer;
-  }
-
   const fromHistory = lastAssistantSavableContent(history);
   const cleaned = scrubWrongDailyLogUiCopy(answer);
+  const userQ = args.userQuestion?.trim() || "";
   const body =
+    userQ ||
     fromHistory ||
-    (cleaned.length >= 40 ? cleaned : null) ||
-    args.userQuestion?.trim() ||
+    (cleaned.length >= 12 ? cleaned : null) ||
     null;
 
-  if (!body || body.length < 8) {
+  if (!body || body.length < 3) {
     return [
       "I can save this from chat. Once I have the note content, tap **Save to space** under the proposal — no need to create it on another screen.",
       "",
@@ -290,11 +298,18 @@ export function repairDailyLogCaptureAnswer(
     ].join("\n");
   }
 
+  const title = titleFromCaptureQuestion(userQ) || "Daily Log";
+  const intro =
+    scrubWrongDailyLogUiCopy(answer).trim() ||
+    "Got it — tap **Save to space** under this message to log it.";
+
   return [
-    "Here's a Daily Log proposal from our chat. Tap **Save to space** under this message to create it.",
+    intro.includes("Save to space")
+      ? intro
+      : `${intro}\n\nTap **Save to space** under this message to create it.`,
     "",
     "## PROPOSED DAILY LOG",
-    "title: Daily Log",
+    `title: ${title.slice(0, 200)}`,
     "content:",
     body.slice(0, 8000),
     `log_date: ${logDate}`,

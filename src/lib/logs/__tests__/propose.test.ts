@@ -13,6 +13,8 @@ import { todayLogDate } from "../types.ts";
 describe("daily log capture propose helpers", () => {
   it("detects capture intent", () => {
     assert.equal(wantsDailyLogCapture("Remember that Emma has soccer Tuesday"), true);
+    assert.equal(wantsDailyLogCapture("remember to create a profile SBA"), true);
+    assert.equal(wantsDailyLogCapture("don't forget to call Jeff"), true);
     assert.equal(wantsDailyLogCapture("Add this to the vault: met with John"), true);
     assert.equal(wantsDailyLogCapture("Save this list"), true);
     assert.equal(wantsDailyLogCapture("Add these to Nolan's vault"), true);
@@ -64,6 +66,20 @@ log_date: 2026-08-06`,
     assert.equal(isDailyLogConfirmationMessage("yes save it"), true);
     assert.equal(isDailyLogConfirmationMessage("add it to the vault"), true);
     assert.equal(isDailyLogConfirmationMessage("Remember that"), false);
+  });
+
+  it("repairs missing proposal when model mentions Save to space without a block", () => {
+    const answer =
+      "Got it — I'll note this as a to-do. Tap **Save to space** under the proposal below, and it'll be logged in your space.";
+    const repaired = repairDailyLogCaptureAnswer(answer, {
+      userQuestion: "remember to create a profile SBA",
+      defaultLogDate: "2026-09-07",
+    });
+    const proposal = parseProposedDailyLog(repaired, "2026-09-07");
+    assert.ok(proposal);
+    assert.match(proposal!.content, /create a profile SBA/i);
+    assert.match(proposal!.title ?? "", /create a profile SBA/i);
+    assert.match(repaired, /PROPOSED DAILY LOG/i);
   });
 
   it("repairs wrong Add Daily Log refusals into an in-chat proposal", () => {

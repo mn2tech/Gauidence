@@ -268,6 +268,8 @@ export function createVaultChatStreamResponse(
             userQuestion: args.originalUserQuestion ?? args.question,
           });
           if (repaired !== answer) {
+            // Replace streamed text so Save to space appears immediately.
+            write({ type: "replace", text: repaired });
             answer = repaired;
           }
         }

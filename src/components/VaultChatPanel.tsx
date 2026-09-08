@@ -3121,6 +3121,15 @@ export default function VaultChatPanel({
               )
             );
           },
+          onReplace: (text) => {
+            setThinkingSteps([]);
+            setThinkingActiveIndex(0);
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === streamId ? { ...m, content: text } : m
+              )
+            );
+          },
           onDone: (event) => {
             applyVaultChatTurn(event);
             setStreamingAssistantId(null);
