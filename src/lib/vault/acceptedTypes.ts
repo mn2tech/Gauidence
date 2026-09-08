@@ -9,15 +9,18 @@ export const VAULT_ACCEPTED_TYPES: Record<string, string> = {
   "text/csv": "CSV",
   "application/csv": "CSV",
   "application/json": "JSON",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+    "Word",
 };
 
 export const VAULT_UNSUPPORTED_TYPE_MESSAGE =
-  "That file type isn't supported. Upload a PDF, JPG, PNG, WebP, HEIC, CSV, JSON, or paste text.";
+  "That file type isn't supported. Upload a PDF, Word (DOCX), JPG, PNG, WebP, HEIC, CSV, JSON, or paste text.";
 
 /** File-picker accept string: MIME types plus extensions for Windows/empty-type files. */
 export const VAULT_FILE_ACCEPT = [
   ...Object.keys(VAULT_ACCEPTED_TYPES),
   ".pdf",
+  ".docx",
   ".jpg",
   ".jpeg",
   ".png",
@@ -33,6 +36,13 @@ export function resolveVaultFileMimeType(file: {
   type: string;
   name: string;
 }): string {
+  const lower = file.name.toLowerCase();
+  // Prefer extension for types browsers/OS often mislabel.
+  if (lower.endsWith(".csv")) return "text/csv";
+  if (lower.endsWith(".docx")) {
+    return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  }
+
   const direct = file.type?.trim();
   if (direct && VAULT_ACCEPTED_TYPES[direct]) {
     // Normalize alternate CSV MIME to text/csv for storage + analysis.
@@ -40,9 +50,7 @@ export function resolveVaultFileMimeType(file: {
     return direct;
   }
 
-  const lower = file.name.toLowerCase();
   if (lower.endsWith(".txt")) return "text/plain";
-  if (lower.endsWith(".csv")) return "text/csv";
   if (lower.endsWith(".json")) return "application/json";
   if (lower.endsWith(".pdf")) return "application/pdf";
   if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";

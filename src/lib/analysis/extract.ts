@@ -1,5 +1,6 @@
 import "server-only";
 
+import mammoth from "mammoth";
 import {
   extractText,
   extractTextItems,
@@ -20,6 +21,7 @@ export type ExtractionMethod =
   | "native_pdf"
   | "native_pdf_layout"
   | "native_text"
+  | "native_docx"
   | "vision_ocr"
   | "image_fallback"
   | "none";
@@ -175,6 +177,50 @@ export async function extractDocumentText(args: {
 }): Promise<ExtractionResult> {
   const isJson = isJsonMimeOrName(args.mimeType, args.fileName);
   const isCsv = isCsvMimeOrName(args.mimeType, args.fileName);
+  const isDocx =
+    args.mimeType ===
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    /\.docx$/i.test(args.fileName);
+
+  if (isDocx) {
+    try {
+      const buffer = Buffer.from(args.base64, "base64");
+      const result = await mammoth.extractRawText({ buffer });
+      const text = result.value.replace(/\r\n/g, "\n").trim();
+      const report = assessExtractionQuality(text);
+      return {
+        text,
+        tablesText: "",
+        method: "native_docx",
+        quality: Math.max(report.score, text.length >= 40 ? 0.85 : report.score),
+        pageCount: 1,
+        charCount: text.length,
+        issues: report.issues,
+        estimatedLineRows: report.estimatedLineRows,
+        pageImages: [],
+        nativeTextPreview: previewText(text || "[empty Word document]", 800),
+        reason:
+          text.length === 0
+            ? "Word document had no extractable text."
+            : "Word (DOCX) file; using native text for analysis.",
+      };
+    } catch {
+      return {
+        text: "",
+        tablesText: "",
+        method: "none",
+        quality: 0,
+        pageCount: null,
+        charCount: 0,
+        issues: ["docx_parse_failed"],
+        estimatedLineRows: 0,
+        pageImages: [],
+        nativeTextPreview: "",
+        reason: "Failed to parse Word (DOCX) file.",
+      };
+    }
+  }
+
   if (
     args.mimeType === "text/plain" ||
     args.mimeType === "text/markdown" ||

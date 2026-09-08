@@ -19,6 +19,20 @@ describe("vault accepted types", () => {
     assert.match(VAULT_FILE_ACCEPT, /text\/csv/);
   });
 
+  it("includes Word DOCX", () => {
+    assert.equal(
+      VAULT_ACCEPTED_TYPES[
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      ],
+      "Word"
+    );
+    assert.match(VAULT_FILE_ACCEPT, /\.docx/);
+    assert.match(
+      VAULT_FILE_ACCEPT,
+      /application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document/
+    );
+  });
+
   it("resolves JSON from MIME or extension", () => {
     assert.equal(
       resolveVaultFileMimeType({
@@ -53,6 +67,27 @@ describe("vault accepted types", () => {
         name: "rows.csv",
       }),
       "text/csv"
+    );
+  });
+
+  it("resolves DOCX from MIME or extension", () => {
+    assert.equal(
+      resolveVaultFileMimeType({
+        type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        name: "notes.docx",
+      }),
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    );
+    assert.equal(
+      resolveVaultFileMimeType({ type: "", name: "contract.DOCX" }),
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    );
+    assert.equal(
+      resolveVaultFileMimeType({
+        type: "application/octet-stream",
+        name: "letter.docx",
+      }),
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     );
   });
 
