@@ -39,6 +39,9 @@ export const REMEMBER_TODAY_PATH = "/remember";
 /** History timeline (replaces Daily Log as primary historical experience). */
 export const HISTORY_PATH = "/history";
 
+/** My World — contexts over Spaces (open actions, deadlines, recent activity). */
+export const WORLD_PATH = "/world";
+
 export function documentsHref(profileId?: string | null): string {
   if (!profileId) return DOCUMENTS_PATH;
   return `${DOCUMENTS_PATH}#documents-${profileId}`;

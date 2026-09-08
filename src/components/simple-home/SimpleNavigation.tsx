@@ -4,12 +4,13 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { History, LayoutGrid, MessageCircle } from "lucide-react";
 import GuardianIcon from "@/components/brand/GuardianIcon";
-import { SPACES_NAV_LABEL } from "@/lib/profiles/types";
+import { MY_WORLD_NAV_LABEL } from "@/lib/profiles/containerLabels";
 import {
   ASK_GIDEON_PATH,
   HISTORY_PATH,
   SIMPLE_HOME_PATH,
   VAULTS_PATH,
+  WORLD_PATH,
 } from "@/lib/simple-home/routing";
 
 function isPathActive(pathname: string, href: string, exact: boolean) {
@@ -26,7 +27,8 @@ export default function SimpleNavigation() {
     isPathActive(pathname, HISTORY_PATH, false) ||
     pathname === "/daily-log" ||
     pathname === "/remember";
-  const spacesActive =
+  const worldActive =
+    isPathActive(pathname, WORLD_PATH, false) ||
     pathname === VAULTS_PATH ||
     pathname.startsWith(`${VAULTS_PATH}/`) ||
     (pathname === "/dashboard" && searchParams.has("docs"));
@@ -81,19 +83,21 @@ export default function SimpleNavigation() {
           <span className="truncate text-[10px] font-semibold">History</span>
         </Link>
         <Link
-          href={VAULTS_PATH}
+          href={WORLD_PATH}
           className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-0.5 transition ${
-            spacesActive ? "text-brand" : "text-ink-muted hover:text-foreground"
+            worldActive ? "text-brand" : "text-ink-muted hover:text-foreground"
           }`}
         >
           <span
             className={`flex h-8 w-12 items-center justify-center rounded-2xl transition sm:w-14 ${
-              spacesActive ? "bg-brand-light" : ""
+              worldActive ? "bg-brand-light" : ""
             }`}
           >
             <LayoutGrid className="h-5 w-5" aria-hidden />
           </span>
-          <span className="truncate text-[10px] font-semibold">{SPACES_NAV_LABEL}</span>
+          <span className="truncate text-[10px] font-semibold">
+            {MY_WORLD_NAV_LABEL}
+          </span>
         </Link>
       </div>
     </nav>

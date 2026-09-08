@@ -33,6 +33,9 @@ export function getContainerLabelPlural(
 /** Primary nav label when a user may have both Spaces and Workspaces. */
 export const SPACES_NAV_LABEL = "Spaces";
 
+/** Primary nav label for My World (Phase 4+). */
+export const MY_WORLD_NAV_LABEL = "My World";
+
 /** Mixed list heading (home, settings). */
 export const SPACES_AND_WORKSPACES_LABEL = "Spaces & Workspaces";
 

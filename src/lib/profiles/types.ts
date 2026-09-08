@@ -1023,6 +1023,7 @@ export {
   spaceMapTitle,
   SPACES_AND_WORKSPACES_LABEL,
   SPACES_NAV_LABEL,
+  MY_WORLD_NAV_LABEL,
   SPACE_CREATE_OPTIONS,
   vaultLabel,
 } from "./containerLabels";

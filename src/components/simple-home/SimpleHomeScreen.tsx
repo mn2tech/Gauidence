@@ -24,7 +24,7 @@ import {
 } from "@/components/guardian-today/GuardianTodaySections";
 import { GuardianSourcePanel } from "@/hooks/useGuardianWatchHome";
 import { formatActivityWhen } from "@/lib/simple-home/helpers";
-import { VAULTS_PATH } from "@/lib/simple-home/routing";
+import { WORLD_PATH } from "@/lib/simple-home/routing";
 import { documentsHref } from "@/lib/routes";
 import type { GuardianIntelligenceItem } from "@/lib/guardian-today/types";
 import { getContainerLabel, topLevelProfiles } from "@/lib/profiles/types";
@@ -331,7 +331,7 @@ export default function SimpleHomeScreen() {
 
       <GuardianWhatChanged entries={today.data.whatChanged} />
 
-      <Section title="Your Spaces">
+      <Section title="My World">
         <ul className="space-y-1">
           {topLevelSpaces.slice(0, 5).map((space) => (
             <li key={space.id}>
@@ -359,10 +359,10 @@ export default function SimpleHomeScreen() {
         </ul>
         <div className="mt-3 flex flex-wrap gap-2">
           <Link
-            href={VAULTS_PATH}
+            href={WORLD_PATH}
             className="text-xs font-semibold text-brand hover:text-brand-dark"
           >
-            View all Spaces
+            Open My World
           </Link>
           <button
             type="button"
