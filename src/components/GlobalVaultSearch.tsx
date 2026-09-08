@@ -12,9 +12,9 @@ import {
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
-  Clock,
   FileText,
   Loader2,
+  Lock,
   MessageCircle,
   NotebookPen,
   Search,
@@ -266,7 +266,7 @@ export default function GlobalVaultSearch({
               }`}
             >
               {mode === "workspace" ? (
-                <Clock className="h-3 w-3 shrink-0 opacity-90" aria-hidden />
+                <Lock className="h-3 w-3 shrink-0 opacity-90" aria-hidden />
               ) : null}
               {searchScopeLabel(mode)}
             </button>

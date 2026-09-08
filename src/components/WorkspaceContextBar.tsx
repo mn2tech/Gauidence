@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, ChevronDown, Clock, Search } from "lucide-react";
+import { ArrowLeft, ChevronDown, Lock, Search } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import ProfileAvatar from "@/components/ProfileAvatar";
 import type { WorkingInDisplay } from "@/lib/workspace-context/client";
@@ -203,7 +203,7 @@ export default function WorkspaceContextBar({
                 }`}
               >
                 {mode === "workspace" ? (
-                  <Clock className="h-3 w-3 shrink-0 opacity-90" aria-hidden />
+                  <Lock className="h-3 w-3 shrink-0 opacity-90" aria-hidden />
                 ) : null}
                 {mode === "global" ? "All spaces" : "This home"}
               </button>
