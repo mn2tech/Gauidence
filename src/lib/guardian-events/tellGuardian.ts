@@ -1,9 +1,10 @@
 /**
  * Derive guardian_events from free-form "Tell Guardian" text (no LLM).
  * Space is optional — leave null when classification is uncertain.
+ * Same text is idempotent (stable content dedupe keys — no timestamps).
  */
 
-import { buildGuardianEventDedupeKey } from "./dedupe";
+import { tellGuardianDedupeKey } from "./dedupe";
 import type { CreateGuardianEventInput, GuardianEventType } from "./types";
 
 export type TellGuardianDeriveArgs = {
@@ -38,9 +39,15 @@ function looksLikeDecision(text: string): boolean {
   );
 }
 
+function pickPrimaryType(text: string): GuardianEventType {
+  if (looksLikeDecision(text)) return "decision";
+  if (looksLikeMeeting(text)) return "meeting";
+  return "note";
+}
+
 /**
- * Build one or more event create payloads from Tell Guardian text.
- * Always includes a primary note; may add meeting / follow_up / decision.
+ * Build create payloads from Tell Guardian text.
+ * At most one primary card + optional distinct follow-up (never note+meeting twins).
  */
 export function deriveEventsFromTellGuardian(
   args: TellGuardianDeriveArgs
@@ -55,21 +62,17 @@ export function deriveEventsFromTellGuardian(
   const confidence =
     spaceId == null ? null : (args.confidenceScore ?? 0.7);
 
-  const stamp = `${now.getTime()}`;
+  const primaryType = pickPrimaryType(text);
   const primary: CreateGuardianEventInput = {
     userId: args.userId,
     spaceId,
-    eventType: "note",
+    eventType: primaryType,
     title,
     summary: text.slice(0, 8000),
     occurredAt,
     sourceType: "tell_guardian",
     sourceId: null,
-    dedupeKey: buildGuardianEventDedupeKey({
-      eventType: "note",
-      title,
-      fragment: stamp,
-    }),
+    dedupeKey: tellGuardianDedupeKey({ eventType: primaryType, text }),
     importanceScore: 0.55,
     actionRequired: false,
     status: "open",
@@ -78,29 +81,30 @@ export function deriveEventsFromTellGuardian(
     confidenceScore: confidence,
   };
 
-  const extras: CreateGuardianEventInput[] = [];
+  const out: CreateGuardianEventInput[] = [primary];
 
-  const pushExtra = (
-    eventType: GuardianEventType,
-    extraTitle: string,
-    actionRequired: boolean
-  ) => {
-    extras.push({
+  if (looksLikeFollowUp(text)) {
+    const followTitleRaw =
+      /\bsend\b.{0,40}\b(demo|proposal|info|document|email)\b/i.exec(text)?.[0] ??
+      "Follow up";
+    const followTitle = followTitleRaw
+      .replace(/^./, (c) => c.toUpperCase())
+      .slice(0, 300);
+    out.push({
       userId: args.userId,
       spaceId,
-      eventType,
-      title: extraTitle.slice(0, 300),
+      eventType: "follow_up",
+      title: followTitle,
       summary: text.slice(0, 8000),
       occurredAt,
       sourceType: "tell_guardian",
       sourceId: null,
-      dedupeKey: buildGuardianEventDedupeKey({
-        eventType,
-        title: extraTitle,
-        fragment: stamp,
+      dedupeKey: tellGuardianDedupeKey({
+        eventType: "follow_up",
+        text,
       }),
-      importanceScore: actionRequired ? 0.75 : 0.6,
-      actionRequired,
+      importanceScore: 0.75,
+      actionRequired: true,
       status: "open",
       metadata: {
         source_label: "Manual note",
@@ -109,41 +113,9 @@ export function deriveEventsFromTellGuardian(
       createdBy: "user",
       confidenceScore: confidence,
     });
-  };
-
-  if (looksLikeMeeting(text)) {
-    pushExtra("meeting", title, false);
-  }
-  if (looksLikeFollowUp(text)) {
-    const followTitle =
-      /\bsend\b.{0,40}\b(demo|proposal|info|document|email)\b/i.exec(text)?.[0] ??
-      "Follow up";
-    pushExtra(
-      "follow_up",
-      followTitle.replace(/^./, (c) => c.toUpperCase()).slice(0, 300),
-      true
-    );
-  }
-  if (looksLikeDecision(text)) {
-    pushExtra("decision", title, false);
   }
 
-  // Avoid duplicate meeting when primary is already meeting-like and only one intent
-  if (extras.length === 1 && extras[0]!.eventType === "meeting") {
-    return [
-      {
-        ...primary,
-        eventType: "meeting",
-        dedupeKey: buildGuardianEventDedupeKey({
-          eventType: "meeting",
-          title,
-          fragment: stamp,
-        }),
-      },
-    ];
-  }
-
-  return [primary, ...extras];
+  return out;
 }
 
 /** Suggest a space id when the note mentions a profile display name. */

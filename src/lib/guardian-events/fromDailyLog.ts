@@ -9,8 +9,8 @@ import {
   type ExtractedDailyLogEvent,
 } from "@/lib/guardian-items/fromDailyLog";
 import {
-  buildGuardianEventDedupeKey,
   dailyLogEntryDedupeKey,
+  dailyLogFragmentDedupeKey,
 } from "./dedupe";
 import type {
   CreateGuardianEventInput,
@@ -97,7 +97,7 @@ export function deriveGuardianEventsFromDailyLog(args: {
   };
 
   const extracted = extractEventsFromDailyLog(log);
-  const fragments: CreateGuardianEventInput[] = extracted.map((item, index) => {
+  const fragments: CreateGuardianEventInput[] = extracted.map((item) => {
     const eventType = mapItemTypeToEventType(item);
     return {
       userId,
@@ -108,10 +108,10 @@ export function deriveGuardianEventsFromDailyLog(args: {
       occurredAt: `${item.eventDate}T12:00:00.000Z`,
       sourceType: "daily_log",
       sourceId: log.id,
-      dedupeKey: buildGuardianEventDedupeKey({
+      dedupeKey: dailyLogFragmentDedupeKey({
         eventType,
         title: item.title,
-        fragment: `${index}:${item.eventDate}`,
+        eventDate: item.eventDate,
       }),
       importanceScore: item.requiresAction ? 0.75 : 0.6,
       actionRequired: item.requiresAction,

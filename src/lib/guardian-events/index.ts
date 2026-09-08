@@ -34,6 +34,10 @@ export {
 export {
   buildGuardianEventDedupeKey,
   dailyLogEntryDedupeKey,
+  dailyLogFragmentDedupeKey,
+  hashNormalizedText,
+  normalizeEventText,
+  tellGuardianDedupeKey,
 } from "./dedupe";
 
 export {

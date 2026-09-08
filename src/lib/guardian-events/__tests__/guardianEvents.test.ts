@@ -15,6 +15,7 @@ import {
   getGuardianEventSourceRef,
   groupGuardianEventsByDate,
   sortGuardianEventsByOccurredAt,
+  tellGuardianDedupeKey,
 } from "../index.ts";
 import type { GuardianEvent } from "../types.ts";
 
@@ -359,6 +360,17 @@ describe("guardian_events dedupe + provenance helpers", () => {
       "meeting:met clark"
     );
     assert.match(dailyLogEntryDedupeKey(), /^daily_log_entry:/);
+    assert.match(
+      tellGuardianDedupeKey({
+        eventType: "note",
+        text: "Hello world",
+      }),
+      /^tell:note:/
+    );
+    assert.equal(
+      tellGuardianDedupeKey({ eventType: "note", text: "Hello world" }),
+      tellGuardianDedupeKey({ eventType: "note", text: "  hello   world  " })
+    );
   });
 
   it("formats source labels for documents and manual notes", () => {

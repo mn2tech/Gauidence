@@ -100,13 +100,13 @@ export function createMemoryGuardianEventStore(
           })
         : null);
 
-    if (sourceId && dedupeKey) {
+    if (dedupeKey) {
       for (const row of rows.values()) {
         if (
           row.user_id === input.userId &&
           row.source_type === sourceType &&
-          row.source_id === sourceId &&
-          row.dedupe_key === dedupeKey
+          row.dedupe_key === dedupeKey &&
+          row.source_id === sourceId
         ) {
           return { ok: true, data: row, created: false };
         }

@@ -154,7 +154,8 @@ export async function POST(request: Request) {
     confidenceScore: confidence,
   });
 
-  const created = [];
+  const events = [];
+  let anyCreated = false;
   for (const input of inputs) {
     const result = await createGuardianEvent(supabase, input);
     if (!result.ok) {
@@ -163,15 +164,17 @@ export async function POST(request: Request) {
         { status: result.status }
       );
     }
-    created.push(result.data);
+    if (!result.deduped) anyCreated = true;
+    events.push(result.data);
   }
 
   return NextResponse.json(
     {
-      events: created,
+      events,
       spaceId,
       spaceSuggested: Boolean(spaceId && !explicitSpaceId),
+      deduped: !anyCreated,
     },
-    { status: 201 }
+    { status: anyCreated ? 201 : 200 }
   );
 }

@@ -95,6 +95,7 @@ export default function HistoryScreen() {
   const [telling, setTelling] = useState(false);
   const [tellError, setTellError] = useState<string | null>(null);
   const [tellSaved, setTellSaved] = useState(false);
+  const [tellAlreadyHad, setTellAlreadyHad] = useState(false);
 
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detail, setDetail] = useState<DetailResponse | null>(null);
@@ -140,11 +141,15 @@ export default function HistoryScreen() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: trimmed }),
       });
-      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        deduped?: boolean;
+      };
       if (!res.ok) {
         setTellError(body.error ?? "Couldn't save that.");
         return;
       }
+      setTellAlreadyHad(Boolean(body.deduped));
       setTellSaved(true);
       setTellText("");
       await load(filter);
@@ -218,6 +223,7 @@ export default function HistoryScreen() {
           onClick={() => {
             setTellOpen(true);
             setTellSaved(false);
+            setTellAlreadyHad(false);
             setTellError(null);
           }}
           className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-brand px-3.5 py-2 text-sm font-semibold text-white hover:bg-brand-dark"
@@ -264,7 +270,12 @@ export default function HistoryScreen() {
           </p>
           <button
             type="button"
-            onClick={() => setTellOpen(true)}
+            onClick={() => {
+              setTellOpen(true);
+              setTellSaved(false);
+              setTellAlreadyHad(false);
+              setTellError(null);
+            }}
             className="rounded-xl bg-brand px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark"
           >
             Tell Guardian something
@@ -334,10 +345,16 @@ export default function HistoryScreen() {
               <div className="space-y-4">
                 <div className="flex items-center gap-2 text-emerald-700">
                   <Check className="h-5 w-5" />
-                  <p className="font-semibold">Guardian remembered that</p>
+                  <p className="font-semibold">
+                    {tellAlreadyHad
+                      ? "Guardian already has that"
+                      : "Guardian remembered that"}
+                  </p>
                 </div>
                 <p className="text-sm text-ink-muted">
-                  It&apos;s in your History. You can ask Gideon about it anytime.
+                  {tellAlreadyHad
+                    ? "Same note wasn't added again. It's already in your History."
+                    : "It's in your History. You can ask Gideon about it anytime."}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <Link
@@ -350,6 +367,7 @@ export default function HistoryScreen() {
                     type="button"
                     onClick={() => {
                       setTellSaved(false);
+                      setTellAlreadyHad(false);
                       setTellOpen(false);
                     }}
                     className="rounded-xl border border-stone-200 px-4 py-2 text-sm font-semibold hover:bg-stone-50"

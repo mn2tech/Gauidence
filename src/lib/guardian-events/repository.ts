@@ -32,7 +32,7 @@ const EVENT_SELECT = `
 `;
 
 export type GuardianEventResult<T> =
-  | { ok: true; data: T }
+  | { ok: true; data: T; deduped?: boolean }
   | { ok: false; error: string; status: number };
 
 function asMetadata(raw: unknown): GuardianEventMetadata {
@@ -138,18 +138,26 @@ export async function createGuardianEvent(
     confidence_score: input.confidenceScore ?? null,
   };
 
-  // Idempotent create when source + dedupe provided
-  if (row.source_id && row.dedupe_key) {
-    const { data: existing } = await supabase
+  // Idempotent create when dedupe_key is provided (sourced or Tell Guardian).
+  if (row.dedupe_key) {
+    let existingQuery = supabase
       .from("guardian_events")
       .select(EVENT_SELECT)
       .eq("user_id", input.userId)
       .eq("source_type", row.source_type)
-      .eq("source_id", row.source_id)
-      .eq("dedupe_key", row.dedupe_key)
-      .maybeSingle();
+      .eq("dedupe_key", row.dedupe_key);
+    if (row.source_id) {
+      existingQuery = existingQuery.eq("source_id", row.source_id);
+    } else {
+      existingQuery = existingQuery.is("source_id", null);
+    }
+    const { data: existing } = await existingQuery.maybeSingle();
     if (existing) {
-      return { ok: true, data: rowToGuardianEvent(existing as Record<string, unknown>) };
+      return {
+        ok: true,
+        data: rowToGuardianEvent(existing as Record<string, unknown>),
+        deduped: true,
+      };
     }
   }
 
@@ -161,19 +169,24 @@ export async function createGuardianEvent(
 
   if (error) {
     // Unique race: treat as idempotent hit
-    if (/duplicate|unique/i.test(error.message) && row.source_id && row.dedupe_key) {
-      const { data: raced } = await supabase
+    if (/duplicate|unique/i.test(error.message) && row.dedupe_key) {
+      let racedQuery = supabase
         .from("guardian_events")
         .select(EVENT_SELECT)
         .eq("user_id", input.userId)
         .eq("source_type", row.source_type)
-        .eq("source_id", row.source_id)
-        .eq("dedupe_key", row.dedupe_key)
-        .maybeSingle();
+        .eq("dedupe_key", row.dedupe_key);
+      if (row.source_id) {
+        racedQuery = racedQuery.eq("source_id", row.source_id);
+      } else {
+        racedQuery = racedQuery.is("source_id", null);
+      }
+      const { data: raced } = await racedQuery.maybeSingle();
       if (raced) {
         return {
           ok: true,
           data: rowToGuardianEvent(raced as Record<string, unknown>),
+          deduped: true,
         };
       }
     }

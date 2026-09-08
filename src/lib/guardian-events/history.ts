@@ -47,6 +47,15 @@ export function eventMatchesHistoryFilter(
   filter: HistoryFilter,
   spaceMeta?: Map<string, { profile_type?: string | null }>
 ): boolean {
+  const meta = event.metadata ?? {};
+  const isDerived =
+    meta.extracted_from_daily_log === true ||
+    meta.derived_from_tell_guardian === true;
+
+  // Default History timeline: one card per source note (hide extracted twins).
+  // Typed filters still surface follow-ups / meetings / insights.
+  if (filter === "all" && isDerived) return false;
+
   if (filter === "all") return true;
   if (filter === "meetings") return MEETING_TYPES.includes(event.event_type);
   if (filter === "decisions") return DECISION_TYPES.includes(event.event_type);
@@ -55,9 +64,10 @@ export function eventMatchesHistoryFilter(
   if (filter === "insights") return INSIGHT_TYPES.includes(event.event_type);
 
   if (filter === "personal" || filter === "business") {
+    if (isDerived) return false;
     if (!event.space_id) return filter === "personal";
-    const meta = spaceMeta?.get(event.space_id);
-    const type = meta?.profile_type ?? "";
+    const space = spaceMeta?.get(event.space_id);
+    const type = space?.profile_type ?? "";
     if (filter === "business") {
       return /business|client|employee|nonprofit|organization/i.test(type);
     }
