@@ -6,7 +6,7 @@
 import type { ChatTurn } from "./types";
 
 const SHORT_AFFIRM =
-  /^(yes|yeah|yep|yup|no|nope|nah|ok|okay|sure|thanks|thank you|please|go ahead|do it)[.!]?$/i;
+  /^(yes|yeah|yep|yup|no|nope|nah|ok|okay|sure|thanks|thank you|please|go ahead|do it)([.!]| please| thanks)?$/i;
 
 const SHORT_METRIC =
   /^(about |around |roughly |approx(?:imately)? )?\$?\d+(\.\d+)?\s*(%|percent|minutes?|mins?|hours?|hrs?|days?|miles?|km|mph)?\.?$/i;

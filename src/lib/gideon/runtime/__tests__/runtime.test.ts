@@ -467,6 +467,24 @@ describe("resolveReferences — unit", () => {
     assert.match(r.resolvedMessage, /Do not search Spaces/i);
   });
 
+  it("yes please continues a Daily Log offer without becoming an inventory query", () => {
+    const history = [
+      {
+        role: "assistant" as const,
+        content:
+          "Ready to Create a Daily Log? I can set up a Matthew's Tutoring Progress Tracker. This keeps everything in one place. Should I create that log now?",
+      },
+    ];
+    const r = resolveReferences({
+      message: "yes please",
+      activeEntities: [],
+      recentMessages: history,
+    });
+    assert.equal(r.conversationContinuity, true);
+    assert.match(r.resolvedMessage, /yes please/i);
+    assert.match(r.resolvedMessage, /Daily Log|Tutoring Progress/i);
+  });
+
   it("short reply 20% uses last_assistant_message when history is empty", () => {
     const r = resolveReferences({
       message: "20%",

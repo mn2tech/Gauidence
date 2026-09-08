@@ -22,6 +22,17 @@ describe("wantsVaultFileInventory", () => {
       false
     );
     assert.equal(wantsVaultFileInventory("What PDFs are in this space?"), false);
+    assert.equal(
+      wantsVaultFileInventory(
+        "This keeps everything in one place and helps you spot patterns over time."
+      ),
+      false
+    );
+  });
+
+  it("still detects everything-in-space inventory phrasing", () => {
+    assert.equal(wantsVaultFileInventory("everything in the space"), true);
+    assert.equal(wantsVaultFileInventory("everything uploaded"), true);
   });
 });
 

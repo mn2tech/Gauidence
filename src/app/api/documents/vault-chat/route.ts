@@ -1357,7 +1357,7 @@ export async function POST(request: Request) {
   if (!isNewChat && history.length === 0 && !regenerateAssistantId) {
     await supabase
       .from("vault_chats")
-      .update({ title: titleFromQuestion(question) })
+      .update({ title: titleFromQuestion(userQuestion) })
       .eq("id", chatId)
       .eq("user_id", user.id)
       .eq("profile_id", active.id);
@@ -1394,7 +1394,8 @@ export async function POST(request: Request) {
         chat_id: chatId,
         user_id: user.id,
         role: "user",
-        content: question,
+        // Always persist the original short reply — never the continuity rewrite.
+        content: userQuestion,
         citations: persistCitations,
       })
       .select("id, role, content, citations, created_at")
@@ -1856,10 +1857,11 @@ export async function POST(request: Request) {
       }));
 
       const inventoryAnswer =
-        wantsVaultFileInventory(question) &&
+        !runtimeContext?.preferConversationContinuity &&
+        wantsVaultFileInventory(userQuestion) &&
         (explicitSpaceName || active.display_name)
           ? buildInventoryQuestionAnswer({
-              question,
+              question: userQuestion,
               spaceDisplayName: explicitSpaceName || active.display_name,
               fileInventoryText: workspaceContext.blocks.fileInventory,
               dailyLogsText: workspaceContext.blocks.dailyLogs,
