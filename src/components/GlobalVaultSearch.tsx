@@ -12,6 +12,7 @@ import {
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
+  Clock,
   FileText,
   Loader2,
   MessageCircle,
@@ -258,12 +259,15 @@ export default function GlobalVaultSearch({
               type="button"
               onClick={() => setSearchScope(mode)}
               title={searchScopeHint(mode, active?.display_name ?? "this space")}
-              className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+              className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition ${
                 searchScope === mode
                   ? "bg-brand text-white"
                   : "bg-stone-100 text-ink-muted hover:bg-stone-200"
               }`}
             >
+              {mode === "workspace" ? (
+                <Clock className="h-3 w-3 shrink-0 opacity-90" aria-hidden />
+              ) : null}
               {searchScopeLabel(mode)}
             </button>
           ))}

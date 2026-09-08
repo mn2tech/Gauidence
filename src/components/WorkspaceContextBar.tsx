@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, ChevronDown, Search } from "lucide-react";
+import { ArrowLeft, ChevronDown, Clock, Search } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import ProfileAvatar from "@/components/ProfileAvatar";
 import type { WorkingInDisplay } from "@/lib/workspace-context/client";
@@ -196,12 +196,15 @@ export default function WorkspaceContextBar({
                   markHintSeen();
                   onSearchScopeChange(mode);
                 }}
-                className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition ${
+                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition ${
                   searchScope === mode
                     ? "bg-brand text-white"
                     : "text-ink-muted hover:text-foreground"
                 }`}
               >
+                {mode === "workspace" ? (
+                  <Clock className="h-3 w-3 shrink-0 opacity-90" aria-hidden />
+                ) : null}
                 {mode === "global" ? "All spaces" : "This home"}
               </button>
             ))}
