@@ -118,6 +118,7 @@ describe("buildGideonSystemPrompt", () => {
         clientRequests: "(none)",
         proposals: "(none)",
         schedule: "(none)",
+        history: "(none)",
         linkedProfiles: "(none)",
         vaultMap: "(none)",
         workMemory: "(none — user has no active work projects)",
@@ -184,6 +185,7 @@ describe("buildGideonSystemPrompt", () => {
         clientRequests: "(none)",
         proposals: "(none)",
         schedule: "(none)",
+        history: "(none)",
         linkedProfiles: "(none)",
         vaultMap: "(none)",
         workMemory: "(none — user has no active work projects)",
@@ -216,6 +218,7 @@ describe("buildGideonSystemPrompt", () => {
     });
     assert.match(system, /SPACE SOURCE MODE/);
     assert.match(system, /Answer ONLY from the retrieval blocks/);
+    assert.match(system, /HISTORY EVENTS/);
     assert.doesNotMatch(system, /No Guardian document search ran/);
   });
 });

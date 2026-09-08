@@ -48,6 +48,10 @@ import {
   formatGuardianItemsForGideon,
   retrieveGuardianItemsForGideon,
 } from "@/lib/guardian-items/retrieveForGideon";
+import {
+  formatGuardianEventsForGideon,
+  retrieveGuardianEventsForGideon,
+} from "@/lib/guardian-events/retrieveForGideon";
 import { formatWorkMemoryForGideon } from "@/lib/work-memory/context";
 import {
   loadWorkMemoryForGideon,
@@ -499,6 +503,7 @@ export async function loadWorkspaceContext(
     proposalsBundle,
     fileInventoryContext,
     scheduleBundle,
+    historyEvents,
     linkedContext,
     workMemoryBundleRaw,
     businessIntelligenceBundle,
@@ -624,6 +629,16 @@ export async function loadWorkspaceContext(
           }),
         ]).then(([items, alerts]) => ({ items, alerts }))
       : Promise.resolve({ items: [], alerts: [] }),
+    load.schedule || load.logs
+      ? retrieveGuardianEventsForGideon(supabase, {
+          userId: user.id,
+          spaceIds: effectiveSearchIds,
+          profileNames,
+          question: retrievalQuestion,
+          limit: effectiveRetrievalScopes.length > 1 ? 14 : 12,
+          includeUnscoped: !focusedSpaceName,
+        })
+      : Promise.resolve([]),
     load.linkedProfiles
       ? loadLinkedOrgContext(supabase, user.id, activeProfile)
       : Promise.resolve("(none)"),
@@ -770,6 +785,8 @@ export async function loadWorkspaceContext(
           .join("\n\n")
       : alertsSchedule;
 
+  const historyContext = formatGuardianEventsForGideon(historyEvents);
+
   const vaultMapOwnerLabel =
     firstNameFrom(
       user.user_metadata?.full_name ??
@@ -795,7 +812,7 @@ export async function loadWorkspaceContext(
     : workMemoryBody;
 
   const explicitScopeNote = focusedSpaceName
-    ? `This question is scoped to the ${focusedSpaceName} space only. Use RETRIEVED EXCERPTS, DAILY LOGS, and SPACE FILE INVENTORY for that space.${
+    ? `This question is scoped to the ${focusedSpaceName} space only. Use RETRIEVED EXCERPTS, DAILY LOGS, HISTORY EVENTS, and SPACE FILE INVENTORY for that space.${
         namedOutsideSpace
           ? ` The user named ${focusedSpaceName} while working from ${activeProfile.display_name}.`
           : ""
@@ -922,6 +939,7 @@ Active space in the UI: ${activeProfile.display_name}. Document search includes 
       clientRequests: clientRequestContext.trim() || "(none)",
       proposals: proposalsContext.trim() || "(none)",
       schedule: scheduleContext.trim() || "(none)",
+      history: historyContext.trim() || "(none)",
       linkedProfiles: linkedContext.trim() || "(none)",
       vaultMap: vaultMapContext,
       workMemory:

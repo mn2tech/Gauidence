@@ -1749,6 +1749,8 @@ export async function POST(request: Request) {
         workspaceContext.blocks.structuredKnowledge,
         workspaceContext.blocks.businessIntelligence,
         workspaceContext.blocks.dailyLogs,
+        workspaceContext.blocks.history,
+        workspaceContext.blocks.schedule,
         workspaceContext.blocks.fileInventory,
       ].some((b) => {
         const t = (b ?? "").trim();

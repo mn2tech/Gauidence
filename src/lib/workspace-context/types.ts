@@ -41,6 +41,8 @@ export type WorkspaceContextBlocks = {
   clientRequests: string;
   proposals: string;
   schedule: string;
+  /** History events (guardian_events) with Source provenance. */
+  history: string;
   linkedProfiles: string;
   vaultMap: string;
   workMemory: string;

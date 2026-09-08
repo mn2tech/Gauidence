@@ -72,6 +72,15 @@ export {
 } from "./history";
 export type { HistoryEventCard, HistoryFilter } from "./history";
 
+export {
+  formatGuardianEventsForGideon,
+  inferGuardianEventTimeWindow,
+  scoreGuardianEventRelevance,
+  wantsGuardianEventRetrieval,
+  wantsOpenPromiseEvents,
+} from "./forGideon";
+export type { GideonGuardianEvent, GuardianEventTimeWindow } from "./forGideon";
+
 export { createMemoryGuardianEventStore } from "./memoryStore";
 export type { MemoryGuardianEventStore, MemoryEventAuth } from "./memoryStore";
 

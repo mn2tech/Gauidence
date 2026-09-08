@@ -198,6 +198,11 @@ export function buildGideonSystemPrompt(
       blocks.schedule,
       searchedKnowledge
     ),
+    namedBlock(
+      "HISTORY EVENTS (structured Timeline from guardian_events — meetings, decisions, follow-ups, notes; use for \"what did I do\", open promises, and temporal questions; ALWAYS cite the Source: line when using a fact)",
+      blocks.history,
+      searchedKnowledge
+    ),
     namedBlock("LINKED PROFILE STRUCTURE", blocks.linkedProfiles, searchedKnowledge),
     namedBlock(
       "SPACE MAP STRUCTURE (account hierarchy; use for Space Map / parent-child questions)",
