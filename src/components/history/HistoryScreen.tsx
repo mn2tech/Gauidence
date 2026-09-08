@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   Calendar,
@@ -100,6 +100,7 @@ export default function HistoryScreen() {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detail, setDetail] = useState<DetailResponse | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const openedFromQuery = useRef<string | null>(null);
 
   const load = useCallback(async (nextFilter: HistoryFilter) => {
     setLoading(true);
@@ -195,6 +196,13 @@ export default function HistoryScreen() {
       setDetailLoading(false);
     }
   }
+
+  useEffect(() => {
+    const eventId = searchParams.get("eventId")?.trim();
+    if (!eventId || openedFromQuery.current === eventId) return;
+    openedFromQuery.current = eventId;
+    void openDetail(eventId);
+  }, [searchParams]);
 
   async function markComplete(id: string) {
     await fetch(`/api/guardian/events/${id}`, {

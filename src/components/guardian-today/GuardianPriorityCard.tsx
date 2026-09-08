@@ -67,6 +67,7 @@ export function GuardianPriorityCard({
   onWhy: (item: GuardianIntelligenceItem) => void;
   showSpaceName?: boolean;
 }) {
+  const isEvent = item.origin === "guardian_event";
   const dot = PRIORITY_DOT[item.priority] ?? PRIORITY_DOT.medium;
   const when = formatWhen(item.effectiveDate);
   const remaining = daysRemaining(item.effectiveDate);
@@ -178,13 +179,15 @@ export function GuardianPriorityCard({
           <Check className="h-3.5 w-3.5" aria-hidden />
           Done
         </button>
-        <button
-          type="button"
-          onClick={() => onSnooze(item.id)}
-          className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-semibold text-stone-700 hover:bg-stone-50"
-        >
-          Snooze 1 day
-        </button>
+        {!isEvent ? (
+          <button
+            type="button"
+            onClick={() => onSnooze(item.id)}
+            className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-semibold text-stone-700 hover:bg-stone-50"
+          >
+            Snooze 1 day
+          </button>
+        ) : null}
         <button
           type="button"
           onClick={() => onDismiss(item.id)}
@@ -210,7 +213,7 @@ export function GuardianPriorityCard({
         >
           Ask Gideon
         </Link>
-        {item.effectiveDate ? (
+        {item.effectiveDate && !isEvent ? (
           <button
             type="button"
             disabled={calendarBusy}
@@ -218,6 +221,15 @@ export function GuardianPriorityCard({
             className={`${navLinkClass} disabled:opacity-60`}
           >
             {calendarBusy ? "Adding…" : "Add to calendar"}
+          </button>
+        ) : null}
+        {isEvent ? (
+          <button
+            type="button"
+            onClick={() => onViewSource(item)}
+            className={navLinkClass}
+          >
+            Open in History
           </button>
         ) : null}
         <div ref={moreRef} className="relative">

@@ -149,5 +149,6 @@ export function toIntelligenceItem(
     }),
     createdAt: item.created_at,
     updatedAt: item.updated_at,
+    origin: "watch_item",
   };
 }

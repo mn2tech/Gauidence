@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { listGuardianEvents } from "@/lib/guardian-events/repository";
 import { getGuardianWatch } from "@/lib/guardian-items/watch";
 import { calendarDateInUserZone } from "@/lib/timezone";
 import { getUserTimeZone } from "@/lib/timezone/server";
@@ -15,6 +16,11 @@ import {
 import { toIntelligenceItem } from "./mapItem";
 import { scoreWatchItem } from "./scoring";
 import {
+  buildRecentFromEvents,
+  mapOpenActionEvents,
+  mergeAttentionLists,
+} from "./sections";
+import {
   TODAY_GROUP_LIMIT,
   TODAY_SCOPE_LIMIT,
   groupScoredByRootSpace,
@@ -23,9 +29,11 @@ import {
   type SpaceScopeProfile,
 } from "./spaceScope";
 import type {
+  GuardianIntelligenceItem,
   GuardianTodayCoverage,
   GuardianTodayResult,
   GuardianTodaySpaceGroup,
+  ScoredWatchItem,
 } from "./types";
 
 async function loadSourceTitles(
@@ -116,8 +124,22 @@ function coverageSummaryForScope(
   return formatCoverageSummary(coverage);
 }
 
+function mapScoredBucket(
+  items: ScoredWatchItem[],
+  sourceTitles: Record<string, string>
+): GuardianIntelligenceItem[] {
+  return items.map((item) =>
+    toIntelligenceItem(
+      item,
+      item.source_document_id
+        ? sourceTitles[item.source_document_id] ?? null
+        : null
+    )
+  );
+}
+
 /**
- * Guardian Today — prioritized intelligence from precomputed items.
+ * Guardian Today — prioritized intelligence from Watch items + History events.
  * All Spaces stay combined in one home view, grouped by Personal / Business / etc.
  * A selected spaceId scopes to that space only (no parent/child expansion).
  * Empty priorities alone do NOT mean "caught up" — coverage must be ready.
@@ -135,6 +157,9 @@ export async function getGuardianToday(
   const authorizedIds = await loadAccessibleSpaceIds(supabase, userId);
   const profiles = await loadSpaceScopeProfiles(supabase, authorizedIds);
   const byId = spaceScopeMap(profiles);
+  const spaceNames = new Map(
+    profiles.map((p) => [p.id, p.display_name] as const)
+  );
 
   const requestedId = options.spaceId?.trim() || null;
   const scoped =
@@ -145,24 +170,44 @@ export async function getGuardianToday(
   const scopeProfile = scoped ? byId.get(scoped) ?? null : null;
   const scopeSpaceName = scopeProfile?.display_name ?? null;
 
-  const [watch, sources, activeItemCount, dailyLogCount] = await Promise.all([
-    getGuardianWatch(supabase, userId, { now, spaceIds }),
-    loadEligibleSourceStatuses(supabase, spaceIds),
-    countActiveGuardianItems(supabase, spaceIds),
-    countDailyLogSources(supabase, spaceIds),
-  ]);
+  const [watch, sources, activeItemCount, dailyLogCount, openEvents, recentEvents] =
+    await Promise.all([
+      getGuardianWatch(supabase, userId, { now, spaceIds }),
+      loadEligibleSourceStatuses(supabase, spaceIds),
+      countActiveGuardianItems(supabase, spaceIds),
+      countDailyLogSources(supabase, spaceIds),
+      listGuardianEvents(supabase, {
+        userId,
+        spaceIds: scoped ? spaceIds : undefined,
+        includeUnscoped: !scoped,
+        statuses: ["open"],
+        actionRequired: true,
+        limit: 40,
+      }),
+      listGuardianEvents(supabase, {
+        userId,
+        spaceIds: scoped ? spaceIds : undefined,
+        includeUnscoped: !scoped,
+        limit: 24,
+      }),
+    ]);
 
-  const candidates = [
-    ...watch.today,
-    ...watch.needsAttention,
-    ...watch.comingUp,
-  ];
+  const attentionCandidates = [...watch.today, ...watch.needsAttention];
+  const upcomingCandidates = [...watch.comingUp];
+  const allCandidates = [...attentionCandidates, ...upcomingCandidates];
 
-  const scored = candidates.map((item) =>
+  const scoredAttention = attentionCandidates.map((item) =>
     scoreWatchItem({ item, today, now })
   );
+  const scoredUpcoming = upcomingCandidates.map((item) =>
+    scoreWatchItem({ item, today, now })
+  );
+  const scoredAll = allCandidates.map((item) =>
+    scoreWatchItem({ item, today, now })
+  );
+
   const grouped = groupScoredByRootSpace(
-    scored,
+    scoredAll,
     byId,
     scoped ? TODAY_SCOPE_LIMIT : TODAY_GROUP_LIMIT
   );
@@ -170,7 +215,11 @@ export async function getGuardianToday(
   const rankedItems = grouped.flatMap((g) => g.items);
   const docIds = [
     ...new Set(
-      rankedItems
+      [
+        ...rankedItems,
+        ...scoredAttention,
+        ...scoredUpcoming,
+      ]
         .map((i) => i.source_document_id)
         .filter((id): id is string => Boolean(id))
     ),
@@ -179,8 +228,7 @@ export async function getGuardianToday(
 
   const groups: GuardianTodaySpaceGroup[] = grouped.map((g) => ({
     spaceId: g.rootId,
-    spaceName:
-      g.profile?.display_name ?? g.items[0]?.space_name ?? "Space",
+    spaceName: g.profile?.display_name ?? g.items[0]?.space_name ?? "Space",
     profileType: g.profile?.profile_type ?? null,
     priorities: g.items.map((item) =>
       toIntelligenceItem(
@@ -192,10 +240,29 @@ export async function getGuardianToday(
     ),
   }));
 
-  const priorities = groups.flatMap((g) => g.priorities);
+  const watchAttention = mapScoredBucket(scoredAttention, sourceTitles);
+  const upcoming = mapScoredBucket(scoredUpcoming, sourceTitles);
+
+  const eventAttention = openEvents.ok
+    ? mapOpenActionEvents(openEvents.data, spaceNames)
+    : [];
+  const needsAttention = mergeAttentionLists(watchAttention, eventAttention);
+
+  const recent = recentEvents.ok
+    ? buildRecentFromEvents(recentEvents.data, spaceNames, 10)
+    : [];
+
+  // Back-compat flat list = attention + upcoming (deduped by id).
+  const byPriorityId = new Map<string, GuardianIntelligenceItem>();
+  for (const item of [...needsAttention, ...upcoming]) {
+    byPriorityId.set(item.id, item);
+  }
+  const priorities = [...byPriorityId.values()].sort(
+    (a, b) => b.score - a.score
+  );
+
   const whatChanged = await getWhatChanged(supabase, spaceIds);
 
-  // Synthetic source rows so Daily Logs count toward coverage / never_scanned.
   const dailyLogSourceRows = Array.from({ length: dailyLogCount }, (_, i) => ({
     id: `daily-log-count-${i}`,
     profile_id: spaceIds[0] ?? "space",
@@ -220,6 +287,9 @@ export async function getGuardianToday(
 
   return {
     priorities,
+    needsAttention,
+    upcoming,
+    recent,
     groups,
     scopeSpaceId: scoped,
     scopeSpaceName,

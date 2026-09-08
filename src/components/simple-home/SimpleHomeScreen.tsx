@@ -24,7 +24,7 @@ import {
 } from "@/components/guardian-today/GuardianTodaySections";
 import { GuardianSourcePanel } from "@/hooks/useGuardianWatchHome";
 import { formatActivityWhen } from "@/lib/simple-home/helpers";
-import { WORLD_PATH } from "@/lib/simple-home/routing";
+import { WORLD_PATH, HISTORY_PATH } from "@/lib/simple-home/routing";
 import { documentsHref } from "@/lib/routes";
 import type { GuardianIntelligenceItem } from "@/lib/guardian-today/types";
 import { getContainerLabel, topLevelProfiles } from "@/lib/profiles/types";
@@ -151,6 +151,9 @@ export default function SimpleHomeScreen() {
     !today.loading &&
     homeData.recentActivity.length === 0 &&
     today.data.priorities.length === 0 &&
+    today.data.needsAttention.length === 0 &&
+    today.data.upcoming.length === 0 &&
+    today.data.recent.length === 0 &&
     today.data.whatChanged.length === 0 &&
     (today.data.coverage?.status === "no_sources" ||
       (today.data.coverage?.sourceCount ?? 0) === 0);
@@ -205,20 +208,16 @@ export default function SimpleHomeScreen() {
       onChange={today.setScope}
     />
   );
-  const groups =
-    today.data.groups.length > 0
-      ? today.data.groups
-      : today.data.priorities.length > 0
-        ? [
-            {
-              spaceId: "all",
-              spaceName: today.data.scopeSpaceName ?? "All spaces",
-              profileType: null,
-              priorities: today.data.priorities,
-            },
-          ]
-        : [];
-  const showGroupHeadings = !today.scopeSpaceId && groups.length > 1;
+  const hasAttention = today.data.needsAttention.length > 0;
+  const hasUpcoming = today.data.upcoming.length > 0;
+  const hasRecent = today.data.recent.length > 0;
+  const hasAnySections = hasAttention || hasUpcoming || hasRecent;
+  // Prefer sectioned lists; fall back to legacy flat priorities if API is old.
+  const attentionItems = hasAttention
+    ? today.data.needsAttention
+    : !hasUpcoming && today.data.priorities.length > 0
+      ? today.data.priorities
+      : [];
 
   return (
     <div className="simple-home-page mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-6 sm:gap-7 sm:py-8">
@@ -255,48 +254,75 @@ export default function SimpleHomeScreen() {
       ) : null}
 
       {today.loading ? (
-        <Section title="Today's priorities" action={spaceFilter}>
+        <Section title="Needs attention" action={spaceFilter}>
           <p className="text-sm text-ink-muted">Loading…</p>
         </Section>
-      ) : today.data.priorities.length > 0 ? (
-        <Section title="Today's priorities" action={spaceFilter}>
-          <GuardianPartialBanner
-            coverage={today.data.coverage ?? emptyCoverage()}
-          />
-          {showGroupHeadings ? (
-            <div className="space-y-6">
-              {groups.map((group) => (
-                <div key={group.spaceId}>
-                  <h3 className="mb-2.5 text-sm font-semibold tracking-tight text-foreground">
-                    {group.spaceName}
-                  </h3>
-                  <PriorityList
-                    items={group.priorities}
-                    groupName={group.spaceName}
-                    today={today}
-                  />
-                </div>
-              ))}
-            </div>
-          ) : (
-            <PriorityList
-              items={groups[0]?.priorities ?? today.data.priorities}
-              groupName={
-                today.scopeSpaceId
-                  ? today.data.scopeSpaceName ?? groups[0]?.spaceName
-                  : null
-              }
-              today={today}
+      ) : hasAnySections || attentionItems.length > 0 ? (
+        <>
+          <Section title="Needs attention" action={spaceFilter}>
+            <GuardianPartialBanner
+              coverage={today.data.coverage ?? emptyCoverage()}
             />
-          )}
-          {today.data.coverageSummary ? (
-            <div className="mt-4 border-t border-border-subtle pt-3">
-              <GuardianCoverageFooter summary={today.data.coverageSummary} />
-            </div>
+            {attentionItems.length > 0 ? (
+              <PriorityList items={attentionItems} today={today} />
+            ) : (
+              <p className="text-sm text-ink-muted">
+                Nothing needs you right now.
+              </p>
+            )}
+            {today.data.coverageSummary ? (
+              <div className="mt-4 border-t border-border-subtle pt-3">
+                <GuardianCoverageFooter summary={today.data.coverageSummary} />
+              </div>
+            ) : null}
+          </Section>
+
+          {hasUpcoming ? (
+            <Section title="Upcoming">
+              <PriorityList items={today.data.upcoming} today={today} />
+            </Section>
           ) : null}
-        </Section>
+
+          {hasRecent ? (
+            <Section
+              title="Recent"
+              action={
+                <Link
+                  href={HISTORY_PATH}
+                  className="text-xs font-semibold text-brand hover:text-brand-dark"
+                >
+                  Full History
+                </Link>
+              }
+            >
+              <ul className="space-y-1">
+                {today.data.recent.map((entry) => (
+                  <li key={entry.id}>
+                    <Link
+                      href={`${HISTORY_PATH}?eventId=${encodeURIComponent(entry.id)}`}
+                      className="flex items-start justify-between gap-3 rounded-xl px-2 py-2.5 text-sm transition hover:bg-brand-light/35"
+                    >
+                      <span className="min-w-0">
+                        <span className="block font-medium text-foreground">
+                          {entry.title}
+                        </span>
+                        <span className="mt-0.5 block text-xs text-ink-muted">
+                          {entry.typeLabel}
+                          {entry.spaceName ? ` · ${entry.spaceName}` : ""}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-xs text-ink-muted">
+                        {formatActivityWhen(entry.occurredAt)}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </Section>
+          ) : null}
+        </>
       ) : (
-        <Section title="Today's priorities" action={spaceFilter}>
+        <Section title="Needs attention" action={spaceFilter}>
           <GuardianIntelligenceEmptyState
             coverage={today.data.coverage ?? emptyCoverage()}
             coverageSummary={today.data.coverageSummary}
@@ -329,7 +355,9 @@ export default function SimpleHomeScreen() {
         </Section>
       )}
 
-      <GuardianWhatChanged entries={today.data.whatChanged} />
+      {!hasRecent ? (
+        <GuardianWhatChanged entries={today.data.whatChanged} />
+      ) : null}
 
       <Section title="My World">
         <ul className="space-y-1">

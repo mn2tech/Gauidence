@@ -6,8 +6,13 @@ import type {
   GuardianTodayCoverage,
   GuardianTodayResult,
   GuardianTodaySpaceGroup,
+  TodayRecentEntry,
   WhatChangedEntry,
 } from "@/lib/guardian-today/types";
+import {
+  isGuardianEventIntelligenceId,
+  stripEventIntelligenceId,
+} from "@/lib/guardian-today/mapEvent";
 
 const EMPTY_COVERAGE: GuardianTodayCoverage = {
   spaceCount: 0,
@@ -24,6 +29,9 @@ const EMPTY_COVERAGE: GuardianTodayCoverage = {
 
 const EMPTY: GuardianTodayResult = {
   priorities: [],
+  needsAttention: [],
+  upcoming: [],
+  recent: [],
   groups: [],
   scopeSpaceId: null,
   scopeSpaceName: null,
@@ -60,6 +68,13 @@ function normalizeToday(
   body: Partial<GuardianTodayResult> | null
 ): GuardianTodayResult {
   const priorities = Array.isArray(body?.priorities) ? body!.priorities! : [];
+  const needsAttention = Array.isArray(body?.needsAttention)
+    ? body!.needsAttention!
+    : priorities;
+  const upcoming = Array.isArray(body?.upcoming) ? body!.upcoming! : [];
+  const recent: TodayRecentEntry[] = Array.isArray(body?.recent)
+    ? body!.recent!
+    : [];
   const groups: GuardianTodaySpaceGroup[] = Array.isArray(body?.groups)
     ? body!.groups!
     : priorities.length
@@ -76,6 +91,9 @@ function normalizeToday(
     ...EMPTY,
     ...body,
     priorities,
+    needsAttention,
+    upcoming,
+    recent,
     groups,
     scopeSpaceId: body?.scopeSpaceId ?? null,
     scopeSpaceName: body?.scopeSpaceName ?? null,
@@ -222,18 +240,26 @@ export function useGuardianToday() {
     let snapshot: GuardianTodayResult = EMPTY;
     setData((prev) => {
       snapshot = prev;
-      const priorities = prev.priorities.filter((p) => p.id !== id);
+      const filterId = (p: GuardianIntelligenceItem) => p.id !== id;
+      const priorities = prev.priorities.filter(filterId);
+      const needsAttention = prev.needsAttention.filter(filterId);
+      const upcoming = prev.upcoming.filter(filterId);
       const groups = prev.groups
         .map((g) => ({
           ...g,
-          priorities: g.priorities.filter((p) => p.id !== id),
+          priorities: g.priorities.filter(filterId),
         }))
         .filter((g) => g.priorities.length > 0);
       return {
         ...prev,
         priorities,
+        needsAttention,
+        upcoming,
         groups,
-        caughtUp: priorities.length === 0 ? true : prev.caughtUp,
+        caughtUp:
+          priorities.length === 0 && needsAttention.length === 0
+            ? true
+            : prev.caughtUp,
       };
     });
     return snapshot;
@@ -248,9 +274,29 @@ export function useGuardianToday() {
       const snapshot = removePriorityOptimistic(id);
       flashNote(successNote);
       try {
-        const res = await fetch(`/api/guardian/items/${id}/${path}`, {
-          method: "POST",
-        });
+        let res: Response;
+        if (isGuardianEventIntelligenceId(id)) {
+          if (path === "snooze") {
+            // Events have no snooze — restore and tip the user.
+            if (snapshot && mounted.current) {
+              setData(snapshot);
+              setActionNote(null);
+              setActionError("Open History to change that note.");
+            }
+            return;
+          }
+          const eventId = stripEventIntelligenceId(id);
+          const status = path === "complete" ? "completed" : "dismissed";
+          res = await fetch(`/api/guardian/events/${eventId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status }),
+          });
+        } else {
+          res = await fetch(`/api/guardian/items/${id}/${path}`, {
+            method: "POST",
+          });
+        }
         if (!res.ok) {
           if (snapshot && mounted.current) {
             setData(snapshot);
@@ -288,6 +334,11 @@ export function useGuardianToday() {
 
   const viewSource = useCallback(
     async (item: GuardianIntelligenceItem) => {
+      if (item.origin === "guardian_event" || isGuardianEventIntelligenceId(item.id)) {
+        const eventId = stripEventIntelligenceId(item.id);
+        window.location.href = `/history?eventId=${encodeURIComponent(eventId)}`;
+        return;
+      }
       void recordFeedback(item.id, "opened");
       const res = await fetch(`/api/guardian/items/${item.id}/source`);
       if (!res.ok) return;

@@ -80,6 +80,21 @@ export type GuardianIntelligenceItem = {
 
   createdAt: string;
   updatedAt: string;
+
+  /** Watch item (default) vs History event card. */
+  origin?: "watch_item" | "guardian_event";
+};
+
+/** Lightweight Recent row from guardian_events (History). */
+export type TodayRecentEntry = {
+  id: string;
+  title: string;
+  summary: string | null;
+  occurredAt: string;
+  spaceId: string | null;
+  spaceName: string | null;
+  eventType: string;
+  typeLabel: string;
 };
 
 export type WhatChangedEntry = {
@@ -126,6 +141,12 @@ export type GuardianTodaySpaceGroup = {
 
 export type GuardianTodayResult = {
   priorities: GuardianIntelligenceItem[];
+  /** Needs attention — Watch today/overdue + open action events. */
+  needsAttention: GuardianIntelligenceItem[];
+  /** Upcoming — Watch comingUp (deadlines / horizon). */
+  upcoming: GuardianIntelligenceItem[];
+  /** Recent History events (not derived twins). */
+  recent: TodayRecentEntry[];
   /** Priorities grouped by top-level Space (Personal, Business, …). */
   groups: GuardianTodaySpaceGroup[];
   /** When set, Today is scoped to that Space only (no nested expansion). */
