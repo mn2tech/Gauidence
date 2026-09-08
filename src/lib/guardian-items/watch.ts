@@ -1,10 +1,17 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { resolveNow } from "@/lib/clock";
 import { calendarDateInUserZone } from "@/lib/timezone";
 import { getUserTimeZone } from "@/lib/timezone/server";
 import { isGuardianSemanticLayerEnabled } from "@/lib/features/semantic-layer";
 import { classifyWatchBucket, effectiveCalendarDate } from "./dates";
+import { isCurrentlyActionable } from "./lifecycle";
+import {
+  applyLifecycleTransitions,
+  reevaluateItemLifecycle,
+  withTemporalMetadata,
+} from "./lifecycle-transitions";
 import { logGuardianEvent } from "./log";
 import {
   GUARDIAN_WATCH_HORIZON_DAYS,
@@ -56,6 +63,7 @@ async function loadAccessibleSpaceIds(
 /**
  * Cross-Space Watch: what matters across Spaces the user can access.
  * Never bypasses membership — queries only authorized space_ids.
+ * Reevaluates temporal lifecycle on each run (deterministic, no LLM).
  */
 export async function getGuardianWatch(
   supabase: SupabaseClient,
@@ -91,8 +99,6 @@ export async function getGuardianWatch(
       const { evaluateSemanticWatchRules } = await import(
         "@/lib/semantic/watch-rules"
       );
-      // Prefer explicit Space when scoped; otherwise evidence-based attach +
-      // global dedupe (avoids fanning one fact across all Spaces).
       await evaluateSemanticWatchRules(supabase, userId, {
         spaceId: options.spaceId,
         now: options.now,
@@ -106,7 +112,7 @@ export async function getGuardianWatch(
   }
 
   const timeZone = await getUserTimeZone(supabase, userId);
-  const now = options.now ?? new Date();
+  const now = resolveNow(options.now);
   const today = calendarDateInUserZone(now, timeZone);
   const horizonDays = options.horizonDays ?? GUARDIAN_WATCH_HORIZON_DAYS;
 
@@ -124,6 +130,30 @@ export async function getGuardianWatch(
   }
 
   const rows = (data ?? []) as GuardianItemRow[];
+
+  // Temporal lifecycle reevaluation (deterministic; persists transitions)
+  let lifecycleById: Map<
+    string,
+    ReturnType<typeof reevaluateItemLifecycle>
+  > = new Map();
+  try {
+    lifecycleById = await applyLifecycleTransitions(supabase, userId, rows, {
+      now,
+      timeZone,
+    });
+  } catch (err) {
+    console.error(
+      "Lifecycle reevaluation failed (non-blocking):",
+      err instanceof Error ? err.message : err
+    );
+    for (const row of rows) {
+      lifecycleById.set(
+        row.id,
+        reevaluateItemLifecycle(row, { now, timeZone })
+      );
+    }
+  }
+
   const nameIds = [
     ...new Set([
       ...rows.map((r) => r.space_id),
@@ -156,28 +186,45 @@ export async function getGuardianWatch(
       continue;
     }
 
+    const reeval =
+      lifecycleById.get(row.id) ??
+      reevaluateItemLifecycle(row, { now, timeZone });
+
+    // Expired obsolete actions (RSVP after event, closed submit, …) stay out of Watch.
+    if (!isCurrentlyActionable(reeval.temporal)) {
+      continue;
+    }
+
+    const enriched = withTemporalMetadata(row, reeval);
+
     const effectiveDate = effectiveCalendarDate({
-      eventDate: row.event_date,
-      dueAt: row.due_at,
+      eventDate: enriched.event_date,
+      dueAt: enriched.due_at,
       timeZone,
       calendarDateInZone: calendarDateInUserZone,
     });
 
     const watchItem: GuardianWatchItem = {
-      ...row,
+      ...enriched,
       space_name: nameMap[row.space_id] ?? null,
       child_name: row.child_id ? nameMap[row.child_id] ?? null : null,
       effective_date: effectiveDate,
+      temporal: reeval.temporal,
     };
 
-    const bucket = classifyWatchBucket({
-      type: row.type,
-      requiresAction: row.requires_action,
-      priority: row.priority,
-      effectiveDate,
-      today,
-      horizonDays,
-    });
+    // Past completed events with follow-up: Needs Attention (not "today")
+    const bucket =
+      reeval.temporal.lifecycleStatus === "completed" &&
+      reeval.temporal.actionability === "follow_up"
+        ? "needsAttention"
+        : classifyWatchBucket({
+            type: row.type,
+            requiresAction: watchItem.requires_action,
+            priority: row.priority,
+            effectiveDate,
+            today,
+            horizonDays,
+          });
 
     result[bucket].push(watchItem);
   }

@@ -1,7 +1,13 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { appNow } from "@/lib/clock";
 import { buildDedupeKey } from "./dedupe";
+import {
+  evaluateLifecycle,
+  mapItemTypeToEntityType,
+  toTemporalMetadata,
+} from "./lifecycle";
 import { logGuardianEvent } from "./log";
 import { resolveItemPriority } from "./priority";
 import {
@@ -71,6 +77,27 @@ export async function persistExtractedGuardianItem(
 
   const needsReview = confidence < CONFIDENCE_AUTO;
 
+  const entityType = mapItemTypeToEntityType(
+    item.type,
+    [item.title, item.description, item.source_excerpt].filter(Boolean).join(" ")
+  );
+  const temporal = toTemporalMetadata(
+    evaluateLifecycle({
+      entityType,
+      startDate: item.event_date,
+      endDate: item.event_date,
+      dueDate: item.due_at,
+      now: args.today
+        ? new Date(`${args.today}T12:00:00.000Z`)
+        : appNow(),
+      title: item.title,
+      description: item.description,
+      sourceExcerpt: item.source_excerpt,
+      confidence,
+      sourceEvidence: [{ text: item.source_excerpt }],
+    })
+  );
+
   const row = {
     user_id: association.userId,
     space_id: association.spaceId,
@@ -91,6 +118,7 @@ export async function persistExtractedGuardianItem(
     needs_review: needsReview,
     extraction_version: GUARDIAN_ITEM_EXTRACTION_VERSION,
     dedupe_key: dedupeKey,
+    metadata: { temporal },
   };
 
   const { data: existing } = await supabase
@@ -111,7 +139,8 @@ export async function persistExtractedGuardianItem(
         needs_review: needsReview,
         priority,
         source_excerpt: row.source_excerpt,
-        updated_at: new Date().toISOString(),
+        metadata: row.metadata,
+        updated_at: appNow().toISOString(),
       })
       .eq("id", existing.id);
 

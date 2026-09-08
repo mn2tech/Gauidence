@@ -83,6 +83,9 @@ export type GuardianIntelligenceItem = {
 
   /** Watch item (default) vs History event card. */
   origin?: "watch_item" | "guardian_event";
+  /** Subtle lifecycle chip for Guardian Today (Upcoming, Overdue, Past event, …). */
+  lifecycleLabel?: string | null;
+  lifecycleStatus?: string | null;
 };
 
 /** Lightweight Recent row from guardian_events (History). */

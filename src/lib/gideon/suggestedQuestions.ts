@@ -13,6 +13,12 @@ import {
   findMentionedButUnavailable,
   isDocumentAvailable,
 } from "./evidenceBoundaries";
+import type { LifecycleStatus } from "@/lib/guardian-items/lifecycle";
+import {
+  followUpSuggestionsForCompletedEvent,
+  isStaleSuggestedQuestion,
+  upcomingEventSuggestions,
+} from "@/lib/guardian-items/lifecycle";
 
 export type SuggestedQuestionContext = {
   question: string;
@@ -27,6 +33,13 @@ export type SuggestedQuestionContext = {
   gaps?: string[];
   /** When true and real gaps exist, prefer evidence / gap follow-ups. */
   preferEvidenceOrGap?: boolean;
+  /**
+   * Lifecycle of the primary event/entity in this turn (from Guardian temporal layer).
+   * When completed/expired, suppress RSVP/register suggestions.
+   */
+  eventLifecycleStatus?: LifecycleStatus | null;
+  /** Display name of the event when known (e.g. Crossroads Connect). */
+  eventName?: string | null;
 };
 
 /** Max contextual follow-ups after a Guardian knowledge answer. */
@@ -116,6 +129,29 @@ function looksLikeRosterContext(question: string, answer: string): boolean {
     /\bRSVP\b/i.test(blob) ||
     looksLikePersonAnswer(answer)
   );
+}
+
+/** Infer lifecycle when callers have not yet passed Guardian temporal metadata. */
+export function inferEventLifecycleFromTurn(
+  question: string,
+  answer: string
+): LifecycleStatus | null {
+  const blob = `${question}\n${answer}`;
+  if (
+    /\b(was held|took place|has (?:already )?ended|event (?:is|has) (?:over|ended|passed)|after the event)\b/i.test(
+      blob
+    )
+  ) {
+    return "completed";
+  }
+  if (
+    /\b(upcoming|will (?:be|take place)|is (?:scheduled|coming up)|scheduled for)\b/i.test(
+      blob
+    )
+  ) {
+    return "upcoming";
+  }
+  return null;
 }
 
 function looksLikeOrgEntity(name: string, answer: string): boolean {
@@ -216,6 +252,35 @@ export function buildSuggestedQuestions(
 
   // --- Roster / RSVP / contact cards ---
   if (rosterContext) {
+    const lifecycle =
+      ctx.eventLifecycleStatus ??
+      inferEventLifecycleFromTurn(question, answer);
+    const pastEvent =
+      lifecycle === "completed" ||
+      lifecycle === "historical" ||
+      lifecycle === "expired";
+    const upcomingEvent =
+      lifecycle === "upcoming" || lifecycle === "active";
+    const eventName =
+      ctx.eventName?.trim() ||
+      primaryEntity(ctx.entityNames) ||
+      "the event";
+
+    if (pastEvent) {
+      for (const cand of followUpSuggestionsForCompletedEvent(eventName)) {
+        pushUnique(out, seen, cand, question);
+      }
+      return out
+        .filter((q) => !isStaleSuggestedQuestion({ question: q, eventLifecycle: lifecycle }))
+        .slice(0, MAX_SUGGESTIONS);
+    }
+
+    if (upcomingEvent) {
+      for (const cand of upcomingEventSuggestions(eventName)) {
+        pushUnique(out, seen, cand, question);
+      }
+    }
+
     if (personFocus) {
       pushUnique(
         out,
@@ -224,18 +289,24 @@ export function buildSuggestedQuestions(
         question
       );
       pushUnique(out, seen, "Who else is on the roster?", question);
-      if (/\brsvp\b/i.test(`${question}\n${answer}`)) {
+      if (/\brsvp\b/i.test(`${question}\n${answer}`) && !pastEvent) {
         pushUnique(out, seen, "Who else has RSVP'd?", question);
       }
       if (/\bguest/i.test(answer)) {
         pushUnique(out, seen, `Did ${personFocus} bring guests?`, question);
       }
-    } else {
+    } else if (!upcomingEvent) {
       pushUnique(out, seen, "Who is on the complete roster?", question);
-      pushUnique(out, seen, "Who has RSVP'd so far?", question);
+      if (!pastEvent) {
+        pushUnique(out, seen, "Who has RSVP'd so far?", question);
+      }
     }
-    pushUnique(out, seen, "Summarize the guest list", question);
-    return out.slice(0, MAX_SUGGESTIONS);
+    if (!pastEvent) {
+      pushUnique(out, seen, "Summarize the guest list", question);
+    }
+    return out
+      .filter((q) => !isStaleSuggestedQuestion({ question: q, eventLifecycle: lifecycle }))
+      .slice(0, MAX_SUGGESTIONS);
   }
 
   // --- Business / disclosure follow-ups (only on business turns) ---
@@ -299,7 +370,17 @@ export function buildSuggestedQuestions(
   }
 
   // Prefer returning fewer relevant chips over generic fillers.
-  return out.slice(0, MAX_SUGGESTIONS);
+  return out
+    .filter(
+      (q) =>
+        !isStaleSuggestedQuestion({
+          question: q,
+          eventLifecycle:
+            ctx.eventLifecycleStatus ??
+            inferEventLifecycleFromTurn(question, answer),
+        })
+    )
+    .slice(0, MAX_SUGGESTIONS);
 }
 
 /** Parse suggested_questions jsonb from a DB / API payload. */

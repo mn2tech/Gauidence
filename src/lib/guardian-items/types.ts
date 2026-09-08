@@ -1,5 +1,7 @@
 /** Guardian item types, statuses, priorities, and Watch constants. */
 
+import type { TemporalMetadata } from "./lifecycle";
+
 export const GUARDIAN_ITEM_TYPES = [
   "event",
   "deadline",
@@ -78,11 +80,13 @@ export type GuardianItemRow = {
   needs_review: boolean;
   extraction_version: string | null;
   dedupe_key: string;
-  /** Extensible metadata; semantic refs live under semantic_*_ids keys. */
+  /** Extensible metadata; semantic refs + temporal lifecycle live here. */
   metadata?: {
     semantic_entity_ids?: string[];
     semantic_relationship_ids?: string[];
     semantic_fact_ids?: string[];
+    /** Computed Temporal & Lifecycle Intelligence (immutable source docs stay separate). */
+    temporal?: TemporalMetadata;
     [key: string]: unknown;
   } | null;
   created_at: string;
@@ -96,6 +100,8 @@ export type GuardianWatchItem = GuardianItemRow & {
   child_name: string | null;
   /** Effective calendar date used for Watch bucketing (YYYY-MM-DD). */
   effective_date: string | null;
+  /** Evaluated lifecycle (from metadata.temporal or fresh reevaluation). */
+  temporal?: TemporalMetadata | null;
 };
 
 export type GuardianWatchResult = {

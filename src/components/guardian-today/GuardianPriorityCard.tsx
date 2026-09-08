@@ -144,6 +144,11 @@ export function GuardianPriorityCard({
           <p className="text-base font-bold leading-snug tracking-tight text-foreground">
             {item.title}
           </p>
+          {item.lifecycleLabel ? (
+            <span className="mt-1.5 inline-block text-xs font-semibold uppercase tracking-wide text-stone-500">
+              {item.lifecycleLabel}
+            </span>
+          ) : null}
           <p className="mt-1.5 text-[15px] leading-relaxed text-stone-800">
             {item.summary}
           </p>

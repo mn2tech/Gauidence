@@ -1,5 +1,11 @@
 import type { GuardianItemType } from "@/lib/guardian-items/types";
 import type { GuardianWatchItem } from "@/lib/guardian-items/types";
+import {
+  lifecycleLabel,
+  readTemporalFromMetadata,
+  type LifecycleStatus,
+  type TemporalEntityType,
+} from "@/lib/guardian-items/lifecycle";
 import type {
   GuardianIntelligenceItem,
   IntelligencePriority,
@@ -56,6 +62,14 @@ export function mapSourceType(raw: string): IntelligenceSourceType {
 }
 
 function buildSummary(item: GuardianWatchItem): string {
+  const temporal =
+    item.temporal ?? readTemporalFromMetadata(item.metadata ?? null);
+  if (
+    temporal?.lifecycleStatus === "completed" &&
+    temporal.actionability === "follow_up"
+  ) {
+    return "Event completed — review contacts, notes, and opportunities.";
+  }
   if (item.description?.trim()) return item.description.trim();
   if (item.requires_action) return "This needs your attention.";
   if (item.effective_date) return "Coming up on your calendar.";
@@ -63,6 +77,14 @@ function buildSummary(item: GuardianWatchItem): string {
 }
 
 function buildSuggestedAction(item: GuardianWatchItem): string | null {
+  const temporal =
+    item.temporal ?? readTemporalFromMetadata(item.metadata ?? null);
+  if (
+    temporal?.lifecycleStatus === "completed" &&
+    temporal.actionability === "follow_up"
+  ) {
+    return item.action_label?.trim() || "Review contacts and opportunities";
+  }
   if (item.action_label?.trim()) return item.action_label.trim();
   if (item.requires_action) {
     switch (item.type) {
@@ -117,6 +139,12 @@ export function toIntelligenceItem(
 ): GuardianIntelligenceItem {
   const intelligenceType = mapGuardianTypeToIntelligence(item.type);
   const priority = guardianPriorityToIntelligence(item.resolvedPriority);
+  const temporal =
+    item.temporal ?? readTemporalFromMetadata(item.metadata ?? null);
+  const label = lifecycleLabel(
+    temporal?.lifecycleStatus as LifecycleStatus | undefined,
+    temporal?.entityType as TemporalEntityType | undefined
+  );
 
   return {
     id: item.id,
@@ -150,5 +178,7 @@ export function toIntelligenceItem(
     createdAt: item.created_at,
     updatedAt: item.updated_at,
     origin: "watch_item",
+    lifecycleLabel: label,
+    lifecycleStatus: temporal?.lifecycleStatus ?? null,
   };
 }

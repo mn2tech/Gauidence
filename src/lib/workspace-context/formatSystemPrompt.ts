@@ -194,7 +194,7 @@ export function buildGideonSystemPrompt(
       searchedKnowledge
     ),
     namedBlock(
-      "WHAT MATTERS (saved items Guardian is watching — events, deadlines, reminders; prefer these before re-reading documents for schedule questions; space/child labeled when known)",
+      "WHAT MATTERS (saved items Guardian is watching — events, deadlines, reminders with TEMPORAL INTERPRETATION; prefer these before re-reading documents for schedule questions; never recommend expired actions; completed events are follow-up/historical; space/child labeled when known)",
       blocks.schedule,
       searchedKnowledge
     ),

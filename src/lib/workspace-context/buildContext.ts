@@ -768,7 +768,9 @@ export async function loadWorkspaceContext(
   );
 
   const proposalsContext = proposalsBundle;
-  const guardianSchedule = formatGuardianItemsForGideon(scheduleBundle.items);
+  const guardianSchedule = formatGuardianItemsForGideon(scheduleBundle.items, {
+    timeZone,
+  });
   const alertsSchedule = formatAlertsForGideon(scheduleBundle.alerts, {
     profileNames,
     timeZone,
