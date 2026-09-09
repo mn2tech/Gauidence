@@ -16,9 +16,13 @@ export const ENTITY_TYPES = [
   "task",
   "deadline",
   "location",
+  "place", // alias of location (normalized in schema)
   "product",
   "payment",
   "school",
+  "client", // organization role; kept as type for My World filters
+  "account",
+  "asset",
   "topic",
 ] as const;
 
@@ -40,9 +44,13 @@ export const ENTITY_TYPE_DESCRIPTIONS: Record<SemanticEntityType, string> = {
   deadline:
     "A date by which an action, submission, payment, response, or event must occur.",
   location: "A place, address, facility, or geographic area.",
+  place: "Alias of location — a place, address, facility, or area.",
   product: "A product, offering, or named capability.",
   payment: "A payment, invoice amount, fee, or monetary transfer.",
   school: "A school, district, university, or educational institution.",
+  client: "A client organization or person in a client role.",
+  account: "A named account, membership, or service account.",
+  asset: "A physical or digital asset worth tracking.",
   topic: "A subject, skill, role theme, or thematic concept worth tracking.",
 };
 

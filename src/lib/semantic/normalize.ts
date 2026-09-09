@@ -65,7 +65,11 @@ export function isFuzzyMatchAllowed(entityType: string): boolean {
     entityType === "project" ||
     entityType === "product" ||
     entityType === "school" ||
-    entityType === "location"
+    entityType === "location" ||
+    entityType === "place" ||
+    entityType === "client" ||
+    entityType === "account" ||
+    entityType === "asset"
   );
 }
 

@@ -146,7 +146,9 @@ export function parseSemanticExtraction(
 
   const entities = parsed.data.entities
     .map((e) => {
-      const type = e.type.trim().toLowerCase();
+      let type = e.type.trim().toLowerCase();
+      // My World aliases → canonical semantic types
+      if (type === "place") type = "location";
       const name = e.name.trim();
       if (!name || e.confidence < 0.3) return null;
       if (!ENTITY_TYPE_SET.has(type)) {

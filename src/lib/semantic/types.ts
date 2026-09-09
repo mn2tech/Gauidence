@@ -31,6 +31,9 @@ export type SemanticEntity = {
   last_seen_at: string | null;
   created_at: string;
   updated_at: string;
+  importance_score?: number | null;
+  status?: string;
+  merged_into_id?: string | null;
 };
 
 export type SemanticRelationship = {
@@ -170,7 +173,7 @@ export type SemanticIngestResult = {
 export const SEMANTIC_ENTITY_SELECT = `
   id, user_id, canonical_name, entity_type, normalized_name, description,
   aliases, attributes, confidence, first_seen_at, last_seen_at,
-  created_at, updated_at
+  created_at, updated_at, importance_score, status, merged_into_id
 `;
 
 export const SEMANTIC_RELATIONSHIP_SELECT = `
