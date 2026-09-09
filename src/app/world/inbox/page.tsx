@@ -10,7 +10,8 @@ import WorldInboxScreen from "@/components/world/WorldInboxScreen";
 
 export const metadata: Metadata = {
   title: "Confirmations — My World — Guardian",
-  description: "Confirm, edit, or reject what Guardian thinks it knows.",
+  description:
+    "Quick checks so Guardian doesn't mix up people or promises. Confirm, edit, or skip when unsure.",
 };
 
 export default async function WorldInboxPage() {

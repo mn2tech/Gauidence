@@ -5,13 +5,20 @@ import Link from "next/link";
 import {
   ArrowLeft,
   Check,
+  FileUp,
   Loader2,
   Merge,
+  MessageSquarePlus,
   Pencil,
   X,
 } from "lucide-react";
 import type { WorldInboxItem } from "@/lib/world/types";
 import { WORLD_PATH, worldEntityHref } from "@/lib/routes";
+import {
+  ADD_ANYTHING_PATH,
+  HISTORY_PATH,
+} from "@/lib/simple-home/routing";
+import { FIRST_MINUTE_TELL_HREF } from "@/lib/guardian-today/firstMinute";
 
 function typeLabel(type: string): string {
   switch (type) {
@@ -35,6 +42,23 @@ function candidateName(item: WorldInboxItem): string {
   if (typeof c.name === "string" && c.name.trim()) return c.name.trim();
   if (typeof c.suggested_merge_name === "string") return c.suggested_merge_name;
   return "Unknown";
+}
+
+function actionNote(
+  action: "confirm" | "edit" | "merge" | "reject" | "ignore"
+): string {
+  switch (action) {
+    case "confirm":
+      return "Saved — Guardian will recognize this next time.";
+    case "merge":
+      return "Merged — duplicates won't keep asking.";
+    case "edit":
+      return "Updated — Guardian will use the corrected name.";
+    case "reject":
+      return "Not saved — Guardian won't remember this as that person or thing.";
+    case "ignore":
+      return "Skipped for now — Guardian may ask again later.";
+  }
 }
 
 export default function WorldInboxScreen() {
@@ -96,17 +120,7 @@ export default function WorldInboxScreen() {
       }
       setItems((prev) => prev.filter((i) => i.id !== item.id));
       setEditingId(null);
-      setNote(
-        action === "confirm"
-          ? "Saved — Guardian will remember this."
-          : action === "merge"
-            ? "Merged — future matches will be smarter."
-            : action === "reject"
-              ? "Rejected."
-              : action === "ignore"
-                ? "Ignored."
-                : "Updated."
-      );
+      setNote(actionNote(action));
     } catch {
       setNote("Couldn't reach Guardian.");
     } finally {
@@ -126,18 +140,24 @@ export default function WorldInboxScreen() {
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Confirmations</h1>
         <p className="mt-1 text-sm text-ink-muted">
-          When Guardian is unsure, you decide. Your answers become lasting
-          knowledge.
+          Quick checks so Guardian doesn&apos;t mix up people or promises. Your
+          answers become lasting knowledge.
         </p>
       </header>
 
       {note ? (
-        <p className="rounded-xl bg-brand-light/50 px-4 py-2.5 text-sm text-brand" role="status">
+        <p
+          className="rounded-xl bg-brand-light/50 px-4 py-2.5 text-sm text-brand"
+          role="status"
+        >
           {note}
         </p>
       ) : null}
       {error ? (
-        <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
+        <p
+          className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800"
+          role="alert"
+        >
           {error}
         </p>
       ) : null}
@@ -147,11 +167,38 @@ export default function WorldInboxScreen() {
           <Loader2 className="h-4 w-4 animate-spin" /> Loading…
         </p>
       ) : items.length === 0 ? (
-        <div className="simple-home-card p-6 text-center">
-          <p className="font-semibold">You&apos;re all caught up</p>
-          <p className="mt-1 text-sm text-ink-muted">
-            Nothing needs confirmation right now.
-          </p>
+        <div className="simple-home-card space-y-4 p-6 text-center">
+          <div>
+            <p className="font-semibold text-foreground">
+              You&apos;re all caught up
+            </p>
+            <p className="mt-1 text-sm text-ink-muted">
+              Nothing needs confirmation right now. Tell Guardian something or
+              add a document — we&apos;ll ask only when we&apos;re unsure.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <Link
+              href={FIRST_MINUTE_TELL_HREF}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark"
+            >
+              <MessageSquarePlus className="h-4 w-4" aria-hidden />
+              Tell Guardian
+            </Link>
+            <Link
+              href={ADD_ANYTHING_PATH}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-border-subtle bg-white px-4 py-2.5 text-sm font-semibold text-foreground hover:bg-stone-50"
+            >
+              <FileUp className="h-4 w-4" aria-hidden />
+              Add a document
+            </Link>
+            <Link
+              href={HISTORY_PATH}
+              className="text-sm font-semibold text-ink-muted hover:text-brand"
+            >
+              Review History
+            </Link>
+          </div>
         </div>
       ) : (
         <ul className="flex flex-col gap-3">
@@ -164,7 +211,9 @@ export default function WorldInboxScreen() {
             const mergeId =
               (typeof item.candidate.suggested_merge_into === "string"
                 ? item.candidate.suggested_merge_into
-                : null) ?? item.related_entity_ids[0] ?? null;
+                : null) ??
+              item.related_entity_ids[0] ??
+              null;
             const busy = busyId === item.id;
 
             return (
@@ -178,10 +227,16 @@ export default function WorldInboxScreen() {
                   </p>
                   {item.reason ? (
                     <p className="mt-1 text-sm text-ink-muted">{item.reason}</p>
-                  ) : null}
+                  ) : (
+                    <p className="mt-1 text-sm text-ink-muted">
+                      Guardian isn&apos;t sure yet — confirm so this stays
+                      accurate.
+                    </p>
+                  )}
                   {mergeTarget ? (
                     <p className="mt-1 text-sm text-ink-muted">
-                      Looks like: <span className="font-medium">{mergeTarget}</span>
+                      Looks like:{" "}
+                      <span className="font-medium">{mergeTarget}</span>
                     </p>
                   ) : null}
                   {item.semantic_entity_id ? (
@@ -222,56 +277,69 @@ export default function WorldInboxScreen() {
                     </button>
                   </div>
                 ) : (
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => void act(item, "confirm")}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
-                    >
-                      <Check className="h-4 w-4" /> Confirm
-                    </button>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => {
-                        setEditingId(item.id);
-                        setEditName(name);
-                      }}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-stone-200 px-3 py-2 text-sm font-semibold disabled:opacity-50"
-                    >
-                      <Pencil className="h-4 w-4" /> Edit
-                    </button>
-                    {item.type === "ENTITY_MERGE" && mergeId ? (
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
                         disabled={busy}
-                        onClick={() =>
-                          void act(item, "merge", {
-                            mergeIntoEntityId: mergeId,
-                          })
-                        }
+                        onClick={() => void act(item, "confirm")}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                      >
+                        <Check className="h-4 w-4" /> Confirm
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => {
+                          setEditingId(item.id);
+                          setEditName(name);
+                        }}
                         className="inline-flex items-center gap-1.5 rounded-xl border border-stone-200 px-3 py-2 text-sm font-semibold disabled:opacity-50"
                       >
-                        <Merge className="h-4 w-4" /> Merge
+                        <Pencil className="h-4 w-4" /> Edit
                       </button>
-                    ) : null}
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => void act(item, "reject")}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-stone-200 px-3 py-2 text-sm font-semibold text-rose-700 disabled:opacity-50"
-                    >
-                      <X className="h-4 w-4" /> Reject
-                    </button>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => void act(item, "ignore")}
-                      className="rounded-xl px-3 py-2 text-sm font-semibold text-ink-muted hover:text-foreground disabled:opacity-50"
-                    >
-                      Ignore
-                    </button>
+                      {item.type === "ENTITY_MERGE" && mergeId ? (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() =>
+                            void act(item, "merge", {
+                              mergeIntoEntityId: mergeId,
+                            })
+                          }
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-stone-200 px-3 py-2 text-sm font-semibold disabled:opacity-50"
+                          title="Combine these into one entry"
+                        >
+                          <Merge className="h-4 w-4" /> Merge
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void act(item, "reject")}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-stone-200 px-3 py-2 text-sm font-semibold text-rose-700 disabled:opacity-50"
+                        title="Not this — don't remember it"
+                      >
+                        <X className="h-4 w-4" /> Not this
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void act(item, "ignore")}
+                        className="rounded-xl px-3 py-2 text-sm font-semibold text-ink-muted hover:text-foreground disabled:opacity-50"
+                        title="Skip for now — ask again later"
+                      >
+                        Skip for now
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-ink-muted">
+                      <span className="font-medium text-stone-600">Not this</span>{" "}
+                      = don&apos;t remember.{" "}
+                      <span className="font-medium text-stone-600">
+                        Skip for now
+                      </span>{" "}
+                      = ask again later.
+                    </p>
                   </div>
                 )}
               </li>
