@@ -151,12 +151,56 @@ async function loadWorldWatchContext(
       .limit(40),
   ]);
 
-  return {
-    entities: (entitiesRes.data ?? []) as WorldWatchEntity[],
-    facts: (factsRes.data ?? []) as WorldWatchFact[],
-    timeline: (timelineRes.data ?? []) as WorldWatchTimeline[],
-    inbox: (inboxRes.data ?? []) as WorldWatchInbox[],
-  };
+  const entities: WorldWatchEntity[] = (entitiesRes.data ?? []).map((row) => ({
+    id: String(row.id),
+    name: String(row.canonical_name ?? ""),
+    entity_type: String(row.entity_type ?? "thing"),
+    importance_score:
+      typeof row.importance_score === "number" ? row.importance_score : null,
+    status: typeof row.status === "string" ? row.status : null,
+    last_seen_at:
+      typeof row.last_seen_at === "string" ? row.last_seen_at : null,
+  }));
+
+  const facts: WorldWatchFact[] = (factsRes.data ?? []).map((row) => ({
+    id: String(row.id),
+    subject_entity_id:
+      typeof row.subject_entity_id === "string" ? row.subject_entity_id : null,
+    predicate: String(row.predicate ?? ""),
+    value_text: typeof row.value_text === "string" ? row.value_text : null,
+    value_date: typeof row.value_date === "string" ? row.value_date : null,
+    confidence: typeof row.confidence === "number" ? row.confidence : null,
+  }));
+
+  const timeline: WorldWatchTimeline[] = (timelineRes.data ?? []).map(
+    (row) => ({
+      id: String(row.id),
+      title: String(row.title ?? ""),
+      summary: typeof row.summary === "string" ? row.summary : null,
+      entry_type: String(row.entry_type ?? "other_important"),
+      primary_entity_id:
+        typeof row.primary_entity_id === "string"
+          ? row.primary_entity_id
+          : null,
+      space_id: typeof row.space_id === "string" ? row.space_id : null,
+      occurred_at: String(row.occurred_at ?? new Date(0).toISOString()),
+      importance_score:
+        typeof row.importance_score === "number" ? row.importance_score : null,
+    })
+  );
+
+  const inbox: WorldWatchInbox[] = (inboxRes.data ?? []).map((row) => ({
+    id: String(row.id),
+    type: String(row.type ?? ""),
+    title: typeof row.title === "string" ? row.title : null,
+    space_id: typeof row.space_id === "string" ? row.space_id : null,
+    payload:
+      row.payload && typeof row.payload === "object"
+        ? (row.payload as Record<string, unknown>)
+        : null,
+  }));
+
+  return { entities, facts, timeline, inbox };
 }
 
 /**
