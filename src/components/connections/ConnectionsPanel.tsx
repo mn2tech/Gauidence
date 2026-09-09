@@ -2151,6 +2151,21 @@ export default function ConnectionsPanel() {
                       </Link>
                       <button
                         type="button"
+                        onClick={() => {
+                          const q = new URLSearchParams({
+                            returnTo: "/settings/connections",
+                            switch: "1",
+                          });
+                          if (active?.id) q.set("profileId", active.id);
+                          window.location.href = `/api/connections/gmail/start?${q}`;
+                        }}
+                        disabled={busy !== null}
+                        className="inline-flex items-center justify-center rounded-full border border-stone-300 px-4 py-2 text-sm font-semibold text-foreground hover:bg-stone-50 disabled:opacity-60"
+                      >
+                        Change Gmail
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => setConfirmGmailDisconnect(true)}
                         disabled={busy !== null}
                         className="inline-flex items-center justify-center rounded-full border border-stone-300 px-4 py-2 text-sm font-semibold text-foreground hover:bg-stone-50 disabled:opacity-60"
@@ -2482,9 +2497,8 @@ export default function ConnectionsPanel() {
               Disconnect Gmail?
             </h3>
             <p className="mt-2 text-sm text-ink-muted">
-              Guardian will stop syncing your inbox. Saved Gmail access is
-              removed from this connection. Previously synced message rows stay
-              until you clear them.
+              Guardian will stop syncing your inbox and remove saved Gmail
+              access and synced message rows from this connection.
             </p>
             <div className="mt-6 flex flex-wrap justify-end gap-2">
               <button

@@ -36,6 +36,8 @@ export function gmailRedirectUri(request: Request): string {
 export function gmailAuthorizeUrl(args: {
   request: Request;
   state: string;
+  /** Force Google account picker (switch Gmail). */
+  forceAccountPicker?: boolean;
 }): string {
   const params = new URLSearchParams({
     client_id: googleDriveClientId(),
@@ -43,7 +45,7 @@ export function gmailAuthorizeUrl(args: {
     response_type: "code",
     scope: GMAIL_SCOPES,
     access_type: "offline",
-    prompt: "consent",
+    prompt: args.forceAccountPicker ? "select_account consent" : "consent",
     include_granted_scopes: "true",
     state: args.state,
   });

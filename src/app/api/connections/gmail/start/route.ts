@@ -51,10 +51,17 @@ export async function GET(request: Request) {
     return NextResponse.redirect(login);
   }
 
-  const profileId =
-    new URL(request.url).searchParams.get("profileId")?.trim() || "";
+  const incoming = new URL(request.url);
+  const profileId = incoming.searchParams.get("profileId")?.trim() || "";
+  const forceAccountPicker =
+    incoming.searchParams.get("switch") === "1" ||
+    incoming.searchParams.get("switch") === "true";
   const state = newGmailOAuthState();
-  const authorize = gmailAuthorizeUrl({ request, state });
+  const authorize = gmailAuthorizeUrl({
+    request,
+    state,
+    forceAccountPicker,
+  });
   const response = NextResponse.redirect(authorize);
   response.cookies.set(GMAIL_OAUTH_STATE_COOKIE, state, oauthCookieOptions(600));
   response.cookies.set(

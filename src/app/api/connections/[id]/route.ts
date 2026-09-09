@@ -7,6 +7,7 @@ import {
   updateConnectedSource,
 } from "@/lib/connectors/services/connectedSources";
 import type { ConnectedSourceStatus } from "@/lib/connectors/types";
+import { clearInboxMessagesForSource } from "@/lib/inbox/clearSource";
 
 export const runtime = "nodejs";
 
@@ -205,6 +206,18 @@ export async function DELETE(_req: Request, ctx: Ctx) {
           folderName: existing.settings.folderName ?? null,
           driveId: existing.settings.driveId ?? null,
           folderKind: existing.settings.folderKind ?? null,
+        },
+      });
+      return NextResponse.json({ source });
+    }
+    if (existing.sourceType === "gmail") {
+      await clearInboxMessagesForSource(supabase, user.id, id);
+      const source = await updateConnectedSource(supabase, user.id, id, {
+        status: "disconnected",
+        settings: {
+          email: existing.settings.email ?? null,
+          accountName: existing.settings.accountName ?? null,
+          photoLink: existing.settings.photoLink ?? null,
         },
       });
       return NextResponse.json({ source });

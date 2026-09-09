@@ -20,6 +20,7 @@ import {
   GmailApiError,
   gmailTokensToSettings,
 } from "@/lib/connectors/gmail/client";
+import { clearInboxMessagesForSource } from "@/lib/inbox/clearSource";
 
 export const runtime = "nodejs";
 
@@ -124,6 +125,15 @@ export async function GET(request: Request) {
     const existing = await listConnectedSources(supabase, user.id);
     const prior = existing.find((s) => s.sourceType === "gmail");
     if (prior) {
+      const priorEmail = String(prior.settings.email ?? "")
+        .trim()
+        .toLowerCase();
+      const nextEmail = String(account.email ?? "")
+        .trim()
+        .toLowerCase();
+      if (priorEmail && nextEmail && priorEmail !== nextEmail) {
+        await clearInboxMessagesForSource(supabase, user.id, prior.id);
+      }
       await updateConnectedSource(supabase, user.id, prior.id, {
         displayName,
         sourceUri,
