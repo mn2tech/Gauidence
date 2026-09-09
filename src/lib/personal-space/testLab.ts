@@ -82,7 +82,7 @@ export function buildTestLabCases(): TestLabCase[] {
       tab: "Onboarding",
       name: "Brand-new account creates Personal Space",
       input: "new user login",
-      expected: "My Personal Space auto-created; welcome shown; no create-space form",
+      expected: "My Personal Space auto-created; welcome shown; tell-first actions; no create-space form",
       run: () => {
         const welcome = buildPersonalSpaceWelcome({
           hasPersonalSpace: true,
@@ -95,6 +95,7 @@ export function buildTestLabCases(): TestLabCase[] {
           welcome.showWelcome ? "welcome" : "no-welcome",
           welcome.skipCreateSpaceForm ? "no-create-form" : "create-form",
           welcome.actions.map((a) => a.label).join(", "),
+          welcome.secondaryActions.map((a) => a.label).join(", "),
         ].join(" | ");
         return passFail(
           actual,
@@ -102,11 +103,9 @@ export function buildTestLabCases(): TestLabCase[] {
             a.includes(PERSONAL_SPACE_DISPLAY_NAME) &&
             a.includes("welcome") &&
             a.includes("no-create-form") &&
-            a.includes("Open My World") &&
-            a.includes("Ask Gideon") &&
-            a.includes("Add something") &&
             a.includes("Tell Guardian") &&
-            a.includes("Connect something")
+            a.includes("Add a document") &&
+            a.includes("Ask Gideon")
         );
       },
     },
@@ -136,16 +135,16 @@ export function buildTestLabCases(): TestLabCase[] {
     {
       id: "1.3",
       tab: "Onboarding",
-      name: "Immediate Gideon use",
+      name: "Ask Gideon available as secondary path",
       input: "What's the weather like today?",
-      expected: "No onboarding gate; general answer allowed",
+      expected: "No onboarding gate; Ask Gideon still reachable from welcome",
       run: () => {
         const welcome = buildPersonalSpaceWelcome({
           hasPersonalSpace: true,
           isEmptySpace: true,
           isNewUser: true,
         });
-        const actual = welcome.actions.some((a) => a.id === "ask-gideon")
+        const actual = welcome.secondaryActions.some((a) => a.id === "ask-gideon")
           ? "Ask Gideon available immediately"
           : "blocked";
         return passFail(actual, (a) => a.includes("available"));
@@ -155,7 +154,7 @@ export function buildTestLabCases(): TestLabCase[] {
       id: "1.4",
       tab: "Onboarding",
       name: "My World onboarding intents",
-      input: "Let's build your world",
+      input: "Stop carrying paperwork and promises in your head.",
       expected: "My Work / My Family / My School / My Documents / Something Else",
       run: () => {
         const labels = INTENT_OPTIONS.map((o) => o.label).join(" | ");

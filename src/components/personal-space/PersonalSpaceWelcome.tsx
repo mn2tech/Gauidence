@@ -1,18 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { Globe2, Link2, MessageCircle, MessageSquarePlus, Plus } from "lucide-react";
+import { FileUp, MessageSquarePlus } from "lucide-react";
 import {
   PERSONAL_SPACE_ACTIONS,
+  PERSONAL_SPACE_SECONDARY_ACTIONS,
   PERSONAL_SPACE_WELCOME,
 } from "@/lib/personal-space/types";
+import {
+  FIRST_MINUTE_CHIPS,
+  firstMinuteChipHref,
+} from "@/lib/guardian-today/firstMinute";
 
 const ICONS = {
-  "build-world": Globe2,
-  "ask-gideon": MessageCircle,
-  "add-something": Plus,
   "tell-guardian": MessageSquarePlus,
-  "connect-something": Link2,
+  "add-something": FileUp,
 } as const;
 
 export default function PersonalSpaceWelcome({
@@ -34,10 +36,22 @@ export default function PersonalSpaceWelcome({
         </p>
       </div>
 
+      <div className="flex flex-wrap gap-2">
+        {FIRST_MINUTE_CHIPS.map((chip) => (
+          <Link
+            key={chip.id}
+            href={firstMinuteChipHref(chip)}
+            className="rounded-full border border-border-subtle bg-white px-3 py-1.5 text-xs font-semibold text-foreground transition hover:border-brand/40 hover:bg-brand-light/40"
+          >
+            {chip.label}
+          </Link>
+        ))}
+      </div>
+
       <div className="grid gap-3 sm:grid-cols-2">
         {PERSONAL_SPACE_ACTIONS.map((action) => {
           const Icon = ICONS[action.id];
-          const primary = action.id === "build-world";
+          const primary = action.id === "tell-guardian";
           return (
             <Link
               key={action.id}
@@ -68,6 +82,18 @@ export default function PersonalSpaceWelcome({
             </Link>
           );
         })}
+      </div>
+
+      <div className="flex flex-wrap gap-x-4 gap-y-2 border-t border-border-subtle pt-4">
+        {PERSONAL_SPACE_SECONDARY_ACTIONS.map((action) => (
+          <Link
+            key={action.id}
+            href={action.href}
+            className="text-xs font-semibold text-ink-muted transition hover:text-brand"
+          >
+            {action.label}
+          </Link>
+        ))}
       </div>
     </section>
   );

@@ -6,7 +6,7 @@ import { DOCUMENTS_PATH } from "@/lib/routes";
 
 export const GETTING_STARTED_DISMISS_KEY = "guardian:getting-started-dismissed";
 
-export type OnboardingStepId = "document" | "ask_gideon" | "daily_log";
+export type OnboardingStepId = "daily_log" | "document" | "ask_gideon";
 
 export type OnboardingProgress = {
   hasVault: boolean;
@@ -26,14 +26,22 @@ export type OnboardingStep = {
 };
 
 /**
- * Activation path: add a document, ask Gideon.
- * Daily Log is explore-more (listed last, not required for the core story).
- * Vault creation is automatic — not a checklist step.
+ * Activation path: Tell Guardian first (mental-load win), then add a document.
+ * Ask Gideon is explore-more after there's something to ask about.
  */
 export const ONBOARDING_STEPS: OnboardingStep[] = [
   {
+    id: "daily_log",
+    title: "Tell Guardian one thing",
+    description:
+      "A deadline, promise, or note you'd otherwise keep in your head — Guardian holds it.",
+    href: () => "/history?tell=1",
+    cta: "Tell Guardian",
+    done: (p) => p.hasDailyLog,
+  },
+  {
     id: "document",
-    title: "Add your first document",
+    title: "Add a document",
     description:
       "Scan or upload a PDF or photo so Guardian can find dates and key facts.",
     href: (profileId) =>
@@ -47,19 +55,10 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     id: "ask_gideon",
     title: "Ask Gideon",
     description:
-      "Ask a question about what’s in the vault — Gideon answers from your files and notes.",
+      "Optional — look something up in your files and notes once Guardian has memory.",
     href: () => "/ask",
     cta: "Ask Gideon",
     done: (p) => p.hasAskedGideon,
-  },
-  {
-    id: "daily_log",
-    title: "Tell Guardian something",
-    description:
-      "Optional — save a quick note to History. Guardian organizes it without a formal Daily Log.",
-    href: () => "/history?tell=1",
-    cta: "Tell Guardian",
-    done: (p) => p.hasDailyLog,
   },
 ];
 
@@ -77,9 +76,9 @@ export function isOnboardingComplete(progress: OnboardingProgress): boolean {
   return completedStepCount(progress) === ONBOARDING_STEPS.length;
 }
 
-/** Core activation: document + Ask Gideon (Daily Log is optional). */
+/** Core activation: Tell Guardian (first win). Document is the second beat. */
 export function isActivationComplete(progress: OnboardingProgress): boolean {
-  return progress.hasDocument && progress.hasAskedGideon;
+  return progress.hasDailyLog;
 }
 
 export type ActivationChip = {
@@ -94,27 +93,28 @@ export type ActivationChip = {
 export function nextActivationChip(
   progress: OnboardingProgress
 ): ActivationChip | null {
-  if (!progress.hasDocument) {
+  if (!progress.hasDailyLog) {
     return {
       step: 1,
       total: 2,
+      title: "Tell Guardian one thing",
+      description:
+        "What's taking up space in your head? A deadline or promise is enough.",
+      href: () => "/history?tell=1",
+      cta: "Tell Guardian",
+    };
+  }
+  if (!progress.hasDocument) {
+    return {
+      step: 2,
+      total: 2,
       title: "Add a document",
-      description: "Upload or scan something so Gideon has memory to work with.",
+      description: "Upload or scan something so Guardian can watch dates in it.",
       href: (profileId) =>
         profileId
           ? `/dashboard?docs=1&camera=1#documents-${profileId}`
           : DOCUMENTS_PATH,
       cta: "Scan or upload",
-    };
-  }
-  if (!progress.hasAskedGideon) {
-    return {
-      step: 2,
-      total: 2,
-      title: "Ask Gideon",
-      description: "Ask a question about what’s in your vault.",
-      href: () => "/ask",
-      cta: "Ask Gideon",
     };
   }
   return null;

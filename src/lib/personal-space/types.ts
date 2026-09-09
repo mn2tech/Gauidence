@@ -144,28 +144,33 @@ export type PersonalAnswer = {
 export const PERSONAL_SPACE_DISPLAY_NAME = "My Personal Space";
 
 export const PERSONAL_SPACE_WELCOME = {
-  title: "Let's build your world",
-  body: "Guardian learns the people, places, and things that matter — then Watch and Ask Gideon stay useful. Start with a source, or open My World anytime.",
+  title: "Stop carrying paperwork and promises in your head.",
+  body: "Tell Guardian one thing you're keeping track of. We'll bring it back when it matters.",
 } as const;
 
+/** Primary first-minute actions — keep to two so the job is obvious. */
 export const PERSONAL_SPACE_ACTIONS = [
+  {
+    id: "tell-guardian",
+    label: "Tell Guardian",
+    description: "A deadline, promise, or note you'd otherwise keep in your head",
+    href: "/history?tell=1",
+  },
+  {
+    id: "add-something",
+    label: "Add a document",
+    description: "Upload a form, receipt, or photo — Guardian watches for dates",
+    href: "/add",
+  },
+] as const;
+
+/** Secondary paths — available, not competing with the first win. */
+export const PERSONAL_SPACE_SECONDARY_ACTIONS = [
   {
     id: "build-world",
     label: "Open My World",
     description: "See people, organizations, and what needs attention",
     href: "/world",
-  },
-  {
-    id: "add-something",
-    label: "Add something",
-    description: "Upload files, notes, receipts, and more",
-    href: "/add",
-  },
-  {
-    id: "tell-guardian",
-    label: "Tell Guardian",
-    description: "Save a quick note to History — no Space required",
-    href: "/history?tell=1",
   },
   {
     id: "connect-something",
@@ -176,7 +181,7 @@ export const PERSONAL_SPACE_ACTIONS = [
   {
     id: "ask-gideon",
     label: "Ask Gideon",
-    description: "Ask across what Guardian already knows",
+    description: "Look something up once Guardian has memory",
     href: "/ask",
   },
 ] as const;

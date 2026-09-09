@@ -223,8 +223,8 @@ export default function AuthForm({ mode }: { mode: Mode }) {
       </h1>
       <p className="mt-2 text-sm text-ink-muted">
         {isSignup
-          ? "Guardian remembers what matters — documents, notes, deadlines — so you can ask instead of search."
-          : "Log in to ask Gideon about your documents, notes, and deadlines."}
+          ? "Stop carrying paperwork and promises in your head. Tell Guardian once — we'll bring it back when it matters."
+          : "Log in — Guardian holds paperwork and promises so you don't have to dig."}
       </p>
 
       {isSignup && campaignWelcome ? (

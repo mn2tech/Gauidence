@@ -1,12 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { MessageCircle, RefreshCw } from "lucide-react";
+import { FileUp, MessageSquarePlus, RefreshCw } from "lucide-react";
 import type {
   GuardianTodayCoverage,
   WhatChangedEntry,
 } from "@/lib/guardian-today/types";
-import { ASK_GIDEON_PATH } from "@/lib/simple-home/routing";
+import { HISTORY_PATH } from "@/lib/simple-home/routing";
+import {
+  EMPTY_CAUGHT_UP,
+  EMPTY_NO_SOURCES,
+  FIRST_MINUTE_ADD_HREF,
+  FIRST_MINUTE_CHIPS,
+  FIRST_MINUTE_TELL_HREF,
+  firstMinuteChipHref,
+} from "@/lib/guardian-today/firstMinute";
 
 export function GuardianTodaySpaceFilter({
   spaces,
@@ -166,21 +174,39 @@ export function GuardianIntelligenceEmptyState({
     return (
       <div className={box}>
         <p className="text-sm font-semibold text-foreground">
-          Guardian is ready when you are.
+          {EMPTY_NO_SOURCES.title}
         </p>
         <p className="mt-2 text-sm text-ink-muted">
-          Add documents or notes
-          {scopeName ? ` to ${scopeName}` : " to your Spaces"} and Guardian
-          will watch for deadlines, commitments, and things that may need your
-          attention.
+          {EMPTY_NO_SOURCES.body}
+          {scopeName ? ` Start in ${scopeName}.` : ""}
         </p>
-        <Link
-          href={ASK_GIDEON_PATH}
-          className="mt-4 inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-dark"
-        >
-          <MessageCircle className="h-4 w-4" aria-hidden />
-          Ask Gideon
-        </Link>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {FIRST_MINUTE_CHIPS.map((chip) => (
+            <Link
+              key={chip.id}
+              href={firstMinuteChipHref(chip)}
+              className="rounded-full border border-border-subtle bg-white px-3 py-1.5 text-xs font-semibold text-foreground transition hover:border-brand/40 hover:bg-brand-light/40"
+            >
+              {chip.label}
+            </Link>
+          ))}
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <Link
+            href={FIRST_MINUTE_TELL_HREF}
+            className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-dark"
+          >
+            <MessageSquarePlus className="h-4 w-4" aria-hidden />
+            {EMPTY_NO_SOURCES.primaryCta}
+          </Link>
+          <Link
+            href={FIRST_MINUTE_ADD_HREF}
+            className="inline-flex items-center gap-2 rounded-xl border border-border-subtle bg-white px-4 py-2.5 text-sm font-semibold text-foreground transition hover:bg-stone-50"
+          >
+            <FileUp className="h-4 w-4" aria-hidden />
+            {EMPTY_NO_SOURCES.secondaryCta}
+          </Link>
+        </div>
       </div>
     );
   }
@@ -218,22 +244,26 @@ export function GuardianIntelligenceEmptyState({
   return (
     <div className={box}>
       <p className="text-sm font-semibold text-foreground">
-        Nothing needs your attention
-        {scopeName ? ` in ${scopeName}` : ""} right now.
+        {EMPTY_CAUGHT_UP.title}
+        {scopeName ? ` in ${scopeName}` : ""}.
       </p>
-      <p className="mt-2 text-sm text-ink-muted">
-        Guardian checked
-        {scopeName ? ` ${scopeName}` : " your Spaces"} and found no urgent
-        deadlines, unresolved commitments, important changes, or follow-ups.
-      </p>
+      <p className="mt-2 text-sm text-ink-muted">{EMPTY_CAUGHT_UP.body}</p>
       <CoverageLine coverage={coverage} summary={coverageSummary} />
-      <Link
-        href={ASK_GIDEON_PATH}
-        className="mt-4 inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-dark"
-      >
-        <MessageCircle className="h-4 w-4" aria-hidden />
-        Ask Gideon
-      </Link>
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <Link
+          href={FIRST_MINUTE_TELL_HREF}
+          className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-dark"
+        >
+          <MessageSquarePlus className="h-4 w-4" aria-hidden />
+          {EMPTY_CAUGHT_UP.primaryCta}
+        </Link>
+        <Link
+          href={HISTORY_PATH}
+          className="inline-flex items-center gap-2 rounded-xl border border-border-subtle bg-white px-4 py-2.5 text-sm font-semibold text-foreground transition hover:bg-stone-50"
+        >
+          {EMPTY_CAUGHT_UP.secondaryCta}
+        </Link>
+      </div>
       {showRecentActivity && children ? (
         <div className="mt-5 border-t border-border-subtle pt-4">{children}</div>
       ) : null}

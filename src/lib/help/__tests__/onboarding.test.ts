@@ -17,8 +17,8 @@ const empty: OnboardingProgress = {
 };
 
 describe("onboarding helpers", () => {
-  it("points to document first (vault is automatic)", () => {
-    assert.equal(nextIncompleteStep(empty)?.id, "document");
+  it("points to Tell Guardian first (mental-load win)", () => {
+    assert.equal(nextIncompleteStep(empty)?.id, "daily_log");
     assert.equal(completedStepCount(empty), 0);
     assert.equal(isOnboardingComplete(empty), false);
   });
@@ -26,24 +26,24 @@ describe("onboarding helpers", () => {
   it("advances through steps in order", () => {
     assert.equal(
       nextIncompleteStep({ ...empty, hasVault: true })?.id,
+      "daily_log"
+    );
+    assert.equal(
+      nextIncompleteStep({
+        ...empty,
+        hasVault: true,
+        hasDailyLog: true,
+      })?.id,
       "document"
     );
     assert.equal(
       nextIncompleteStep({
         ...empty,
         hasVault: true,
+        hasDailyLog: true,
         hasDocument: true,
       })?.id,
       "ask_gideon"
-    );
-    assert.equal(
-      nextIncompleteStep({
-        ...empty,
-        hasVault: true,
-        hasDocument: true,
-        hasAskedGideon: true,
-      })?.id,
-      "daily_log"
     );
   });
 
@@ -59,29 +59,29 @@ describe("onboarding helpers", () => {
     assert.equal(completedStepCount(done), 3);
   });
 
-  it("tracks activation without requiring Daily Log", () => {
+  it("tracks activation from Tell Guardian without requiring Ask Gideon", () => {
     assert.equal(isActivationComplete(empty), false);
     assert.equal(nextActivationChip(empty)?.step, 1);
+    assert.equal(nextActivationChip(empty)?.cta, "Tell Guardian");
     assert.equal(
       nextActivationChip({
         ...empty,
-        hasDocument: true,
+        hasDailyLog: true,
       })?.step,
       2
     );
     assert.equal(
       isActivationComplete({
         ...empty,
-        hasDocument: true,
-        hasAskedGideon: true,
+        hasDailyLog: true,
       }),
       true
     );
     assert.equal(
       nextActivationChip({
         ...empty,
+        hasDailyLog: true,
         hasDocument: true,
-        hasAskedGideon: true,
       }),
       null
     );

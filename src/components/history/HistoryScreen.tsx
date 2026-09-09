@@ -22,6 +22,10 @@ import {
   type HistoryFilter,
 } from "@/lib/guardian-events/history";
 import { ASK_GIDEON_PATH } from "@/lib/simple-home/routing";
+import {
+  FIRST_MINUTE_HOLDING,
+  FIRST_MINUTE_TODAY_HREF,
+} from "@/lib/guardian-today/firstMinute";
 import Link from "next/link";
 
 type TimelineDay = { date: string; events: HistoryEventCard[] };
@@ -211,6 +215,8 @@ export default function HistoryScreen() {
       setTellSaved(false);
       setTellAlreadyHad(false);
       setTellError(null);
+      const draft = searchParams.get("draft")?.trim();
+      if (draft) setTellText(draft);
     }
   }, [searchParams]);
 
@@ -372,12 +378,18 @@ export default function HistoryScreen() {
                 <p className="text-sm text-ink-muted">
                   {tellAlreadyHad
                     ? "Same note wasn't added again. It's already in your History."
-                    : "It's in your History. You can ask Gideon about it anytime."}
+                    : FIRST_MINUTE_HOLDING}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <Link
-                    href={ASK_GIDEON_PATH}
+                    href={FIRST_MINUTE_TODAY_HREF}
                     className="rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark"
+                  >
+                    See it on Today
+                  </Link>
+                  <Link
+                    href={ASK_GIDEON_PATH}
+                    className="rounded-xl border border-stone-200 px-4 py-2 text-sm font-semibold hover:bg-stone-50"
                   >
                     Ask Gideon
                   </Link>
@@ -405,7 +417,8 @@ export default function HistoryScreen() {
                       Tell Guardian something
                     </h2>
                     <p className="mt-1 text-sm text-ink-muted">
-                      No need to pick a space — Guardian organizes it.
+                      What&apos;s taking up space in your head? Guardian will
+                      hold it.
                     </p>
                   </div>
                   <button

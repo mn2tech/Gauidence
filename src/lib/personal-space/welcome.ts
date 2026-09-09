@@ -1,6 +1,7 @@
 import {
   PERSONAL_SPACE_ACTIONS,
   PERSONAL_SPACE_DISPLAY_NAME,
+  PERSONAL_SPACE_SECONDARY_ACTIONS,
   PERSONAL_SPACE_WELCOME,
 } from "./types";
 
@@ -10,13 +11,14 @@ export type PersonalSpaceWelcomeModel = {
   spaceName: string;
   showWelcome: boolean;
   actions: typeof PERSONAL_SPACE_ACTIONS;
+  secondaryActions: typeof PERSONAL_SPACE_SECONDARY_ACTIONS;
   /** True when user should not see create-space form. */
   skipCreateSpaceForm: boolean;
 };
 
 /**
  * First-login welcome for Personal Space.
- * No complicated wizard — four remember-first actions and immediate Gideon access.
+ * One job: dump a mental-load item into Guardian within 60 seconds.
  */
 export function buildPersonalSpaceWelcome(options: {
   hasPersonalSpace: boolean;
@@ -35,6 +37,7 @@ export function buildPersonalSpaceWelcome(options: {
       options.spaceDisplayName?.trim() || PERSONAL_SPACE_DISPLAY_NAME,
     showWelcome,
     actions: PERSONAL_SPACE_ACTIONS,
+    secondaryActions: PERSONAL_SPACE_SECONDARY_ACTIONS,
     skipCreateSpaceForm: options.hasPersonalSpace,
   };
 }

@@ -13,7 +13,7 @@ const EMPTY: OnboardingProgress = {
 };
 
 async function exists(
-  table: "documents" | "daily_logs" | "vault_chats"
+  table: "documents" | "daily_logs" | "vault_chats" | "guardian_events"
 ): Promise<boolean> {
   const supabase = createClient();
   if (!supabase) return false;
@@ -42,15 +42,18 @@ export function useOnboardingProgress() {
     }
     setLoading(true);
     try {
-      const [hasDocument, hasDailyLog, hasAskedGideon] = await Promise.all([
-        exists("documents"),
-        exists("daily_logs"),
-        exists("vault_chats"),
-      ]);
+      const [hasDocument, hasDailyLog, hasToldGuardian, hasAskedGideon] =
+        await Promise.all([
+          exists("documents"),
+          exists("daily_logs"),
+          exists("guardian_events"),
+          exists("vault_chats"),
+        ]);
       setProgress({
         hasVault: true,
         hasDocument,
-        hasDailyLog,
+        // Tell Guardian + legacy Daily Logs both count as the first mental-load win.
+        hasDailyLog: hasDailyLog || hasToldGuardian,
         hasAskedGideon,
       });
     } finally {
