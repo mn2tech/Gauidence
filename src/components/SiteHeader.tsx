@@ -105,7 +105,7 @@ export default function SiteHeader() {
     pathname === "/employee/ask" ||
     pathname?.startsWith("/employee/ask");
   const hideHeaderOnAsk = isAskRoute;
-  /** On Ask Gideon, bottom nav is omitted — Ask is full-screen focus. */
+  /** Ask owns its own bottom nav via VaultChatPanel; SiteHeader skips Ask to avoid duplicates. */
   const showBottomNav = showSimpleNav && !isAskRoute;
   const homeHref = simpleHomeEnabled ? SIMPLE_HOME_PATH : "/ask";
   const cameraHref = needsSetup

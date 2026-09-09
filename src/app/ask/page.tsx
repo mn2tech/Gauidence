@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     "Ask Gideon — your AI Chief of Staff. Plan your day, think through decisions, or search Guardian when you need your files.",
 };
 
-/** Full-screen Ask Gideon — no SiteHeader / bottom nav chrome. */
+/** Ask Gideon page — shares Today bottom nav when simple home is enabled. */
 export default async function AskGideonPage() {
   const supabase = await createClient();
   if (!supabase) redirect("/login?error=not_configured");

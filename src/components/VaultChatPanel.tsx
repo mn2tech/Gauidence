@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Suspense,
   useCallback,
   useEffect,
   useRef,
@@ -13,6 +14,9 @@ import {
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import PlanLimitAlert from "@/components/PlanLimitAlert";
+import SimpleNavigation from "@/components/simple-home/SimpleNavigation";
+import GuardianIcon from "@/components/brand/GuardianIcon";
+import { useSimpleHomeEnabled } from "@/hooks/useSimpleHomeEnabled";
 import {
   Brain,
   ExternalLink,
@@ -881,8 +885,10 @@ export default function VaultChatPanel({
   const { progress: onboardingProgress, refresh: refreshOnboarding } =
     useOnboardingProgress();
   const needsSetup = !profilesLoading && profiles.length === 0;
-  // Full-screen Ask Focus: no bottom-nav padding (Home lives in the ⋯ menu).
-  const reserveSimpleNav = false;
+  const { enabled: simpleHomeEnabled } = useSimpleHomeEnabled();
+  // Same bottom nav as Today so Ask ↔ Today is obvious (not buried in ⋯).
+  const reserveSimpleNav =
+    isPage && simpleHomeEnabled && !needsSetup;
   const bootstrapTried = useRef(false);
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
@@ -2367,7 +2373,7 @@ export default function VaultChatPanel({
     }
     window.dispatchEvent(new Event("guardian:alerts-updated"));
     pushLocalNote(
-      `Added to Today: "${title}". Open Guardian Today to review or mark it done.`
+      `Added to Today: "${title}". Tap Today in the bar below to review or mark it done.`
     );
   };
 
@@ -5582,6 +5588,17 @@ export default function VaultChatPanel({
             </button>
           ) : null}
           <div className="flex shrink-0 items-center gap-1">
+            {reserveSimpleNav ? (
+              <Link
+                href={SIMPLE_HOME_PATH}
+                aria-label="Back to Today"
+                title="Today"
+                className="inline-flex items-center gap-1.5 rounded-full border border-border-subtle bg-surface px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-surface-elevated"
+              >
+                <GuardianIcon size={16} alt="" />
+                <span>Today</span>
+              </Link>
+            ) : null}
             <button
               type="button"
               onClick={() => void startNewChat()}
@@ -5609,8 +5626,12 @@ export default function VaultChatPanel({
                     onClick={() => setHeaderMoreOpen(false)}
                     className="flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-surface-elevated"
                   >
-                    <Home className="h-4 w-4 text-ink-muted" />
-                    Home
+                    {simpleHomeEnabled ? (
+                      <GuardianIcon size={16} alt="" />
+                    ) : (
+                      <Home className="h-4 w-4 text-ink-muted" />
+                    )}
+                    {simpleHomeEnabled ? "Today" : "Home"}
                   </Link>
                   <Link
                     href={INBOX_PATH}
@@ -5708,6 +5729,11 @@ export default function VaultChatPanel({
         profileName={sideVault.profileName}
         onClose={() => setSideVault(null)}
       />
+    ) : null}
+    {reserveSimpleNav ? (
+      <Suspense fallback={null}>
+        <SimpleNavigation />
+      </Suspense>
     ) : null}
     </>
   );
