@@ -211,12 +211,12 @@ export default function WorkspaceContextBar({
                       : "text-ink-muted hover:text-foreground"
                   }`}
                 >
-                  <Icon
-                    className={`h-3 w-3 shrink-0 transition-transform duration-300 ${
-                      active ? "scale-110 opacity-100" : "opacity-70"
-                    }`}
-                    aria-hidden
-                  />
+                  {active ? (
+                    <Icon
+                      className="h-3 w-3 shrink-0 opacity-90"
+                      aria-hidden
+                    />
+                  ) : null}
                   {mode === "global" ? "All spaces" : "This home"}
                 </button>
               );
