@@ -7,6 +7,7 @@ import {
   GraduationCap,
   Home,
   Loader2,
+  MessageSquarePlus,
   NotebookPen,
   Sparkles,
   Users,
@@ -44,6 +45,12 @@ import {
 import { kickDocumentProcessingJobs } from "@/lib/documents/clientProcessing";
 import type { Fact } from "@/lib/analysis/types";
 import { ASK_GIDEON_PATH } from "@/lib/simple-home/routing";
+import {
+  FIRST_MINUTE_CHIPS,
+  FIRST_MINUTE_HOLDING,
+  FIRST_MINUTE_PROMISE,
+  FIRST_MINUTE_SUPPORT,
+} from "@/lib/guardian-today/firstMinute";
 
 type Props = {
   onComplete: (result: {
@@ -212,6 +219,51 @@ export default function ActivationFlow({ onComplete }: Props) {
       setStep("add_knowledge");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't save your choice.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /**
+   * First-60s path: skip category paralysis — bootstrap Personal Space and
+   * land on capture (note or upload).
+   */
+  async function bootstrapCapture(args: {
+    mode: KnowledgeMode;
+    draft?: string;
+    openFilePicker?: boolean;
+  }) {
+    if (saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const id: OnboardingIntent = "personal";
+      await patch({ action: "select_category", intent: id });
+      const name = DEFAULT_SPACE_NAMES[id] ?? "My Personal";
+      setIntent(id);
+      setSpaceName(name);
+      const created = await patch({
+        action: "create_space",
+        intent: id,
+        workspaceName: name,
+      });
+      const profileId =
+        created.activeProfileId ?? created.createdProfileId ?? null;
+      if (profileId) {
+        setActiveProfileId(profileId);
+        await refresh();
+        await switchProfile(profileId);
+      }
+      if (args.draft?.trim()) setNoteText(args.draft.trim());
+      setKnowledgeMode(args.mode);
+      setStep("add_knowledge");
+      if (args.openFilePicker) {
+        window.setTimeout(() => fileRef.current?.click(), 80);
+      }
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "Couldn't start — try again."
+      );
     } finally {
       setSaving(false);
     }
@@ -457,8 +509,6 @@ export default function ActivationFlow({ onComplete }: Props) {
     }
   }
 
-  const categoryLabel =
-    INTENT_OPTIONS.find((o) => o.id === intent)?.label ?? "Space";
   const knowledgeCopy = firstKnowledgeCopy(intent, schoolIntent);
 
   async function trySample() {
@@ -493,40 +543,113 @@ export default function ActivationFlow({ onComplete }: Props) {
                   {greeting}
                   {greetName ? `, ${greetName}` : ""}.
                 </h1>
-                <p className="mt-1 text-lg font-semibold text-brand-dark">
-                  Let&apos;s build your world.
+                <p className="mt-2 text-lg font-semibold text-brand-dark">
+                  {FIRST_MINUTE_PROMISE}
                 </p>
-                <p className="mt-4 text-base font-semibold text-foreground">
-                  Where should we start?
-                </p>
-                <p className="mt-2 text-sm text-ink-muted">
-                  Pick a focus — Guardian builds one World across your life.
-                  Spaces stay available when you need boundaries or sharing.
+                <p className="mt-3 text-sm leading-relaxed text-ink-muted">
+                  {FIRST_MINUTE_SUPPORT}
                 </p>
               </div>
-              <ul className="grid gap-2.5 sm:grid-cols-2">
-                {INTENT_OPTIONS.map((opt) => {
-                  const Icon = CATEGORY_ICONS[opt.id] ?? Sparkles;
-                  return (
-                    <li key={opt.id} className="sm:col-span-1">
-                      <button
-                        type="button"
-                        disabled={saving}
-                        onClick={() => void selectCategory(opt.id)}
-                        className="flex h-full w-full flex-col items-start gap-2 rounded-2xl border border-stone-200 bg-white p-4 text-left shadow-sm transition hover:border-brand hover:bg-brand-light/30 disabled:opacity-60"
-                      >
-                        <Icon className="h-5 w-5 text-brand" aria-hidden />
-                        <span className="text-sm font-semibold text-foreground">
-                          {opt.label}
-                        </span>
-                        <span className="text-xs leading-relaxed text-ink-muted">
-                          {opt.description}
-                        </span>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
+
+              <div className="flex flex-wrap gap-2">
+                {FIRST_MINUTE_CHIPS.map((chip) => (
+                  <button
+                    key={chip.id}
+                    type="button"
+                    disabled={saving}
+                    onClick={() =>
+                      void bootstrapCapture({
+                        mode: "note",
+                        draft: chip.draft,
+                      })
+                    }
+                    className="rounded-full border border-border-subtle bg-white px-3 py-1.5 text-xs font-semibold text-foreground transition hover:border-brand/40 hover:bg-brand-light/40 disabled:opacity-60"
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="grid gap-3">
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => void bootstrapCapture({ mode: "note" })}
+                  className="flex w-full flex-col gap-1 rounded-2xl border border-brand/30 bg-brand-light/50 p-4 text-left shadow-sm transition hover:border-brand hover:bg-brand-light/70 disabled:opacity-60"
+                >
+                  <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                    {saving ? (
+                      <Loader2 className="h-5 w-5 animate-spin text-brand" />
+                    ) : (
+                      <MessageSquarePlus className="h-5 w-5 text-brand" aria-hidden />
+                    )}
+                    Tell Guardian one thing
+                  </span>
+                  <span className="pl-7 text-xs text-ink-muted">
+                    A deadline, promise, or note you&apos;d otherwise keep in
+                    your head
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() =>
+                    void bootstrapCapture({
+                      mode: "choose",
+                      openFilePicker: true,
+                    })
+                  }
+                  className="flex w-full flex-col gap-1 rounded-2xl border border-stone-200 bg-white p-4 text-left transition hover:border-brand hover:bg-brand-light/30 disabled:opacity-60"
+                >
+                  <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <FileUp className="h-5 w-5 text-brand" aria-hidden />
+                    Add a document
+                  </span>
+                  <span className="pl-7 text-xs text-ink-muted">
+                    Upload a form, receipt, or photo — Guardian watches for dates
+                  </span>
+                </button>
+              </div>
+
+              <details className="rounded-xl border border-border-subtle bg-white/80 px-4 py-3">
+                <summary className="cursor-pointer text-sm font-semibold text-ink-muted hover:text-foreground">
+                  Or pick a focus (optional)
+                </summary>
+                <p className="mt-2 text-xs text-ink-muted">
+                  Spaces help when you share or keep work and life separate.
+                  You can do this later.
+                </p>
+                <ul className="mt-3 grid gap-2">
+                  {INTENT_OPTIONS.filter((o) => o.id !== "personal").map(
+                    (opt) => {
+                      const Icon = CATEGORY_ICONS[opt.id] ?? Sparkles;
+                      return (
+                        <li key={opt.id}>
+                          <button
+                            type="button"
+                            disabled={saving}
+                            onClick={() => void selectCategory(opt.id)}
+                            className="flex w-full items-start gap-3 rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-left transition hover:border-brand hover:bg-brand-light/30 disabled:opacity-60"
+                          >
+                            <Icon
+                              className="mt-0.5 h-4 w-4 shrink-0 text-brand"
+                              aria-hidden
+                            />
+                            <span>
+                              <span className="block text-sm font-semibold text-foreground">
+                                {opt.label}
+                              </span>
+                              <span className="mt-0.5 block text-xs text-ink-muted">
+                                {opt.description}
+                              </span>
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    }
+                  )}
+                </ul>
+              </details>
             </div>
           ) : null}
 
@@ -780,11 +903,11 @@ export default function ActivationFlow({ onComplete }: Props) {
                 <>
                   <div>
                     <h1 className="text-2xl font-bold tracking-tight">
-                      Your World has started.
+                      {FIRST_MINUTE_HOLDING}
                     </h1>
                     <p className="mt-2 text-sm text-ink-muted">
-                      Guardian noticed people, facts, and things worth
-                      remembering. Ask Gideon anytime.
+                      It&apos;s in your world now. Open Today to review, or ask
+                      Gideon when you want to dig in.
                     </p>
                   </div>
                   {categories.length > 0 ? (
@@ -811,11 +934,19 @@ export default function ActivationFlow({ onComplete }: Props) {
                     </p>
                   ) : (
                     <p className="rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-ink-muted">
-                      Your item is saved. Ask Gideon to explore what Guardian
-                      remembers.
+                      Your item is saved. You don&apos;t have to keep track of it
+                      alone anymore.
                     </p>
                   )}
                   <div className="flex flex-col gap-2 sm:flex-row">
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={() => void finishAndAsk()}
+                      className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-60"
+                    >
+                      Go to Today
+                    </button>
                     <button
                       type="button"
                       disabled={saving}
@@ -824,21 +955,10 @@ export default function ActivationFlow({ onComplete }: Props) {
                           firstAskQuestionFromCategories(categories)
                         )
                       }
-                      className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-60"
+                      className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm font-semibold text-foreground hover:bg-stone-50 disabled:opacity-60"
                     >
                       <Sparkles className="h-4 w-4" aria-hidden />
-                      Ask Gideon about this
-                    </button>
-                    <button
-                      type="button"
-                      disabled={saving}
-                      onClick={() => {
-                        setKnowledgeMode("choose");
-                        setStep("add_knowledge");
-                      }}
-                      className="inline-flex flex-1 items-center justify-center rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm font-semibold text-foreground hover:bg-stone-50 disabled:opacity-60"
-                    >
-                      Add another item
+                      Ask Gideon
                     </button>
                   </div>
                 </>

@@ -22,13 +22,17 @@ export function isActivationStep(value: unknown): value is ActivationStep {
 
 /** Minimal progress shown during onboarding (3 user-facing milestones). */
 export const ACTIVATION_PROGRESS = [
-  { id: "space", label: "Your world", steps: ["welcome", "create_space"] },
+  {
+    id: "capture",
+    label: "Tell Guardian",
+    steps: ["welcome", "create_space", "add_knowledge"],
+  },
   {
     id: "knowledge",
-    label: "Add sources",
-    steps: ["add_knowledge", "first_value"],
+    label: "See it held",
+    steps: ["first_value"],
   },
-  { id: "gideon", label: "Ask Gideon", steps: ["ask_gideon", "completed"] },
+  { id: "gideon", label: "Today", steps: ["ask_gideon", "completed"] },
 ] as const;
 
 export function activationProgressIndex(step: ActivationStep | null): number {
@@ -314,16 +318,16 @@ export function firstKnowledgeCopy(
     case "personal":
     default:
       return {
-        headline: "Give Guardian one thing to work with.",
+        headline: "What's taking up space in your head?",
         subcopy:
-          "A document, photo, or short note is enough to unlock Ask Gideon.",
-        uploadLabel: "Upload a document or photo",
-        uploadHint: "PDF, photo, or file",
-        notePlaceholder: "e.g. Renew car registration by April 30.",
+          "A deadline, promise, or document. Guardian will hold it and bring it back when it matters.",
+        uploadLabel: "Add a document or photo",
+        uploadHint: "PDF, form, receipt, or photo",
+        notePlaceholder: "e.g. Passport expires March 2027",
         starters: [
-          "Renew car registration by April 30.",
-          "Call the dentist to reschedule.",
-          "Pay rent by the 1st — $1,850.",
+          "Passport expires March 2027",
+          "Promised Jordan a proposal next week — need to follow up",
+          "Kids' registration is due June 1",
         ],
         sampleLabel: "Try a sample document",
       };

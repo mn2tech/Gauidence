@@ -47,8 +47,8 @@ function shouldSkipPath(pathname: string | null): boolean {
 }
 
 /**
- * Soft gate: signed-in users who haven't finished intent see the screen
- * instead of the app (except public, auth, and invite routes).
+ * Soft gate: signed-in users who haven't finished first-run activation see
+ * the capture flow instead of the app (except public, auth, and invite routes).
  */
 export default function OnboardingGate({
   children,

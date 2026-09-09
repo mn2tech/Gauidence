@@ -35,9 +35,16 @@ describe("activation first-value categories", () => {
 
   it("maps steps to progress index", () => {
     assert.equal(activationProgressIndex("welcome"), 0);
-    assert.equal(activationProgressIndex("add_knowledge"), 1);
+    assert.equal(activationProgressIndex("add_knowledge"), 0);
+    assert.equal(activationProgressIndex("first_value"), 1);
     assert.equal(activationProgressIndex("ask_gideon"), 2);
     assert.equal(activationProgressIndex("completed"), 3);
+  });
+
+  it("leads personal first-knowledge with mental-load copy", () => {
+    const personal = firstKnowledgeCopy("personal");
+    assert.match(personal.headline, /taking up space in your head/i);
+    assert.match(personal.starters[0] ?? "", /passport/i);
   });
 
   it("tunes first-knowledge copy by intent", () => {
