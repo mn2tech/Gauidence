@@ -12,6 +12,7 @@ import {
 } from "../mapEvent.ts";
 import {
   buildRecentFromEvents,
+  collapseNearDuplicateAttention,
   dedupeEventItemsAgainstWatch,
   mergeAttentionLists,
 } from "../sections.ts";
@@ -123,6 +124,26 @@ describe("Today section merge", () => {
     );
     assert.equal(merged.length, 2);
     assert.ok(merged[0]!.score >= merged[1]!.score);
+  });
+
+  it("collapses paraphrased Watch cards from the same document", () => {
+    const collapsed = collapseNearDuplicateAttention([
+      watchItem({
+        id: "w1",
+        title: "Respond to teacher permission request for resource program",
+        score: 70,
+        sourceDocumentId: "doc-1",
+      }),
+      watchItem({
+        id: "w2",
+        title:
+          "Respond to teacher Alison Sellner with permission for resource program",
+        score: 90,
+        sourceDocumentId: "doc-1",
+      }),
+    ]);
+    assert.equal(collapsed.length, 1);
+    assert.equal(collapsed[0]!.id, "w2");
   });
 
   it("builds Recent from primary History events only", () => {

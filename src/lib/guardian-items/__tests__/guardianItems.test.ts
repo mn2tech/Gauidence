@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import { associateGuardianItem } from "../associate";
 import {
   buildDedupeKey,
+  collapseNearDuplicateExtractedItems,
   normalizeTitle,
   titleMatchKey,
   titlesLikelySameAttention,
@@ -13,7 +14,10 @@ import {
   daysBetween,
   effectiveCalendarDate,
 } from "../dates";
-import { isLowValueHistoricalFact } from "../negativeFilter";
+import {
+  isLowValueHistoricalFact,
+  isNonActionableFragment,
+} from "../negativeFilter";
 import { resolveItemPriority } from "../priority";
 import { parseGuardianExtraction } from "../schema";
 import {
@@ -143,6 +147,55 @@ describe("negative extraction filter", () => {
       false
     );
   });
+
+  it("blocks email, program blurb, and screenshot-meta fragments", () => {
+    assert.equal(
+      isNonActionableFragment({
+        type: "task",
+        title: "alison.sellner@mcpsmd.org",
+        requires_action: true,
+        priority: "normal",
+        confidence: 0.9,
+        source_excerpt: "alison.sellner@mcpsmd.org",
+      }),
+      true
+    );
+    assert.equal(
+      isNonActionableFragment({
+        type: "informational",
+        title:
+          "Provides targeted instruction to support students in building essential academic skills and becoming more confident, independent learners through small group setting",
+        requires_action: false,
+        priority: "low",
+        confidence: 0.9,
+        source_excerpt: "Resource teachers provide targeted instruction",
+      }),
+      true
+    );
+    assert.equal(
+      isNonActionableFragment({
+        type: "task",
+        title:
+          "Requested start date is Monday; screenshot timestamp indicates September 9, 2026 (Tuesday), suggesting following Monday would be September 15, 2026",
+        requires_action: true,
+        priority: "normal",
+        confidence: 0.7,
+        source_excerpt: "starting Monday",
+      }),
+      true
+    );
+    assert.equal(
+      isNonActionableFragment({
+        type: "follow_up",
+        title: "Respond to teacher Alison Sellner with permission for resource program",
+        requires_action: true,
+        priority: "high",
+        confidence: 0.95,
+        source_excerpt: "Please reply with permission",
+      }),
+      false
+    );
+  });
 });
 
 describe("deduplication", () => {
@@ -191,6 +244,33 @@ describe("deduplication", () => {
         "Reminder: Highlander repair visit — Sep 10 @ 3 PM"
       )
     );
+  });
+
+  it("collapses paraphrased permission follow-ups from one document", () => {
+    const collapsed = collapseNearDuplicateExtractedItems([
+      {
+        type: "follow_up",
+        title: "Respond to teacher permission request for resource program",
+        description: "Need to respond with permission.",
+        requires_action: true,
+        priority: "high",
+        confidence: 0.88,
+        source_excerpt: "Please reply with permission",
+      },
+      {
+        type: "follow_up",
+        title:
+          "Respond to teacher Alison Sellner with permission for resource program",
+        description:
+          "Teacher requesting parental permission for resource program starting Monday.",
+        requires_action: true,
+        priority: "high",
+        confidence: 0.95,
+        source_excerpt: "Please reply with permission for the resource program",
+      },
+    ]);
+    assert.equal(collapsed.length, 1);
+    assert.match(collapsed[0]!.title, /Alison Sellner/);
   });
 
   it("keeps multi-child items separate", () => {

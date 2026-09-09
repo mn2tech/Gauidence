@@ -4,6 +4,10 @@
 
 import type { GuardianEvent } from "@/lib/guardian-events/types";
 import {
+  titleMatchKey,
+  titlesLikelySameAttention,
+} from "@/lib/guardian-items/dedupe";
+import {
   isDerivedHistoryEvent,
   toIntelligenceItemFromEvent,
   toTodayRecentEntry,
@@ -33,6 +37,36 @@ export function dedupeEventItemsAgainstWatch(
   });
 }
 
+/**
+ * Collapse paraphrased Watch cards from the same document (or exact title keys).
+ * Keeps the higher-scored card.
+ */
+export function collapseNearDuplicateAttention(
+  items: GuardianIntelligenceItem[]
+): GuardianIntelligenceItem[] {
+  const sorted = [...items].sort((a, b) => b.score - a.score);
+  const kept: GuardianIntelligenceItem[] = [];
+
+  for (const item of sorted) {
+    const duplicate = kept.find((k) => {
+      if (k.spaceId !== item.spaceId) return false;
+      const sameDoc =
+        k.sourceDocumentId &&
+        item.sourceDocumentId &&
+        k.sourceDocumentId === item.sourceDocumentId;
+      if (sameDoc && titlesLikelySameAttention(k.title, item.title)) {
+        return true;
+      }
+      const ka = titleMatchKey(k.title);
+      const kb = titleMatchKey(item.title);
+      return Boolean(ka && kb && ka === kb);
+    });
+    if (!duplicate) kept.push(item);
+  }
+
+  return kept;
+}
+
 export function mergeAttentionLists(
   watchAttention: GuardianIntelligenceItem[],
   eventAttention: GuardianIntelligenceItem[]
@@ -41,7 +75,9 @@ export function mergeAttentionLists(
     ...watchAttention,
     ...dedupeEventItemsAgainstWatch(eventAttention, watchAttention),
   ];
-  return merged.sort((a, b) => b.score - a.score);
+  return collapseNearDuplicateAttention(merged).sort(
+    (a, b) => b.score - a.score
+  );
 }
 
 export function buildRecentFromEvents(

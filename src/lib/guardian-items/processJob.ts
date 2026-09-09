@@ -7,6 +7,7 @@ import { associateGuardianItem } from "./associate";
 import { extractGuardianItemsWithLlm } from "./extract";
 import { guardianItemsFromImportantDates, guardianItemsFromSourceText } from "./fromImportantDates";
 import { logGuardianEvent } from "./log";
+import { collapseNearDuplicateExtractedItems } from "./dedupe";
 import { isLowValueHistoricalFact } from "./negativeFilter";
 import { persistExtractedGuardianItem } from "./persist";
 import type { GuardianExtractedItem } from "./schema";
@@ -173,15 +174,14 @@ export async function processGuardianItemExtraction(
     return { created: 0, deduped: 0, lowConfidence: 0, skipped: true };
   }
 
+  const filtered = merged.filter((item) => !isLowValueHistoricalFact(item));
+  const collapsed = collapseNearDuplicateExtractedItems(filtered);
+
   let created = 0;
   let deduped = 0;
   let lowConfidence = 0;
 
-  for (const item of merged) {
-    if (isLowValueHistoricalFact(item)) {
-      continue;
-    }
-
+  for (const item of collapsed) {
     const association = associateGuardianItem(
       {
         userId,
@@ -213,7 +213,10 @@ export async function processGuardianItemExtraction(
     created,
     deduped,
     low_confidence: lowConfidence,
-    item_count: merged.length,
+    item_count: collapsed.length,
+    merged_count: merged.length,
+    filtered_out: merged.length - filtered.length,
+    collapsed_from: filtered.length,
     seeded: seeded.length,
   });
 

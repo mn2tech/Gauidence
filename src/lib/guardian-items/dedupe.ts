@@ -1,3 +1,4 @@
+import type { GuardianExtractedItem } from "./schema";
 import type { GuardianItemType } from "./types";
 
 /** Collapse punctuation/whitespace and lowercase for stable matching. */
@@ -96,4 +97,63 @@ export function titlesLikelySameAttention(a: string, b: string): boolean {
     }
   }
   return titlesLikelySameEvent(a, b);
+}
+
+const ACTION_TITLE_RE =
+  /\b(respond|reply|submit|sign|pay|renew|confirm|schedule|call|email|send|complete|return|approve|permission|rsvp|register|attend|remind|follow.?up|due|deadline)\b/i;
+
+/** Prefer clearer, actionable titles when collapsing near-duplicates. */
+export function extractedItemQualityScore(item: GuardianExtractedItem): number {
+  let score = item.confidence * 100;
+  if (item.requires_action) score += 40;
+  if (item.event_date || item.due_at) score += 15;
+  if (ACTION_TITLE_RE.test(item.title)) score += 25;
+  if (/\b[A-Z][a-z]+\s+[A-Z][a-z]+\b/.test(item.title)) score += 10;
+  const len = item.title.length;
+  if (len >= 20 && len <= 120) score += 10;
+  if (len > 180) score -= 20;
+  if (
+    item.type === "follow_up" ||
+    item.type === "deadline" ||
+    item.type === "reminder" ||
+    item.type === "document_requirement" ||
+    item.type === "payment"
+  ) {
+    score += 15;
+  }
+  if (item.type === "informational") score -= 10;
+  return score;
+}
+
+/**
+ * Collapse near-duplicate extracted items from the same document batch.
+ * Keeps the higher-quality title and merges missing dates/descriptions.
+ */
+export function collapseNearDuplicateExtractedItems(
+  items: GuardianExtractedItem[]
+): GuardianExtractedItem[] {
+  const kept: GuardianExtractedItem[] = [];
+  for (const item of items) {
+    const idx = kept.findIndex((k) =>
+      titlesLikelySameAttention(k.title, item.title)
+    );
+    if (idx === -1) {
+      kept.push(item);
+      continue;
+    }
+    const existing = kept[idx]!;
+    const preferNew =
+      extractedItemQualityScore(item) > extractedItemQualityScore(existing);
+    const winner = preferNew ? item : existing;
+    const loser = preferNew ? existing : item;
+    kept[idx] = {
+      ...winner,
+      event_date: winner.event_date ?? loser.event_date ?? null,
+      due_at: winner.due_at ?? loser.due_at ?? null,
+      description: winner.description ?? loser.description ?? null,
+      requires_action: winner.requires_action || loser.requires_action,
+      confidence: Math.max(winner.confidence, loser.confidence),
+    };
+  }
+  return kept;
 }

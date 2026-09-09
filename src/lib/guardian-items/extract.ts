@@ -32,8 +32,13 @@ Do NOT create items for low-value historical or evergreen facts such as:
 - document generated / printed dates with no user action
 - typical school week schedules ("Monday through Friday")
 - marketing CTAs ("contact us today")
+- bare email addresses, phone numbers, or contact lines as standalone items
+- long program/service descriptions that are not themselves a user action
+- date-inference commentary ("screenshot timestamp suggests…", "inferred Monday…")
 
 Rules:
+- One item per real-world user action or dated event. Do NOT split one request into multiple near-duplicate cards.
+- Fold supporting details (who, email, program blurb, start day) into title/description of the single action — do not emit them as separate items.
 - Every item MUST include a short verbatim source_excerpt from the text.
 - Never invent exact dates. If the text says "next Friday" without enough context for an unambiguous calendar date, omit event_date/due_at (set null) rather than guessing.
 - Use ISO dates YYYY-MM-DD when dates are explicit in the document.

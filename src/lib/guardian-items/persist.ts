@@ -153,6 +153,50 @@ export async function persistExtractedGuardianItem(
     return { outcome: "deduped", id: existing.id };
   }
 
+  // Near-duplicate from the same document (paraphrased titles).
+  const { data: sameSource } = await supabase
+    .from("guardian_items")
+    .select("id, title, confidence")
+    .eq("space_id", association.spaceId)
+    .eq("source_document_id", args.sourceDocumentId)
+    .eq("status", "active")
+    .limit(50);
+
+  const fuzzy = (sameSource ?? []).find((candidate) =>
+    titlesLikelySameAttention(String(candidate.title ?? ""), item.title)
+  );
+
+  if (fuzzy?.id) {
+    const existingTitle = String(fuzzy.title ?? "");
+    const preferIncomingTitle =
+      confidence > Number(fuzzy.confidence ?? 0) ||
+      (/\b[A-Z][a-z]+\s+[A-Z][a-z]+\b/.test(item.title) &&
+        !/\b[A-Z][a-z]+\s+[A-Z][a-z]+\b/.test(existingTitle));
+
+    await supabase
+      .from("guardian_items")
+      .update({
+        ...(preferIncomingTitle ? { title: row.title } : {}),
+        description: row.description,
+        confidence: Math.max(confidence, Number(fuzzy.confidence ?? 0)),
+        needs_review: needsReview,
+        priority,
+        source_excerpt: row.source_excerpt,
+        metadata: row.metadata,
+        updated_at: appNow().toISOString(),
+      })
+      .eq("id", fuzzy.id);
+
+    logGuardianEvent("guardian_item_deduped", {
+      item_id: fuzzy.id,
+      space_id: association.spaceId,
+      type: item.type,
+      document_id: args.sourceDocumentId,
+      fuzzy: true,
+    });
+    return { outcome: "deduped", id: fuzzy.id };
+  }
+
   const { data, error } = await supabase
     .from("guardian_items")
     .insert(row)
