@@ -122,3 +122,20 @@ export type {
 } from "./mapGraph";
 
 export { getWorldMap } from "./map";
+
+export {
+  retrieveWorldContextForGideon,
+  resolveWorldEntityForGideon,
+  formatWorldEntityForGideon,
+  extractWorldEntityQueryName,
+  wantsWorldEntityRetrieval,
+} from "./retrieveForGideon";
+
+export { evaluateWorldWatchRules } from "./watch";
+export {
+  evaluateWorldWatchCandidates,
+  candidatesFromOpenCommitments,
+  candidatesFromTimeline,
+  candidatesFromInbox,
+} from "./watchEvaluate";
+

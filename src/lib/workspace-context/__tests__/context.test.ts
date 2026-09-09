@@ -135,6 +135,7 @@ describe("buildGideonSystemPrompt", () => {
         workMemory: "(none — user has no active work projects)",
         structuredKnowledge: "(none)",
         ontology: "(none)",
+        myWorld: "(none)",
         businessIntelligence: "(none)",
       },
       promptOptions: {
@@ -202,6 +203,7 @@ describe("buildGideonSystemPrompt", () => {
         workMemory: "(none — user has no active work projects)",
         structuredKnowledge: "(none)",
         ontology: "(none)",
+        myWorld: "(none)",
         businessIntelligence: "(none)",
       },
       promptOptions: {
@@ -231,6 +233,76 @@ describe("buildGideonSystemPrompt", () => {
     assert.match(system, /Answer ONLY from the retrieval blocks/);
     assert.match(system, /HISTORY EVENTS/);
     assert.doesNotMatch(system, /No Guardian document search ran/);
+  });
+
+  it("includes targeted MY WORLD CONTEXT when present", async () => {
+    const { buildGideonSystemPrompt } = await import("../formatSystemPrompt.ts");
+    const { GIDEON_LOAD_FULL } = await import("@/lib/gideon/capabilities");
+    const system = buildGideonSystemPrompt({
+      activeProfile: {
+        id: "p1",
+        display_name: "Home",
+        profile_type: "personal",
+        parent_profile_id: null,
+      },
+      retrievalScopes: [
+        { id: "p1", display_name: "Home", profile_type: "personal" },
+      ],
+      accessibleProfiles: [],
+      profileNames: { p1: "Home" },
+      searchProfileIds: ["p1"],
+      chatHomeProfileId: "p1",
+      chatScopedProfileId: null,
+      searchScope: "workspace",
+      scopedProfile: null,
+      profileKind: "personal",
+      chatContextLabel: "label",
+      vaultScopeNote: "note",
+      blocks: {
+        excerpts: "(none)",
+        fileInventory: "(none)",
+        attachedDocument: "(none)",
+        currentArtifact: "(none)",
+        dailyLogs: "(none)",
+        clientRequests: "(none)",
+        proposals: "(none)",
+        schedule: "(none)",
+        history: "(none)",
+        linkedProfiles: "(none)",
+        vaultMap: "(none)",
+        workMemory: "(none — user has no active work projects)",
+        structuredKnowledge: "(none)",
+        ontology: "(none)",
+        myWorld:
+          "Name: Jaime (Person)\nSummary: Contact at Olney MD\nAnswer from this My World context first.",
+        businessIntelligence: "(none)",
+      },
+      promptOptions: {
+        timeZone: "America/New_York",
+        showPictures: false,
+        reminderAgent: false,
+        dailyLogCaptureAgent: false,
+        workMemoryUpdateAgent: false,
+        clientRequestReplyAgent: false,
+        clientRequestCreateAgent: false,
+        spaceCreateAgent: false,
+        transcriptionMode: false,
+        hasAttachedDocument: false,
+        allVaultsNote: "Search this space",
+        vaultEmptyNote: "",
+        focusedWorkMemory: false,
+        agentMode: false,
+        fullLogQuote: false,
+        intent: "knowledge_search",
+        loaded: GIDEON_LOAD_FULL,
+        calendarNote: "",
+        focusBlockNote: "",
+        confirmationRequired: false,
+      },
+    });
+    assert.match(system, /MY WORLD CONTEXT/);
+    assert.match(system, /Jaime/);
+    assert.match(system, /prefer plain language/i);
   });
 });
 

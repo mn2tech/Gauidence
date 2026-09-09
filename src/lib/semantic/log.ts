@@ -8,7 +8,8 @@ export type SemanticLogEvent =
   | "semantic_watch_rule_fired"
   | "semantic_extraction_failed"
   | "semantic_backfill_queued"
-  | "world_engine_completed";
+  | "world_engine_completed"
+  | "world_watch_rule_fired";
 
 export function logSemanticEvent(
   event: SemanticLogEvent,

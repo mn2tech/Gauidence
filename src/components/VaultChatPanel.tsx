@@ -872,6 +872,10 @@ export default function VaultChatPanel({
     ? null
     : searchParams.get("requestId");
   const requestedDraft = isScopedPanel ? null : searchParams.get("draft");
+  const requestedWorldEntityId = isScopedPanel
+    ? null
+    : searchParams.get("worldEntityId");
+  const worldEntityIdForSendRef = useRef<string | null>(null);
   const { active, profiles, loading: profilesLoading, switchProfile, refresh, timeZone, timeZoneLabel } =
     useActiveProfile();
   const { progress: onboardingProgress, refresh: refreshOnboarding } =
@@ -1161,6 +1165,12 @@ export default function VaultChatPanel({
 
   // Welcome / deep-link chips land on /ask?draft=…&profileId=… — auto-send once
   // the target Space is active and history has finished loading.
+  useEffect(() => {
+    if (requestedWorldEntityId?.trim()) {
+      worldEntityIdForSendRef.current = requestedWorldEntityId.trim();
+    }
+  }, [requestedWorldEntityId]);
+
   useEffect(() => {
     if (isScopedPanel) return;
     const draft = requestedDraft?.trim();
@@ -2890,6 +2900,9 @@ export default function VaultChatPanel({
           ...(agentModeEnabled ? { agentMode: true } : {}),
           searchScope: meta?.searchScope ?? DEFAULT_SEARCH_SCOPE,
           ...(blockForRequest ? { focusBlock: blockForRequest } : {}),
+          ...(worldEntityIdForSendRef.current
+            ? { worldEntityId: worldEntityIdForSendRef.current }
+            : {}),
         },
         vaultProfileId ?? profileId
       );

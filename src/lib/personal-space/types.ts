@@ -144,11 +144,17 @@ export type PersonalAnswer = {
 export const PERSONAL_SPACE_DISPLAY_NAME = "My Personal Space";
 
 export const PERSONAL_SPACE_WELCOME = {
-  title: "Welcome to Guardian",
-  body: "What would you like Guardian to remember? Add something, tell Gideon a note, connect a source, or just ask — Guardian organizes the rest.",
+  title: "Let's build your world",
+  body: "Guardian learns the people, places, and things that matter — then Watch and Ask Gideon stay useful. Start with a source, or open My World anytime.",
 } as const;
 
 export const PERSONAL_SPACE_ACTIONS = [
+  {
+    id: "build-world",
+    label: "Open My World",
+    description: "See people, organizations, and what needs attention",
+    href: "/world",
+  },
   {
     id: "add-something",
     label: "Add something",

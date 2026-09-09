@@ -410,6 +410,18 @@ export async function processWorldExtraction(
     inbox: result.inboxCreated,
   });
 
+  try {
+    const { evaluateWorldWatchRules } = await import("./watch");
+    await evaluateWorldWatchRules(supabase, input.userId, {
+      spaceId: input.spaceId ?? undefined,
+    });
+  } catch (err) {
+    console.error(
+      "World watch after engine failed (non-blocking):",
+      err instanceof Error ? err.message : err
+    );
+  }
+
   return result;
 }
 

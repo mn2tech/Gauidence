@@ -48,6 +48,8 @@ export type WorkspaceContextBlocks = {
   workMemory: string;
   structuredKnowledge: string;
   ontology: string;
+  /** Targeted My World entity context (never the full graph). */
+  myWorld: string;
   /** Guardian Business Pack V1.1 — intent-based BI briefing. */
   businessIntelligence: string;
 };

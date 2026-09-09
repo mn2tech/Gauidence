@@ -93,7 +93,7 @@ export async function getGuardianWatch(
     return empty;
   }
 
-  // Semantic Watch rules (additive; failures never block existing Watch)
+  // Semantic + World Watch rules (additive; failures never block existing Watch)
   if (isGuardianSemanticLayerEnabled()) {
     try {
       const { evaluateSemanticWatchRules } = await import(
@@ -106,6 +106,18 @@ export async function getGuardianWatch(
     } catch (err) {
       console.error(
         "Semantic watch rules failed (non-blocking):",
+        err instanceof Error ? err.message : err
+      );
+    }
+    try {
+      const { evaluateWorldWatchRules } = await import("@/lib/world/watch");
+      await evaluateWorldWatchRules(supabase, userId, {
+        spaceId: options.spaceId,
+        now: options.now,
+      });
+    } catch (err) {
+      console.error(
+        "World watch rules failed (non-blocking):",
         err instanceof Error ? err.message : err
       );
     }

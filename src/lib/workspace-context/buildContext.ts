@@ -77,6 +77,7 @@ import {
   isLikelyChordChartFile,
 } from "@/lib/ontology/connectorCitationIds";
 import { entityMatchesSongTitle } from "@/lib/ontology/pipeline/chartTranscript";
+import { retrieveWorldContextForGideon } from "@/lib/world/retrieveForGideon";
 import { wantsReminderAgent } from "@/lib/reminders/propose";
 import { wantsDailyLogCapture } from "@/lib/logs/propose";
 import { wantsWorkMemoryUpdate } from "@/lib/work-memory/propose";
@@ -159,6 +160,8 @@ export type LoadWorkspaceContextArgs = {
   confirmationRequired?: boolean;
   /** Claims from the previous assistant turn (Business Pack evidence follow-ups). */
   priorClaims?: unknown;
+  /** Deep-link or Ask chip targeting a My World entity. */
+  worldEntityId?: string | null;
 };
 
 export type WorkspaceContextResult = {
@@ -692,6 +695,15 @@ export async function loadWorkspaceContext(
   knowledgeCandidateCount = structuredKnowledgeBundle.count;
   const structuredKnowledgeContext = structuredKnowledgeBundle.text;
   const ontologyContext = ontologyBundle.text;
+
+  const myWorldContext =
+    load.documents || args.worldEntityId
+      ? await retrieveWorldContextForGideon(supabase, {
+          userId: user.id,
+          question: retrievalQuestion,
+          worldEntityId: args.worldEntityId,
+        })
+      : "(none)";
   const namedCharts = extractChartTitlesFromText(retrievalQuestion);
   let connectorCitations = ontologyBundle.citations;
   if (isPianoOrSongLearnRequest(question) || namedCharts.length > 0 || wantsOpenChartAttachment(question)) {
@@ -959,6 +971,7 @@ Active space in the UI: ${activeProfile.display_name}. Document search includes 
         businessPlan?.intent === "EVIDENCE_REQUEST"
           ? "(none — prefer BUSINESS INTELLIGENCE block over raw ontology dump)"
           : ontologyContext,
+      myWorld: myWorldContext.trim() || "(none)",
       businessIntelligence:
         businessIntelligenceBundle?.promptBlock?.trim() || "(none)",
     },

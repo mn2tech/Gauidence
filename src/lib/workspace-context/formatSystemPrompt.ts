@@ -129,6 +129,11 @@ export function buildGideonSystemPrompt(
     blocks.ontology.trim() !== "(none)"
       ? `When ONTOLOGY has matches, always answer using those entities and relationships — including when the user sends a short name or keyword (for example "Onyx"). If INVOICE SUMMARY is present, answer in 2–5 plain sentences from that summary (amount, parties, date). Do not dump MATCHED ENTITIES or RELATIONSHIPS lists unless the user asked about connections. Never return a blank reply when ONTOLOGY is non-empty.`
       : "";
+  const myWorldNote =
+    (blocks.myWorld ?? "").trim() &&
+    (blocks.myWorld ?? "").trim() !== "(none)"
+      ? `When MY WORLD CONTEXT is present, answer from that person/organization/thing first (facts, connections, timeline, evidence). Prefer plain language — people, organizations, connections. Never say ontology, vectors, chunks, or semantic graph. Cite evidence titles when stating facts.`
+      : "";
   const businessIntelNote =
     (blocks.businessIntelligence ?? "").trim() &&
     (blocks.businessIntelligence ?? "").trim() !== "(none)"
@@ -225,6 +230,11 @@ export function buildGideonSystemPrompt(
       searchedKnowledge
     ),
     namedBlock(
+      "MY WORLD CONTEXT (targeted person/organization/thing from the user's world — prefer for \"what's going on with X\" / Ask about this; cite evidence; never dump the full world)",
+      blocks.myWorld ?? "(none)",
+      true
+    ),
+    namedBlock(
       "BUSINESS INTELLIGENCE (Guardian Business Pack — prefer this over raw ontology dumps for Entity 360, relationships, proposals, commitments, advisory, and evidence questions)",
       blocks.businessIntelligence ?? "(none)",
       true
@@ -255,6 +265,7 @@ ${pictureNote}
 ${searchedKnowledge ? vaultEmptyNote : ""}
 ${fullLogNote}
 ${ontologyNote}
+${myWorldNote}
 ${businessIntelNote}
 ${actionNotes}
 ${clientRequestCreateNote}

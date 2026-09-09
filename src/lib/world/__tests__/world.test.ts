@@ -312,3 +312,154 @@ describe("world vocabulary aliases", () => {
     assert.equal(parsed!.entities[1]!.type, "client");
   });
 });
+
+describe("world gideon retrieval formatting", () => {
+  it("extracts entity names from common question shapes", async () => {
+    const {
+      extractWorldEntityQueryName,
+      wantsWorldEntityRetrieval,
+    } = await import("../retrieveFormat.ts");
+    assert.equal(
+      extractWorldEntityQueryName("What's going on with Jaime?"),
+      "Jaime"
+    );
+    assert.equal(extractWorldEntityQueryName("Tell me about Onyx Health"), "Onyx Health");
+    assert.equal(wantsWorldEntityRetrieval("What's going on with Jaime?"), true);
+    assert.equal(wantsWorldEntityRetrieval("hello there"), false);
+  });
+
+  it("formats a compact My World block without dumping the graph", async () => {
+    const { formatWorldEntityForGideon } = await import("../retrieveFormat.ts");
+    const text = formatWorldEntityForGideon({
+      entity: {
+        id: "e1",
+        name: "Jaime",
+        type: "person",
+        typeLabel: "Person",
+        group: "people",
+        description: "Contact",
+        importance: 0.8,
+        lastSeenAt: null,
+      },
+      description: "Works at Olney MD",
+      aliases: [],
+      attributes: {},
+      relationshipToUser: "works_at Olney MD",
+      relatedPeople: [],
+      relatedOrganizations: [
+        {
+          id: "o1",
+          name: "Olney MD",
+          type: "organization",
+          typeLabel: "Organization",
+          group: "organizations",
+          description: null,
+          importance: 0.7,
+          lastSeenAt: null,
+        },
+      ],
+      relationships: [],
+      facts: [
+        {
+          id: "f1",
+          predicate: "email",
+          valueText: "jaime@olneymd.org",
+          valueNumber: null,
+          valueDate: null,
+          confidence: 0.9,
+        },
+      ],
+      evidence: [
+        {
+          id: "ev1",
+          sourceType: "document",
+          sourceTitle: "Intro email.pdf",
+          sourceExcerpt: "Please contact Jaime at Olney",
+          spaceId: "s1",
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+      ],
+      timeline: [],
+      attention: [],
+      primarySpaceId: "s1",
+    });
+    assert.match(text, /Jaime/);
+    assert.match(text, /Intro email/);
+    assert.match(text, /never say ontology/i);
+    assert.ok(text.length < 2000);
+  });
+});
+
+describe("world watch candidates", () => {
+  it("creates attention from open commitments and upcoming deadlines", async () => {
+    const {
+      evaluateWorldWatchCandidates,
+    } = await import("../watchEvaluate.ts");
+    const now = new Date("2026-09-09T12:00:00Z");
+    const candidates = evaluateWorldWatchCandidates({
+      now,
+      entities: [
+        {
+          id: "e1",
+          name: "Jaime",
+          entity_type: "person",
+          importance_score: 0.8,
+          status: "active",
+          last_seen_at: "2026-09-08T12:00:00Z",
+        },
+      ],
+      facts: [
+        {
+          id: "f1",
+          subject_entity_id: "e1",
+          predicate: "open_commitment",
+          value_text: "Send proposal by Friday",
+          value_date: "2026-09-12",
+          confidence: 0.85,
+        },
+      ],
+      timeline: [
+        {
+          id: "t1",
+          title: "Contract renewal",
+          summary: "Renew Onyx contract",
+          entry_type: "deadline_created",
+          primary_entity_id: "e1",
+          space_id: "s1",
+          occurred_at: "2026-09-11T00:00:00Z",
+          importance_score: 0.8,
+        },
+      ],
+      inbox: [
+        {
+          id: "i1",
+          type: "ENTITY_MERGE",
+          title: "Same person as Jaime Costolo?",
+          space_id: "s1",
+        },
+      ],
+    });
+    assert.ok(candidates.some((c) => c.dedupeKey.startsWith("world:open_commitment")));
+    assert.ok(candidates.some((c) => c.dedupeKey.startsWith("world:timeline")));
+    assert.ok(candidates.some((c) => c.dedupeKey.startsWith("world:inbox")));
+  });
+});
+
+describe("world evidence leakage guard", () => {
+  it("hides entities whose evidence is only in unauthorized spaces", () => {
+    assert.equal(
+      entityHasAuthorizedEvidence({
+        evidenceSpaces: ["space-secret"],
+        authorizedSpaceIds: new Set(["space-a"]),
+      }),
+      false
+    );
+    assert.equal(
+      entityHasAuthorizedEvidence({
+        evidenceSpaces: ["space-a"],
+        authorizedSpaceIds: new Set(["space-a"]),
+      }),
+      true
+    );
+  });
+});

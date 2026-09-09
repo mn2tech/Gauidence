@@ -43,33 +43,39 @@ export type IntentOption = {
 export const INTENT_OPTIONS: IntentOption[] = [
   {
     id: "business",
-    label: "Business",
+    label: "My Work",
     description: "Contracts, clients, invoices, and company knowledge",
     emoji: "💼",
   },
   {
-    id: "personal",
-    label: "Personal",
-    description: "Everyday documents, notes, receipts, and plans",
-    emoji: "👤",
-  },
-  {
     id: "family",
-    label: "Family",
+    label: "My Family",
     description: "Household paperwork, activities, and shared life",
     emoji: "👨‍👩‍👧",
   },
   {
     id: "school",
-    label: "School",
+    label: "My School",
     description: "Teaching, studying, or supporting a student’s records",
     emoji: "🎓",
   },
   {
+    id: "personal",
+    label: "My Documents",
+    description: "Everyday documents, notes, receipts, and plans",
+    emoji: "📄",
+  },
+  {
     id: "organization",
-    label: "Organization",
+    label: "My Organization",
     description: "Nonprofit, team, church, or community knowledge",
     emoji: "🏛️",
+  },
+  {
+    id: "other",
+    label: "Something Else",
+    description: "Start broad — Guardian will learn what matters to you",
+    emoji: "✨",
   },
 ];
 

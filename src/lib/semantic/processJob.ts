@@ -2,12 +2,13 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isGuardianSemanticLayerEnabled } from "@/lib/features/semantic-layer";
-import { ingestSemanticKnowledge } from "./ingest-semantic-knowledge";
+import { processWorldExtraction } from "@/lib/world/engine";
+import { evaluateWorldWatchRules } from "@/lib/world/watch";
 import { evaluateSemanticWatchRules } from "./watch-rules";
 import { logSemanticEvent } from "./log";
 
 /**
- * Run Semantic Layer extraction for a document after content analysis.
+ * Run Semantic / World Layer extraction for a document after content analysis.
  * Failures are isolated — never block document ingestion success.
  */
 export async function processSemanticExtraction(
@@ -56,7 +57,7 @@ export async function processSemanticExtraction(
   }
 
   try {
-    const result = await ingestSemanticKnowledge(supabase, {
+    const result = await processWorldExtraction(supabase, {
       userId,
       spaceId,
       sourceType: "document",
@@ -65,12 +66,21 @@ export async function processSemanticExtraction(
       content: sourceText,
     });
 
-    // Watch Engine semantic rules (non-blocking)
+    // Watch Engine — semantic + world rules (non-blocking)
     try {
       await evaluateSemanticWatchRules(supabase, userId, { spaceId });
     } catch (err) {
       console.error(
         "Semantic watch rules failed (non-blocking):",
+        documentId,
+        err instanceof Error ? err.message : err
+      );
+    }
+    try {
+      await evaluateWorldWatchRules(supabase, userId, { spaceId });
+    } catch (err) {
+      console.error(
+        "World watch rules failed (non-blocking):",
         documentId,
         err instanceof Error ? err.message : err
       );

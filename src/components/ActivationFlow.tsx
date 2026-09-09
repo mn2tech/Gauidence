@@ -60,6 +60,7 @@ const CATEGORY_ICONS: Record<string, typeof Building2> = {
   family: Users,
   school: GraduationCap,
   organization: Building2,
+  other: Sparkles,
 };
 
 function ProgressBar({ step }: { step: ActivationStep }) {
@@ -493,14 +494,14 @@ export default function ActivationFlow({ onComplete }: Props) {
                   {greetName ? `, ${greetName}` : ""}.
                 </h1>
                 <p className="mt-1 text-lg font-semibold text-brand-dark">
-                  Welcome to Guardian.
+                  Let&apos;s build your world.
                 </p>
                 <p className="mt-4 text-base font-semibold text-foreground">
-                  What would you like Guardian to remember?
+                  Where should we start?
                 </p>
                 <p className="mt-2 text-sm text-ink-muted">
-                  Pick a starting focus — Guardian can organize contexts for you.
-                  You only need a separate Space for sharing or clear boundaries.
+                  Pick a focus — Guardian builds one World across your life.
+                  Spaces stay available when you need boundaries or sharing.
                 </p>
               </div>
               <ul className="grid gap-2.5 sm:grid-cols-2">
@@ -684,6 +685,19 @@ export default function ActivationFlow({ onComplete }: Props) {
                   >
                     {knowledgeCopy.sampleLabel}
                   </button>
+
+                  <a
+                    href="/settings/connections"
+                    className="flex w-full flex-col gap-1 rounded-2xl border border-stone-200 bg-white p-4 text-left transition hover:border-brand hover:bg-brand-light/30"
+                  >
+                    <span className="text-sm font-semibold text-foreground">
+                      Connect email or calendar
+                    </span>
+                    <span className="text-xs text-ink-muted">
+                      Optional — Guardian can notice people and events from your
+                      sources
+                    </span>
+                  </a>
                 </div>
               ) : null}
 
@@ -766,10 +780,11 @@ export default function ActivationFlow({ onComplete }: Props) {
                 <>
                   <div>
                     <h1 className="text-2xl font-bold tracking-tight">
-                      Guardian found useful information.
+                      Your World has started.
                     </h1>
                     <p className="mt-2 text-sm text-ink-muted">
-                      Guardian now knows more about this Space.
+                      Guardian noticed people, facts, and things worth
+                      remembering. Ask Gideon anytime.
                     </p>
                   </div>
                   {categories.length > 0 ? (

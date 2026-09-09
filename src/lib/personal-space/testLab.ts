@@ -25,6 +25,12 @@ import {
   mayClaimAttachmentView,
 } from "@/lib/artifacts";
 import type { GuardableChunk } from "@/lib/artifacts/retrievalGuard";
+import { INTENT_OPTIONS } from "@/lib/onboarding/intent";
+import {
+  extractWorldEntityQueryName,
+  wantsWorldEntityRetrieval,
+} from "@/lib/world/retrieveFormat";
+import { evaluateWorldWatchCandidates } from "@/lib/world/watchEvaluate";
 
 export type TestLabCase = {
   id: string;
@@ -96,6 +102,7 @@ export function buildTestLabCases(): TestLabCase[] {
             a.includes(PERSONAL_SPACE_DISPLAY_NAME) &&
             a.includes("welcome") &&
             a.includes("no-create-form") &&
+            a.includes("Open My World") &&
             a.includes("Ask Gideon") &&
             a.includes("Add something") &&
             a.includes("Tell Guardian") &&
@@ -142,6 +149,66 @@ export function buildTestLabCases(): TestLabCase[] {
           ? "Ask Gideon available immediately"
           : "blocked";
         return passFail(actual, (a) => a.includes("available"));
+      },
+    },
+    {
+      id: "1.4",
+      tab: "Onboarding",
+      name: "My World onboarding intents",
+      input: "Let's build your world",
+      expected: "My Work / My Family / My School / My Documents / Something Else",
+      run: () => {
+        const labels = INTENT_OPTIONS.map((o) => o.label).join(" | ");
+        return passFail(labels, (a) =>
+          Boolean(
+            a.includes("My Work") &&
+              a.includes("My Family") &&
+              a.includes("My School") &&
+              a.includes("My Documents") &&
+              a.includes("Something Else")
+          )
+        );
+      },
+    },
+    {
+      id: "1.5",
+      tab: "Retrieval",
+      name: "My World Gideon name extraction",
+      input: "What's going on with Jaime?",
+      expected: "Extracts Jaime; wants world retrieval",
+      run: () => {
+        const name = extractWorldEntityQueryName(
+          "What's going on with Jaime?"
+        );
+        const wants = wantsWorldEntityRetrieval("What's going on with Jaime?");
+        const actual = `name=${name}; wants=${wants}`;
+        return passFail(actual, (a) => a.includes("Jaime") && a.includes("true"));
+      },
+    },
+    {
+      id: "1.6",
+      tab: "Entities",
+      name: "My World watch open commitment",
+      input: "open_commitment fact",
+      expected: "Watch candidate with world:open_commitment dedupe",
+      run: () => {
+        const candidates = evaluateWorldWatchCandidates({
+          now: new Date("2026-09-09T12:00:00Z"),
+          entities: [{ id: "e1", name: "Jaime", entity_type: "person" }],
+          facts: [
+            {
+              id: "f1",
+              subject_entity_id: "e1",
+              predicate: "open_commitment",
+              value_text: "Follow up Friday",
+              value_date: null,
+            },
+          ],
+          timeline: [],
+          inbox: [],
+        });
+        const actual = candidates.map((c) => c.dedupeKey).join(",");
+        return passFail(actual, (a) => a.includes("world:open_commitment"));
       },
     },
     {

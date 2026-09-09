@@ -1005,6 +1005,7 @@ export async function POST(request: Request) {
   let profileIdRaw: unknown;
   let agentMode = false;
   let focusBlockRaw: unknown;
+  let worldEntityIdRaw: unknown;
   try {
     const body = await request.json();
     questionRaw = body.question;
@@ -1018,6 +1019,7 @@ export async function POST(request: Request) {
     profileIdRaw = body.profileId;
     agentMode = body.agentMode === true;
     focusBlockRaw = body.focusBlock;
+    worldEntityIdRaw = body.worldEntityId;
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
@@ -1026,6 +1028,11 @@ export async function POST(request: Request) {
     typeof regenerateAssistantIdRaw === "string" &&
     regenerateAssistantIdRaw.trim()
       ? regenerateAssistantIdRaw.trim()
+      : null;
+
+  const worldEntityId =
+    typeof worldEntityIdRaw === "string" && worldEntityIdRaw.trim()
+      ? worldEntityIdRaw.trim()
       : null;
 
   let question = sanitizeChatQuestion(questionRaw);
@@ -1708,6 +1715,7 @@ export async function POST(request: Request) {
         focusBlockNote,
         confirmationRequired: gideonRoute.confirmationRequired,
         priorClaims: priorAssistantClaims,
+        worldEntityId,
       });
 
       workspaceContext.promptOptions.agentMode = agentMode;
