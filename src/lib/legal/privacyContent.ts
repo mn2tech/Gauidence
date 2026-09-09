@@ -33,9 +33,10 @@ export const PRIVACY_SECTIONS: LegalSection[] = [
       "Information contained inside materials you upload (for example names, dates, amounts, or other content present in a document)",
       "Billing-related contact details when you subscribe through our payment processor",
       "Preferences such as reminder, tip, and notification settings",
+      "If you connect optional Google integrations (such as Gmail or Google Drive), information Google provides under the permissions you grant (described below)",
     ],
     paragraphsAfter: [
-      "The contents of uploaded materials depend entirely on what you choose to store. Guardian does not independently collect the substance of your documents from outside sources unless you connect an optional integration and authorize it.",
+      "The contents of uploaded materials depend entirely on what you choose to store. Guardian does not independently collect the substance of your documents or email from outside sources unless you connect an optional integration and authorize it.",
     ],
   },
   {
@@ -69,10 +70,27 @@ export const PRIVACY_SECTIONS: LegalSection[] = [
       "Maintain security, prevent abuse, and troubleshoot problems",
       "Manage subscriptions and billing when you choose a paid plan",
       "Send service-related communications you enable (for example deadline reminders, optional tips, or push notifications)",
+      "When you connect Gmail, sync limited message metadata into Inbox so you can triage bills, school mail, and follow-ups, file items into Spaces, and discuss them with Gideon",
       "Improve product functionality and understand how features are used",
     ],
     paragraphsAfter: [
       "Guardian does not claim that your content is used to train third-party foundation models. Whether a specific AI provider may use API inputs for training depends on that provider’s terms and configuration, which can change. See “Artificial intelligence processing” and our verification notes for what we can and cannot currently assert.",
+    ],
+  },
+  {
+    id: "google-integrations",
+    title: "Google integrations (optional)",
+    paragraphs: [
+      "Guardian may offer optional connections to Google services. These features are off until you explicitly connect them. You can disconnect at any time.",
+    ],
+    list: [
+      "Google sign-in — if you choose to sign in with Google, we receive basic account identifiers such as your email address and profile name from Google to create or authenticate your Guardian account.",
+      "Google Drive (optional) — if you connect Drive, Guardian requests access needed to list and sync files from folders you select so those materials can be stored and used in your Spaces. You control which folders you authorize.",
+      "Gmail (optional) — if you choose Connect Gmail, Guardian requests read-only access to Gmail (Google scope gmail.readonly). We use that access only to sync recent message metadata into your Guardian Inbox—typically sender name and email, subject, a short preview/snippet, labels, and received time—so you can triage items (for example bills, school mail, and follow-ups), file them into Spaces, and ask Gideon about a message. We do not use Gmail access to send, delete, or permanently alter your email. OAuth tokens are stored for your account so Guardian can sync on your behalf until you disconnect. Disconnecting Gmail in Inbox or Settings → Connections removes stored Gmail credentials for that connection and clears synced Inbox message rows for that connection. You may also revoke Guardian’s access in your Google Account permissions.",
+    ],
+    paragraphsAfter: [
+      "Google’s handling of information is governed by Google’s Privacy Policy and your Google Account settings.",
+      "Guardian’s use of information received from Google APIs will adhere to the Google API Services User Data Policy, including the Limited Use requirements.",
     ],
   },
   {
@@ -100,10 +118,11 @@ export const PRIVACY_SECTIONS: LegalSection[] = [
       "PostHog — product analytics (when an analytics key is configured)",
       "Sentry — error and diagnostic monitoring (when configured)",
       "Resend — transactional and optional product email (when configured)",
+      "Google — authentication and optional Drive or Gmail access when you connect those features",
       "Hosting and infrastructure providers that deliver the Guardian application",
     ],
     paragraphsAfter: [
-      "Optional features may involve additional processors only when you use them (for example SMS via Twilio if enabled, web search tools for research features, or Google services if you connect Google sign-in or Drive). Providers process information under their own terms and solely as needed to provide the relevant functionality.",
+      "Optional features may involve additional processors only when you use them (for example SMS via Twilio if enabled, or web search tools for research features). Providers process information under their own terms and solely as needed to provide the relevant functionality.",
     ],
   },
   {
@@ -152,7 +171,7 @@ export const PRIVACY_SECTIONS: LegalSection[] = [
     title: "Retention and deletion",
     paragraphs: [
       "We retain information for as long as your account remains active and as needed to provide Guardian, comply with legal obligations, resolve disputes, and enforce agreements.",
-      "Within the product you can delete individual documents and delete Spaces (with confirmation where required). You can also permanently delete your account from Settings, which removes your authentication user and cascades associated vault data according to our database design, with best-effort cleanup of stored files.",
+      "Within the product you can delete individual documents and delete Spaces (with confirmation where required). You can disconnect optional Google integrations (including Gmail) to stop syncing and remove stored connector credentials and synced Inbox rows for that connection. You can also permanently delete your account from Settings, which removes your authentication user and cascades associated vault data according to our database design, with best-effort cleanup of stored files.",
       "Some residual records (for example backups, logs, or billing records held by processors) may persist for a limited period consistent with normal operations and legal requirements.",
     ],
   },

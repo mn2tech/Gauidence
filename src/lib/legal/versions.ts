@@ -5,7 +5,7 @@
  */
 
 export const LEGAL_VERSIONS = {
-  privacy: "2026-08-20",
+  privacy: "2026-09-09",
   terms: "2026-08-20",
   aiDisclaimer: "2026-08-20",
 } as const;
@@ -13,7 +13,7 @@ export const LEGAL_VERSIONS = {
 export type LegalDocumentId = keyof typeof LEGAL_VERSIONS;
 
 export const LEGAL_EFFECTIVE_DATES = {
-  privacy: "August 20, 2026",
+  privacy: "September 9, 2026",
   terms: "August 20, 2026",
   aiDisclaimer: "August 20, 2026",
 } as const;
