@@ -1093,9 +1093,17 @@ export default function VaultChatPanel({
   sendingRef.current = sending;
   activeChatIdRef.current = activeChatId;
   const workProjectPrefillDone = useRef(false);
-  const sendQuestionRef = useRef<(questionRaw: string) => Promise<void>>(
-    async () => {}
-  );
+  const sendQuestionRef = useRef<
+    (
+      questionRaw: string,
+      options?: {
+        attachment?: VaultMessageAttachment;
+        userDisplayContent?: string;
+        replaceUserMessageId?: string;
+        regenerateAssistantId?: string;
+      }
+    ) => Promise<void>
+  >(async () => {});
   const inputId = isPage
     ? "ask-gideon-page-input"
     : isDrawer
