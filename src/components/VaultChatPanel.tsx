@@ -43,6 +43,7 @@ import {
   Home,
   Inbox,
   Lock,
+  Check,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import GideonAvatar from "@/components/GideonAvatar";
@@ -216,10 +217,12 @@ import {
 } from "@/lib/vault/actionTitle";
 import { askSpaceHref, documentsHref, VAULT_NAV_LABEL } from "@/lib/routes";
 import {
+  HISTORY_PATH,
   INBOX_PATH,
   SIMPLE_HOME_PATH,
   VAULTS_PATH,
 } from "@/lib/simple-home/routing";
+import { FIRST_MINUTE_HOLDING } from "@/lib/guardian-today/firstMinute";
 import { practiceStatsListPrompt } from "@/lib/vault/askInventory";
 import type { WorkProject } from "@/lib/work-memory/types";
 import OnboardingProgressChip from "@/components/OnboardingProgressChip";
@@ -2445,7 +2448,7 @@ export default function VaultChatPanel({
       markDailyLogConfirmed(messageId);
       window.dispatchEvent(new Event("guardian:logs-updated"));
       pushLocalNote(
-        `Daily Log saved: ${proposedDailyLogSummary(proposal, timeZone)}`
+        `${FIRST_MINUTE_HOLDING} Open Today to review it, or History to see the note.`
       );
     } catch {
       setError("Couldn't save Daily Log. Check your connection and try again.");
@@ -3584,9 +3587,29 @@ export default function VaultChatPanel({
               </p>
             ) : null}
             {alreadySetReminder ? (
-              <p className="mt-2 text-xs font-medium text-emerald-800">
-                Reminder saved. You decide what happens next.
-              </p>
+              <div className="mt-3 space-y-3 rounded-lg border border-emerald-200 bg-emerald-50/90 px-3 py-3">
+                <div className="flex items-start gap-2">
+                  <Check
+                    className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700"
+                    aria-hidden
+                  />
+                  <div>
+                    <p className="text-sm font-semibold text-emerald-900">
+                      Reminder saved
+                    </p>
+                    <p className="mt-1 text-xs leading-relaxed text-emerald-900/80">
+                      Next: open Today when it&apos;s due, or keep chatting.
+                    </p>
+                  </div>
+                </div>
+                <Link
+                  href={SIMPLE_HOME_PATH}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-dark"
+                >
+                  <GuardianIcon size={14} alt="" />
+                  Go to Today
+                </Link>
+              </div>
             ) : (
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
@@ -3642,9 +3665,38 @@ export default function VaultChatPanel({
               </p>
             ) : null}
             {alreadySavedDailyLog ? (
-              <p className="mt-2 text-xs font-medium text-emerald-800">
-                Daily Log saved to your vault.
-              </p>
+              <div className="mt-3 space-y-3 rounded-lg border border-emerald-200 bg-emerald-50/90 px-3 py-3">
+                <div className="flex items-start gap-2">
+                  <Check
+                    className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700"
+                    aria-hidden
+                  />
+                  <div>
+                    <p className="text-sm font-semibold text-emerald-900">
+                      Saved — {FIRST_MINUTE_HOLDING}
+                    </p>
+                    <p className="mt-1 text-xs leading-relaxed text-emerald-900/80">
+                      Next: open Today to see what needs you, or History to
+                      review this note.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Link
+                    href={SIMPLE_HOME_PATH}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-dark"
+                  >
+                    <GuardianIcon size={14} alt="" />
+                    Go to Today
+                  </Link>
+                  <Link
+                    href={HISTORY_PATH}
+                    className="inline-flex items-center rounded-lg border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-950 transition hover:bg-emerald-50"
+                  >
+                    Open History
+                  </Link>
+                </div>
+              </div>
             ) : (
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
@@ -4082,8 +4134,12 @@ export default function VaultChatPanel({
             speechSupported={speechOutputSupported}
             disabled={sending || vaultBusy || Boolean(streamingAssistantId)}
             canRegenerate={Boolean(options?.userMessage && activeChatId)}
-            canAddToToday={Boolean(profileId)}
-            canRemind={Boolean(profileId)}
+            canAddToToday={
+              Boolean(profileId) && !alreadySavedDailyLog && !alreadySetReminder
+            }
+            canRemind={
+              Boolean(profileId) && !alreadySavedDailyLog && !alreadySetReminder
+            }
             onSpeak={speakAssistant}
             onAddToToday={addAnswerToToday}
             onRemindMe={remindFromAnswer}
