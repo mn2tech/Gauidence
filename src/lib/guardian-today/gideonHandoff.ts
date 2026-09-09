@@ -21,17 +21,31 @@ export function buildGideonHandoffDraft(item: GuardianIntelligenceItem): string 
   return lines.join("\n");
 }
 
+/**
+ * Ask Gideon opens on the extracted World topic (or source document) so Gideon
+ * answers in that extract's context — not a generic unscoped chat.
+ */
 export function gideonHandoffHref(item: GuardianIntelligenceItem): string {
   const params = new URLSearchParams({
     draft: buildGideonHandoffDraft(item),
     profileId: item.spaceId,
   });
+  if (item.worldEntityId) {
+    params.set("worldEntityId", item.worldEntityId);
+  } else if (item.sourceDocumentId) {
+    params.set("documentId", item.sourceDocumentId);
+  }
   return `${ASK_GIDEON_PATH}?${params.toString()}`;
 }
 
 export function reviewHref(item: GuardianIntelligenceItem): string {
   if (item.sourceDocumentId) {
-    return `${documentsHref(item.spaceId)}?doc=${encodeURIComponent(item.sourceDocumentId)}`;
+    const params = new URLSearchParams({
+      docs: "1",
+      documentId: item.sourceDocumentId,
+      profileId: item.spaceId,
+    });
+    return `/dashboard?${params.toString()}#documents-${item.spaceId}`;
   }
   return documentsHref(item.spaceId);
 }

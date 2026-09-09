@@ -61,6 +61,8 @@ export type GuardianIntelligenceItem = {
   sourceDocumentId: string | null;
   sourceTitle: string | null;
   sourceExcerpt: string | null;
+  /** My World entity for this extract (Ask Gideon → topic). */
+  worldEntityId?: string | null;
 
   type: IntelligenceType;
   title: string;

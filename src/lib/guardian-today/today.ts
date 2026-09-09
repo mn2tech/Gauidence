@@ -35,6 +35,7 @@ import type {
   GuardianTodaySpaceGroup,
   ScoredWatchItem,
 } from "./types";
+import { loadWorldEntityIdsForItems } from "./worldEntityIds";
 
 async function loadSourceTitles(
   supabase: SupabaseClient,
@@ -126,14 +127,16 @@ function coverageSummaryForScope(
 
 function mapScoredBucket(
   items: ScoredWatchItem[],
-  sourceTitles: Record<string, string>
+  sourceTitles: Record<string, string>,
+  worldEntityIds: Record<string, string>
 ): GuardianIntelligenceItem[] {
   return items.map((item) =>
     toIntelligenceItem(
       item,
       item.source_document_id
         ? sourceTitles[item.source_document_id] ?? null
-        : null
+        : null,
+      worldEntityIds[item.id] ?? null
     )
   );
 }
@@ -226,6 +229,17 @@ export async function getGuardianToday(
   ];
   const sourceTitles = await loadSourceTitles(supabase, docIds);
 
+  const worldEntityIds = await loadWorldEntityIdsForItems(
+    supabase,
+    userId,
+    [...rankedItems, ...scoredAttention, ...scoredUpcoming].map((item) => ({
+      id: item.id,
+      title: item.title,
+      metadata: item.metadata,
+      source_document_id: item.source_document_id,
+    }))
+  );
+
   const groups: GuardianTodaySpaceGroup[] = grouped.map((g) => ({
     spaceId: g.rootId,
     spaceName: g.profile?.display_name ?? g.items[0]?.space_name ?? "Space",
@@ -235,13 +249,18 @@ export async function getGuardianToday(
         item,
         item.source_document_id
           ? sourceTitles[item.source_document_id] ?? null
-          : null
+          : null,
+        worldEntityIds[item.id] ?? null
       )
     ),
   }));
 
-  const watchAttention = mapScoredBucket(scoredAttention, sourceTitles);
-  const upcoming = mapScoredBucket(scoredUpcoming, sourceTitles);
+  const watchAttention = mapScoredBucket(
+    scoredAttention,
+    sourceTitles,
+    worldEntityIds
+  );
+  const upcoming = mapScoredBucket(scoredUpcoming, sourceTitles, worldEntityIds);
 
   const eventAttention = openEvents.ok
     ? mapOpenActionEvents(openEvents.data, spaceNames)

@@ -882,7 +882,11 @@ export default function VaultChatPanel({
   const requestedWorldEntityId = isScopedPanel
     ? null
     : searchParams.get("worldEntityId");
+  const requestedDocumentId = isScopedPanel
+    ? null
+    : searchParams.get("documentId");
   const worldEntityIdForSendRef = useRef<string | null>(null);
+  const documentIdForSendRef = useRef<string | null>(null);
   const { active, profiles, loading: profilesLoading, switchProfile, refresh, timeZone, timeZoneLabel } =
     useActiveProfile();
   const { progress: onboardingProgress, refresh: refreshOnboarding } =
@@ -1181,6 +1185,12 @@ export default function VaultChatPanel({
   }, [requestedWorldEntityId]);
 
   useEffect(() => {
+    if (requestedDocumentId?.trim()) {
+      documentIdForSendRef.current = requestedDocumentId.trim();
+    }
+  }, [requestedDocumentId]);
+
+  useEffect(() => {
     if (isScopedPanel) return;
     const draft = requestedDraft?.trim();
     if (!draft) {
@@ -1203,7 +1213,20 @@ export default function VaultChatPanel({
       const next = `${window.location.pathname}${qs ? `?${qs}` : ""}`;
       window.history.replaceState(window.history.state, "", next);
     }
-    void sendQuestionRef.current(draft);
+    const docId = documentIdForSendRef.current;
+    if (docId) {
+      void sendQuestionRef.current(draft, {
+        attachment: {
+          documentId: docId,
+          fileName: "Source document",
+          kind: "document",
+          previewUrl: null,
+        },
+      });
+      documentIdForSendRef.current = null;
+    } else {
+      void sendQuestionRef.current(draft);
+    }
   }, [
     requestedDraft,
     isScopedPanel,

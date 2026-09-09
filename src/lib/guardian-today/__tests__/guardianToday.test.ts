@@ -211,8 +211,43 @@ describe("Guardian Today — Gideon handoff", () => {
     const href = gideonHandoffHref(item);
     assert.match(href, /draft=/);
     assert.match(href, /profileId=space-1/);
+    assert.match(href, /documentId=doc-1/);
     assert.match(reviewHref(item), /space-1/);
-    assert.match(reviewHref(item), /doc=doc-1/);
+    assert.match(reviewHref(item), /documentId=doc-1/);
+  });
+
+  it("grounds Ask Gideon on the World extract topic when known", () => {
+    const item = {
+      id: "item-1",
+      userId: "user-1",
+      spaceId: "space-1",
+      spaceName: "Family",
+      childName: "Nolan Kola",
+      sourceId: "doc-1",
+      sourceType: "document" as const,
+      sourceDocumentId: "doc-1",
+      sourceTitle: "Teacher email",
+      sourceExcerpt: null,
+      worldEntityId: "entity-resource-teacher",
+      type: "follow_up" as const,
+      title: "Resource teacher",
+      summary: "Email signature Ms. Sellner requesting permission.",
+      dueAt: null,
+      effectiveDate: "2026-09-09",
+      status: "open" as const,
+      priority: "high" as const,
+      score: 80,
+      confidence: 0.9,
+      reason: "Due today",
+      suggestedAction: "Respond",
+      provenanceMessage: "Found in document",
+      createdAt: "2026-09-01T00:00:00.000Z",
+      updatedAt: "2026-09-01T00:00:00.000Z",
+    };
+    const href = gideonHandoffHref(item);
+    assert.match(href, /worldEntityId=entity-resource-teacher/);
+    assert.match(href, /profileId=space-1/);
+    assert.doesNotMatch(href, /documentId=/);
   });
 });
 

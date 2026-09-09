@@ -135,7 +135,8 @@ function formatDateLabel(date: string): string {
 
 export function toIntelligenceItem(
   item: ScoredWatchItem,
-  sourceTitle: string | null
+  sourceTitle: string | null,
+  worldEntityId: string | null = null
 ): GuardianIntelligenceItem {
   const intelligenceType = mapGuardianTypeToIntelligence(item.type);
   const priority = guardianPriorityToIntelligence(item.resolvedPriority);
@@ -157,6 +158,7 @@ export function toIntelligenceItem(
     sourceDocumentId: item.source_document_id,
     sourceTitle,
     sourceExcerpt: item.source_excerpt,
+    worldEntityId,
     type: intelligenceType,
     title: item.title,
     summary: buildSummary(item),

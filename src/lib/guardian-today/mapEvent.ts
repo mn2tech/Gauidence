@@ -98,6 +98,7 @@ export function toIntelligenceItemFromEvent(
     sourceDocumentId: null,
     sourceTitle,
     sourceExcerpt: event.summary,
+    worldEntityId: null,
     type: intelligenceType,
     title: event.title,
     summary: event.summary?.trim() || "This needs your attention.",
