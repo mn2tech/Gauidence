@@ -89,10 +89,13 @@ import {
 import {
   askGideonScopeMeta,
   buildGideonSystemPrompt,
+  buildSessionIdentityAnswer,
   gideonMaxTokens,
+  isSessionIdentityQuestion,
   loadWorkspaceContext,
   parseSearchScope,
   isSearchScopeMode,
+  resolveTrustedSessionIdentity,
   resolveWorkspaceScopes,
   suggestionKindFrom,
   DEFAULT_SEARCH_SCOPE,
@@ -1494,6 +1497,25 @@ export async function POST(request: Request) {
     !attachmentDocumentId
   ) {
     answer = buildFocusRemainingAnswer(activeFocusBlock, userTz);
+  } else if (
+    isSessionIdentityQuestion(question) &&
+    !attachmentDocumentId
+  ) {
+    const { data: accountForIdentity } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", user.id)
+      .maybeSingle();
+    answer = buildSessionIdentityAnswer({
+      session: resolveTrustedSessionIdentity({
+        user,
+        activeProfile: active,
+        accountFullName:
+          typeof accountForIdentity?.full_name === "string"
+            ? accountForIdentity.full_name
+            : null,
+      }),
+    });
   } else if (!attachmentDocumentId) {
     const directAnswer = await runDirectAction(actionCtx);
     if (directAnswer) {
@@ -1912,10 +1934,26 @@ export async function POST(request: Request) {
             })()
           : null;
 
+      const hasDocumentPeople =
+        (workspaceContext.documentDerivedPeople ?? []).length > 0;
+      const identityAnswer =
+        !inventoryAnswer &&
+        !openChartAnswer &&
+        !pianoClarify &&
+        isSessionIdentityQuestion(question) &&
+        // Attached docs without structured people → LLM uses excerpts + trusted session.
+        (!attachedDoc || hasDocumentPeople)
+          ? buildSessionIdentityAnswer({
+              session: workspaceContext.trustedSession,
+              documentPeople: workspaceContext.documentDerivedPeople,
+            })
+          : null;
+
       const biAnswer =
         !inventoryAnswer &&
         !openChartAnswer &&
         !pianoClarify &&
+        !identityAnswer &&
         !wantsReminderAgent(question) &&
         typeof businessAnswerDraft === "string" &&
         businessAnswerDraft.trim()
@@ -1926,6 +1964,7 @@ export async function POST(request: Request) {
         !inventoryAnswer &&
         !openChartAnswer &&
         !pianoClarify &&
+        !identityAnswer &&
         !biAnswer &&
         orchestrationAnswerText
           ? orchestrationAnswerText
@@ -1946,6 +1985,8 @@ export async function POST(request: Request) {
         citations = openChartAnswer.citations;
       } else if (pianoClarify) {
         answer = pianoClarify;
+      } else if (identityAnswer) {
+        answer = identityAnswer;
       } else if (biAnswer) {
         answer = biAnswer;
         pendingClaims = Array.isArray(businessClaims)

@@ -63,13 +63,34 @@ export function formatEmailThreadSemantics(
   extraction: EmailThreadExtraction
 ): string {
   const people = extraction.participants
-    .map((p) => p.name)
-    .filter(Boolean)
-    .slice(0, 12);
+    .map((p) => {
+      const name = (p.name ?? p.email ?? "").trim();
+      if (!name) return null;
+      const role =
+        p.role === "from"
+          ? "sender"
+          : p.role === "to" || p.role === "cc" || p.role === "bcc"
+            ? "recipient"
+            : "mentioned";
+      return { name, role };
+    })
+    .filter((p): p is { name: string; role: string } => Boolean(p));
+  const senders = [
+    ...new Set(people.filter((p) => p.role === "sender").map((p) => p.name)),
+  ].slice(0, 8);
+  const recipients = [
+    ...new Set(people.filter((p) => p.role === "recipient").map((p) => p.name)),
+  ].slice(0, 8);
+  const mentioned = [
+    ...new Set(people.filter((p) => p.role === "mentioned").map((p) => p.name)),
+  ].slice(0, 8);
   const lines = [
     `Artifact type: email_thread`,
     extraction.subject ? `Subject: ${extraction.subject}` : null,
-    people.length ? `People: ${[...new Set(people)].join(", ")}` : null,
+    senders.length ? `Document senders: ${senders.join(", ")}` : null,
+    recipients.length ? `Document recipients: ${recipients.join(", ")}` : null,
+    mentioned.length ? `Mentioned people: ${mentioned.join(", ")}` : null,
+    "Identity note: email senders/recipients/mentioned people are document-derived — not the authenticated login account.",
     extraction.organizations.length
       ? `Organizations: ${extraction.organizations.join(", ")}`
       : null,

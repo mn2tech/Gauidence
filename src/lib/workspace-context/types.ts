@@ -3,6 +3,10 @@ import type { SuggestionProfileKind } from "@/lib/vault/gideon";
 import type { GideonIntent } from "@/lib/gideon/intent";
 import type { GideonLoadFlags } from "@/lib/gideon/capabilities";
 import type { SearchScopeMode } from "./searchScope";
+import type {
+  DocumentDerivedPerson,
+  TrustedSessionIdentity,
+} from "./sessionIdentity";
 
 /** A vault/profile in the current search scope. */
 export type RetrievalScope = {
@@ -93,6 +97,13 @@ export type WorkspacePromptOptions = {
 export type WorkspaceContextData = WorkspaceContextMeta & {
   blocks: WorkspaceContextBlocks;
   promptOptions: WorkspacePromptOptions;
+  /**
+   * Authenticated account + active space from the server session only.
+   * Never derived from documents or conversation text.
+   */
+  trustedSession: TrustedSessionIdentity;
+  /** People labeled from documents/emails — separate from trustedSession. */
+  documentDerivedPeople?: DocumentDerivedPerson[];
   /** Structured claims for persistence / evidence follow-ups (Business Pack). */
   businessClaims?: import("@/lib/gideon/business").GideonClaim[];
   /** Admin / Test Lab grounding diagnostics — not for ordinary user replies. */

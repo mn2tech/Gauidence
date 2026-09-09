@@ -138,10 +138,37 @@ import type { LinkedVaultProfile } from "@/lib/vault/rollup";
 import { loadLinkedOrgContext } from "./linkedProfiles";
 import type { WorkspaceContextData, WorkspaceContextMeta } from "./types";
 import {
+  authorizeRetrievalSpaceIds,
+  resolveTrustedSessionIdentity,
+  type DocumentDerivedPerson,
+} from "./sessionIdentity";
+import {
   GIDEON_LOAD_FULL,
   type GideonLoadFlags,
 } from "@/lib/gideon/capabilities";
 import type { GideonIntent } from "@/lib/gideon/intent";
+
+function documentPeopleFromEmailThread(
+  thread: NonNullable<ReturnType<typeof extractEmailThread>>
+): DocumentDerivedPerson[] {
+  const out: DocumentDerivedPerson[] = [];
+  const seen = new Set<string>();
+  for (const p of thread.participants) {
+    const name = (p.name ?? p.email ?? "").trim();
+    if (!name) continue;
+    const role: DocumentDerivedPerson["role"] =
+      p.role === "from"
+        ? "sender"
+        : p.role === "to" || p.role === "cc" || p.role === "bcc"
+          ? "recipient"
+          : "mentioned";
+    const key = `${role}:${name.toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ name, role });
+  }
+  return out;
+}
 
 export type LoadWorkspaceContextArgs = {
   supabase: SupabaseClient;
@@ -260,6 +287,23 @@ export async function loadWorkspaceContext(
     focusedSpaceName = namedOutsideSpace.display_name;
   }
 
+  // Server-side membership gate: never retrieve for spaces outside accessible set.
+  const accessibleIdSet = new Set(meta.accessibleProfiles.map((p) => p.id));
+  const membershipGate = authorizeRetrievalSpaceIds(
+    effectiveSearchIds,
+    accessibleIdSet
+  );
+  if (membershipGate.deniedIds.length > 0) {
+    console.warn(
+      "Vault retrieval denied unauthorized space ids:",
+      membershipGate.deniedIds.join(", ")
+    );
+  }
+  effectiveSearchIds = membershipGate.authorizedIds;
+  effectiveRetrievalScopes = effectiveRetrievalScopes.filter((scope) =>
+    accessibleIdSet.has(scope.id)
+  );
+
   const forceNamedSpaceDocs = Boolean(namedOutsideSpace);
   const runDocumentSearch =
     load.documents &&
@@ -367,6 +411,21 @@ export async function loadWorkspaceContext(
   const emailSemantics = emailThread
     ? formatEmailThreadSemantics(emailThread)
     : null;
+  const documentDerivedPeople = emailThread
+    ? documentPeopleFromEmailThread(emailThread)
+    : [];
+
+  const { data: accountRow } = await supabase
+    .from("profiles")
+    .select("full_name")
+    .eq("id", user.id)
+    .maybeSingle();
+  const trustedSession = resolveTrustedSessionIdentity({
+    user,
+    activeProfile,
+    accountFullName:
+      typeof accountRow?.full_name === "string" ? accountRow.full_name : null,
+  });
 
   // When analyzing a substantial current artifact, keep historical retrieval
   // optional/supportive — do not let vector search dominate the answer.
@@ -943,6 +1002,8 @@ Active space in the UI: ${activeProfile.display_name}. Document search includes 
 
   const context: WorkspaceContextData = {
     ...meta,
+    trustedSession,
+    documentDerivedPeople,
     blocks: {
       excerpts: suppressRawDocsForBi
         ? "(none — use BUSINESS INTELLIGENCE; do not invent a raw fact list from documents)"

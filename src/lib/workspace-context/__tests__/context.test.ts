@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { suggestionKindFrom } from "../suggestionKind.ts";
 import { resolveWorkspaceScopes } from "../scopes.ts";
 import type { GuardianProfile } from "@/lib/profiles/types";
+import type { TrustedSessionIdentity } from "../sessionIdentity.ts";
+import type { WorkspaceContextData } from "../types.ts";
 
 function profile(
   overrides: Partial<GuardianProfile> &
@@ -27,6 +29,41 @@ function profile(
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
     ...overrides,
+  };
+}
+
+function trustedSessionFor(
+  active: { id: string; display_name: string }
+): TrustedSessionIdentity {
+  return {
+    authenticated_user_id: "u1",
+    authenticated_user_name: "Test User",
+    authenticated_user_email: "test@example.com",
+    active_profile_id: active.id,
+    active_profile_name: active.display_name,
+    active_space_id: active.id,
+    active_space_name: active.display_name,
+  };
+}
+
+function emptyBlocks(): WorkspaceContextData["blocks"] {
+  return {
+    excerpts: "(none)",
+    fileInventory: "(none)",
+    attachedDocument: "(none)",
+    currentArtifact: "(none)",
+    dailyLogs: "(none)",
+    clientRequests: "(none)",
+    proposals: "(none)",
+    schedule: "(none)",
+    history: "(none)",
+    linkedProfiles: "(none)",
+    vaultMap: "(none)",
+    workMemory: "(none — user has no active work projects)",
+    structuredKnowledge: "(none)",
+    ontology: "(none)",
+    myWorld: "(none)",
+    businessIntelligence: "(none)",
   };
 }
 
@@ -102,13 +139,14 @@ describe("buildGideonSystemPrompt", () => {
   it("omits retrieval blocks when Guardian knowledge was not loaded", async () => {
     const { buildGideonSystemPrompt } = await import("../formatSystemPrompt.ts");
     const { GIDEON_LOAD_NONE } = await import("@/lib/gideon/capabilities");
+    const active = {
+      id: "p1",
+      display_name: "NM2TECH",
+      profile_type: "business" as const,
+      parent_profile_id: null,
+    };
     const system = buildGideonSystemPrompt({
-      activeProfile: {
-        id: "p1",
-        display_name: "NM2TECH",
-        profile_type: "business",
-        parent_profile_id: null,
-      },
+      activeProfile: active,
       retrievalScopes: [{ id: "p1", display_name: "NM2TECH", profile_type: "business" }],
       accessibleProfiles: [],
       profileNames: { p1: "NM2TECH" },
@@ -120,24 +158,8 @@ describe("buildGideonSystemPrompt", () => {
       profileKind: "business",
       chatContextLabel: "label",
       vaultScopeNote: "note",
-      blocks: {
-        excerpts: "(none)",
-        fileInventory: "(none)",
-        attachedDocument: "(none)",
-        currentArtifact: "(none)",
-        dailyLogs: "(none)",
-        clientRequests: "(none)",
-        proposals: "(none)",
-        schedule: "(none)",
-        history: "(none)",
-        linkedProfiles: "(none)",
-        vaultMap: "(none)",
-        workMemory: "(none — user has no active work projects)",
-        structuredKnowledge: "(none)",
-        ontology: "(none)",
-        myWorld: "(none)",
-        businessIntelligence: "(none)",
-      },
+      trustedSession: trustedSessionFor(active),
+      blocks: emptyBlocks(),
       promptOptions: {
         timeZone: "America/New_York",
         showPictures: false,
@@ -165,18 +187,20 @@ describe("buildGideonSystemPrompt", () => {
     assert.doesNotMatch(system, /No document excerpts matched/);
     assert.match(system, /No Guardian document search ran/);
     assert.match(system, /CONVERSATION CONTEXT/);
+    assert.match(system, /TRUSTED SESSION CONTEXT/);
   });
 
   it("requires Space sources when Guardian knowledge was loaded", async () => {
     const { buildGideonSystemPrompt } = await import("../formatSystemPrompt.ts");
     const { GIDEON_LOAD_FULL } = await import("@/lib/gideon/capabilities");
+    const active = {
+      id: "p1",
+      display_name: "NM2TECH",
+      profile_type: "business" as const,
+      parent_profile_id: null,
+    };
     const system = buildGideonSystemPrompt({
-      activeProfile: {
-        id: "p1",
-        display_name: "NM2TECH",
-        profile_type: "business",
-        parent_profile_id: null,
-      },
+      activeProfile: active,
       retrievalScopes: [{ id: "p1", display_name: "NM2TECH", profile_type: "business" }],
       accessibleProfiles: [],
       profileNames: { p1: "NM2TECH" },
@@ -188,23 +212,11 @@ describe("buildGideonSystemPrompt", () => {
       profileKind: "business",
       chatContextLabel: "label",
       vaultScopeNote: "note",
+      trustedSession: trustedSessionFor(active),
       blocks: {
+        ...emptyBlocks(),
         excerpts: "Fact from roster.pdf",
         fileInventory: "roster.pdf",
-        attachedDocument: "(none)",
-        currentArtifact: "(none)",
-        dailyLogs: "(none)",
-        clientRequests: "(none)",
-        proposals: "(none)",
-        schedule: "(none)",
-        history: "(none)",
-        linkedProfiles: "(none)",
-        vaultMap: "(none)",
-        workMemory: "(none — user has no active work projects)",
-        structuredKnowledge: "(none)",
-        ontology: "(none)",
-        myWorld: "(none)",
-        businessIntelligence: "(none)",
       },
       promptOptions: {
         timeZone: "America/New_York",
@@ -238,13 +250,14 @@ describe("buildGideonSystemPrompt", () => {
   it("includes targeted MY WORLD CONTEXT when present", async () => {
     const { buildGideonSystemPrompt } = await import("../formatSystemPrompt.ts");
     const { GIDEON_LOAD_FULL } = await import("@/lib/gideon/capabilities");
+    const active = {
+      id: "p1",
+      display_name: "Home",
+      profile_type: "personal" as const,
+      parent_profile_id: null,
+    };
     const system = buildGideonSystemPrompt({
-      activeProfile: {
-        id: "p1",
-        display_name: "Home",
-        profile_type: "personal",
-        parent_profile_id: null,
-      },
+      activeProfile: active,
       retrievalScopes: [
         { id: "p1", display_name: "Home", profile_type: "personal" },
       ],
@@ -258,24 +271,11 @@ describe("buildGideonSystemPrompt", () => {
       profileKind: "personal",
       chatContextLabel: "label",
       vaultScopeNote: "note",
+      trustedSession: trustedSessionFor(active),
       blocks: {
-        excerpts: "(none)",
-        fileInventory: "(none)",
-        attachedDocument: "(none)",
-        currentArtifact: "(none)",
-        dailyLogs: "(none)",
-        clientRequests: "(none)",
-        proposals: "(none)",
-        schedule: "(none)",
-        history: "(none)",
-        linkedProfiles: "(none)",
-        vaultMap: "(none)",
-        workMemory: "(none — user has no active work projects)",
-        structuredKnowledge: "(none)",
-        ontology: "(none)",
+        ...emptyBlocks(),
         myWorld:
           "Name: Jaime (Person)\nSummary: Contact at Olney MD\nAnswer from this My World context first.",
-        businessIntelligence: "(none)",
       },
       promptOptions: {
         timeZone: "America/New_York",

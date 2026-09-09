@@ -22,6 +22,19 @@ export {
 } from "./formatSystemPrompt";
 
 export {
+  resolveTrustedSessionIdentity,
+  formatTrustedSessionContext,
+  formatDocumentDerivedIdentities,
+  buildSessionIdentityAnswer,
+  authorizeRetrievalSpaceIds,
+  hasAuthenticatedIdentity,
+  isSessionIdentityQuestion,
+  GIDEON_TRUSTED_SESSION_IDENTITY_RULE,
+  type TrustedSessionIdentity,
+  type DocumentDerivedPerson,
+} from "./sessionIdentity";
+
+export {
   buildWorkingInDisplay,
   profileIdsForSearchScope,
   searchScopeLabel,

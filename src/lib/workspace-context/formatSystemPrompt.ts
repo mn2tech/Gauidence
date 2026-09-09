@@ -33,6 +33,10 @@ import {
 } from "@/lib/personal-space/responseDepth";
 import { personalRetrievalSystemNote } from "@/lib/personal-space/retrievalPriority";
 import type { WorkspaceContextData } from "./types";
+import {
+  formatDocumentDerivedIdentities,
+  formatTrustedSessionContext,
+} from "./sessionIdentity";
 
 function blockIsPresent(text: string | undefined): boolean {
   const t = (text ?? "").trim();
@@ -243,11 +247,20 @@ export function buildGideonSystemPrompt(
     .filter(Boolean)
     .join("");
 
+  const trustedSessionBlock = formatTrustedSessionContext(
+    context.trustedSession
+  );
+  const documentIdentityBlock = formatDocumentDerivedIdentities(
+    context.documentDerivedPeople ?? []
+  );
+
   return `${withVaultPersonality(VAULT_CHAT_SYSTEM, profileKind)}
 
 USER-FACING TERMINOLOGY (strict): In every reply to the user, say "space" or "workspace" — never "vault". Source tags like space:Name below are internal metadata only.
 Never mention routing, intents, RAG, or vector search.
 
+${trustedSessionBlock}
+${documentIdentityBlock ? `\n${documentIdentityBlock}\n` : ""}
 Active ${getContainerLabel(activeProfile.profile_type).toLowerCase()}: ${activeProfile.display_name}.
 ${buildGideonTodayNote(new Date(), timeZone)}
 ${GIDEON_CONVERSATION_CONTEXT_NOTE}
