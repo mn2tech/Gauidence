@@ -108,3 +108,17 @@ export {
   WORLD_INBOX_PATH,
 } from "./labels";
 export type { WorldTabId } from "./labels";
+
+export {
+  buildWorldMapGraph,
+  worldMapNodePosition,
+  WORLD_MAP_DEFAULT_MAX_NODES,
+} from "./mapGraph";
+export type {
+  WorldMapGraph,
+  WorldMapNode,
+  WorldMapEdge,
+  WorldMapEntityInput,
+} from "./mapGraph";
+
+export { getWorldMap } from "./map";
