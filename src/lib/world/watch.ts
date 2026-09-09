@@ -28,7 +28,7 @@ export {
 } from "./watchEvaluate";
 export type { WorldWatchCandidate } from "./watchEvaluate";
 
-async function hasActiveDedupe(
+async function hasActiveOrResolvedDedupe(
   supabase: SupabaseClient,
   userId: string,
   dedupeKey: string
@@ -38,7 +38,7 @@ async function hasActiveDedupe(
     .select("id")
     .eq("user_id", userId)
     .eq("dedupe_key", dedupeKey)
-    .eq("status", "active")
+    .in("status", ["active", "completed", "dismissed"])
     .limit(1)
     .maybeSingle();
   return Boolean(data?.id);
@@ -50,7 +50,7 @@ async function persistWorldWatchCandidate(
   preferredSpaceId: string | undefined,
   candidate: WorldWatchCandidate
 ): Promise<boolean> {
-  if (await hasActiveDedupe(supabase, userId, candidate.dedupeKey)) {
+  if (await hasActiveOrResolvedDedupe(supabase, userId, candidate.dedupeKey)) {
     return false;
   }
 

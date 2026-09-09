@@ -5,6 +5,7 @@ import {
   buildDedupeKey,
   collapseNearDuplicateExtractedItems,
   normalizeTitle,
+  selectNearDuplicateSiblingIds,
   titleMatchKey,
   titlesLikelySameAttention,
   titlesLikelySameEvent,
@@ -271,6 +272,20 @@ describe("deduplication", () => {
     ]);
     assert.equal(collapsed.length, 1);
     assert.match(collapsed[0]!.title, /Alison Sellner/);
+  });
+
+  it("selects paraphrased siblings when marking Done", () => {
+    const ids = selectNearDuplicateSiblingIds(
+      "Respond to teacher Alison Sellner with permission for resource program",
+      [
+        {
+          id: "a",
+          title: "Respond to teacher permission request for resource program",
+        },
+        { id: "b", title: "Pay vehicle registration" },
+      ]
+    );
+    assert.deepEqual(ids, ["a"]);
   });
 
   it("keeps multi-child items separate", () => {

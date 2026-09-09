@@ -4,11 +4,66 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { calendarDateInUserZone } from "@/lib/timezone";
 import { getUserTimeZone } from "@/lib/timezone/server";
 import { zonedDateTimeToIso } from "@/lib/reminders/time";
+import { selectNearDuplicateSiblingIds } from "./dedupe";
 import { logGuardianEvent } from "./log";
 
 export type ItemActionResult =
   | { ok: true }
   | { ok: false; error: string; status: number };
+
+async function resolveNearDuplicateSiblings(
+  supabase: SupabaseClient,
+  item: {
+    id: string;
+    space_id: string;
+    title: string;
+    source_document_id: string | null;
+  },
+  status: "completed" | "dismissed"
+): Promise<number> {
+  // Only collapse paraphrases that came from the same source document.
+  if (!item.source_document_id) return 0;
+
+  const { data: candidates } = await supabase
+    .from("guardian_items")
+    .select("id, title")
+    .eq("space_id", item.space_id)
+    .eq("source_document_id", item.source_document_id)
+    .eq("status", "active")
+    .neq("id", item.id)
+    .limit(50);
+
+  const siblingIds = selectNearDuplicateSiblingIds(
+    item.title,
+    (candidates ?? []).map((row) => ({
+      id: String(row.id),
+      title: String(row.title ?? ""),
+    }))
+  );
+
+  if (siblingIds.length === 0) return 0;
+
+  const now = new Date().toISOString();
+  const patch =
+    status === "completed"
+      ? { status, completed_at: now, updated_at: now }
+      : { status, dismissed_at: now, updated_at: now };
+
+  const { error } = await supabase
+    .from("guardian_items")
+    .update(patch)
+    .in("id", siblingIds)
+    .eq("status", "active");
+
+  if (error) {
+    console.error(
+      "Failed to resolve near-duplicate guardian siblings:",
+      error.message
+    );
+    return 0;
+  }
+  return siblingIds.length;
+}
 
 export async function completeGuardianItem(
   supabase: SupabaseClient,
@@ -24,7 +79,7 @@ export async function completeGuardianItem(
     })
     .eq("id", itemId)
     .eq("status", "active")
-    .select("id, space_id")
+    .select("id, space_id, title, source_document_id")
     .maybeSingle();
 
   if (error) {
@@ -41,9 +96,21 @@ export async function completeGuardianItem(
     return { ok: false, error: "Item not found or already updated.", status: 404 };
   }
 
+  const siblings = await resolveNearDuplicateSiblings(
+    supabase,
+    {
+      id: data.id,
+      space_id: data.space_id,
+      title: String(data.title ?? ""),
+      source_document_id: data.source_document_id ?? null,
+    },
+    "completed"
+  );
+
   logGuardianEvent("guardian_item_completed", {
     item_id: data.id,
     space_id: data.space_id,
+    siblings_completed: siblings,
   });
   return { ok: true };
 }
@@ -62,7 +129,7 @@ export async function dismissGuardianItem(
     })
     .eq("id", itemId)
     .eq("status", "active")
-    .select("id, space_id")
+    .select("id, space_id, title, source_document_id")
     .maybeSingle();
 
   if (error) {
@@ -79,9 +146,21 @@ export async function dismissGuardianItem(
     return { ok: false, error: "Item not found or already updated.", status: 404 };
   }
 
+  const siblings = await resolveNearDuplicateSiblings(
+    supabase,
+    {
+      id: data.id,
+      space_id: data.space_id,
+      title: String(data.title ?? ""),
+      source_document_id: data.source_document_id ?? null,
+    },
+    "dismissed"
+  );
+
   logGuardianEvent("guardian_item_dismissed", {
     item_id: data.id,
     space_id: data.space_id,
+    siblings_dismissed: siblings,
   });
   return { ok: true };
 }

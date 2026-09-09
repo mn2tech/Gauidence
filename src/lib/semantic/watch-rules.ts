@@ -488,7 +488,7 @@ async function resolveEvidenceSpaceIds(
   return [...spaceIds];
 }
 
-async function hasActiveDedupeAnywhere(
+async function hasActiveOrResolvedDedupeAnywhere(
   supabase: SupabaseClient,
   userId: string,
   dedupeKey: string
@@ -498,7 +498,7 @@ async function hasActiveDedupeAnywhere(
     .select("id")
     .eq("user_id", userId)
     .eq("dedupe_key", dedupeKey)
-    .eq("status", "active")
+    .in("status", ["active", "completed", "dismissed"])
     .limit(1)
     .maybeSingle();
   return Boolean(data?.id);
@@ -578,7 +578,7 @@ async function persistCandidateOnce(
   preferredSpaceId: string | undefined,
   candidate: SemanticWatchCandidate
 ): Promise<boolean> {
-  if (await hasActiveDedupeAnywhere(supabase, userId, candidate.dedupeKey)) {
+  if (await hasActiveOrResolvedDedupeAnywhere(supabase, userId, candidate.dedupeKey)) {
     return false;
   }
 

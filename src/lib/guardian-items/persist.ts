@@ -153,23 +153,47 @@ export async function persistExtractedGuardianItem(
     return { outcome: "deduped", id: existing.id };
   }
 
+  // User already completed/dismissed this exact key — do not resurrect it.
+  const { data: resolvedExact } = await supabase
+    .from("guardian_items")
+    .select("id, status")
+    .eq("space_id", association.spaceId)
+    .eq("dedupe_key", dedupeKey)
+    .in("status", ["completed", "dismissed"])
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (resolvedExact?.id) {
+    logGuardianEvent("guardian_item_deduped", {
+      item_id: resolvedExact.id,
+      space_id: association.spaceId,
+      type: item.type,
+      document_id: args.sourceDocumentId,
+      skipped_resolved: resolvedExact.status,
+    });
+    return { outcome: "skipped", reason: "already_resolved" };
+  }
+
   // Near-duplicate from the same document (paraphrased titles).
   const { data: sameSource } = await supabase
     .from("guardian_items")
-    .select("id, title, confidence")
+    .select("id, title, confidence, status")
     .eq("space_id", association.spaceId)
     .eq("source_document_id", args.sourceDocumentId)
-    .eq("status", "active")
+    .in("status", ["active", "completed", "dismissed"])
     .limit(50);
 
-  const fuzzy = (sameSource ?? []).find((candidate) =>
-    titlesLikelySameAttention(String(candidate.title ?? ""), item.title)
+  const fuzzyActive = (sameSource ?? []).find(
+    (candidate) =>
+      candidate.status === "active" &&
+      titlesLikelySameAttention(String(candidate.title ?? ""), item.title)
   );
 
-  if (fuzzy?.id) {
-    const existingTitle = String(fuzzy.title ?? "");
+  if (fuzzyActive?.id) {
+    const existingTitle = String(fuzzyActive.title ?? "");
     const preferIncomingTitle =
-      confidence > Number(fuzzy.confidence ?? 0) ||
+      confidence > Number(fuzzyActive.confidence ?? 0) ||
       (/\b[A-Z][a-z]+\s+[A-Z][a-z]+\b/.test(item.title) &&
         !/\b[A-Z][a-z]+\s+[A-Z][a-z]+\b/.test(existingTitle));
 
@@ -178,23 +202,41 @@ export async function persistExtractedGuardianItem(
       .update({
         ...(preferIncomingTitle ? { title: row.title } : {}),
         description: row.description,
-        confidence: Math.max(confidence, Number(fuzzy.confidence ?? 0)),
+        confidence: Math.max(confidence, Number(fuzzyActive.confidence ?? 0)),
         needs_review: needsReview,
         priority,
         source_excerpt: row.source_excerpt,
         metadata: row.metadata,
         updated_at: appNow().toISOString(),
       })
-      .eq("id", fuzzy.id);
+      .eq("id", fuzzyActive.id);
 
     logGuardianEvent("guardian_item_deduped", {
-      item_id: fuzzy.id,
+      item_id: fuzzyActive.id,
       space_id: association.spaceId,
       type: item.type,
       document_id: args.sourceDocumentId,
       fuzzy: true,
     });
-    return { outcome: "deduped", id: fuzzy.id };
+    return { outcome: "deduped", id: fuzzyActive.id };
+  }
+
+  const fuzzyResolved = (sameSource ?? []).find(
+    (candidate) =>
+      (candidate.status === "completed" || candidate.status === "dismissed") &&
+      titlesLikelySameAttention(String(candidate.title ?? ""), item.title)
+  );
+
+  if (fuzzyResolved?.id) {
+    logGuardianEvent("guardian_item_deduped", {
+      item_id: fuzzyResolved.id,
+      space_id: association.spaceId,
+      type: item.type,
+      document_id: args.sourceDocumentId,
+      skipped_resolved: fuzzyResolved.status,
+      fuzzy: true,
+    });
+    return { outcome: "skipped", reason: "already_resolved" };
   }
 
   const { data, error } = await supabase

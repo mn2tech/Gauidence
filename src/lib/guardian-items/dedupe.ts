@@ -157,3 +157,16 @@ export function collapseNearDuplicateExtractedItems(
   }
   return kept;
 }
+
+/**
+ * Active sibling ids that are the same attention topic as `primaryTitle`
+ * (used when Done/Dismiss should clear paraphrased cards too).
+ */
+export function selectNearDuplicateSiblingIds(
+  primaryTitle: string,
+  candidates: { id: string; title: string }[]
+): string[] {
+  return candidates
+    .filter((c) => titlesLikelySameAttention(c.title, primaryTitle))
+    .map((c) => c.id);
+}
