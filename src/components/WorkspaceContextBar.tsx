@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, ChevronDown, Lock, Search } from "lucide-react";
+import { ArrowLeft, ChevronDown, Lock, LockOpen, Search } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import ProfileAvatar from "@/components/ProfileAvatar";
 import type { WorkingInDisplay } from "@/lib/workspace-context/client";
@@ -182,32 +182,45 @@ export default function WorkspaceContextBar({
 
         {showSearchScopeToggle && onSearchScopeChange ? (
           <div
-            className="ml-auto flex shrink-0 gap-0.5 rounded-full bg-surface p-0.5 ring-1 ring-border-subtle"
+            className="relative ml-auto grid shrink-0 grid-cols-2 rounded-full bg-surface p-0.5 ring-1 ring-border-subtle"
             role="group"
             aria-label="Answer scope"
           >
-            {(["global", "workspace"] as const).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                aria-pressed={searchScope === mode}
-                title={searchScopeHint(mode, display.primaryName)}
-                onClick={() => {
-                  markHintSeen();
-                  onSearchScopeChange(mode);
-                }}
-                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition ${
-                  searchScope === mode
-                    ? "bg-brand text-white"
-                    : "text-ink-muted hover:text-foreground"
-                }`}
-              >
-                {mode === "workspace" ? (
-                  <Lock className="h-3 w-3 shrink-0 opacity-90" aria-hidden />
-                ) : null}
-                {mode === "global" ? "All spaces" : "This home"}
-              </button>
-            ))}
+            <span
+              aria-hidden
+              className={`pointer-events-none absolute inset-y-0.5 left-0.5 w-[calc(50%-2px)] rounded-full bg-brand shadow-sm transition-transform duration-300 ease-out ${
+                isGlobal ? "translate-x-0" : "translate-x-full"
+              }`}
+            />
+            {(["global", "workspace"] as const).map((mode) => {
+              const active = searchScope === mode;
+              const Icon = mode === "global" ? LockOpen : Lock;
+              return (
+                <button
+                  key={mode}
+                  type="button"
+                  aria-pressed={active}
+                  title={searchScopeHint(mode, display.primaryName)}
+                  onClick={() => {
+                    markHintSeen();
+                    onSearchScopeChange(mode);
+                  }}
+                  className={`relative z-10 inline-flex items-center justify-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors duration-300 ${
+                    active
+                      ? "text-white"
+                      : "text-ink-muted hover:text-foreground"
+                  }`}
+                >
+                  <Icon
+                    className={`h-3 w-3 shrink-0 transition-transform duration-300 ${
+                      active ? "scale-110 opacity-100" : "opacity-70"
+                    }`}
+                    aria-hidden
+                  />
+                  {mode === "global" ? "All spaces" : "This home"}
+                </button>
+              );
+            })}
           </div>
         ) : (
           <div className="ml-auto" />
