@@ -28,6 +28,8 @@ export const REMEMBER_TODAY_PATH = "/remember";
 export const HISTORY_PATH = "/history";
 /** My World — friendly layer over Spaces (guardian_profiles). */
 export const WORLD_PATH = "/world";
+export const WORLD_MAP_PATH = "/world/map";
+export const WORLD_INBOX_PATH = "/world/inbox";
 export const INBOX_PATH = "/inbox";
 
 /** Default signed-in landing page when simple home is enabled. */

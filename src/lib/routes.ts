@@ -41,6 +41,25 @@ export const HISTORY_PATH = "/history";
 
 /** My World — contexts over Spaces (open actions, deadlines, recent activity). */
 export const WORLD_PATH = "/world";
+export const WORLD_MAP_PATH = "/world/map";
+export const WORLD_INBOX_PATH = "/world/inbox";
+
+export function worldEntityHref(entityId: string): string {
+  return `${WORLD_PATH}/${encodeURIComponent(entityId)}`;
+}
+
+export function askAboutWorldEntityHref(args: {
+  entityId: string;
+  entityName: string;
+  spaceId?: string | null;
+}): string {
+  const draft = `What's going on with ${args.entityName}?`;
+  const params = new URLSearchParams();
+  params.set("draft", draft);
+  params.set("worldEntityId", args.entityId);
+  if (args.spaceId) params.set("profileId", args.spaceId);
+  return `${ASK_GIDEON_PATH}?${params.toString()}`;
+}
 
 export function documentsHref(profileId?: string | null): string {
   if (!profileId) return DOCUMENTS_PATH;

@@ -78,3 +78,33 @@ export {
 } from "./auth";
 
 export { processWorldExtraction } from "./engine";
+
+export {
+  getWorldOverview,
+  getImportantEntities,
+  getWorldEntity,
+  getWorldRelationships,
+  getWorldTimeline,
+  getWorldAttention,
+  getWorldInbox,
+  searchWorld,
+  getAuthorizedWorldSpaceIds,
+} from "./api";
+export type {
+  WorldOverview,
+  WorldEntitySummary,
+  WorldEntityDetail,
+  WorldAttentionItem,
+  WorldCounts,
+} from "./apiTypes";
+
+export {
+  worldEntityGroup,
+  worldEntityTypeLabel,
+  worldRelationshipLabel,
+  askAboutWorldEntityHref,
+  worldEntityHref,
+  WORLD_MAP_PATH,
+  WORLD_INBOX_PATH,
+} from "./labels";
+export type { WorldTabId } from "./labels";
