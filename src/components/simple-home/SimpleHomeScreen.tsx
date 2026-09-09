@@ -242,11 +242,6 @@ export default function SimpleHomeScreen() {
       ? today.data.priorities
       : [];
 
-  const mattersPreview = [
-    ...attentionItems.slice(0, 2),
-    ...today.data.upcoming.slice(0, 2),
-  ].slice(0, 3);
-
   return (
     <div className="simple-home-page mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-6 sm:gap-7 sm:py-8">
       {/* 1. Greeting */}
@@ -282,29 +277,13 @@ export default function SimpleHomeScreen() {
         </p>
       ) : null}
 
-      {/* 2. Here's what matters today */}
-      {!today.loading && mattersPreview.length > 0 ? (
-        <Section title="Here's what matters today">
-          <ul className="space-y-2">
-            {mattersPreview.map((item) => (
-              <li key={`matter-${item.id}`} className="text-sm">
-                <span className="font-medium text-foreground">{item.title}</span>
-                {item.spaceName ? (
-                  <span className="text-ink-muted"> · {item.spaceName}</span>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </Section>
-      ) : null}
-
-      {/* 3. Needs Your Attention */}
+      {/* 2. What matters — full priority cards only (no duplicate teaser list) */}
       {today.loading ? (
-        <Section title="Needs your attention" action={spaceFilter}>
+        <Section title="Here's what matters today" action={spaceFilter}>
           <p className="text-sm text-ink-muted">Loading…</p>
         </Section>
       ) : hasAnySections || attentionItems.length > 0 ? (
-        <Section title="Needs your attention" action={spaceFilter}>
+        <Section title="Here's what matters today" action={spaceFilter}>
           <GuardianPartialBanner
             coverage={today.data.coverage ?? emptyCoverage()}
           />
@@ -322,7 +301,7 @@ export default function SimpleHomeScreen() {
           ) : null}
         </Section>
       ) : (
-        <Section title="Needs your attention" action={spaceFilter}>
+        <Section title="Here's what matters today" action={spaceFilter}>
           <GuardianIntelligenceEmptyState
             coverage={today.data.coverage ?? emptyCoverage()}
             coverageSummary={today.data.coverageSummary}
@@ -355,7 +334,7 @@ export default function SimpleHomeScreen() {
         </Section>
       )}
 
-      {/* 4. Guardian Noticed */}
+      {/* 3. Coming up */}
       {hasUpcoming ? (
         <Section title="Coming up">
           <PriorityList items={today.data.upcoming} today={today} />
