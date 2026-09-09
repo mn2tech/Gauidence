@@ -2332,6 +2332,7 @@ export default function VaultChatPanel({
       const body = (await res.json().catch(() => ({}))) as {
         error?: string;
         whenLabel?: string;
+        replaced?: boolean;
         reminder?: { title: string };
       };
       if (!res.ok) {
@@ -2344,7 +2345,9 @@ export default function VaultChatPanel({
       const when =
         body.whenLabel ?? proposedReminderWhenLabel(proposal, timeZone);
       pushLocalNote(
-        `Reminder set: "${title}" — ${when}. You'll see it under Attention on the dashboard.`
+        body.replaced
+          ? `Updated reminder: "${title}" — now ${when}. Open Today to see the new time.`
+          : `Reminder set: "${title}" — ${when}. You'll see it under Attention on Today.`
       );
     } catch {
       setError("Couldn't save reminder. Check your connection and try again.");

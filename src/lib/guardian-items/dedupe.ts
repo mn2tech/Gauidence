@@ -29,6 +29,23 @@ export function normalizeTitle(title: string): string {
   return n;
 }
 
+/**
+ * Title key that ignores clock times / calendar fluff so "repair at 2pm"
+ * and "repair at 3pm" match for attention reschedules.
+ */
+export function titleMatchKey(title: string): string {
+  return normalizeTitle(title)
+    .replace(/\b\d{1,2}(:\d{2})?\s*(a\.?m\.?|p\.?m\.?)\b/g, " ")
+    .replace(/\b(20\d{2})-(\d{2})-(\d{2})\b/g, " ")
+    .replace(
+      /\b(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sept?|oct|nov|dec)\.?\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s*20\d{2})?\b/g,
+      " "
+    )
+    .replace(/\b(at|@|on|for|by|tomorrow|today|tonight)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export function buildDedupeKey(args: {
   type: GuardianItemType;
   title: string;
@@ -60,4 +77,23 @@ export function titlesLikelySameEvent(a: string, b: string): boolean {
   if (tokensA.size === 0 || tokensB.length === 0) return false;
   const overlap = tokensB.filter((t) => tokensA.has(t)).length;
   return overlap >= Math.min(2, tokensB.length);
+}
+
+/** Same attention topic after a reschedule (time/date change). */
+export function titlesLikelySameAttention(a: string, b: string): boolean {
+  const ka = titleMatchKey(a);
+  const kb = titleMatchKey(b);
+  if (ka && kb) {
+    if (ka === kb) return true;
+    if (ka.length >= 8 && kb.length >= 8 && (ka.includes(kb) || kb.includes(ka))) {
+      return true;
+    }
+    const tokensA = new Set(ka.split(" ").filter((t) => t.length >= 3));
+    const tokensB = kb.split(" ").filter((t) => t.length >= 3);
+    if (tokensA.size > 0 && tokensB.length > 0) {
+      const overlap = tokensB.filter((t) => tokensA.has(t)).length;
+      if (overlap >= Math.min(2, tokensB.length, tokensA.size)) return true;
+    }
+  }
+  return titlesLikelySameEvent(a, b);
 }

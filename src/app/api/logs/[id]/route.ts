@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { User, SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { requireEditableGuardianProfile } from "@/lib/profiles/server";
+import { getUserTimeZone } from "@/lib/timezone/server";
 import { isValidLogDate } from "@/lib/logs/types";
 
 export const runtime = "nodejs";
@@ -113,9 +114,11 @@ export async function PATCH(request: Request, ctx: Ctx) {
   }
 
   void import("@/lib/guardian-items/fromDailyLog").then(
-    ({ syncGuardianItemsFromDailyLog }) =>
-      syncGuardianItemsFromDailyLog(supabase, {
+    async ({ syncGuardianItemsFromDailyLog }) => {
+      const timeZone = await getUserTimeZone(supabase, user.id);
+      return syncGuardianItemsFromDailyLog(supabase, {
         userId: user.id,
+        timeZone,
         log: {
           id: data.id,
           profile_id: data.profile_id,
@@ -123,10 +126,11 @@ export async function PATCH(request: Request, ctx: Ctx) {
           content: data.content,
           log_date: data.log_date,
         },
-      }).catch((err) => {
-        console.error("Daily log → guardian items sync failed:", err);
-      })
-  );
+      });
+    }
+  ).catch((err) => {
+    console.error("Daily log → guardian items sync failed:", err);
+  });
 
   void import("@/lib/guardian-events/syncFromDailyLog").then(
     ({ syncGuardianEventsFromDailyLogBestEffort }) =>

@@ -1,8 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { addCalendarDays } from "./dates";
-import { buildDedupeKey } from "./dedupe";
+import { buildDedupeKey, titlesLikelySameAttention } from "./dedupe";
 import { logGuardianEvent } from "./log";
 import type { GuardianItemType } from "./types";
+import { appNow } from "@/lib/clock";
+import { zonedDateTimeToIso, normalizeReminderTime } from "@/lib/reminders/time";
+import { GUARDIAN_TIME_ZONE } from "@/lib/timezone";
 
 const MONTHS: Record<string, number> = {
   january: 1,
@@ -111,6 +114,23 @@ function cleanTitle(raw: string): string {
     .slice(0, 300);
 }
 
+/** Best-effort clock time from log text for Attention due_at. */
+export function parseTimeFromText(text: string): string | null {
+  const m =
+    /\b(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)\b/i.exec(text) ??
+    /\b([01]?\d|2[0-3]):([0-5]\d)\b/.exec(text);
+  if (!m) return null;
+  if (m[3]) {
+    let hour = Number(m[1]);
+    const minute = m[2] ? Number(m[2]) : 0;
+    const ap = m[3].toLowerCase().replace(/\./g, "");
+    if (ap.startsWith("p") && hour < 12) hour += 12;
+    if (ap.startsWith("a") && hour === 12) hour = 0;
+    return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+  }
+  return normalizeReminderTime(`${m[1]}:${m[2]}`);
+}
+
 function looksLikeEvent(text: string): boolean {
   return /\b(event|appointment|meeting|breakfast|lunch|dinner|ceremony|conference|hearing|game|recital|concert|wedding|interview|deadline|due|follow[- ]?up)\b/i.test(
     text
@@ -207,22 +227,35 @@ export function extractEventsFromDailyLog(
 
 /**
  * Create/update guardian_items for dated events found in a Daily Log.
- * Idempotent via space + dedupe_key (includes daily_log id).
+ * Idempotent via space + dedupe_key; reschedules update matching Attention
+ * items when the user changes the time (e.g. 2pm → 3pm).
  */
 export async function syncGuardianItemsFromDailyLog(
   supabase: SupabaseClient,
   args: {
     userId: string;
     log: DailyLogIntelligenceInput;
+    timeZone?: string;
   }
-): Promise<{ created: number; skipped: number }> {
+): Promise<{ created: number; updated: number; skipped: number }> {
   const extracted = extractEventsFromDailyLog(args.log);
   if (extracted.length === 0) {
-    return { created: 0, skipped: 0 };
+    return { created: 0, updated: 0, skipped: 0 };
   }
 
+  const tz = args.timeZone ?? GUARDIAN_TIME_ZONE;
   let created = 0;
+  let updated = 0;
   let skipped = 0;
+
+  const { data: activeItems } = await supabase
+    .from("guardian_items")
+    .select("id, title, type, event_date, due_at, dedupe_key")
+    .eq("space_id", args.log.profile_id)
+    .eq("status", "active")
+    .in("type", ["reminder", "deadline", "follow_up", "event"])
+    .order("updated_at", { ascending: false })
+    .limit(60);
 
   for (const event of extracted) {
     const baseKey = buildDedupeKey({
@@ -233,8 +266,16 @@ export async function syncGuardianItemsFromDailyLog(
       sourceDocumentId: null,
     });
     const dedupeKey = `${baseKey}|daily_log|${args.log.id}`.slice(0, 500);
+    const clock = parseTimeFromText(`${event.title}\n${event.excerpt}`);
+    const dueAt = clock
+      ? zonedDateTimeToIso({
+          date: event.eventDate,
+          time: clock,
+          timeZone: tz,
+        })
+      : null;
 
-    const { data: existing } = await supabase
+    const { data: existingExact } = await supabase
       .from("guardian_items")
       .select("id")
       .eq("space_id", args.log.profile_id)
@@ -242,8 +283,47 @@ export async function syncGuardianItemsFromDailyLog(
       .eq("status", "active")
       .maybeSingle();
 
-    if (existing) {
-      skipped += 1;
+    const similar =
+      existingExact ??
+      (activeItems ?? []).find(
+        (row) =>
+          titlesLikelySameAttention(String(row.title ?? ""), event.title) &&
+          (row.type === event.type ||
+            ["reminder", "deadline", "follow_up", "event"].includes(
+              String(row.type)
+            ))
+      );
+
+    if (similar?.id) {
+      const { error: updateError } = await supabase
+        .from("guardian_items")
+        .update({
+          title: event.title.slice(0, 300),
+          description: event.excerpt.slice(0, 500),
+          type: event.type,
+          event_date: event.eventDate,
+          due_at: dueAt,
+          requires_action: event.requiresAction,
+          source_type: "daily_log",
+          source_id: args.log.id,
+          source_excerpt: event.excerpt.slice(0, 800),
+          dedupe_key: dedupeKey,
+          updated_at: appNow().toISOString(),
+        })
+        .eq("id", similar.id);
+
+      if (updateError) {
+        skipped += 1;
+        continue;
+      }
+      updated += 1;
+      logGuardianEvent("guardian_item_deduped", {
+        item_id: similar.id,
+        space_id: args.log.profile_id,
+        type: event.type,
+        source_type: "daily_log",
+        rescheduled: true,
+      });
       continue;
     }
 
@@ -258,7 +338,7 @@ export async function syncGuardianItemsFromDailyLog(
         title: event.title.slice(0, 300),
         description: event.excerpt.slice(0, 500),
         event_date: event.eventDate,
-        due_at: null,
+        due_at: dueAt,
         status: "active",
         priority: event.requiresAction ? "normal" : "normal",
         requires_action: event.requiresAction,
@@ -297,5 +377,5 @@ export async function syncGuardianItemsFromDailyLog(
     });
   }
 
-  return { created, skipped };
+  return { created, updated, skipped };
 }

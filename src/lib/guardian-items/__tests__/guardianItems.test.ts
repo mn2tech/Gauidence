@@ -4,6 +4,8 @@ import { associateGuardianItem } from "../associate";
 import {
   buildDedupeKey,
   normalizeTitle,
+  titleMatchKey,
+  titlesLikelySameAttention,
   titlesLikelySameEvent,
 } from "../dedupe";
 import {
@@ -176,6 +178,19 @@ describe("deduplication", () => {
     });
     assert.equal(k1, k2);
     assert.equal(k2, k3);
+  });
+
+  it("matches the same attention item after a time change", () => {
+    assert.equal(
+      titleMatchKey("Highlander repair visit — Sep 10 @ 2 PM"),
+      titleMatchKey("Highlander repair visit — Sep 10 @ 3 PM")
+    );
+    assert.ok(
+      titlesLikelySameAttention(
+        "Reminder: Highlander repair visit — Sep 10 @ 2 PM",
+        "Reminder: Highlander repair visit — Sep 10 @ 3 PM"
+      )
+    );
   });
 
   it("keeps multi-child items separate", () => {

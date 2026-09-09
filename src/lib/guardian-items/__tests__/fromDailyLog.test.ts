@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   extractEventsFromDailyLog,
   parseEventDateFromText,
+  parseTimeFromText,
 } from "../fromDailyLog";
 
 describe("daily log → guardian events", () => {
@@ -60,5 +61,11 @@ describe("daily log → guardian events", () => {
       log_date: "2026-08-27",
     });
     assert.equal(events.length, 0);
+  });
+
+  it("parses clock times for due_at on Attention items", () => {
+    assert.equal(parseTimeFromText("Sep 10 @ 2 PM"), "14:00");
+    assert.equal(parseTimeFromText("tomorrow at 3pm"), "15:00");
+    assert.equal(parseTimeFromText("meet at 09:30"), "09:30");
   });
 });

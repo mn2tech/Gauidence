@@ -2,7 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { appNow } from "@/lib/clock";
-import { buildDedupeKey } from "./dedupe";
+import { buildDedupeKey, titlesLikelySameAttention } from "./dedupe";
 import {
   evaluateLifecycle,
   mapItemTypeToEntityType,
@@ -206,17 +206,60 @@ export async function insertManualGuardianItem(
   }
 ): Promise<GuardianItemRow | null> {
   const type = args.type ?? "reminder";
+  const title = args.title.slice(0, 300);
+  const description = args.description?.trim()
+    ? args.description.trim().slice(0, 500)
+    : null;
+
+  // Reschedule path: same topic, new time → update existing Attention item.
+  const { data: candidates } = await supabase
+    .from("guardian_items")
+    .select("*")
+    .eq("space_id", args.spaceId)
+    .eq("status", "active")
+    .in("type", ["reminder", "deadline", "follow_up", "event"])
+    .order("updated_at", { ascending: false })
+    .limit(40);
+
+  const match = (candidates ?? []).find((row) =>
+    titlesLikelySameAttention(String(row.title ?? ""), title)
+  );
+
+  if (match?.id) {
+    const { data: updated, error: updateError } = await supabase
+      .from("guardian_items")
+      .update({
+        title,
+        description: description ?? match.description,
+        type,
+        event_date: args.eventDate,
+        due_at: args.dueAt,
+        requires_action: true,
+        updated_at: appNow().toISOString(),
+      })
+      .eq("id", match.id)
+      .select("*")
+      .single();
+
+    if (!updateError && updated) {
+      logGuardianEvent("guardian_item_deduped", {
+        item_id: updated.id,
+        space_id: args.spaceId,
+        type,
+        source_type: "user",
+        rescheduled: true,
+      });
+      return updated as GuardianItemRow;
+    }
+  }
+
   const dedupeKey = buildDedupeKey({
     type,
-    title: args.title,
+    title,
     effectiveDate: args.eventDate,
     childId: null,
     sourceDocumentId: null,
   });
-
-  const description = args.description?.trim()
-    ? args.description.trim().slice(0, 500)
-    : null;
 
   const row = {
     user_id: args.userId,
@@ -224,7 +267,7 @@ export async function insertManualGuardianItem(
     child_id: null,
     school_context_id: null,
     type,
-    title: args.title.slice(0, 300),
+    title,
     description,
     event_date: args.eventDate,
     due_at: args.dueAt,
@@ -237,7 +280,8 @@ export async function insertManualGuardianItem(
     confidence: 1,
     needs_review: false,
     extraction_version: null,
-    dedupe_key: `${dedupeKey}|manual|${Date.now()}`,
+    // Stable key so identical manual reminders still collapse.
+    dedupe_key: `${dedupeKey}|manual`.slice(0, 500),
   };
 
   const { data, error } = await supabase
@@ -247,6 +291,31 @@ export async function insertManualGuardianItem(
     .single();
 
   if (error || !data) {
+    // Unique race — fetch and update times instead of failing.
+    if (error?.code === "23505") {
+      const { data: raced } = await supabase
+        .from("guardian_items")
+        .select("*")
+        .eq("space_id", args.spaceId)
+        .eq("dedupe_key", row.dedupe_key)
+        .eq("status", "active")
+        .maybeSingle();
+      if (raced?.id) {
+        const { data: updated } = await supabase
+          .from("guardian_items")
+          .update({
+            title,
+            description,
+            event_date: args.eventDate,
+            due_at: args.dueAt,
+            updated_at: appNow().toISOString(),
+          })
+          .eq("id", raced.id)
+          .select("*")
+          .single();
+        if (updated) return updated as GuardianItemRow;
+      }
+    }
     console.error("Manual guardian item insert failed:", error?.message);
     return null;
   }

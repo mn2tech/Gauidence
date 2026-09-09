@@ -254,6 +254,7 @@ export async function POST(request: Request) {
     ({ syncGuardianItemsFromDailyLog }) =>
       syncGuardianItemsFromDailyLog(supabase, {
         userId: user.id,
+        timeZone: userTz,
         log: {
           id: data.id,
           profile_id: data.profile_id,

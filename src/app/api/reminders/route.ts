@@ -160,24 +160,66 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient();
   const writer = admin ?? supabase;
-  const { data, error } = await writer
-    .from("alerts")
-    .insert(row)
-    .select(REMINDER_SELECT)
-    .single();
 
-  if (error || !data) {
-    console.error(
-      "Create reminder failed:",
-      error?.code,
-      error?.message ?? "unknown",
-      error?.details,
-      error?.hint
-    );
-    return NextResponse.json(
-      { error: reminderSaveError(error?.message) },
-      { status: 502 }
-    );
+  // Reschedule: same reminder topic → replace Attention time instead of duplicating.
+  const { titlesLikelySameAttention } = await import(
+    "@/lib/guardian-items/dedupe"
+  );
+  const { data: existingAlerts } = await writer
+    .from("alerts")
+    .select(REMINDER_SELECT)
+    .eq("user_id", user.id)
+    .eq("profile_id", profileId)
+    .is("document_id", null)
+    .gte("due_at", new Date(Date.now() - 7 * 86_400_000).toISOString())
+    .order("due_at", { ascending: true })
+    .limit(40);
+
+  const existingAlert = (existingAlerts ?? []).find((a) =>
+    titlesLikelySameAttention(String(a.title ?? ""), title)
+  );
+
+  let data = existingAlert ?? null;
+  let replaced = false;
+
+  if (existingAlert?.id) {
+    const { data: updated, error: updateError } = await writer
+      .from("alerts")
+      .update({
+        title,
+        due_date: dueDate,
+        due_at: dueAt,
+      })
+      .eq("id", existingAlert.id)
+      .select(REMINDER_SELECT)
+      .single();
+    if (!updateError && updated) {
+      data = updated;
+      replaced = true;
+    }
+  }
+
+  if (!data) {
+    const { data: inserted, error } = await writer
+      .from("alerts")
+      .insert(row)
+      .select(REMINDER_SELECT)
+      .single();
+
+    if (error || !inserted) {
+      console.error(
+        "Create reminder failed:",
+        error?.code,
+        error?.message ?? "unknown",
+        error?.details,
+        error?.hint
+      );
+      return NextResponse.json(
+        { error: reminderSaveError(error?.message) },
+        { status: 502 }
+      );
+    }
+    data = inserted;
   }
 
   // Dual-write into guardian_items so Watch / Gideon share one model.
@@ -202,6 +244,7 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     reminder: data,
+    replaced,
     whenLabel: formatReminderWhen(data.due_at, data.due_date, userTz),
   });
 }
