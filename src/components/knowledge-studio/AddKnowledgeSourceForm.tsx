@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import {
   CLS_PROJECT_SLUG,
   MCPS_AUTHORITY,
@@ -14,6 +14,22 @@ import {
   type KnowledgeScope,
 } from "@/lib/knowledge-studio/projects/types";
 
+type StarterSource = {
+  source_name: string;
+  source_url: string;
+  category: string;
+};
+
+function normalizeUrlKey(url: string): string {
+  try {
+    const u = new URL(url.trim());
+    const path = u.pathname.replace(/\/+/g, "/").replace(/\/$/, "") || "/";
+    return `${u.hostname.replace(/^www\./i, "").toLowerCase()}${path.toLowerCase()}`;
+  } catch {
+    return url.trim().toLowerCase();
+  }
+}
+
 export default function AddKnowledgeSourceForm({
   projectSlug,
   authorityDefault = MCPS_AUTHORITY,
@@ -23,12 +39,14 @@ export default function AddKnowledgeSourceForm({
   })),
   defaultScope = "district",
   schoolDefault = "",
+  starterSources = [],
 }: {
   projectSlug: string;
   authorityDefault?: string;
   categories?: Array<{ slug: string; name: string }>;
   defaultScope?: KnowledgeScope;
   schoolDefault?: string;
+  starterSources?: ReadonlyArray<StarterSource>;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -48,12 +66,35 @@ export default function AddKnowledgeSourceForm({
   const [nameTouched, setNameTouched] = useState(false);
   const [categoryTouched, setCategoryTouched] = useState(false);
   const [autoHint, setAutoHint] = useState<string | null>(null);
+  const [existingByUrl, setExistingByUrl] = useState<
+    Record<string, { id: string; status: string }>
+  >({});
 
   const categorySlugs = categories.map((c) => c.slug);
   const urlHint =
     projectSlug === CLS_PROJECT_SLUG
       ? "Public HTTPS pages on covenantlifeschool.org. Category is filled from the URL when possible."
       : "Public HTTPS pages or PDFs on montgomeryschoolsmd.org only.";
+
+  const loadExisting = useCallback(async () => {
+    if (!starterSources.length) return;
+    const res = await fetch(`/api/knowledge-studio/projects/${projectSlug}`, {
+      cache: "no-store",
+    });
+    const body = (await res.json().catch(() => ({}))) as {
+      sources?: Array<{ id: string; source_url: string; status: string }>;
+    };
+    if (!res.ok || !body.sources) return;
+    const map: Record<string, { id: string; status: string }> = {};
+    for (const s of body.sources) {
+      map[normalizeUrlKey(s.source_url)] = { id: s.id, status: s.status };
+    }
+    setExistingByUrl(map);
+  }, [projectSlug, starterSources.length]);
+
+  useEffect(() => {
+    void loadExisting();
+  }, [loadExisting]);
 
   function applyUrlHints(nextUrl: string) {
     setSourceUrl(nextUrl);
@@ -72,11 +113,40 @@ export default function AddKnowledgeSourceForm({
     }
   }
 
+  function useStarter(starter: StarterSource) {
+    const existing = existingByUrl[normalizeUrlKey(starter.source_url)];
+    if (existing) {
+      router.push(`/knowledge-studio/${projectSlug}/sources/${existing.id}`);
+      return;
+    }
+    setError(null);
+    setNameTouched(false);
+    setCategoryTouched(false);
+    setSourceName(starter.source_name);
+    setCategory(starter.category);
+    setSourceUrl(starter.source_url);
+    setAutoHint(
+      `Filled from starter · ${
+        categories.find((c) => c.slug === starter.category)?.name ??
+        starter.category
+      }`
+    );
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError(null);
     try {
+      const existing = existingByUrl[normalizeUrlKey(sourceUrl)];
+      if (existing) {
+        setError(
+          "A source with this URL already exists. Open it from the starter list or project Sources."
+        );
+        setBusy(false);
+        return;
+      }
+
       const res = await fetch(
         `/api/knowledge-studio/projects/${projectSlug}/sources`,
         {
@@ -103,6 +173,9 @@ export default function AddKnowledgeSourceForm({
       };
       if (!res.ok) {
         setError(body.error ?? "Could not add source.");
+        if (/already exists/i.test(body.error ?? "")) {
+          await loadExisting();
+        }
         return;
       }
       if (body.source?.id) {
@@ -120,6 +193,9 @@ export default function AddKnowledgeSourceForm({
   const field =
     "w-full rounded-md border border-stone-300 px-3 py-2 text-sm bg-white";
   const label = "block text-sm font-medium text-foreground";
+  const missingStarters = starterSources.filter(
+    (s) => !existingByUrl[normalizeUrlKey(s.source_url)]
+  );
 
   return (
     <form onSubmit={(e) => void onSubmit(e)} className="space-y-5">
@@ -127,6 +203,74 @@ export default function AddKnowledgeSourceForm({
         <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
           {error}
         </p>
+      ) : null}
+
+      {starterSources.length ? (
+        <details
+          open
+          className="rounded-xl border border-stone-200 bg-stone-50 p-4"
+        >
+          <summary className="cursor-pointer text-sm font-semibold text-foreground">
+            Suggested starter URLs ({missingStarters.length} left of{" "}
+            {starterSources.length})
+          </summary>
+          <p className="mt-2 text-xs text-ink-muted">
+            Tap Use to fill the form, or Review if already added. Homepage is
+            already in — pick Admissions, Parent Resources, or Faculty Directory
+            next.
+          </p>
+          <ul className="mt-3 space-y-2 text-sm">
+            {starterSources.map((s) => {
+              const existing = existingByUrl[normalizeUrlKey(s.source_url)];
+              return (
+                <li
+                  key={s.source_url}
+                  className="flex flex-wrap items-start justify-between gap-2 rounded-lg border border-stone-200 bg-white px-3 py-2"
+                >
+                  <div className="min-w-0 flex-1 break-all">
+                    <span className="font-medium">{s.source_name}</span>
+                    <span className="text-ink-muted"> · {s.category}</span>
+                    {existing ? (
+                      <span className="ml-2 inline-flex rounded border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-900">
+                        {String(existing.status).replace(/_/g, " ")}
+                      </span>
+                    ) : null}
+                    <br />
+                    <a
+                      href={s.source_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-brand hover:underline"
+                    >
+                      {s.source_url}
+                    </a>
+                  </div>
+                  {existing ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        router.push(
+                          `/knowledge-studio/${projectSlug}/sources/${existing.id}`
+                        )
+                      }
+                      className="rounded-md border border-stone-300 px-2.5 py-1 text-xs font-semibold hover:bg-stone-50"
+                    >
+                      Review
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => useStarter(s)}
+                      className="rounded-md border border-brand/30 bg-brand/10 px-2.5 py-1 text-xs font-semibold text-brand-dark hover:bg-brand/20"
+                    >
+                      Use
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </details>
       ) : null}
 
       <div className="grid gap-4 md:grid-cols-2">
