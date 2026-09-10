@@ -41,33 +41,10 @@ export default async function AddCovenantLifeSourcePage() {
         </p>
         <h1 className="mt-1 text-3xl font-semibold">Add Knowledge Source</h1>
         <p className="mt-3 text-ink-muted">
-          Paste an official public Covenant Life School URL. Guardian will
-          fetch, extract, and create review drafts — nothing publishes
-          automatically.
+          Paste an official public Covenant Life School URL — or tap a starter
+          below. Guardian will fetch, extract, and create review drafts —
+          nothing publishes automatically.
         </p>
-
-        <details className="mt-6 rounded-xl border border-stone-200 bg-stone-50 p-4">
-          <summary className="cursor-pointer text-sm font-semibold text-foreground">
-            Suggested starter URLs ({CLS_STARTER_SOURCES.length})
-          </summary>
-          <ul className="mt-3 space-y-2 text-sm">
-            {CLS_STARTER_SOURCES.map((s) => (
-              <li key={s.source_url} className="break-all">
-                <span className="font-medium">{s.source_name}</span>
-                <span className="text-ink-muted"> · {s.category}</span>
-                <br />
-                <a
-                  href={s.source_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-brand hover:underline"
-                >
-                  {s.source_url}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </details>
 
         <div className="mt-8 rounded-xl border border-stone-200 bg-white p-6 shadow-sm">
           <AddKnowledgeSourceForm
@@ -79,6 +56,7 @@ export default async function AddCovenantLifeSourcePage() {
             }))}
             defaultScope="school"
             schoolDefault="Covenant Life School"
+            starterSources={CLS_STARTER_SOURCES}
           />
         </div>
       </main>
