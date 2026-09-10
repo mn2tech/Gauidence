@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { FormEvent, useState } from "react";
 import { renderGideonText } from "@/components/gideonText";
 
@@ -50,17 +51,28 @@ export default function PublicCovenantLifeAssistant() {
   return (
     <div className="mx-auto max-w-2xl">
       <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm md:p-8">
-        <div className="text-sm font-medium text-ink-muted">
-          Covenant Life School
+        <div className="flex flex-col items-center text-center">
+          <Image
+            src="/branding/covenant-life-school-seal.png"
+            alt="Covenant Life School seal — Preparing for the Call of God, Est. 1979"
+            width={112}
+            height={112}
+            priority
+            className="h-28 w-28 object-contain"
+          />
+          <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-ink-muted">
+            Covenant Life School
+          </p>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+            Ask Gideon about CLS
+          </h1>
+          <p className="mt-3 max-w-md text-ink-muted">
+            Ask about admissions, academics, parent resources, calendar,
+            athletics, and other information published from the official school
+            website.
+          </p>
         </div>
-        <h1 className="mt-1 text-3xl font-semibold">
-          Ask Gideon about CLS
-        </h1>
-        <p className="mt-3 text-ink-muted">
-          Ask about admissions, academics, parent resources, calendar, athletics,
-          and other information published from the official school website.
-        </p>
-        <div className="mt-5 flex flex-wrap gap-2">
+        <div className="mt-5 flex flex-wrap justify-center gap-2">
           {starters.map((s) => (
             <button
               key={s}
