@@ -177,6 +177,11 @@ export default function SourceReviewClient({
       i.version_id === current_version.id ||
       i.status === "published"
   );
+  const needsReviewCount = reviewItems.filter(
+    (i) => i.status === "needs_review" || i.status === "draft"
+  ).length;
+  const approvedCount = reviewItems.filter((i) => i.status === "approved").length;
+  const publishedCount = reviewItems.filter((i) => i.status === "published").length;
 
   return (
     <div className="space-y-8">
@@ -213,6 +218,51 @@ export default function SourceReviewClient({
           the new version before replacing it.
         </p>
       ) : null}
+
+      <section className="sticky top-0 z-30 -mx-2 rounded-xl border border-stone-200 bg-white/95 p-4 shadow-sm backdrop-blur sm:mx-0">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-base font-semibold">Review &amp; publish</h2>
+            <p className="mt-0.5 text-xs text-ink-muted">
+              {needsReviewCount} needs review · {approvedCount} approved ·{" "}
+              {publishedCount} published
+            </p>
+            {reviewItems.length === 0 ? (
+              <p className="mt-1 text-xs text-amber-800">
+                No extracted items yet — refresh the source or wait for
+                extraction to finish.
+              </p>
+            ) : approvedCount === 0 && publishedCount === 0 ? (
+              <p className="mt-1 text-xs text-ink-muted">
+                Tap Approve All first, then Publish Approved.
+              </p>
+            ) : approvedCount > 0 ? (
+              <p className="mt-1 text-xs text-ink-muted">
+                Ready to publish {approvedCount} approved item
+                {approvedCount === 1 ? "" : "s"}.
+              </p>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={busy === "approve_all" || needsReviewCount === 0}
+              onClick={() => void sourceAction("approve_all")}
+              className="rounded-lg border border-sky-300 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-900 hover:bg-sky-100 disabled:opacity-50"
+            >
+              {busy === "approve_all" ? "Approving…" : "Approve All"}
+            </button>
+            <button
+              type="button"
+              disabled={busy === "publish_approved" || approvedCount === 0}
+              onClick={() => void sourceAction("publish_approved")}
+              className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50"
+            >
+              {busy === "publish_approved" ? "Publishing…" : "Publish Approved"}
+            </button>
+          </div>
+        </div>
+      </section>
 
       <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
         <h2 className="text-lg font-semibold">Source Information</h2>
@@ -285,27 +335,7 @@ export default function SourceReviewClient({
       </section>
 
       <section className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold">Extracted Knowledge</h2>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={busy === "approve_all"}
-              onClick={() => void sourceAction("approve_all")}
-              className="rounded-md border border-sky-300 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-900 hover:bg-sky-100 disabled:opacity-60"
-            >
-              Approve All
-            </button>
-            <button
-              type="button"
-              disabled={busy === "publish_approved"}
-              onClick={() => void sourceAction("publish_approved")}
-              className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-900 hover:bg-emerald-100 disabled:opacity-60"
-            >
-              Publish Approved
-            </button>
-          </div>
-        </div>
+        <h2 className="text-lg font-semibold">Extracted Knowledge</h2>
 
         {reviewItems.length === 0 ? (
           <p className="text-sm text-ink-muted">No knowledge items yet.</p>
