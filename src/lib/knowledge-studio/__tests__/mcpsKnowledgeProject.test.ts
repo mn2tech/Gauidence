@@ -24,6 +24,7 @@ import {
   allowedDomainsForProject,
   parseHttpsUrl,
   preferredCategoriesForQuestion,
+  inferSourceHintsFromUrl,
   scoreKnowledgeRelevance,
   validateAddSourceInput,
 } from "@/lib/knowledge-studio/projects";
@@ -96,6 +97,27 @@ describe("Covenant Life School knowledge project", () => {
       preferredCategoriesForQuestion("How do I enroll at Covenant Life?"),
       ["admissions"]
     );
+  });
+
+  it("infers category and name from CLS URLs", () => {
+    const admissions = inferSourceHintsFromUrl(
+      "https://www.covenantlifeschool.org/admissions/",
+      CLS_CATEGORY_SLUGS
+    );
+    assert.equal(admissions.category, "admissions");
+    assert.equal(admissions.sourceName, "Admissions");
+
+    const uniforms = inferSourceHintsFromUrl(
+      "https://www.covenantlifeschool.org/community/uniforms/",
+      CLS_CATEGORY_SLUGS
+    );
+    assert.equal(uniforms.category, "community");
+
+    const faculty = inferSourceHintsFromUrl(
+      "https://www.covenantlifeschool.org/faculty-directory/",
+      CLS_CATEGORY_SLUGS
+    );
+    assert.equal(faculty.category, "contact");
   });
 });
 

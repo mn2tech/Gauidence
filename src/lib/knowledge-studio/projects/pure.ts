@@ -1,4 +1,5 @@
 import type { ExtractedKnowledgeItem } from "./types";
+import { CLS_STARTER_SOURCES } from "./constants";
 
 /**
  * Heuristic fallback when LLM extraction fails — split into coarse chunks
@@ -43,6 +44,118 @@ export function fallbackItemsFromText(args: {
       evidence_text: chunk.slice(0, 4000),
     };
   });
+}
+
+function normalizeUrlKey(url: string): string | null {
+  try {
+    const u = new URL(url.trim());
+    const path = u.pathname.replace(/\/+/g, "/").replace(/\/$/, "") || "/";
+    return `${u.hostname.replace(/^www\./i, "").toLowerCase()}${path.toLowerCase()}`;
+  } catch {
+    return null;
+  }
+}
+
+function titleFromPath(pathname: string): string {
+  const clean = pathname.replace(/\/+/g, "/").replace(/\/$/, "") || "/";
+  if (clean === "/") return "";
+  const segment = clean.split("/").filter(Boolean).pop() ?? "";
+  return segment
+    .replace(/[-_]+/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .trim();
+}
+
+/**
+ * Infer category (+ optional source name) from a public page URL.
+ * Uses curated CLS starter URLs first, then path heuristics.
+ */
+export function inferSourceHintsFromUrl(
+  url: string,
+  allowedCategories: ReadonlyArray<string>
+): { category: string | null; sourceName: string | null } {
+  const allowed = new Set(
+    allowedCategories.map((c) => c.trim().toLowerCase()).filter(Boolean)
+  );
+  const pick = (slug: string | null | undefined): string | null => {
+    if (!slug) return null;
+    const key = slug.toLowerCase();
+    return allowed.has(key) ? key : null;
+  };
+
+  const key = normalizeUrlKey(url);
+  if (!key) return { category: null, sourceName: null };
+
+  for (const starter of CLS_STARTER_SOURCES) {
+    const starterKey = normalizeUrlKey(starter.source_url);
+    if (starterKey && starterKey === key) {
+      return {
+        category: pick(starter.category),
+        sourceName: starter.source_name,
+      };
+    }
+  }
+
+  let pathname = "/";
+  try {
+    pathname = new URL(url.trim()).pathname.toLowerCase();
+  } catch {
+    return { category: null, sourceName: null };
+  }
+
+  const rules: Array<{ test: RegExp; category: string }> = [
+    { test: /\/faculty-directory|\/contact/, category: "contact" },
+    {
+      test: /\/student-health|\/health-and-safety|\/health-safety/,
+      category: "health-safety",
+    },
+    {
+      test: /\/parent-resources|\/parentsweb|\/parentvue|\/facts/,
+      category: "parent-resources",
+    },
+    {
+      test: /\/uniforms|\/after-care|\/aftercare|\/summer-camps|\/community\//,
+      category: "community",
+    },
+    { test: /\/athletics|\/sports/, category: "athletics" },
+    { test: /\/calendar/, category: "calendar" },
+    {
+      test: /\/preschool|\/elementary|\/middle-school|\/high-school|\/academics/,
+      category: "academics",
+    },
+    {
+      test: /\/admissions|\/tuition|\/open-house|\/international-students/,
+      category: "admissions",
+    },
+    { test: /\/about-us|\/about\//, category: "about" },
+    { test: /\/school-assignment|\/boundaries/, category: "school-assignment" },
+    { test: /\/transportation|\/bus/, category: "transportation" },
+    { test: /\/schools?\//, category: "schools" },
+  ];
+
+  for (const rule of rules) {
+    if (rule.test.test(pathname)) {
+      const category = pick(rule.category);
+      if (category) {
+        return {
+          category,
+          sourceName: titleFromPath(pathname) || null,
+        };
+      }
+    }
+  }
+
+  if (pathname === "/" || pathname === "") {
+    return {
+      category: pick("about") ?? pick("schools") ?? null,
+      sourceName: null,
+    };
+  }
+
+  return {
+    category: null,
+    sourceName: titleFromPath(pathname) || null,
+  };
 }
 
 /** Pure helper for tests: unpublished statuses must never be returned. */

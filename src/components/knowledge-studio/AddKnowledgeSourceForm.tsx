@@ -3,9 +3,11 @@
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import {
+  CLS_PROJECT_SLUG,
   MCPS_AUTHORITY,
   MCPS_CATEGORY_DEFS,
 } from "@/lib/knowledge-studio/projects/constants";
+import { inferSourceHintsFromUrl } from "@/lib/knowledge-studio/projects/pure";
 import {
   KNOWLEDGE_SCOPES,
   REFRESH_FREQUENCIES,
@@ -43,6 +45,32 @@ export default function AddKnowledgeSourceForm({
   const [notes, setNotes] = useState("");
   const [effectiveDate, setEffectiveDate] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
+  const [nameTouched, setNameTouched] = useState(false);
+  const [categoryTouched, setCategoryTouched] = useState(false);
+  const [autoHint, setAutoHint] = useState<string | null>(null);
+
+  const categorySlugs = categories.map((c) => c.slug);
+  const urlHint =
+    projectSlug === CLS_PROJECT_SLUG
+      ? "Public HTTPS pages on covenantlifeschool.org. Category is filled from the URL when possible."
+      : "Public HTTPS pages or PDFs on montgomeryschoolsmd.org only.";
+
+  function applyUrlHints(nextUrl: string) {
+    setSourceUrl(nextUrl);
+    const hints = inferSourceHintsFromUrl(nextUrl, categorySlugs);
+    if (hints.category && !categoryTouched) {
+      setCategory(hints.category);
+      const label =
+        categories.find((c) => c.slug === hints.category)?.name ??
+        hints.category;
+      setAutoHint(`Category set to ${label} from URL.`);
+    } else if (!hints.category) {
+      setAutoHint(null);
+    }
+    if (hints.sourceName && !nameTouched) {
+      setSourceName(hints.sourceName);
+    }
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -103,20 +131,6 @@ export default function AddKnowledgeSourceForm({
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-1.5 md:col-span-2">
-          <label className={label} htmlFor="source_name">
-            Source Name *
-          </label>
-          <input
-            id="source_name"
-            required
-            className={field}
-            value={sourceName}
-            onChange={(e) => setSourceName(e.target.value)}
-            placeholder="MCPS School Calendar"
-          />
-        </div>
-
-        <div className="space-y-1.5 md:col-span-2">
           <label className={label} htmlFor="source_url">
             Source URL *
           </label>
@@ -126,12 +140,39 @@ export default function AddKnowledgeSourceForm({
             type="url"
             className={field}
             value={sourceUrl}
-            onChange={(e) => setSourceUrl(e.target.value)}
-            placeholder="https://www.montgomeryschoolsmd.org/..."
+            onChange={(e) => applyUrlHints(e.target.value)}
+            onBlur={(e) => applyUrlHints(e.target.value.trim())}
+            placeholder={
+              projectSlug === CLS_PROJECT_SLUG
+                ? "https://www.covenantlifeschool.org/..."
+                : "https://www.montgomeryschoolsmd.org/..."
+            }
           />
-          <p className="text-xs text-ink-muted">
-            Public HTTPS pages or PDFs on montgomeryschoolsmd.org only.
-          </p>
+          <p className="text-xs text-ink-muted">{urlHint}</p>
+          {autoHint ? (
+            <p className="text-xs font-medium text-emerald-800">{autoHint}</p>
+          ) : null}
+        </div>
+
+        <div className="space-y-1.5 md:col-span-2">
+          <label className={label} htmlFor="source_name">
+            Source Name *
+          </label>
+          <input
+            id="source_name"
+            required
+            className={field}
+            value={sourceName}
+            onChange={(e) => {
+              setNameTouched(true);
+              setSourceName(e.target.value);
+            }}
+            placeholder={
+              projectSlug === CLS_PROJECT_SLUG
+                ? "CLS Admissions"
+                : "MCPS School Calendar"
+            }
+          />
         </div>
 
         <div className="space-y-1.5">
@@ -143,7 +184,11 @@ export default function AddKnowledgeSourceForm({
             required
             className={field}
             value={category}
-            onChange={(e) => setCategory(e.target.value)}
+            onChange={(e) => {
+              setCategoryTouched(true);
+              setCategory(e.target.value);
+              setAutoHint(null);
+            }}
           >
             {categories.map((c) => (
               <option key={c.slug} value={c.slug}>

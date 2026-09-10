@@ -6,6 +6,7 @@ export {
   expandAskTokens,
   fallbackItemsFromText,
   filterPublishedOnly,
+  inferSourceHintsFromUrl,
   preferredCategoriesForQuestion,
   scoreKnowledgeRelevance,
 } from "./pure";
