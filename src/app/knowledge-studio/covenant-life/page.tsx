@@ -45,6 +45,14 @@ export default async function CovenantLifeKnowledgeStudioPage() {
             : add sources, review extracted items, publish intentionally, then
             test Gideon with citations.
           </p>
+          <p className="mt-2 text-sm">
+            <Link
+              href="/covenant-life"
+              className="font-medium text-brand hover:underline"
+            >
+              Open public family page →
+            </Link>
+          </p>
         </div>
         <McpsKnowledgeStudioClient
           projectSlug={CLS_PROJECT_SLUG}
