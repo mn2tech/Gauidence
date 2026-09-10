@@ -18,10 +18,14 @@ export default function AddKnowledgeSourceForm({
     slug: c.slug,
     name: c.name,
   })),
+  defaultScope = "district",
+  schoolDefault = "",
 }: {
   projectSlug: string;
   authorityDefault?: string;
   categories?: Array<{ slug: string; name: string }>;
+  defaultScope?: (typeof KNOWLEDGE_SCOPES)[number];
+  schoolDefault?: string;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -31,9 +35,9 @@ export default function AddKnowledgeSourceForm({
   const [sourceUrl, setSourceUrl] = useState("");
   const [category, setCategory] = useState(categories[0]?.slug ?? "calendar");
   const [authority, setAuthority] = useState(authorityDefault);
-  const [scope, setScope] = useState("district");
+  const [scope, setScope] = useState(defaultScope);
   const [refreshFrequency, setRefreshFrequency] = useState("manual");
-  const [school, setSchool] = useState("");
+  const [school, setSchool] = useState(schoolDefault);
   const [gradeLevel, setGradeLevel] = useState("");
   const [notes, setNotes] = useState("");
   const [effectiveDate, setEffectiveDate] = useState("");

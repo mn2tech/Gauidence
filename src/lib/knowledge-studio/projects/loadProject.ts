@@ -2,6 +2,11 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  CLS_AUTHORITY,
+  CLS_CATEGORY_DEFS,
+  CLS_DISCLAIMER,
+  CLS_PROJECT_NAME,
+  CLS_PROJECT_SLUG,
   MCPS_AUTHORITY,
   MCPS_CATEGORY_DEFS,
   MCPS_DISCLAIMER,
@@ -19,7 +24,7 @@ export type LoadedKnowledgeProject = {
 };
 
 /**
- * Load a knowledge project by slug. Ensures MCPS seed rows exist if missing
+ * Load a knowledge project by slug. Ensures known seed rows exist if missing
  * (useful before migration is applied in some local setups).
  */
 export async function loadKnowledgeProject(
@@ -28,6 +33,8 @@ export async function loadKnowledgeProject(
 ): Promise<LoadedKnowledgeProject | null> {
   if (slug === MCPS_PROJECT_SLUG) {
     await ensureMcpsProject(admin);
+  } else if (slug === CLS_PROJECT_SLUG) {
+    await ensureCovenantLifeProject(admin);
   }
 
   const { data: project, error } = await admin
@@ -82,6 +89,53 @@ export async function ensureMcpsProject(admin: SupabaseClient): Promise<void> {
 
   for (let i = 0; i < MCPS_CATEGORY_DEFS.length; i++) {
     const cat = MCPS_CATEGORY_DEFS[i]!;
+    await admin.from("knowledge_project_categories").upsert(
+      {
+        project_id: projectId,
+        slug: cat.slug,
+        name: cat.name,
+        description: cat.description,
+        sort_order: (i + 1) * 10,
+      },
+      { onConflict: "project_id,slug" }
+    );
+  }
+}
+
+export async function ensureCovenantLifeProject(
+  admin: SupabaseClient
+): Promise<void> {
+  const { data: existing } = await admin
+    .from("knowledge_projects")
+    .select("id")
+    .eq("slug", CLS_PROJECT_SLUG)
+    .maybeSingle();
+
+  let projectId = existing?.id as string | undefined;
+
+  if (!projectId) {
+    const { data: inserted, error } = await admin
+      .from("knowledge_projects")
+      .insert({
+        slug: CLS_PROJECT_SLUG,
+        name: CLS_PROJECT_NAME,
+        description:
+          "Curated public information for Covenant Life School (Gaithersburg, MD) parents and families.",
+        authority_default: CLS_AUTHORITY,
+        disclaimer: CLS_DISCLAIMER,
+        project_type: "school",
+      })
+      .select("id")
+      .single();
+    if (error || !inserted) {
+      console.error("ensureCovenantLifeProject insert failed:", error?.message);
+      return;
+    }
+    projectId = inserted.id as string;
+  }
+
+  for (let i = 0; i < CLS_CATEGORY_DEFS.length; i++) {
+    const cat = CLS_CATEGORY_DEFS[i]!;
     await admin.from("knowledge_project_categories").upsert(
       {
         project_id: projectId,

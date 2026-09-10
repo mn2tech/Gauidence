@@ -15,6 +15,13 @@ import {
   MCPS_DISCLAIMER,
   MCPS_PROJECT_SLUG,
   NO_VERIFIED_MCPS_ANSWER,
+  CLS_ALLOWED_DOMAINS,
+  CLS_CATEGORY_SLUGS,
+  CLS_DISCLAIMER,
+  CLS_PROJECT_SLUG,
+  CLS_STARTER_SOURCES,
+  NO_VERIFIED_CLS_ANSWER,
+  allowedDomainsForProject,
   parseHttpsUrl,
   preferredCategoriesForQuestion,
   scoreKnowledgeRelevance,
@@ -35,6 +42,60 @@ describe("MCPS knowledge project seed constants", () => {
       ].sort()
     );
     assert.match(MCPS_DISCLAIMER, /not affiliated with or endorsed by/i);
+  });
+});
+
+describe("Covenant Life School knowledge project", () => {
+  it("defines covenant-life school project and categories", () => {
+    assert.equal(CLS_PROJECT_SLUG, "covenant-life");
+    assert.ok(CLS_CATEGORY_SLUGS.includes("admissions"));
+    assert.ok(CLS_CATEGORY_SLUGS.includes("parent-resources"));
+    assert.ok(CLS_CATEGORY_SLUGS.includes("contact"));
+    assert.match(CLS_DISCLAIMER, /not affiliated with or endorsed by/i);
+    assert.match(NO_VERIFIED_CLS_ANSWER, /covenantlifeschool\.org/i);
+    assert.ok(CLS_STARTER_SOURCES.length >= 10);
+  });
+
+  it("allowlists only covenantlifeschool.org", () => {
+    assert.deepEqual(allowedDomainsForProject(CLS_PROJECT_SLUG), [
+      ...CLS_ALLOWED_DOMAINS,
+    ]);
+    assert.ok(
+      hostMatchesAllowedDomains("www.covenantlifeschool.org", CLS_ALLOWED_DOMAINS)
+    );
+    assert.ok(
+      assertAllowedDomainUrl(
+        "https://www.covenantlifeschool.org/admissions/",
+        CLS_ALLOWED_DOMAINS
+      )
+    );
+    assert.throws(() =>
+      assertAllowedDomainUrl(
+        "https://www.montgomeryschoolsmd.org/",
+        CLS_ALLOWED_DOMAINS
+      )
+    );
+  });
+
+  it("accepts a valid CLS source payload", () => {
+    const result = validateAddSourceInput(
+      {
+        source_name: "Admissions",
+        source_url: "https://www.covenantlifeschool.org/admissions/",
+        category: "admissions",
+        scope: "school",
+        refresh_frequency: "weekly",
+      },
+      CLS_CATEGORY_SLUGS
+    );
+    assert.equal(result.ok, true);
+  });
+
+  it("prefers admissions category for enroll questions", () => {
+    assert.deepEqual(
+      preferredCategoriesForQuestion("How do I enroll at Covenant Life?"),
+      ["admissions"]
+    );
   });
 });
 
@@ -242,6 +303,7 @@ describe("knowledge lifecycle retrieval rules", () => {
     assert.ok(expandAskTokens("Whats the prinicpal's name").includes("principal"));
     assert.deepEqual(preferredCategoriesForQuestion("Whats the prinicpal's name"), [
       "schools",
+      "contact",
     ]);
 
     const directory = scoreKnowledgeRelevance({

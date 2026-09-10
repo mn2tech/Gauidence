@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireProjectAdmin } from "@/lib/knowledge-studio/projects/apiContext";
 import { answerProjectTestQuestion } from "@/lib/knowledge-studio/projects/ask";
+import {
+  CLS_PROJECT_SLUG,
+  NO_VERIFIED_CLS_ANSWER,
+  NO_VERIFIED_MCPS_ANSWER,
+} from "@/lib/knowledge-studio/projects/constants";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -29,6 +34,10 @@ export async function POST(request: Request, context: RouteContext) {
       question,
       schoolHint: typeof body.school === "string" ? body.school : null,
       authorityDefault: ctx.loaded.project.authority_default ?? undefined,
+      emptyAnswer:
+        slug === CLS_PROJECT_SLUG
+          ? NO_VERIFIED_CLS_ANSWER
+          : NO_VERIFIED_MCPS_ANSWER,
     });
     return NextResponse.json({ ok: true, ...result });
   } catch (err) {

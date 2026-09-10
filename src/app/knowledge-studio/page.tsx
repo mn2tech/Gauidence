@@ -41,6 +41,17 @@ export default async function KnowledgeStudioPage() {
             </p>
           </Link>
           <Link
+            href="/knowledge-studio/covenant-life"
+            className="rounded-2xl border border-black/10 bg-white p-6 shadow-sm transition hover:shadow-md"
+          >
+            <div className="text-sm text-ink-muted">School</div>
+            <h2 className="mt-1 text-xl font-semibold">Covenant Life School</h2>
+            <p className="mt-2 text-sm text-ink-muted">
+              Curated public CLS pages — admissions, academics, parent
+              resources, calendar, athletics, and more.
+            </p>
+          </Link>
+          <Link
             href="/knowledge-studio/crossroadsconnect"
             className="rounded-2xl border border-black/10 bg-white p-6 shadow-sm transition hover:shadow-md"
           >

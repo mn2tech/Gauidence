@@ -34,8 +34,12 @@ function statusClass(status: string): string {
 
 export default function McpsKnowledgeStudioClient({
   projectSlug = MCPS_PROJECT_SLUG,
+  emptySourcesHint = "No sources yet. Add 10–20 high-value official MCPS URLs manually.",
+  showParentIntelligence = projectSlug === MCPS_PROJECT_SLUG,
 }: {
   projectSlug?: string;
+  emptySourcesHint?: string;
+  showParentIntelligence?: boolean;
 }) {
   const [project, setProject] = useState<KnowledgeProjectRow | null>(null);
   const [categories, setCategories] = useState<KnowledgeProjectCategoryRow[]>(
@@ -202,7 +206,9 @@ export default function McpsKnowledgeStudioClient({
       {showTest ? (
         <div className="space-y-6">
           <TestGideonPanel projectSlug={projectSlug} />
-          <ParentIntelligenceTestPanel projectSlug={projectSlug} />
+          {showParentIntelligence ? (
+            <ParentIntelligenceTestPanel projectSlug={projectSlug} />
+          ) : null}
         </div>
       ) : null}
 
@@ -259,9 +265,7 @@ export default function McpsKnowledgeStudioClient({
         {loading ? (
           <p className="text-sm text-ink-muted">Loading…</p>
         ) : sources.length === 0 ? (
-          <p className="text-sm text-ink-muted">
-            No sources yet. Add 10–20 high-value official MCPS URLs manually.
-          </p>
+          <p className="text-sm text-ink-muted">{emptySourcesHint}</p>
         ) : (
           <ul className="space-y-3">
             {sources.map((source) => (

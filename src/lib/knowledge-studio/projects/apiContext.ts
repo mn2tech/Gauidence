@@ -7,7 +7,7 @@ import {
   type KnowledgeStudioAdminContext,
 } from "@/lib/knowledge-studio/auth";
 import {
-  MCPS_ALLOWED_DOMAINS,
+  allowedDomainsForProject,
   MCPS_CATEGORY_SLUGS,
   MCPS_PROJECT_SLUG,
 } from "@/lib/knowledge-studio/projects/constants";
@@ -32,8 +32,14 @@ export async function requireProjectAdmin(
     return NextResponse.json({ error: "Knowledge project not found." }, { status: 404 });
   }
 
-  const allowedDomains =
-    slug === MCPS_PROJECT_SLUG ? MCPS_ALLOWED_DOMAINS : MCPS_ALLOWED_DOMAINS;
+  const domains = allowedDomainsForProject(slug);
+  if (!domains) {
+    return NextResponse.json(
+      { error: "Knowledge project domain allowlist is not configured." },
+      { status: 400 }
+    );
+  }
+
   const categorySlugs =
     slug === MCPS_PROJECT_SLUG
       ? [...MCPS_CATEGORY_SLUGS]
@@ -42,7 +48,7 @@ export async function requireProjectAdmin(
   return {
     ...ctx,
     loaded,
-    allowedDomains,
+    allowedDomains: domains,
     categorySlugs,
   };
 }

@@ -99,11 +99,12 @@ export function expandAskTokens(question: string): string[] {
 /** Prefer these knowledge categories for common parent intents. */
 export function preferredCategoriesForQuestion(question: string): string[] {
   const tokens = expandAskTokens(question).join(" ");
+  const q = question.toLowerCase();
   if (
-    /\b(principal|contact|directory|phone|address|staff)\b/.test(tokens) ||
-    /\bwho\s+is\b/.test(question.toLowerCase())
+    /\b(principal|contact|directory|phone|address|staff|faculty)\b/.test(tokens) ||
+    /\bwho\s+is\b/.test(q)
   ) {
-    return ["schools"];
+    return ["schools", "contact"];
   }
   if (/\b(bus|transport|route|depot)\b/.test(tokens)) {
     return ["transportation"];
@@ -113,6 +114,24 @@ export function preferredCategoriesForQuestion(question: string): string[] {
   }
   if (/\b(assign|boundary|which\s+school)\b/.test(tokens)) {
     return ["school-assignment"];
+  }
+  if (/\b(admission|apply|enroll|tuition|tour|open\s+house)\b/.test(tokens)) {
+    return ["admissions"];
+  }
+  if (/\b(uniform|dress\s+code|after\s*care|summer\s+camp)\b/.test(tokens)) {
+    return ["community"];
+  }
+  if (/\b(athletic|sport|cougar)\b/.test(tokens)) {
+    return ["athletics"];
+  }
+  if (/\b(preschool|elementary|middle\s+school|high\s+school|academic)\b/.test(tokens)) {
+    return ["academics"];
+  }
+  if (/\b(health|safety|immunization|medication|weather)\b/.test(tokens)) {
+    return ["health-safety", "parent-resources"];
+  }
+  if (/\b(facts|parents?\s*web|portal|lunch|supplies)\b/.test(tokens)) {
+    return ["parent-resources"];
   }
   return [];
 }
