@@ -8,9 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function CovenantLifePublicPage() {
-  return (
-    <main className="min-h-screen bg-[var(--background)] px-5 py-12 md:py-20">
-      <PublicCovenantLifeAssistant />
-    </main>
-  );
+  return <PublicCovenantLifeAssistant />;
 }
