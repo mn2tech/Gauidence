@@ -116,11 +116,7 @@ export default function PublicCovenantLifeAssistant() {
             <button
               type="submit"
               disabled={loading}
-              className={`rounded-xl px-5 py-3 font-medium disabled:opacity-60 ${
-                isDark
-                  ? "bg-white text-stone-900 hover:bg-stone-100"
-                  : "bg-black text-white hover:bg-stone-800"
-              }`}
+              className="rounded-xl bg-brand px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-brand-dark disabled:opacity-60"
             >
               {loading ? "Thinking…" : "Ask"}
             </button>
