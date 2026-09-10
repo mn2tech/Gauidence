@@ -9,6 +9,7 @@ import {
 import {
   KNOWLEDGE_SCOPES,
   REFRESH_FREQUENCIES,
+  type KnowledgeScope,
 } from "@/lib/knowledge-studio/projects/types";
 
 export default function AddKnowledgeSourceForm({
@@ -24,7 +25,7 @@ export default function AddKnowledgeSourceForm({
   projectSlug: string;
   authorityDefault?: string;
   categories?: Array<{ slug: string; name: string }>;
-  defaultScope?: (typeof KNOWLEDGE_SCOPES)[number];
+  defaultScope?: KnowledgeScope;
   schoolDefault?: string;
 }) {
   const router = useRouter();
@@ -35,7 +36,7 @@ export default function AddKnowledgeSourceForm({
   const [sourceUrl, setSourceUrl] = useState("");
   const [category, setCategory] = useState(categories[0]?.slug ?? "calendar");
   const [authority, setAuthority] = useState(authorityDefault);
-  const [scope, setScope] = useState(defaultScope);
+  const [scope, setScope] = useState<KnowledgeScope>(defaultScope);
   const [refreshFrequency, setRefreshFrequency] = useState("manual");
   const [school, setSchool] = useState(schoolDefault);
   const [gradeLevel, setGradeLevel] = useState("");
@@ -174,7 +175,7 @@ export default function AddKnowledgeSourceForm({
             required
             className={field}
             value={scope}
-            onChange={(e) => setScope(e.target.value)}
+            onChange={(e) => setScope(e.target.value as KnowledgeScope)}
           >
             {KNOWLEDGE_SCOPES.map((s) => (
               <option key={s} value={s}>
