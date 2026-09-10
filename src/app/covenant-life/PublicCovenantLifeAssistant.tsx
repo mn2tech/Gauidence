@@ -165,6 +165,43 @@ export default function PublicCovenantLifeAssistant() {
             (301) 869-4500
           </a>
         </p>
+        <div className="mt-8 flex flex-col items-center gap-2 border-t border-black/10 pt-6">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-ink-muted">
+            Designed by
+          </span>
+          <a
+            href="https://guardian.nm2tech.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Designed by Guardian"
+            className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 transition hover:opacity-90 ${
+              isDark
+                ? "bg-white text-stone-900"
+                : "bg-stone-900 text-white"
+            }`}
+          >
+            <Image
+              src="/branding/guardian-icon.png"
+              alt=""
+              width={20}
+              height={20}
+              className={`h-5 w-5 object-contain ${
+                isDark ? "" : "brightness-0 invert"
+              }`}
+            />
+            <span className="text-sm font-semibold tracking-tight">Guardian</span>
+          </a>
+          <p className="text-[11px] text-ink-muted">
+            <a
+              href="https://guardian.nm2tech.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:underline"
+            >
+              guardian.nm2tech.com
+            </a>
+          </p>
+        </div>
       </div>
     </div>
   );
