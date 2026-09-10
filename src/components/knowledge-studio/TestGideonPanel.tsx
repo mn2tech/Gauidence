@@ -1,7 +1,10 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { NO_VERIFIED_MCPS_ANSWER } from "@/lib/knowledge-studio/projects/constants";
+import {
+  CLS_PROJECT_SLUG,
+  MCPS_PROJECT_SLUG,
+} from "@/lib/knowledge-studio/projects/constants";
 
 type AskResult = {
   answer: string;
@@ -23,7 +26,7 @@ type AskResult = {
   }>;
 };
 
-const SAMPLE_QUESTIONS = [
+const MCPS_SAMPLE_QUESTIONS = [
   "Is there school next Monday?",
   "How do I find my child's assigned school?",
   "Who should I contact about transportation?",
@@ -31,6 +34,21 @@ const SAMPLE_QUESTIONS = [
   "What is ParentVUE?",
   "Where can parents get help?",
 ];
+
+const CLS_SAMPLE_QUESTIONS = [
+  "Who is the head of school?",
+  "How do I apply for admissions?",
+  "What is the school address and phone?",
+  "How do parents access the FACTS portal?",
+  "Where can I find the uniform policy?",
+  "Does CLS follow MCPS for weather closures?",
+];
+
+function sampleQuestionsFor(slug: string): string[] {
+  if (slug === CLS_PROJECT_SLUG) return CLS_SAMPLE_QUESTIONS;
+  if (slug === MCPS_PROJECT_SLUG) return MCPS_SAMPLE_QUESTIONS;
+  return MCPS_SAMPLE_QUESTIONS;
+}
 
 export default function TestGideonPanel({
   projectSlug,
@@ -41,6 +59,7 @@ export default function TestGideonPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<AskResult | null>(null);
+  const samples = sampleQuestionsFor(projectSlug);
 
   async function ask(q: string) {
     setBusy(true);
@@ -80,12 +99,13 @@ export default function TestGideonPanel({
         <h2 className="text-lg font-semibold">Test Gideon</h2>
         <p className="mt-1 text-sm text-ink-muted">
           Answers use only published knowledge from this project. Citations are
-          required.
+          required. Draft / needs-review sources do not count until you approve
+          and publish them.
         </p>
       </div>
 
       <div className="flex flex-wrap gap-2">
-        {SAMPLE_QUESTIONS.map((q) => (
+        {samples.map((q) => (
           <button
             key={q}
             type="button"
@@ -130,7 +150,7 @@ export default function TestGideonPanel({
               Answer
             </h3>
             <p className="mt-2 whitespace-pre-wrap text-sm text-foreground">
-              {result.answer || NO_VERIFIED_MCPS_ANSWER}
+              {result.answer}
             </p>
           </div>
 
@@ -170,7 +190,14 @@ export default function TestGideonPanel({
             </h3>
             <p className="mt-1 text-xs text-ink-muted">Admin only</p>
             {result.retrieval.length === 0 ? (
-              <p className="mt-2 text-sm text-ink-muted">No published hits.</p>
+              <p className="mt-2 text-sm text-ink-muted">
+                No published hits. Open the source → Approve all → Publish
+                approved, then ask again. For leadership questions, also add{" "}
+                <span className="font-medium text-foreground">
+                  Faculty Directory
+                </span>{" "}
+                or Admissions pages that name the Head of School.
+              </p>
             ) : (
               <div className="mt-2 overflow-x-auto">
                 <table className="min-w-full text-left text-xs">
