@@ -108,7 +108,7 @@ export type EvaluateLifecycleInput = {
   description?: string | null;
   sourceExcerpt?: string | null;
   /** Existing DB status when the user marked complete. */
-  itemStatus?: "active" | "completed" | "dismissed" | "expired" | "cancelled";
+  itemStatus?: "active" | "completed" | "dismissed" | "expired" | "cancelled" | "superseded";
   confidence?: number;
   sourceEvidence?: TemporalSourceEvidence[];
 };
@@ -195,6 +195,9 @@ export function mapItemTypeToEntityType(
   switch (type) {
     case "event":
     case "school_closure":
+    case "no_school":
+    case "school_event":
+    case "early_dismissal":
     case "travel":
     case "birthday":
       return "event";
@@ -206,16 +209,23 @@ export function mapItemTypeToEntityType(
     case "return_window":
     case "warranty":
     case "document_requirement":
+    case "homework":
+    case "test":
+    case "no_homework":
       return "deadline";
     case "task":
     case "follow_up":
     case "commitment":
+    case "study_reminder":
       return "task";
     case "reminder":
       return "reminder";
     case "payment":
       return "invoice";
     case "informational":
+    case "spelling_list":
+    case "announcement":
+    case "school_contact":
       return "document";
     default:
       return "unknown";

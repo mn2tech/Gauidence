@@ -13,6 +13,7 @@ import {
   withTemporalMetadata,
 } from "./lifecycle-transitions";
 import { logGuardianEvent } from "./log";
+import { shouldSurfaceSchoolItemInToday } from "./newsletter/answer";
 import {
   GUARDIAN_WATCH_HORIZON_DAYS,
   type GuardianItemRow,
@@ -202,8 +203,16 @@ export async function getGuardianWatch(
       lifecycleById.get(row.id) ??
       reevaluateItemLifecycle(row, { now, timeZone });
 
+    const isSchoolAwareness =
+      row.type === "no_homework" ||
+      row.type === "no_school" ||
+      row.type === "school_event" ||
+      row.type === "early_dismissal" ||
+      row.type === "school_closure";
+
     // Expired obsolete actions (RSVP after event, closed submit, …) stay out of Watch.
-    if (!isCurrentlyActionable(reeval.temporal)) {
+    // School awareness cards (no homework / events) still surface when current.
+    if (!isCurrentlyActionable(reeval.temporal) && !isSchoolAwareness) {
       continue;
     }
 
@@ -215,6 +224,36 @@ export async function getGuardianWatch(
       timeZone,
       calendarDateInZone: calendarDateInUserZone,
     });
+
+    // Hide spelling lists, contacts, past homework, superseded noise from Today
+    if (
+      row.metadata &&
+      (row.metadata as { newsletter?: boolean }).newsletter &&
+      !shouldSurfaceSchoolItemInToday({
+        type: row.type,
+        eventDate: effectiveDate,
+        today,
+        status: row.status,
+      })
+    ) {
+      continue;
+    }
+
+    // Always hide spelling_list / school_contact from Watch (searchable in history)
+    if (row.type === "spelling_list" || row.type === "school_contact") {
+      continue;
+    }
+
+    // Past dated school homework (completed days) should not clutter Today
+    if (
+      effectiveDate &&
+      effectiveDate < today &&
+      (row.type === "homework" ||
+        row.type === "no_homework" ||
+        row.type === "study_reminder")
+    ) {
+      continue;
+    }
 
     const watchItem: GuardianWatchItem = {
       ...enriched,

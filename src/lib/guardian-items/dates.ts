@@ -51,6 +51,10 @@ const ACTION_TYPES = new Set<GuardianItemType>([
   "return_window",
   "document_requirement",
   "reminder",
+  "homework",
+  "test",
+  "study_reminder",
+  "early_dismissal",
 ]);
 
 /**
@@ -74,6 +78,13 @@ export function classifyWatchBucket(args: {
     (args.type === "appointment" ||
       args.type === "event" ||
       args.type === "school_closure" ||
+      args.type === "no_school" ||
+      args.type === "no_homework" ||
+      args.type === "school_event" ||
+      args.type === "homework" ||
+      args.type === "test" ||
+      args.type === "study_reminder" ||
+      args.type === "early_dismissal" ||
       args.type === "payment" ||
       args.type === "deadline" ||
       args.type === "task" ||
@@ -82,6 +93,18 @@ export function classifyWatchBucket(args: {
 
   if (isTodayOccurrence) {
     return "today";
+  }
+
+  // Tomorrow prep for school (study / events / early dismissal)
+  if (
+    days === 1 &&
+    (args.type === "study_reminder" ||
+      args.type === "test" ||
+      args.type === "school_event" ||
+      args.type === "early_dismissal" ||
+      args.type === "event")
+  ) {
+    return "needsAttention";
   }
 
   const needsAttention =
@@ -107,7 +130,10 @@ export function classifyWatchBucket(args: {
     days <= 7 &&
     (args.type === "event" ||
       args.type === "appointment" ||
-      args.type === "travel");
+      args.type === "travel" ||
+      args.type === "school_event" ||
+      args.type === "early_dismissal" ||
+      args.type === "no_school");
   if (isNearTermCalendar) {
     return "needsAttention";
   }

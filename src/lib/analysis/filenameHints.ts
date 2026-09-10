@@ -7,6 +7,8 @@ import type { Classification } from "./types";
 
 const CONTRACT_NAME =
   /\b(contract|agreement|ctr[-_]|mou|statement[\s_-]?of[\s_-]?work|sow)\b/i;
+const NEWSLETTER_NAME =
+  /\b(newsletter|classroom[\s_-]?news|homework[\s_-]?sheet|word[\s_-]?list)\b/i;
 const JSON_OR_TRELLO_NAME = /\.json$/i;
 const CSV_EXPORT_NAME = /\.csv$/i;
 
@@ -15,6 +17,14 @@ export function classificationFromFileName(
 ): Classification | null {
   const name = fileName?.trim();
   if (!name) return null;
+  if (NEWSLETTER_NAME.test(name)) {
+    return {
+      document_type: "school_newsletter",
+      document_subtype: "classroom_newsletter",
+      classification_confidence: 0.9,
+      classification_reason: "School newsletter inferred from the file name.",
+    };
+  }
   if (JSON_OR_TRELLO_NAME.test(name) || /trello/i.test(name)) {
     return {
       document_type: "general",

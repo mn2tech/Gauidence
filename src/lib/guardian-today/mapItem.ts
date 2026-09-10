@@ -33,6 +33,16 @@ const TYPE_MAP: Record<GuardianItemType, IntelligenceType> = {
   document_requirement: "task",
   event: "important_fact",
   informational: "important_fact",
+  school_event: "important_fact",
+  homework: "task",
+  test: "deadline",
+  study_reminder: "task",
+  spelling_list: "important_fact",
+  announcement: "important_fact",
+  school_contact: "important_fact",
+  early_dismissal: "important_fact",
+  no_school: "important_fact",
+  no_homework: "important_fact",
 };
 
 export function mapGuardianTypeToIntelligence(

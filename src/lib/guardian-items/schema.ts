@@ -7,17 +7,27 @@ const isoDate = z
   .nullable()
   .optional();
 
+const isoDateTime = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}T/, "expected ISO datetime")
+  .nullable()
+  .optional();
+
 export const guardianExtractedItemSchema = z.object({
   type: z.enum(GUARDIAN_ITEM_TYPES),
   title: z.string().trim().min(1).max(300),
   description: z.string().trim().max(1000).nullable().optional(),
   event_date: isoDate,
   due_at: isoDate,
+  start_at: isoDateTime,
+  end_at: isoDateTime,
   requires_action: z.boolean(),
   priority: z.enum(GUARDIAN_ITEM_PRIORITIES).default("normal"),
   child_reference: z.string().trim().max(200).nullable().optional(),
   confidence: z.number().min(0).max(1),
   source_excerpt: z.string().trim().min(1).max(500),
+  source_page: z.number().int().min(1).nullable().optional(),
+  metadata: z.record(z.string(), z.unknown()).nullable().optional(),
 });
 
 export const guardianExtractionSchema = z.object({
@@ -50,11 +60,14 @@ export const GUARDIAN_EXTRACTION_JSON_SCHEMA = {
           description: { type: ["string", "null"] },
           event_date: { type: ["string", "null"] },
           due_at: { type: ["string", "null"] },
+          start_at: { type: ["string", "null"] },
+          end_at: { type: ["string", "null"] },
           requires_action: { type: "boolean" },
           priority: { type: "string" },
           child_reference: { type: ["string", "null"] },
           confidence: { type: "number" },
           source_excerpt: { type: "string" },
+          source_page: { type: ["number", "null"] },
         },
         required: [
           "type",

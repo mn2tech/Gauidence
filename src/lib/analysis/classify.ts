@@ -27,6 +27,7 @@ const CLASSIFY_SCHEMA = {
         "drivers_license",
         "warranty",
         "tax_document",
+        "school_newsletter",
         "general",
       ],
     },
@@ -44,6 +45,8 @@ const CLASSIFY_SCHEMA = {
 
 const SYSTEM = `You classify personal and business documents for Guardian.
 Pick exactly one document_type. Be conservative: if uncertain, use "general" and lower confidence.
+Use school_newsletter for classroom/school newsletters, weekly homework sheets with weekday schedules,
+word lists, and teacher flyers that include upcoming school events.
 Never invent details. classification_confidence is 0–1.`;
 
 export async function classifyDocument(

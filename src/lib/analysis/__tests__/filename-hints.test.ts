@@ -15,6 +15,11 @@ describe("classificationFromFileName", () => {
     assert.equal(classificationFromFileName("summer-camp-flyer.pdf"), null);
   });
 
+  it("detects school newsletter file names", () => {
+    const hint = classificationFromFileName("classroom-newsletter.pdf");
+    assert.equal(hint?.document_type, "school_newsletter");
+  });
+
   it("skips classify LLM for JSON / Trello exports", () => {
     const json = classificationFromFileName("Trello_Knowledge.json");
     assert.equal(json?.document_type, "general");

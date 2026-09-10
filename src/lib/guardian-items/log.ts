@@ -5,6 +5,7 @@ export type GuardianLogEvent =
   | "guardian_extraction_completed"
   | "guardian_item_created"
   | "guardian_item_deduped"
+  | "guardian_item_superseded"
   | "guardian_item_low_confidence"
   | "guardian_item_completed"
   | "guardian_item_dismissed"

@@ -5,12 +5,21 @@ import { calendarDateInUserZone } from "@/lib/timezone";
 import { getUserTimeZone } from "@/lib/timezone/server";
 import { associateGuardianItem } from "./associate";
 import { extractGuardianItemsWithLlm } from "./extract";
-import { guardianItemsFromImportantDates, guardianItemsFromSourceText } from "./fromImportantDates";
+import {
+  guardianItemsFromImportantDates,
+  guardianItemsFromSourceText,
+} from "./fromImportantDates";
 import { logGuardianEvent } from "./log";
 import { collapseNearDuplicateExtractedItems } from "./dedupe";
 import { isLowValueHistoricalFact } from "./negativeFilter";
 import { persistExtractedGuardianItem } from "./persist";
 import type { GuardianExtractedItem } from "./schema";
+import {
+  buildNewsletterReviewSummary,
+  classifySchoolNewsletter,
+  extractSchoolNewsletterItems,
+} from "./newsletter";
+import { SCHOOL_NEWSLETTER_DOCUMENT_TYPE } from "./types";
 
 /**
  * Run Guardian item extraction for a document after analysis/indexing/ontology.
@@ -25,6 +34,7 @@ export async function processGuardianItemExtraction(
   deduped: number;
   lowConfidence: number;
   skipped: boolean;
+  newsletterReview?: ReturnType<typeof buildNewsletterReviewSummary> | null;
 }> {
   logGuardianEvent("guardian_extraction_started", {
     document_id: documentId,
@@ -64,8 +74,6 @@ export async function processGuardianItemExtraction(
     return { created: 0, deduped: 0, lowConfidence: 0, skipped: true };
   }
 
-  // Prefer OCR/source text; for chat image uploads fall back to vision fields.
-  // Join unique parts so a short source_text still gets vision OCR dates.
   const sourceText = [
     ...new Set(
       [
@@ -111,7 +119,6 @@ export async function processGuardianItemExtraction(
     display_name: c.display_name,
   }));
 
-  // important_dates live under specialist (no top-level column on extracted_data).
   const specialist = (extracted?.specialist ?? {}) as {
     important_dates?: {
       label?: string;
@@ -126,41 +133,122 @@ export async function processGuardianItemExtraction(
   const timeZone = await getUserTimeZone(supabase, userId);
   const today = calendarDateInUserZone(new Date(), timeZone);
 
-  const seeded = guardianItemsFromImportantDates({
-    dates: importantDates,
+  const newsletterClass = classifySchoolNewsletter({
+    sourceText,
     title: extracted?.title,
-    summary: extracted?.summary,
-    today,
+    fileName: doc.file_name,
+    documentType: extracted?.document_type,
   });
-  if (seeded.length === 0) {
-    seeded.push(
-      ...guardianItemsFromSourceText({
-        sourceText,
-        title: extracted?.title,
-        summary: extracted?.summary,
-        today,
+
+  const isNewsletter =
+    newsletterClass.isSchoolNewsletter ||
+    extracted?.document_type === SCHOOL_NEWSLETTER_DOCUMENT_TYPE;
+
+  if (isNewsletter) {
+    await supabase
+      .from("documents")
+      .update({
+        newsletter_classification_confidence: newsletterClass.confidence,
+        newsletter_extraction_status: "processing",
       })
-    );
+      .eq("id", documentId);
+
+    if (
+      extracted?.document_type !== SCHOOL_NEWSLETTER_DOCUMENT_TYPE &&
+      newsletterClass.confidence >= 0.45
+    ) {
+      await supabase
+        .from("extracted_data")
+        .update({ document_type: SCHOOL_NEWSLETTER_DOCUMENT_TYPE })
+        .eq("document_id", documentId);
+    }
   }
 
-  const parsed = await extractGuardianItemsWithLlm({
-    sourceText,
-    fileName: doc.file_name ?? "document",
-    documentType: extracted?.document_type,
-    title: extracted?.title,
-    summary: extracted?.summary,
-    spaceName: space?.display_name,
-    importantDates,
-  });
+  let merged: GuardianExtractedItem[] = [];
+  let newsletterReview: ReturnType<typeof buildNewsletterReviewSummary> | null =
+    null;
 
-  const merged: GuardianExtractedItem[] = [...seeded];
-  if (parsed?.items?.length) {
-    for (const item of parsed.items) {
-      merged.push(item);
+  if (isNewsletter) {
+    const newsletter = extractSchoolNewsletterItems({
+      sourceText,
+      title: extracted?.title,
+      today,
+    });
+    merged = [...newsletter.items];
+
+    // Supplement with LLM for anything the deterministic pass missed
+    try {
+      const parsed = await extractGuardianItemsWithLlm({
+        sourceText,
+        fileName: doc.file_name ?? "document",
+        documentType: SCHOOL_NEWSLETTER_DOCUMENT_TYPE,
+        title: extracted?.title,
+        summary: extracted?.summary,
+        spaceName: space?.display_name,
+        importantDates,
+        newsletterMode: true,
+        publicationDate: newsletter.meta.publicationDate,
+        homeworkWeekStart: newsletter.meta.homeworkWeekStart,
+      });
+      if (parsed?.items?.length) {
+        for (const item of parsed.items) {
+          merged.push({
+            ...item,
+            metadata: {
+              ...(item.metadata ?? {}),
+              newsletter: true,
+              publication_date: newsletter.meta.publicationDate,
+            },
+          });
+        }
+      }
+    } catch (err) {
+      console.error(
+        "Newsletter LLM supplement failed (deterministic items retained):",
+        err instanceof Error ? err.message : err
+      );
+    }
+  } else {
+    const seeded = guardianItemsFromImportantDates({
+      dates: importantDates,
+      title: extracted?.title,
+      summary: extracted?.summary,
+      today,
+    });
+    if (seeded.length === 0) {
+      seeded.push(
+        ...guardianItemsFromSourceText({
+          sourceText,
+          title: extracted?.title,
+          summary: extracted?.summary,
+          today,
+        })
+      );
+    }
+
+    const parsed = await extractGuardianItemsWithLlm({
+      sourceText,
+      fileName: doc.file_name ?? "document",
+      documentType: extracted?.document_type,
+      title: extracted?.title,
+      summary: extracted?.summary,
+      spaceName: space?.display_name,
+      importantDates,
+    });
+
+    merged = [...seeded];
+    if (parsed?.items?.length) {
+      for (const item of parsed.items) merged.push(item);
     }
   }
 
   if (merged.length === 0) {
+    if (isNewsletter) {
+      await supabase
+        .from("documents")
+        .update({ newsletter_extraction_status: "skipped" })
+        .eq("id", documentId);
+    }
     logGuardianEvent("guardian_extraction_completed", {
       document_id: documentId,
       space_id: spaceId,
@@ -168,8 +256,8 @@ export async function processGuardianItemExtraction(
       deduped: 0,
       low_confidence: 0,
       skipped: true,
-      reason: parsed ? "no_items" : "parse_failed",
-      seeded: seeded.length,
+      reason: "no_items",
+      newsletter: isNewsletter,
     });
     return { created: 0, deduped: 0, lowConfidence: 0, skipped: true };
   }
@@ -180,6 +268,8 @@ export async function processGuardianItemExtraction(
   let created = 0;
   let deduped = 0;
   let lowConfidence = 0;
+  let associatedChildId: string | null = null;
+  let associatedChildName: string | null = null;
 
   for (const item of collapsed) {
     const association = associateGuardianItem(
@@ -193,6 +283,20 @@ export async function processGuardianItemExtraction(
       item.child_reference
     );
 
+    if (association.childId) {
+      associatedChildId = association.childId;
+      associatedChildName =
+        childSpaces.find((c) => c.id === association.childId)?.display_name ??
+        (space?.profile_type === "child" || space?.profile_type === "student"
+          ? space.display_name
+          : null);
+    }
+
+    const forceNeedsReview =
+      isNewsletter &&
+      !association.childId &&
+      childSpaces.length !== 1;
+
     const result = await persistExtractedGuardianItem({
       supabase,
       association,
@@ -200,11 +304,42 @@ export async function processGuardianItemExtraction(
       sourceDocumentId: documentId,
       sourceDocumentTitle: doc.file_name,
       today,
+      allowSupersession: isNewsletter,
+      forceNeedsReview,
     });
 
-    if (result.outcome === "created") created += 1;
+    if (result.outcome === "created" || result.outcome === "superseded")
+      created += 1;
     else if (result.outcome === "deduped") deduped += 1;
     else if (result.outcome === "low_confidence") lowConfidence += 1;
+  }
+
+  if (isNewsletter) {
+    // If exactly one child space exists under the family, association may still
+    // be null when uploading to a parent space without an explicit reference.
+    // Never invent — leave confirmation unless leaf child space upload.
+    const meta = extractSchoolNewsletterItems({
+      sourceText,
+      title: extracted?.title,
+      today,
+    }).meta;
+
+    newsletterReview = buildNewsletterReviewSummary({
+      items: collapsed,
+      meta,
+      childName: associatedChildName,
+      childId: associatedChildId,
+    });
+
+    await supabase
+      .from("documents")
+      .update({
+        newsletter_extraction_status: newsletterReview.needsChildConfirmation
+          ? "needs_confirmation"
+          : "completed",
+        newsletter_classification_confidence: newsletterClass.confidence,
+      })
+      .eq("id", documentId);
   }
 
   logGuardianEvent("guardian_extraction_completed", {
@@ -217,8 +352,14 @@ export async function processGuardianItemExtraction(
     merged_count: merged.length,
     filtered_out: merged.length - filtered.length,
     collapsed_from: filtered.length,
-    seeded: seeded.length,
+    newsletter: isNewsletter,
   });
 
-  return { created, deduped, lowConfidence, skipped: false };
+  return {
+    created,
+    deduped,
+    lowConfidence,
+    skipped: false,
+    newsletterReview,
+  };
 }

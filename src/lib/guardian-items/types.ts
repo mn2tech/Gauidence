@@ -20,6 +20,16 @@ export const GUARDIAN_ITEM_TYPES = [
   "travel",
   "document_requirement",
   "informational",
+  "school_event",
+  "homework",
+  "test",
+  "study_reminder",
+  "spelling_list",
+  "announcement",
+  "school_contact",
+  "early_dismissal",
+  "no_school",
+  "no_homework",
 ] as const;
 
 export type GuardianItemType = (typeof GUARDIAN_ITEM_TYPES)[number];
@@ -30,6 +40,7 @@ export const GUARDIAN_ITEM_STATUSES = [
   "dismissed",
   "expired",
   "cancelled",
+  "superseded",
 ] as const;
 
 export type GuardianItemStatus = (typeof GUARDIAN_ITEM_STATUSES)[number];
@@ -45,7 +56,10 @@ export type GuardianItemPriority = (typeof GUARDIAN_ITEM_PRIORITIES)[number];
 
 export const GUARDIAN_WATCH_HORIZON_DAYS = 30;
 
-export const GUARDIAN_ITEM_EXTRACTION_VERSION = "v1";
+export const GUARDIAN_ITEM_EXTRACTION_VERSION = "v2-school-newsletter";
+
+/** School newsletter document type stored on extracted_data.document_type. */
+export const SCHOOL_NEWSLETTER_DOCUMENT_TYPE = "school_newsletter";
 
 /** Auto-create threshold. */
 export const CONFIDENCE_AUTO = 0.9;
@@ -80,6 +94,7 @@ export type GuardianItemRow = {
   needs_review: boolean;
   extraction_version: string | null;
   dedupe_key: string;
+  superseded_by_id?: string | null;
   /** Extensible metadata; semantic refs + temporal lifecycle live here. */
   metadata?: {
     semantic_entity_ids?: string[];
@@ -87,6 +102,9 @@ export type GuardianItemRow = {
     semantic_fact_ids?: string[];
     /** Computed Temporal & Lifecycle Intelligence (immutable source docs stay separate). */
     temporal?: TemporalMetadata;
+    newsletter?: boolean;
+    spelling_words?: string[];
+    logical_fingerprint?: string;
     [key: string]: unknown;
   } | null;
   created_at: string;

@@ -14,6 +14,13 @@ import {
   type TemporalPartition,
 } from "./lifecycle";
 import { reevaluateItemLifecycle } from "./lifecycle-transitions";
+import {
+  formatSchoolDayAnswer,
+  wantsSchoolHistory,
+  wantsSchoolStructuredAnswer,
+  wantsSpellingList,
+  type SchoolAnswerItem,
+} from "./newsletter/answer";
 import type { GuardianItemRow } from "./types";
 
 export type GideonGuardianItem = {
@@ -28,22 +35,39 @@ export type GideonGuardianItem = {
   space_name: string | null;
   child_name: string | null;
   source_excerpt: string | null;
+  source_document_id?: string | null;
+  start_at?: string | null;
+  end_at?: string | null;
+  description?: string | null;
+  metadata?: GuardianItemRow["metadata"];
   temporal?: TemporalMetadata | null;
   partition?: TemporalPartition;
 };
 
 const SCHEDULE_INTENT =
-  /\b(schedule|calendar|remind(?:er)?s?|upcoming|attention|deadline|due|what(?:'s| is) (?:on|coming)|this week|next week|tomorrow|today|what do i need|needs? (?:my )?attention|closed|closure)\b/i;
+  /\b(schedule|calendar|remind(?:er)?s?|upcoming|attention|deadline|due|what(?:'s| is) (?:on|coming)|this week|next week|tomorrow|today|what do i need|needs? (?:my )?attention|closed|closure|homework|spelling|picnic|pickup|half[\s-]?day|what does \w+ have)\b/i;
 
 const HISTORICAL_INTENT =
   /\b(who (?:did|has|have) (?:i |we )?rsvp|who rsvped|who rsvp'?d|what happened|who did i meet|follow[- ]?ups?|histor(?:y|ical)|past event|last (?:year|month|week))\b/i;
 
+const CHILD_NAME_IN_QUESTION =
+  /\b(?:what does|does|show|for)\s+([A-Z][a-z]+)\b|\b([A-Z][a-z]+)(?:'s)?\s+(?:homework|spelling|school|today|tomorrow)\b/;
+
 export function wantsGuardianItemRetrieval(question: string): boolean {
-  return SCHEDULE_INTENT.test(question.trim());
+  return (
+    SCHEDULE_INTENT.test(question.trim()) ||
+    wantsSchoolStructuredAnswer(question)
+  );
 }
 
 export function wantsHistoricalGuardianContext(question: string): boolean {
-  return HISTORICAL_INTENT.test(question.trim());
+  return HISTORICAL_INTENT.test(question.trim()) || wantsSchoolHistory(question);
+}
+
+export function extractChildNameFromQuestion(question: string): string | null {
+  const m = CHILD_NAME_IN_QUESTION.exec(question.trim());
+  if (!m) return null;
+  return (m[1] || m[2] || "").trim() || null;
 }
 
 export function scoreGuardianItemRelevance(
@@ -63,12 +87,38 @@ export function scoreGuardianItemRelevance(
   if (item.requires_action && /\b(need|do|deadline|due|attention)\b/i.test(q)) {
     score += 2;
   }
+
+  // Prefer structured school items for school questions
+  if (wantsSchoolStructuredAnswer(q)) {
+    if (
+      [
+        "no_homework",
+        "homework",
+        "test",
+        "study_reminder",
+        "school_event",
+        "early_dismissal",
+        "no_school",
+        "spelling_list",
+      ].includes(item.type)
+    ) {
+      score += 6;
+    }
+    if (item.effective_date) {
+      // Boost today/tomorrow heavily
+      score += 2;
+    }
+  }
+
   if (item.temporal && isCurrentlyActionable(item.temporal)) score += 1;
   if (
     item.temporal?.actionability === "expired" &&
     !wantsHistoricalGuardianContext(question)
   ) {
     score -= 5;
+  }
+  if (item.type === "spelling_list" && !wantsSpellingList(q)) {
+    score -= 4;
   }
   return score;
 }
@@ -96,18 +146,23 @@ export async function retrieveGuardianItemsForGideon(
   const today = calendarDateInUserZone(now, args.timeZone);
   const horizonEnd = addCalendarDays(today, horizonDays);
   const allowHistorical = wantsHistoricalGuardianContext(args.question);
+  const childFromQuestion =
+    args.childNameFilter?.trim() ||
+    extractChildNameFromQuestion(args.question);
 
   const { data, error } = await supabase
     .from("guardian_items")
     .select(
-      "id, space_id, child_id, type, title, description, event_date, start_at, end_at, due_at, requires_action, priority, source_excerpt, status, action_label, confidence, metadata"
+      "id, space_id, child_id, type, title, description, event_date, start_at, end_at, due_at, requires_action, priority, source_excerpt, source_document_id, status, action_label, confidence, metadata"
     )
     .in("space_id", scopeIds)
     .in(
       "status",
-      allowHistorical ? ["active", "completed", "expired"] : ["active"]
+      allowHistorical
+        ? ["active", "completed", "expired", "superseded"]
+        : ["active"]
     )
-    .limit(80);
+    .limit(120);
 
   if (error || !data) return [];
 
@@ -132,7 +187,7 @@ export async function retrieveGuardianItemsForGideon(
     }
   }
 
-  const childFilter = args.childNameFilter?.trim().toLowerCase();
+  const childFilter = childFromQuestion?.trim().toLowerCase() ?? null;
 
   const items: GideonGuardianItem[] = [];
   for (const row of data as GuardianItemRow[]) {
@@ -145,7 +200,16 @@ export async function retrieveGuardianItemsForGideon(
     if (
       !allowHistorical &&
       (temporal.actionability === "expired" ||
-        temporal.lifecycleStatus === "expired")
+        temporal.lifecycleStatus === "expired" ||
+        row.status === "superseded")
+    ) {
+      continue;
+    }
+
+    // Hide completed/expired unless history asked
+    if (
+      !allowHistorical &&
+      (row.status === "completed" || row.status === "expired")
     ) {
       continue;
     }
@@ -156,7 +220,27 @@ export async function retrieveGuardianItemsForGideon(
       timeZone: args.timeZone,
       calendarDateInZone: calendarDateInUserZone,
     });
-    if (effective && effective > horizonEnd && !allowHistorical) continue;
+
+    // For school day questions, prefer today/tomorrow window tightly
+    if (wantsSchoolStructuredAnswer(args.question) && !allowHistorical) {
+      if (
+        effective &&
+        effective < today &&
+        row.type !== "spelling_list" &&
+        row.type !== "school_contact"
+      ) {
+        continue;
+      }
+      if (
+        effective &&
+        effective > addCalendarDays(today, 14) &&
+        row.type !== "spelling_list"
+      ) {
+        continue;
+      }
+    } else if (effective && effective > horizonEnd && !allowHistorical) {
+      continue;
+    }
 
     const childName = row.child_id ? nameMap[row.child_id] ?? null : null;
     if (childFilter && childName) {
@@ -168,6 +252,7 @@ export async function retrieveGuardianItemsForGideon(
         continue;
       }
     } else if (childFilter && !childName) {
+      // Multi-child isolation: skip unscoped items when a child was named
       continue;
     }
 
@@ -183,6 +268,11 @@ export async function retrieveGuardianItemsForGideon(
       space_name: nameMap[row.space_id] ?? null,
       child_name: childName,
       source_excerpt: row.source_excerpt,
+      source_document_id: row.source_document_id,
+      start_at: row.start_at,
+      end_at: row.end_at,
+      description: row.description,
+      metadata: row.metadata,
       temporal,
       partition: partitionLifecycleStatus(temporal.lifecycleStatus),
     });
@@ -195,6 +285,96 @@ export async function retrieveGuardianItemsForGideon(
   );
 
   return items.slice(0, limit);
+}
+
+/**
+ * Deterministic school answer from structured items (preferred Gideon path).
+ */
+export async function answerSchoolQuestionFromItems(
+  supabase: SupabaseClient,
+  args: {
+    spaceIds: string[];
+    profileNames?: Record<string, string>;
+    question: string;
+    timeZone: string;
+    now?: Date;
+  }
+): Promise<{
+  answer: string;
+  citations: {
+    documentId: string;
+    fileName: string;
+    excerpt: string | null;
+  }[];
+} | null> {
+  if (!wantsSchoolStructuredAnswer(args.question)) return null;
+
+  const now = resolveNow(args.now);
+  const today = calendarDateInUserZone(now, args.timeZone);
+  const childName = extractChildNameFromQuestion(args.question);
+  const items = await retrieveGuardianItemsForGideon(supabase, {
+    ...args,
+    childNameFilter: childName,
+    limit: 40,
+    horizonDays: 30,
+    now,
+  });
+
+  if (items.length === 0) return null;
+
+  const schoolItems: SchoolAnswerItem[] = items.map((i) => ({
+    id: i.id,
+    type: i.type,
+    title: i.title,
+    description: i.description,
+    event_date: i.effective_date,
+    start_at: i.start_at,
+    end_at: i.end_at,
+    status: "active",
+    child_name: i.child_name,
+    source_document_id: i.source_document_id,
+    source_excerpt: i.source_excerpt,
+    metadata: i.metadata as Record<string, unknown> | null,
+  }));
+
+  const displayChild =
+    childName ||
+    schoolItems.find((i) => i.child_name)?.child_name ||
+    "Your child";
+
+  const formatted = formatSchoolDayAnswer({
+    question: args.question,
+    childName: displayChild,
+    today,
+    items: schoolItems,
+  });
+
+  if (!formatted) return null;
+
+  const citations: {
+    documentId: string;
+    fileName: string;
+    excerpt: string | null;
+  }[] = [];
+
+  if (formatted.citationDocumentIds.length > 0) {
+    const { data: docs } = await supabase
+      .from("documents")
+      .select("id, file_name")
+      .in("id", formatted.citationDocumentIds);
+    for (const doc of docs ?? []) {
+      const excerpt =
+        schoolItems.find((i) => i.source_document_id === doc.id)
+          ?.source_excerpt ?? null;
+      citations.push({
+        documentId: doc.id,
+        fileName: doc.file_name ?? "School newsletter",
+        excerpt,
+      });
+    }
+  }
+
+  return { answer: formatted.answer, citations };
 }
 
 export function formatGuardianItemsForGideon(
@@ -217,7 +397,12 @@ export function formatGuardianItemsForGideon(
     );
 
   const header = formatTemporalHeader({ now, timeZone, lines: summaryLines });
-  const sections: string[] = [header, ""];
+  const sections: string[] = [
+    header,
+    "",
+    "SCHOOL / SCHEDULE PRIORITY: Prefer structured items below over document OCR for homework, no-homework, tests, and school events. Answer directly — do not begin with 'Looking at the images' or 'Based on documents'. Cite the source document briefly after the answer.",
+    "",
+  ];
 
   const render = (label: string, list: GideonGuardianItem[]) => {
     if (list.length === 0) return;
@@ -240,8 +425,9 @@ export function formatGuardianItemsForGideon(
             : item.temporal?.actionability === "expired"
               ? " — expired (do not recommend)"
               : "";
+      const typeTag = item.type ? ` {${item.type}}` : "";
       sections.push(
-        `- [${when}] ${item.title}${who ? ` (${who})` : ""}${life}${action}`
+        `- [${when}] ${item.title}${typeTag}${who ? ` (${who})` : ""}${life}${action}`
       );
     }
     sections.push("");
@@ -257,7 +443,7 @@ export function formatGuardianItemsForGideon(
     partitioned.expired
   );
 
-  if (sections.length <= 2) {
+  if (sections.length <= 4) {
     return items
       .map((item) => {
         const who = [item.child_name, item.space_name]

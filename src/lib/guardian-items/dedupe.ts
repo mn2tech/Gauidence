@@ -65,6 +65,26 @@ export function buildDedupeKey(args: {
 }
 
 /**
+ * Cross-document logical fingerprint for newsletter supersession.
+ * Omits source_document_id so a newer newsletter can replace an older item.
+ */
+export function buildLogicalFingerprint(args: {
+  type: GuardianItemType;
+  title: string;
+  effectiveDate: string | null;
+  childId: string | null;
+}): string {
+  return [
+    args.type,
+    normalizeTitle(args.title),
+    args.effectiveDate ?? "nodate",
+    args.childId ?? "nochild",
+  ]
+    .join("|")
+    .slice(0, 500);
+}
+
+/**
  * Titles that refer to the same school closure / holiday should normalize
  * similarly when date + source match.
  */

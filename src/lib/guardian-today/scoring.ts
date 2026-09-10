@@ -23,6 +23,14 @@ const TYPE_SCORE: Partial<Record<GuardianItemType, number>> = {
   task: 15,
   payment: 15,
   document_requirement: 12,
+  no_homework: 28,
+  homework: 22,
+  test: 26,
+  study_reminder: 24,
+  early_dismissal: 25,
+  no_school: 24,
+  school_closure: 24,
+  school_event: 18,
 };
 
 export function guardianPriorityToIntelligence(

@@ -41,6 +41,7 @@ export type DocumentType =
   | "drivers_license"
   | "warranty"
   | "tax_document"
+  | "school_newsletter"
   | "general";
 
 export type GuardianStatus =

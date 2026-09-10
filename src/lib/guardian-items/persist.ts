@@ -2,7 +2,11 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { appNow } from "@/lib/clock";
-import { buildDedupeKey, titlesLikelySameAttention } from "./dedupe";
+import {
+  buildDedupeKey,
+  buildLogicalFingerprint,
+  titlesLikelySameAttention,
+} from "./dedupe";
 import {
   evaluateLifecycle,
   mapItemTypeToEntityType,
@@ -28,11 +32,16 @@ export type PersistExtractedItemArgs = {
   sourceDocumentId: string;
   sourceDocumentTitle?: string | null;
   today: string;
+  /** When true, allow cross-document supersession via logical fingerprint. */
+  allowSupersession?: boolean;
+  /** Force needs_review (e.g. missing child on school newsletter). */
+  forceNeedsReview?: boolean;
 };
 
 export type PersistResult =
   | { outcome: "created"; id: string }
   | { outcome: "deduped"; id: string }
+  | { outcome: "superseded"; id: string; previousId: string }
   | { outcome: "low_confidence" }
   | { outcome: "skipped"; reason: string };
 
@@ -75,7 +84,15 @@ export async function persistExtractedGuardianItem(
     sourceDocumentId: args.sourceDocumentId,
   });
 
-  const needsReview = confidence < CONFIDENCE_AUTO;
+  const logicalFingerprint = buildLogicalFingerprint({
+    type: item.type as GuardianItemType,
+    title: item.title,
+    effectiveDate,
+    childId: association.childId,
+  });
+
+  const needsReview =
+    args.forceNeedsReview === true || confidence < CONFIDENCE_AUTO;
 
   const entityType = mapItemTypeToEntityType(
     item.type,
@@ -98,6 +115,9 @@ export async function persistExtractedGuardianItem(
     })
   );
 
+  const itemMeta =
+    item.metadata && typeof item.metadata === "object" ? item.metadata : {};
+
   const row = {
     user_id: association.userId,
     space_id: association.spaceId,
@@ -107,6 +127,8 @@ export async function persistExtractedGuardianItem(
     title: item.title.slice(0, 300),
     description: item.description ?? null,
     event_date: item.event_date ?? null,
+    start_at: item.start_at ?? null,
+    end_at: item.end_at ?? null,
     due_at: item.due_at ? `${item.due_at}T12:00:00.000Z` : null,
     status: "active" as const,
     priority,
@@ -114,11 +136,16 @@ export async function persistExtractedGuardianItem(
     source_type: "document",
     source_document_id: args.sourceDocumentId,
     source_excerpt: item.source_excerpt.slice(0, 800),
+    source_page: item.source_page ?? null,
     confidence,
     needs_review: needsReview,
     extraction_version: GUARDIAN_ITEM_EXTRACTION_VERSION,
     dedupe_key: dedupeKey,
-    metadata: { temporal },
+    metadata: {
+      ...itemMeta,
+      temporal,
+      logical_fingerprint: logicalFingerprint,
+    },
   };
 
   const { data: existing } = await supabase
@@ -135,10 +162,13 @@ export async function persistExtractedGuardianItem(
       .update({
         title: row.title,
         description: row.description,
+        start_at: row.start_at,
+        end_at: row.end_at,
         confidence,
         needs_review: needsReview,
         priority,
         source_excerpt: row.source_excerpt,
+        source_page: row.source_page,
         metadata: row.metadata,
         updated_at: appNow().toISOString(),
       })
@@ -153,7 +183,6 @@ export async function persistExtractedGuardianItem(
     return { outcome: "deduped", id: existing.id };
   }
 
-  // User already completed/dismissed this exact key — do not resurrect it.
   const { data: resolvedExact } = await supabase
     .from("guardian_items")
     .select("id, status")
@@ -175,7 +204,6 @@ export async function persistExtractedGuardianItem(
     return { outcome: "skipped", reason: "already_resolved" };
   }
 
-  // Near-duplicate from the same document (paraphrased titles).
   const { data: sameSource } = await supabase
     .from("guardian_items")
     .select("id, title, confidence, status")
@@ -202,6 +230,8 @@ export async function persistExtractedGuardianItem(
       .update({
         ...(preferIncomingTitle ? { title: row.title } : {}),
         description: row.description,
+        start_at: row.start_at,
+        end_at: row.end_at,
         confidence: Math.max(confidence, Number(fuzzyActive.confidence ?? 0)),
         needs_review: needsReview,
         priority,
@@ -239,6 +269,27 @@ export async function persistExtractedGuardianItem(
     return { outcome: "skipped", reason: "already_resolved" };
   }
 
+  let previousId: string | null = null;
+  if (args.allowSupersession !== false) {
+    const { data: logicalMatches } = await supabase
+      .from("guardian_items")
+      .select("id, source_document_id, metadata, status")
+      .eq("space_id", association.spaceId)
+      .eq("status", "active")
+      .eq("type", item.type)
+      .limit(40);
+
+    const match = (logicalMatches ?? []).find((candidate) => {
+      if (candidate.source_document_id === args.sourceDocumentId) return false;
+      const meta = (candidate.metadata ?? {}) as {
+        logical_fingerprint?: string;
+      };
+      return meta.logical_fingerprint === logicalFingerprint;
+    });
+
+    if (match?.id) previousId = match.id;
+  }
+
   const { data, error } = await supabase
     .from("guardian_items")
     .insert(row)
@@ -246,7 +297,6 @@ export async function persistExtractedGuardianItem(
     .single();
 
   if (error || !data) {
-    // Race on unique index — treat as dedupe.
     if (error?.code === "23505") {
       const { data: raced } = await supabase
         .from("guardian_items")
@@ -266,6 +316,36 @@ export async function persistExtractedGuardianItem(
       }
     }
     throw new Error(error?.message ?? "Failed to insert guardian item");
+  }
+
+  if (previousId) {
+    await supabase
+      .from("guardian_items")
+      .update({
+        status: "superseded",
+        superseded_by_id: data.id,
+        updated_at: appNow().toISOString(),
+      })
+      .eq("id", previousId)
+      .eq("status", "active");
+
+    logGuardianEvent("guardian_item_superseded", {
+      item_id: previousId,
+      superseded_by: data.id,
+      space_id: association.spaceId,
+      type: item.type,
+      document_id: args.sourceDocumentId,
+    });
+
+    logGuardianEvent("guardian_item_created", {
+      item_id: data.id,
+      space_id: association.spaceId,
+      type: item.type,
+      needs_review: needsReview,
+      document_id: args.sourceDocumentId,
+    });
+
+    return { outcome: "superseded", id: data.id, previousId };
   }
 
   logGuardianEvent("guardian_item_created", {
@@ -297,7 +377,6 @@ export async function insertManualGuardianItem(
     ? args.description.trim().slice(0, 500)
     : null;
 
-  // Reschedule path: same topic, new time → update existing Attention item.
   const { data: candidates } = await supabase
     .from("guardian_items")
     .select("*")
@@ -366,7 +445,6 @@ export async function insertManualGuardianItem(
     confidence: 1,
     needs_review: false,
     extraction_version: null,
-    // Stable key so identical manual reminders still collapse.
     dedupe_key: `${dedupeKey}|manual`.slice(0, 500),
   };
 
@@ -377,7 +455,6 @@ export async function insertManualGuardianItem(
     .single();
 
   if (error || !data) {
-    // Unique race — fetch and update times instead of failing.
     if (error?.code === "23505") {
       const { data: raced } = await supabase
         .from("guardian_items")

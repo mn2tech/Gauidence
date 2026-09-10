@@ -48,6 +48,7 @@ import CameraCaptureModal from "@/components/CameraCaptureModal";
 import ShareDocumentButton from "@/components/ShareDocumentButton";
 import MoveDocumentButton from "@/components/MoveDocumentButton";
 import OrganizationSuggestionModal from "@/components/OrganizationSuggestionModal";
+import { NewsletterReviewPanel } from "@/components/guardian-items/NewsletterReviewPanel";
 import SearchHighlight from "@/components/SearchHighlight";
 import { syncDocumentAwards } from "@/lib/awards/client";
 import {
@@ -1428,6 +1429,11 @@ export default function DocumentManager({
                             }
                           />
                         </p>
+                      </div>
+                    ) : null}
+                    {analysis.documentType === "school_newsletter" ? (
+                      <div className="mt-3">
+                        <NewsletterReviewPanel documentId={doc.id} />
                       </div>
                     ) : null}
                     {analysis.facts.length > 0 && (

@@ -83,6 +83,14 @@ export async function getWhatChanged(
     "task",
     "payment",
     "document_requirement",
+    "homework",
+    "no_homework",
+    "test",
+    "study_reminder",
+    "school_event",
+    "early_dismissal",
+    "no_school",
+    "school_closure",
   ]);
 
   return data

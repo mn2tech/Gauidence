@@ -15,6 +15,8 @@ import {
   extractChartTitlesFromText,
   isPianoOrSongLearnRequest,
 } from "@/lib/vault/expandRetrievalQuestion";
+import { answerSchoolQuestionFromItems } from "@/lib/guardian-items/retrieveForGideon";
+import { wantsSchoolStructuredAnswer } from "@/lib/guardian-items/newsletter/answer";
 import { loadConnectedSuggestionContext } from "@/lib/vault/loadInventory";
 import { enqueueMissingVaultIndexing } from "@/lib/vault/ensureIndexed";
 import {
@@ -1907,9 +1909,22 @@ export async function POST(request: Request) {
             })
           : null;
 
+      const schoolAnswer =
+        !inventoryAnswer &&
+        !openChartAnswer &&
+        wantsSchoolStructuredAnswer(userQuestion)
+          ? await answerSchoolQuestionFromItems(supabase, {
+              spaceIds: workspaceContext.retrievalScopes.map((s) => s.id),
+              profileNames: workspaceContext.profileNames,
+              question: userQuestion,
+              timeZone: userTz,
+            })
+          : null;
+
       const pianoClarify =
         !inventoryAnswer &&
         !openChartAnswer &&
+        !schoolAnswer &&
         isPianoOrSongLearnRequest(question) &&
         extractChartTitlesFromText(question).length === 0
           ? (() => {
@@ -1939,6 +1954,7 @@ export async function POST(request: Request) {
       const identityAnswer =
         !inventoryAnswer &&
         !openChartAnswer &&
+        !schoolAnswer &&
         !pianoClarify &&
         isSessionIdentityQuestion(question) &&
         // Attached docs without structured people → LLM uses excerpts + trusted session.
@@ -1952,6 +1968,7 @@ export async function POST(request: Request) {
       const biAnswer =
         !inventoryAnswer &&
         !openChartAnswer &&
+        !schoolAnswer &&
         !pianoClarify &&
         !identityAnswer &&
         !wantsReminderAgent(question) &&
@@ -1963,6 +1980,7 @@ export async function POST(request: Request) {
       const orchestrationAnswer =
         !inventoryAnswer &&
         !openChartAnswer &&
+        !schoolAnswer &&
         !pianoClarify &&
         !identityAnswer &&
         !biAnswer &&
@@ -1983,6 +2001,15 @@ export async function POST(request: Request) {
       } else if (openChartAnswer) {
         answer = openChartAnswer.answer;
         citations = openChartAnswer.citations;
+      } else if (schoolAnswer) {
+        answer = schoolAnswer.answer;
+        citations = schoolAnswer.citations.map((c, i) => ({
+          documentId: c.documentId,
+          fileName: c.fileName,
+          page: null,
+          excerpt: c.excerpt,
+          rank: i + 1,
+        }));
       } else if (pianoClarify) {
         answer = pianoClarify;
       } else if (identityAnswer) {
