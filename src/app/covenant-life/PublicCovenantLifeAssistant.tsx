@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { renderGideonText } from "@/components/gideonText";
 import GideonChatThemeToggle from "@/components/GideonChatThemeToggle";
 import { useGideonChatTheme } from "@/hooks/useGideonChatTheme";
@@ -21,12 +21,25 @@ export default function PublicCovenantLifeAssistant() {
   const [answer, setAnswer] = useState("");
   const [sources, setSources] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const answerRef = useRef<HTMLDivElement>(null);
   const isDark = theme === "dark";
+
+  useEffect(() => {
+    if (!loading && !answer) return;
+    const node = answerRef.current;
+    if (!node) return;
+    node.scrollIntoView({ behavior: "smooth", block: "start" });
+    node.focus({ preventScroll: true });
+  }, [loading, answer]);
 
   async function ask(value: string) {
     setLoading(true);
     setAnswer("");
     setSources([]);
+    if (typeof document !== "undefined") {
+      const active = document.activeElement;
+      if (active instanceof HTMLElement) active.blur();
+    }
     try {
       const res = await fetch("/api/public/covenant-life/ask", {
         method: "POST",
@@ -51,6 +64,7 @@ export default function PublicCovenantLifeAssistant() {
   }
 
   const answerHasSource = /\bSource:\s*/i.test(answer);
+  const showAnswerPanel = loading || Boolean(answer);
 
   return (
     <div
@@ -121,20 +135,28 @@ export default function PublicCovenantLifeAssistant() {
               {loading ? "Thinking…" : "Ask"}
             </button>
           </form>
-          {answer ? (
+          {showAnswerPanel ? (
             <div
-              className={`mt-6 rounded-2xl p-5 ${
+              ref={answerRef}
+              tabIndex={-1}
+              className={`mt-6 scroll-mt-6 rounded-2xl p-5 outline-none ${
                 isDark ? "bg-white/[.06]" : "bg-black/[.04]"
               }`}
             >
-              <div className="whitespace-pre-wrap leading-7">
-                {renderGideonText(answer)}
-              </div>
-              {sources.length > 0 && !answerHasSource ? (
-                <div className="mt-4 border-t border-black/10 pt-3 text-xs text-ink-muted">
-                  Source: {renderGideonText(sources.join("; "))}
-                </div>
-              ) : null}
+              {loading && !answer ? (
+                <p className="text-sm text-ink-muted">Thinking…</p>
+              ) : (
+                <>
+                  <div className="whitespace-pre-wrap leading-7">
+                    {renderGideonText(answer)}
+                  </div>
+                  {sources.length > 0 && !answerHasSource ? (
+                    <div className="mt-4 border-t border-black/10 pt-3 text-xs text-ink-muted">
+                      Source: {renderGideonText(sources.join("; "))}
+                    </div>
+                  ) : null}
+                </>
+              )}
             </div>
           ) : null}
         </div>
