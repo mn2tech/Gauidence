@@ -28,7 +28,7 @@ export default async function AddCovenantLifeSourcePage() {
   return (
     <div className="min-h-screen bg-[var(--background)]">
       <SiteHeader />
-      <main className="mx-auto max-w-3xl px-6 py-10">
+      <main className="mx-auto max-w-3xl px-6 py-10 pb-simple-nav-page">
         <p className="text-sm font-medium text-ink-muted">
           <Link
             href={`/knowledge-studio/${CLS_PROJECT_SLUG}`}

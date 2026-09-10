@@ -27,7 +27,7 @@ export default async function ReviewCovenantLifeSourcePage({
   return (
     <div className="min-h-screen bg-[var(--background)]">
       <SiteHeader />
-      <main className="mx-auto max-w-5xl px-6 py-10">
+      <main className="mx-auto max-w-5xl px-6 py-10 pb-simple-nav-page">
         <h1 className="mb-6 text-3xl font-semibold">Source Review</h1>
         <SourceReviewClient
           projectSlug={CLS_PROJECT_SLUG}

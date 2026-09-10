@@ -21,7 +21,7 @@ export default async function KnowledgeStudioPage() {
   return (
     <div className="min-h-screen bg-[var(--background)]">
       <SiteHeader />
-      <main className="mx-auto max-w-5xl px-6 py-10">
+      <main className="mx-auto max-w-5xl px-6 py-10 pb-simple-nav-page">
         <p className="text-sm font-medium text-ink-muted">Admin only</p>
         <h1 className="mt-1 text-3xl font-semibold">Knowledge Studio</h1>
         <p className="mt-3 max-w-2xl text-ink-muted">

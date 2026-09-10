@@ -22,7 +22,7 @@ export default async function CrossroadsStudioPage() {
   return (
     <div className="min-h-screen bg-[var(--background)]">
       <SiteHeader />
-      <main className="mx-auto max-w-5xl px-6 py-10">
+      <main className="mx-auto max-w-5xl px-6 py-10 pb-simple-nav-page">
         <div className="mb-8 flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="text-sm font-medium text-ink-muted">
