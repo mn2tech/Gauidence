@@ -16,6 +16,7 @@ import {
   isPianoOrSongLearnRequest,
 } from "@/lib/vault/expandRetrievalQuestion";
 import { answerSchoolQuestionFromItems } from "@/lib/guardian-items/retrieveForGideon";
+import { processChatTextGuardianItems } from "@/lib/guardian-items/processChatText";
 import { wantsSchoolStructuredAnswer } from "@/lib/guardian-items/newsletter/answer";
 import { loadConnectedSuggestionContext } from "@/lib/vault/loadInventory";
 import { enqueueMissingVaultIndexing } from "@/lib/vault/ensureIndexed";
@@ -1417,6 +1418,25 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: "Couldn't save your question." },
         { status: 502 }
+      );
+    }
+
+    // A pasted email/message is source material, not merely a question. Extract
+    // dated actions into Guardian Today using the same Guardian Items model as
+    // uploaded documents. Ordinary chat questions are rejected by the router.
+    try {
+      await processChatTextGuardianItems(supabase, {
+        userId: user.id,
+        spaceId: active.id,
+        messageId: insertedUserMsg.id,
+        text: userQuestion,
+        spaceName: active.display_name,
+        spaceProfileType: active.profile_type,
+      });
+    } catch (err) {
+      console.error(
+        "Gideon pasted-text Guardian Item extraction failed:",
+        err instanceof Error ? err.message : "unknown error"
       );
     }
     userMsg = hydrateVaultChatMessage(insertedUserMsg as ChatMessageRow);
