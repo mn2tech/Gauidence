@@ -189,6 +189,7 @@ export async function processGuardianItemExtraction(
         newsletterMode: true,
         publicationDate: newsletter.meta.publicationDate,
         homeworkWeekStart: newsletter.meta.homeworkWeekStart,
+        referenceDate: today,
       });
       if (parsed?.items?.length) {
         for (const item of parsed.items) {
@@ -234,6 +235,7 @@ export async function processGuardianItemExtraction(
       summary: extracted?.summary,
       spaceName: space?.display_name,
       importantDates,
+      referenceDate: today,
     });
 
     merged = [...seeded];
