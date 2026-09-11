@@ -18,6 +18,7 @@ import { parseLeadStatus, parseLeadType } from "./validators";
 
 export type LeadsGideonIntent =
   | "pipeline"
+  | "business_cards"
   | "lookup"
   | "follow_up"
   | "today"
@@ -62,6 +63,9 @@ const FOLLOW_UP =
 
 const TODAY =
   /\b(which leads should i contact today|contact today|today'?s actions?|who should i contact today)\b/i;
+
+const BUSINESS_CARDS_ADDED =
+  /\bbusiness cards?\b.{0,80}\b(added|scanned|uploaded|created|saved)\b.{0,30}\btoday\b|\btoday'?s?\b.{0,50}\bbusiness cards?\b/i;
 
 const FEDERAL =
   /\bfederal partners?\b|\bteaming partners?\b|\bfederal (small )?business/i;
@@ -241,6 +245,10 @@ export function parseLeadsGideonQuery(query: string): LeadsGideonParseResult {
     };
   }
 
+  if (BUSINESS_CARDS_ADDED.test(q)) {
+    return { intent: "business_cards", requiresConfirmation: false };
+  }
+
   if (TODAY.test(q)) {
     return { intent: "today", requiresConfirmation: false };
   }
@@ -334,6 +342,51 @@ export function formatLeadPipeline(
   }
   lines.push("", "→ /leads");
   return lines.join("\n");
+}
+
+export function formatBusinessCardsAddedOn(
+  leads: BusinessLead[],
+  calendarDate: string,
+  timeZone = "UTC"
+): string {
+  const cards = leads.filter((lead) => {
+    if (!/^business card$/i.test(lead.source?.trim() ?? "")) return false;
+    const created = new Date(lead.created_at);
+    if (Number.isNaN(created.getTime())) return false;
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(created);
+    const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+    return `${byType.year}-${byType.month}-${byType.day}` === calendarDate;
+  });
+
+  if (!cards.length) {
+    return `I don't see any business cards saved to Leads on ${calendarDate}.\n\n→ /leads`;
+  }
+
+  return [
+    `Business cards added today (${cards.length}):`,
+    ...cards.slice(0, 20).map((lead) => {
+      const name = lead.contact_name?.trim() || "Contact name not captured";
+      const company = lead.company_name?.trim();
+      const role = lead.job_title?.trim();
+      const contact = [lead.email?.trim(), lead.phone?.trim()]
+        .filter(Boolean)
+        .join(" · ");
+      return [
+        `• ${name}${company ? ` — ${company}` : ""}`,
+        role ? `  ${role}` : null,
+        contact ? `  ${contact}` : null,
+      ]
+        .filter(Boolean)
+        .join("\n");
+    }),
+    "",
+    "→ /leads",
+  ].join("\n");
 }
 
 function formatLeadList(title: string, leads: BusinessLead[]): string {
