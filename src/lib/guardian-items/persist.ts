@@ -30,7 +30,7 @@ export type PersistExtractedItemArgs = {
   association: AssociationResult;
   item: GuardianExtractedItem;
   sourceDocumentId: string | null;
-  sourceType?: "document" | "chat";
+  sourceType?: "document" | "chat" | "daily_log";
   sourceId?: string | null;
   sourceDocumentTitle?: string | null;
   today: string;

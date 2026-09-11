@@ -9,6 +9,11 @@ import { collapseNearDuplicateExtractedItems } from "./dedupe";
 import { extractGuardianItemsWithLlm } from "./extract";
 import { isLowValueHistoricalFact } from "./negativeFilter";
 import { persistExtractedGuardianItem } from "./persist";
+import { completeGuardianItem } from "./actions";
+import {
+  reconcileItemWithDailyLogs,
+  type RecentDailyLog,
+} from "./reconcileDailyLogs";
 
 export type ChatTextExtractionResult = {
   attempted: boolean;
@@ -53,11 +58,22 @@ export async function processChatTextGuardianItems(
   const items = collapseNearDuplicateExtractedItems(
     (parsed?.items ?? []).filter((item) => !isLowValueHistoricalFact(item))
   );
+  const recentSince = new Date();
+  recentSince.setUTCDate(recentSince.getUTCDate() - 30);
+  const { data: recentLogRows } = await supabase
+    .from("daily_logs")
+    .select("id, title, content, log_date")
+    .eq("profile_id", args.spaceId)
+    .gte("log_date", recentSince.toISOString().slice(0, 10))
+    .order("log_date", { ascending: false })
+    .limit(20);
+  const recentLogs = (recentLogRows ?? []) as RecentDailyLog[];
   let created = 0;
   let deduped = 0;
   let lowConfidence = 0;
 
   for (const item of items) {
+    const reconciliation = reconcileItemWithDailyLogs(item, recentLogs);
     const association = associateGuardianItem(
       {
         userId: args.userId,
@@ -84,6 +100,34 @@ export async function processChatTextGuardianItems(
     if (result.outcome === "created" || result.outcome === "superseded") created += 1;
     else if (result.outcome === "deduped") deduped += 1;
     else if (result.outcome === "low_confidence") lowConfidence += 1;
+
+    if (
+      reconciliation.completedBy &&
+      (result.outcome === "created" ||
+        result.outcome === "deduped" ||
+        result.outcome === "superseded")
+    ) {
+      await completeGuardianItem(supabase, result.id);
+    }
+
+    if (reconciliation.followUp) {
+      const followUpResult = await persistExtractedGuardianItem({
+        supabase,
+        association,
+        item: reconciliation.followUp,
+        sourceDocumentId: null,
+        sourceType: "daily_log",
+        sourceId: reconciliation.completedBy!.id,
+        today,
+        allowSupersession: false,
+      });
+      if (
+        followUpResult.outcome === "created" ||
+        followUpResult.outcome === "superseded"
+      ) created += 1;
+      else if (followUpResult.outcome === "deduped") deduped += 1;
+      else if (followUpResult.outcome === "low_confidence") lowConfidence += 1;
+    }
   }
 
   return { attempted: true, created, deduped, lowConfidence };
