@@ -1,6 +1,8 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { calendarDateInUserZone } from "@/lib/timezone";
+import { getUserTimeZone } from "@/lib/timezone/server";
 import { requireEditableBusinessProfile } from "@/lib/leads/auth";
 import { findPotentialDuplicates } from "@/lib/leads/duplicates";
 import {
@@ -17,6 +19,7 @@ import {
 } from "@/lib/leads/types";
 import {
   formatFederalPartners,
+  formatBusinessCardsAddedOn,
   formatLeadDetail,
   formatLeadFollowUps,
   formatLeadLine,
@@ -288,6 +291,16 @@ export async function answerLeadsGideonQuery(
     return {
       message: formatTodaysActions(leads),
       intent: "today",
+      href,
+    };
+  }
+
+  if (parsed.intent === "business_cards") {
+    const timeZone = await getUserTimeZone(supabase, args.userId);
+    const today = calendarDateInUserZone(new Date(), timeZone);
+    return {
+      message: formatBusinessCardsAddedOn(leads, today, timeZone),
+      intent: "business_cards",
       href,
     };
   }

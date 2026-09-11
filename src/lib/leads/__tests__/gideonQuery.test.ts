@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   formatLeadFollowUps,
   formatLeadPipeline,
+  formatBusinessCardsAddedOn,
   parseLeadsGideonQuery,
   wantsLeadsQuery,
 } from "../gideonQuery";
@@ -117,6 +118,37 @@ describe("leads Gideon query", () => {
     );
     assert.equal(match.intent, "match");
     assert.equal(match.matchTerm, "ai");
+  });
+
+  it("treats cards added today as a business-card lookup, not a pipeline summary", () => {
+    assert.equal(
+      parseLeadsGideonQuery("Can you check the business cards that I added today?").intent,
+      "business_cards"
+    );
+  });
+
+  it("lists only business-card leads created on the requested local day", () => {
+    const text = formatBusinessCardsAddedOn(
+      [
+        lead({
+          id: "card-1",
+          contact_name: "Larry Smith",
+          company_name: "Example Co",
+          source: "Business Card",
+          created_at: "2026-09-11T13:00:00.000Z",
+        }),
+        lead({
+          id: "proposal-1",
+          company_name: "Washington Christian Academy",
+          source: "Proposal",
+          created_at: "2026-09-11T14:00:00.000Z",
+        }),
+      ],
+      "2026-09-11",
+      "America/New_York"
+    );
+    assert.match(text, /Larry Smith/);
+    assert.doesNotMatch(text, /Washington Christian Academy/);
   });
 
   it("formats a pipeline summary", () => {
