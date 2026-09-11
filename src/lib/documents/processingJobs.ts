@@ -837,6 +837,9 @@ async function runGuardianItemsJob(
         last_processing_error: message.slice(0, 500),
       })
       .eq("id", documentId);
+    // Let the outer job runner mark this job retryable/failed. Swallowing this
+    // error previously allowed a failed extraction to be recorded as completed.
+    throw new Error(message);
   }
 
   return recordDuration(diagnostics, "guardian_items_extraction_ms", start);
