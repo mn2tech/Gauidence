@@ -319,15 +319,25 @@ export async function loadBusinessIntelligence(
           sections.push(brief.answer);
           userAnswerDraft = brief.answer;
         } else {
-          userAnswerDraft = [
-            `I could not find a Guardian entity or matching proposals for "${mention}" in this Space yet.`,
-            "",
-            "Known from Guardian: no canonical client/organization match in the ontology for this Space.",
-            `Gideon recommendation: confirm the exact name used in Guardian for "${mention}", or run Analyze Knowledge on documents that mention them.`,
-          ].join("\n");
-          sections.push(
-            `ENTITY 360: no canonical entity and no mention hits for "${mention}".`
-          );
+          if (plan.strategy === "person_lookup_hybrid") {
+            // Do not short-circuit a person question just because BI lacks a
+            // canonical entity. The response layer can still answer from the
+            // hybrid document and Daily Log blocks loaded for this plan.
+            userAnswerDraft = null;
+            sections.push(
+              `PERSON LOOKUP: no canonical BI entity for "${mention}". Check retrieved documents, Daily Logs, conversations, and other Space evidence before saying the person was not found.`
+            );
+          } else {
+            userAnswerDraft = [
+              `I could not find a Guardian entity or matching proposals for "${mention}" in this Space yet.`,
+              "",
+              "Known from Guardian: no canonical client/organization match in the ontology for this Space.",
+              `Gideon recommendation: confirm the exact name used in Guardian for "${mention}", or run Analyze Knowledge on documents that mention them.`,
+            ].join("\n");
+            sections.push(
+              `ENTITY 360: no canonical entity and no mention hits for "${mention}".`
+            );
+          }
         }
       }
     } else {

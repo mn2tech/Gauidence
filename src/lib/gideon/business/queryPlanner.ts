@@ -8,6 +8,8 @@ import type { BusinessQueryIntent, BusinessQueryPlan } from "./types";
 const ENTITY_360 =
   /\b(everything we know about|tell me (everything )?about|show me (everything|all).{0,40}\babout|who is|what do we know about|entity.?360|full (picture|profile) (of|for))\b/i;
 
+const SIMPLE_PERSON_LOOKUP = /^\s*who\s+is\s+[^?]{2,80}\??\s*$/i;
+
 const RELATIONSHIP_QUERY =
   /\b(which clients? have|clients? .{0,60}(but|without|no) .{0,40}project|what relationships?|relationships? (do we|with)|connected to|linked to|who (do we|are we) (serve|work with)|proposals? but no)\b/i;
 
@@ -370,10 +372,16 @@ export function isBusinessIntelligenceQuestion(question: string): boolean {
 export function planBusinessQuery(question: string): BusinessQueryPlan {
   const intent = detectBusinessQueryIntent(question);
   const entities = extractBusinessEntityMentions(question);
+  const flags = flagsFor(intent);
+  const personLookup =
+    intent === "ENTITY_360" && SIMPLE_PERSON_LOOKUP.test(question);
   return {
     intent,
     entities,
-    ...flagsFor(intent),
-    strategy: strategyFor(intent),
+    ...flags,
+    // A first-name/person question may be answered by correspondence or a
+    // Daily Log even when the person has not become a canonical BI entity.
+    requiresSearch: personLookup ? true : flags.requiresSearch,
+    strategy: personLookup ? "person_lookup_hybrid" : strategyFor(intent),
   };
 }

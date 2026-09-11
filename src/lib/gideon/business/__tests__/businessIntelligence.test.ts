@@ -82,6 +82,14 @@ describe("business query planner", () => {
     assert.equal(proposalPlan.requiresSearch, false);
   });
 
+  it("uses hybrid document retrieval for a simple person lookup", () => {
+    const plan = planBusinessQuery("who is Larry");
+    assert.equal(plan.intent, "ENTITY_360");
+    assert.equal(plan.entities[0], "Larry");
+    assert.equal(plan.requiresSearch, true);
+    assert.equal(plan.strategy, "person_lookup_hybrid");
+  });
+
   it("extracts entity mentions", () => {
     const mentions = extractBusinessEntityMentions(
       "What relationships do we have with Onyx?"
