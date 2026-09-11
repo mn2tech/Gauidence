@@ -20,6 +20,7 @@ export type ChatTextExtractionResult = {
   created: number;
   deduped: number;
   lowConfidence: number;
+  reconciliationNotes: string[];
 };
 
 /** Turn substantive pasted chat text into Today/Watch items with chat provenance. */
@@ -35,7 +36,13 @@ export async function processChatTextGuardianItems(
   }
 ): Promise<ChatTextExtractionResult> {
   if (!shouldExtractGuardianItemsFromChatText(args.text)) {
-    return { attempted: false, created: 0, deduped: 0, lowConfidence: 0 };
+    return {
+      attempted: false,
+      created: 0,
+      deduped: 0,
+      lowConfidence: 0,
+      reconciliationNotes: [],
+    };
   }
 
   const timeZone = await getUserTimeZone(supabase, args.userId);
@@ -71,6 +78,7 @@ export async function processChatTextGuardianItems(
   let created = 0;
   let deduped = 0;
   let lowConfidence = 0;
+  const reconciliationNotes: string[] = [];
 
   for (const item of items) {
     const reconciliation = reconcileItemWithDailyLogs(item, recentLogs);
@@ -108,6 +116,11 @@ export async function processChatTextGuardianItems(
         result.outcome === "superseded")
     ) {
       await completeGuardianItem(supabase, result.id);
+      reconciliationNotes.push(
+        reconciliation.followUp
+          ? `A recent Daily Log proves that \"${item.title}\" is already complete. Do not suggest drafting, sending, or saving the response again. The remaining action is: \"${reconciliation.followUp.title}\".`
+          : `A recent Daily Log proves that \"${item.title}\" is already complete. Do not suggest doing or recording it again.`
+      );
     }
 
     if (reconciliation.followUp) {
@@ -130,5 +143,11 @@ export async function processChatTextGuardianItems(
     }
   }
 
-  return { attempted: true, created, deduped, lowConfidence };
+  return {
+    attempted: true,
+    created,
+    deduped,
+    lowConfidence,
+    reconciliationNotes,
+  };
 }
