@@ -1400,6 +1400,7 @@ export async function POST(request: Request) {
     persistCitations = [citationFromDocument(attachedRow)];
   }
 
+  let pastedTextReconciliationNote = "";
   if (!userMsg) {
     const { data: insertedUserMsg, error: userMsgError } = await supabase
       .from("vault_chat_messages")
@@ -1425,7 +1426,7 @@ export async function POST(request: Request) {
     // dated actions into Guardian Today using the same Guardian Items model as
     // uploaded documents. Ordinary chat questions are rejected by the router.
     try {
-      await processChatTextGuardianItems(supabase, {
+      const extraction = await processChatTextGuardianItems(supabase, {
         userId: user.id,
         spaceId: active.id,
         messageId: insertedUserMsg.id,
@@ -1433,6 +1434,14 @@ export async function POST(request: Request) {
         spaceName: active.display_name,
         spaceProfileType: active.profile_type,
       });
+      if (extraction.reconciliationNotes.length > 0) {
+        pastedTextReconciliationNote = [
+          "--- CROSS-SOURCE ACTION RECONCILIATION (authoritative) ---",
+          ...extraction.reconciliationNotes,
+          "Acknowledge the completed action and recommend only the remaining follow-up. This overrides generic suggestions based only on the pasted request.",
+          "--- END CROSS-SOURCE ACTION RECONCILIATION ---",
+        ].join("\n");
+      }
     } catch (err) {
       console.error(
         "Gideon pasted-text Guardian Item extraction failed:",
@@ -1846,6 +1855,7 @@ export async function POST(request: Request) {
       workspaceContext.promptOptions.orchestrationNotes = [
         composed.systemNotes,
         globalBriefingNote,
+        pastedTextReconciliationNote,
         runtimeContext
           ? formatRuntimeContextForPrompt(runtimeContext)
           : "",
