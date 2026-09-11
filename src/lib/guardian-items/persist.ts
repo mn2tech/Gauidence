@@ -29,7 +29,9 @@ export type PersistExtractedItemArgs = {
   supabase: SupabaseClient;
   association: AssociationResult;
   item: GuardianExtractedItem;
-  sourceDocumentId: string;
+  sourceDocumentId: string | null;
+  sourceType?: "document" | "chat";
+  sourceId?: string | null;
   sourceDocumentTitle?: string | null;
   today: string;
   /** When true, allow cross-document supersession via logical fingerprint. */
@@ -133,7 +135,8 @@ export async function persistExtractedGuardianItem(
     status: "active" as const,
     priority,
     requires_action: item.requires_action,
-    source_type: "document",
+    source_type: args.sourceType ?? "document",
+    source_id: args.sourceId ?? null,
     source_document_id: args.sourceDocumentId,
     source_excerpt: item.source_excerpt.slice(0, 800),
     source_page: item.source_page ?? null,
@@ -204,13 +207,18 @@ export async function persistExtractedGuardianItem(
     return { outcome: "skipped", reason: "already_resolved" };
   }
 
-  const { data: sameSource } = await supabase
+  let sameSourceQuery = supabase
     .from("guardian_items")
     .select("id, title, confidence, status")
     .eq("space_id", association.spaceId)
-    .eq("source_document_id", args.sourceDocumentId)
     .in("status", ["active", "completed", "dismissed"])
     .limit(50);
+  sameSourceQuery = args.sourceDocumentId
+    ? sameSourceQuery.eq("source_document_id", args.sourceDocumentId)
+    : sameSourceQuery
+        .eq("source_type", args.sourceType ?? "chat")
+        .eq("source_id", args.sourceId);
+  const { data: sameSource } = await sameSourceQuery;
 
   const fuzzyActive = (sameSource ?? []).find(
     (candidate) =>
