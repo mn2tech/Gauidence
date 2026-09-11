@@ -15,6 +15,14 @@ Ms. Teacher`;
     assert.equal(shouldExtractGuardianItemsFromChatText(email), true);
   });
 
+  it("routes the Ms. Sellner permission email with standalone Monday", () => {
+    const email = `Dear Parents,
+We are asking permission for your child to get extra help in our resource program. Please respond back saying yes, that you give permission for us to start Monday.
+The resource teachers provide targeted instruction to support students in building essential academic skills and becoming more confident, independent learners. Instruction takes place in a small group setting. This is not a labeling or diagnostic process.
+Ms. Sellner`;
+    assert.equal(shouldExtractGuardianItemsFromChatText(email), true);
+  });
+
   it("does not turn an ordinary date question into a reminder", () => {
     assert.equal(
       shouldExtractGuardianItemsFromChatText("When is my meeting on September 18, 2026?"),
@@ -31,4 +39,3 @@ Ms. Teacher`;
     );
   });
 });
-
