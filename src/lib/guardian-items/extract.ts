@@ -19,6 +19,8 @@ export type GuardianItemLlmInput = {
   newsletterMode?: boolean;
   publicationDate?: string | null;
   homeworkWeekStart?: string | null;
+  /** Calendar date to use when resolving relative wording such as "tomorrow". */
+  referenceDate?: string | null;
 };
 
 function buildSystemPrompt(newsletterMode?: boolean): string {
@@ -65,6 +67,8 @@ Rules:
 - Fold supporting details (who, email, program blurb, start day) into title/description of the single action — do not emit them as separate items.
 - Every item MUST include a short verbatim source_excerpt from the text.
 - Never invent exact dates. If the text says "next Friday" without enough context for an unambiguous calendar date, omit event_date/due_at (set null) rather than guessing.
+- Use the supplied reference date to resolve today, tomorrow, and weekday-relative dates when unambiguous.
+- In pasted emails, Sent/Received header timestamps are context only. Never create a reminder from an email header, signature, copyright year, or quoted-thread timestamp.
 - Use ISO dates YYYY-MM-DD when dates are explicit in the document.
 - "No homework" is an explicit item (type no_homework) — never treat it as an empty extraction.
 - confidence 0.0-1.0. Use high confidence only when clearly supported.
@@ -94,6 +98,9 @@ export async function extractGuardianItemsWithLlm(
       : null,
     input.homeworkWeekStart
       ? `Homework week starts (Monday): ${input.homeworkWeekStart}`
+      : null,
+    input.referenceDate
+      ? `Reference date for relative dates: ${input.referenceDate}`
       : null,
     input.importantDates?.length
       ? `Analysis important dates: ${JSON.stringify(input.importantDates).slice(0, 1500)}`
