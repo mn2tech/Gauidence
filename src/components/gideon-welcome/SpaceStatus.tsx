@@ -1,4 +1,5 @@
 import { CircleDot } from "lucide-react";
+import Link from "next/link";
 import type { GideonWelcomeViewModel } from "@/lib/gideon-welcome/types";
 
 type SpaceStatusProps = {
@@ -50,15 +51,34 @@ export default function SpaceStatus({ view, mode = "default" }: SpaceStatusProps
     <div className="space-y-2">
       <p className="text-sm font-medium text-foreground">{title}</p>
       <ul className="space-y-1.5">
-        {statusItems.map((item) => (
-          <li key={item.id} className="flex items-start gap-2 text-sm text-ink-muted">
-            <CircleDot
-              className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand"
-              aria-hidden
-            />
-            <span>{item.text}</span>
-          </li>
-        ))}
+        {statusItems.map((item) => {
+          const content = (
+            <>
+              <CircleDot
+                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand"
+                aria-hidden
+              />
+              <span>{item.text}</span>
+            </>
+          );
+
+          return (
+            <li key={item.id} className="text-sm">
+              {item.href ? (
+                <Link
+                  href={item.href}
+                  className="flex min-h-8 items-start gap-2 rounded-lg px-1 py-1 font-medium text-foreground transition-colors hover:bg-brand-light/40 hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+                >
+                  {content}
+                </Link>
+              ) : (
+                <span className="flex items-start gap-2 px-1 py-1 font-medium text-foreground">
+                  {content}
+                </span>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </div>
   );

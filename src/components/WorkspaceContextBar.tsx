@@ -217,7 +217,7 @@ export default function WorkspaceContextBar({
                       aria-hidden
                     />
                   ) : null}
-                  {mode === "global" ? "All spaces" : "This home"}
+                  {mode === "global" ? "All spaces" : "This space"}
                 </button>
               );
             })}
