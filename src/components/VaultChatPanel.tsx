@@ -4249,7 +4249,11 @@ export default function VaultChatPanel({
   const welcomeBlock = welcome && (
     isPage && showMinimalWelcome && !emptyVault ? (
       <div className="mx-auto max-w-xl space-y-3 px-1 py-4 sm:py-6">
-        <GideonWelcome showAskForm={false} mode="ask" />
+        <GideonWelcome
+          showAskForm={false}
+          mode="ask"
+          searchScope={meta?.searchScope ?? DEFAULT_SEARCH_SCOPE}
+        />
         <EmptyAskGuidanceChips
           onUpload={openFilePicker}
           onAddToToday={openReminderForm}
@@ -4753,7 +4757,7 @@ export default function VaultChatPanel({
     <div
       className={
         isPage || isDrawer
-          ? "min-h-0 flex-1 space-y-4 overflow-y-auto bg-background px-4 py-4 sm:px-8"
+          ? "min-h-0 flex-1 scroll-pb-8 space-y-4 overflow-y-auto bg-background px-4 pb-8 pt-4 sm:px-8"
           : "max-h-64 space-y-3 overflow-y-auto rounded-xl bg-surface-elevated p-3 ring-1 ring-border-subtle"
       }
     >
