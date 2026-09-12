@@ -81,7 +81,7 @@ export function profileIdsForSearchScope(
 }
 
 export function searchScopeLabel(mode: SearchScopeMode): string {
-  return mode === "global" ? "All spaces" : "This home";
+  return mode === "global" ? "All spaces" : "This space";
 }
 
 /** Large heading next to Searching — space name, or “all your spaces”. */
@@ -92,7 +92,7 @@ export function searchScopeHeading(
   return mode === "global" ? "All your spaces" : spaceName;
 }
 
-/** One-line explanation under the This home / All spaces pills. */
+/** One-line explanation under the This space / All spaces pills. */
 export function searchScopeHint(
   mode: SearchScopeMode,
   spaceName: string
@@ -104,7 +104,7 @@ export function searchScopeHint(
 }
 
 export const SEARCH_SCOPE_FIRST_HINT =
-  "Asking across all your spaces. Use This home to narrow — new files still save to your file home.";
+  "Asking across all your spaces. Use This space to narrow — new files still save to your file home.";
 
 export function formatSearchConfidence(score: number): string {
   const pct = Math.round(Math.max(0, Math.min(100, score)));

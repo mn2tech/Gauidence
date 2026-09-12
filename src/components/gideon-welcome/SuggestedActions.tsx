@@ -42,7 +42,7 @@ export default function SuggestedActions({
             key={action.id}
             type="button"
             onClick={() => handleAction(action)}
-            className="welcome-chip inline-flex items-center rounded-full border border-stone-300 bg-white px-3.5 py-2 text-left text-xs font-medium text-foreground transition hover:border-brand hover:bg-brand-light/40 sm:text-sm"
+            className="welcome-chip inline-flex min-h-11 items-center rounded-full border border-border-subtle bg-surface px-4 py-2 text-left text-sm font-semibold text-foreground shadow-sm transition hover:border-brand hover:bg-brand-light/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
             style={{ animationDelay: `${0.04 * index}s` }}
           >
             {action.label}

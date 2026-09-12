@@ -4,6 +4,7 @@ import type { SimpleHomeProfileCategory } from "@/lib/simple-home/helpers";
 export type GideonWelcomeStatusItem = {
   id: string;
   text: string;
+  href?: string;
 };
 
 export type GideonWelcomeAction = {

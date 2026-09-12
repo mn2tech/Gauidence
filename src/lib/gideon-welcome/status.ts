@@ -7,6 +7,7 @@ import {
   ADD_ANYTHING_PATH,
   ASK_GIDEON_PATH,
   REMEMBER_TODAY_PATH,
+  WORLD_PATH,
 } from "@/lib/simple-home/routing";
 import type {
   GideonWelcomeAction,
@@ -79,24 +80,28 @@ function buildBusinessStatus(stats: GideonWelcomeSpaceStats): GideonWelcomeStatu
     items.push({
       id: "leads",
       text: `${stats.leadsNeedFollowUp} ${plural(stats.leadsNeedFollowUp, "lead")} may need follow-up`,
+      href: LEADS_PATH,
     });
   }
   if (stats.proposalsAwaitingResponse > 0) {
     items.push({
       id: "proposals",
       text: `${stats.proposalsAwaitingResponse} ${plural(stats.proposalsAwaitingResponse, "proposal")} ${stats.proposalsAwaitingResponse === 1 ? "is" : "are"} awaiting a response`,
+      href: PROPOSALS_PATH,
     });
   }
   if (stats.recentItemsCount > 0) {
     items.push({
       id: "recent",
       text: `${stats.recentItemsCount} ${plural(stats.recentItemsCount, "item")} ${stats.recentItemsCount === 1 ? "was" : "were"} recently added`,
+      href: WORLD_PATH,
     });
   }
   if (stats.upcomingAlertsCount > 0) {
     items.push({
       id: "alerts",
       text: `${stats.upcomingAlertsCount} upcoming ${plural(stats.upcomingAlertsCount, "commitment", "commitments")}`,
+      href: askHref("What upcoming commitments should I know about?"),
     });
   }
 
@@ -110,18 +115,21 @@ function buildPersonalStatus(stats: GideonWelcomeSpaceStats): GideonWelcomeStatu
     items.push({
       id: "events",
       text: `${stats.upcomingAlertsCount} upcoming ${plural(stats.upcomingAlertsCount, "event", "events")}`,
+      href: askHref("What upcoming events should I know about?"),
     });
   }
   if (stats.recentItemsCount > 0) {
     items.push({
       id: "recent",
       text: `${stats.recentItemsCount} ${plural(stats.recentItemsCount, "item")} added recently`,
+      href: WORLD_PATH,
     });
   }
   if (stats.openRequestCount > 0) {
     items.push({
       id: "requests",
       text: `${stats.openRequestCount} open ${plural(stats.openRequestCount, "request")}`,
+      href: REQUESTS_PATH,
     });
   }
 
@@ -135,12 +143,14 @@ function buildSchoolStatus(stats: GideonWelcomeSpaceStats): GideonWelcomeStatusI
     items.push({
       id: "dates",
       text: `${stats.upcomingAlertsCount} upcoming school ${plural(stats.upcomingAlertsCount, "date", "dates")}`,
+      href: askHref("What upcoming school dates should I know about?"),
     });
   }
   if (stats.recentItemsCount > 0) {
     items.push({
       id: "recent",
       text: `${stats.recentItemsCount} ${plural(stats.recentItemsCount, "document", "documents")} or notes added recently`,
+      href: WORLD_PATH,
     });
   }
 
