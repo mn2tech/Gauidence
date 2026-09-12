@@ -4757,7 +4757,7 @@ export default function VaultChatPanel({
     <div
       className={
         isPage || isDrawer
-          ? "min-h-0 flex-1 scroll-pb-8 space-y-4 overflow-y-auto bg-background px-4 pb-8 pt-4 sm:px-8"
+          ? "min-h-0 flex-1 scroll-pb-40 space-y-4 overflow-y-auto bg-background px-4 pb-40 pt-4 sm:px-8 md:scroll-pb-8 md:pb-8"
           : "max-h-64 space-y-3 overflow-y-auto rounded-xl bg-surface-elevated p-3 ring-1 ring-border-subtle"
       }
     >
