@@ -10,15 +10,18 @@ import { useActiveProfile } from "@/components/ProfileProvider";
 import { useGideonWelcomeData } from "@/hooks/useGideonWelcomeData";
 import { timeOfDayGreeting } from "@/lib/simple-home/helpers";
 import { ASK_GIDEON_PATH } from "@/lib/simple-home/routing";
+import type { SearchScopeMode } from "@/lib/workspace-context/searchScope";
 
 export default function GideonWelcome({
   showAskForm = true,
   className = "",
   mode = "default",
+  searchScope = "global",
 }: {
   showAskForm?: boolean;
   className?: string;
   mode?: "default" | "today" | "ask";
+  searchScope?: SearchScopeMode;
 }) {
   const router = useRouter();
   const { active } = useActiveProfile();
@@ -62,7 +65,12 @@ export default function GideonWelcome({
     <section
       className={`gideon-welcome simple-home-card welcome-strip space-y-4 p-4 sm:space-y-5 sm:p-5 ${className}`.trim()}
     >
-      <GreetingHeader greeting={greeting} view={view} mode={mode} />
+      <GreetingHeader
+        greeting={greeting}
+        view={view}
+        mode={mode}
+        searchScope={searchScope}
+      />
       {showStatus ? <SpaceStatus view={view} mode={mode} /> : null}
       {showActions ? (
         <SuggestedActions actions={view.actions} showPrompt={showActionPrompt} />
