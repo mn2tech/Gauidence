@@ -205,6 +205,35 @@ describe("Gideon orchestration — acceptance", () => {
     }
   });
 
+  it("short entity-count questions search the selected Guardian scope", () => {
+    for (const q of [
+      "how many churches?",
+      "How many active clients do we have?",
+      "how many locations are there?",
+    ]) {
+      const route = routeGideonOrchestration({
+        question: q,
+        spaceId: "my-business",
+        spaceName: "My Business",
+        globalView: true,
+      });
+      assert.equal(route.intent, "guardian_knowledge", q);
+      assert.equal(route.guardianKnowledgeRequired, true, q);
+      assert.equal(route.generalKnowledgeAllowed, false, q);
+    }
+  });
+
+  it("does not turn general numeric questions into Guardian searches", () => {
+    for (const q of ["How many days are in a year?", "How many planets are there?"]) {
+      const route = routeGideonOrchestration({
+        question: q,
+        spaceId: "my-business",
+        globalView: true,
+      });
+      assert.equal(route.guardianKnowledgeRequired, false, q);
+    }
+  });
+
   it("Test 9 — Give me everything about Kendall", () => {
     const q = "Give me everything Guardian knows about Kendall.";
     const route = routeGideonOrchestration({
