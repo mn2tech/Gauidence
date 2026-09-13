@@ -33,6 +33,9 @@ export type GideonWelcomeViewModel = {
   spaceName: string | null;
   /** Gideon's proactive, state-aware check-in shown when the user arrives. */
   openingMessage: string;
+  openingResponse: "open" | "yes_no";
+  /** Exact next step used by the Yes button for a binary check-in. */
+  openingYesHref?: string;
   isNewUser: boolean;
   isEmptySpace: boolean;
   statusItems: GideonWelcomeStatusItem[];
