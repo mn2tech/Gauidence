@@ -31,6 +31,8 @@ export type GideonWelcomeSpaceStats = {
 export type GideonWelcomeViewModel = {
   greetName: string | null;
   spaceName: string | null;
+  /** Gideon's proactive, state-aware check-in shown when the user arrives. */
+  openingMessage: string;
   isNewUser: boolean;
   isEmptySpace: boolean;
   statusItems: GideonWelcomeStatusItem[];
