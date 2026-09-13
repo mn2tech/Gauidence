@@ -8,7 +8,10 @@ import {
   findEntitiesByPhrase,
   mostRecentEntity,
 } from "./entities";
-import { expandShortReplyFromHistory } from "./shortReplies";
+import {
+  expandKnowledgeFollowUpFromHistory,
+  expandShortReplyFromHistory,
+} from "./shortReplies";
 import type {
   ActiveEntity,
   ActiveEntityType,
@@ -161,6 +164,23 @@ export function resolveReferences(args: {
     return {
       resolvedMessage: message,
       success: false,
+      ambiguous: false,
+      clarificationPrompt: null,
+      conversationContinuity: false,
+      bindings: [],
+    };
+  }
+
+  // Terse knowledge follow-ups must keep the prior subject and run retrieval.
+  const knowledgeFollowUp = expandKnowledgeFollowUpFromHistory(
+    message,
+    recentMessages,
+    lastAssistantMessage
+  );
+  if (knowledgeFollowUp) {
+    return {
+      resolvedMessage: knowledgeFollowUp,
+      success: true,
       ambiguous: false,
       clarificationPrompt: null,
       conversationContinuity: false,

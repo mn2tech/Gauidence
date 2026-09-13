@@ -44,6 +44,17 @@ describe("evidenceBoundaries", () => {
 });
 
 describe("buildSuggestedQuestions", () => {
+  it("offers useful church-directory follow-ups instead of a Daily Log pitch", () => {
+    const qs = buildSuggestedQuestions({
+      question: "how many churches?",
+      answer: "Word Ministries of India has 12 churches.",
+      availableDocumentLabels: ["CHURCHES.txt"],
+    });
+    assert.ok(qs.some((q) => /church names/i.test(q)));
+    assert.ok(qs.some((q) => /pastors/i.test(q)));
+    assert.ok(qs.every((q) => !/Daily Log/i.test(q)));
+  });
+
   it("returns contextual chips without repeating the original question", () => {
     const qs = buildSuggestedQuestions({
       question: "What do we know about Kendall Capital?",

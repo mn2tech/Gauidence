@@ -90,6 +90,9 @@ const GUARDIAN_ENTITY_ASK =
 const GUARDIAN_COUNT_ASK =
   /\bhow many\s+(?:(?:total|active|current|saved|uploaded|connected|linked|registered|upcoming|past|new)\s+)?(?:church(?:es)?|organizations?|companies|businesses|people|contacts?|employees?|contractors?|clients?|customers?|partners?|members?|locations?|offices?|schools?|children|students?|documents?|files?|notes?|events?|meetings?|appointments?|projects?|proposals?|contracts?|invoices?|commitments?|tasks?|reminders?|leads?)\b/i;
 
+const GUARDIAN_EXPLICIT_LOOKUP =
+  /\b(?:find|search|look up|show|get|pull)\b.{0,60}\b(?:my|our|guardian|spaces?|documents?|files?)\b/i;
+
 const PLUS_GENERAL =
   /\b(is .{0,60}(normal|typical|common|usual|reasonable|high|low)|compared to|relative to|in the (industry|market)|should i (worry|be concerned)|does that (make sense|seem)|how does (that|this) compare)\b/i;
 
@@ -157,6 +160,7 @@ function looksLikeGuardianWorldQuestion(
   // Short count questions such as "how many churches?" still refer to the
   // selected Guardian scope even without an explicit "my" or Space name.
   if (GUARDIAN_COUNT_ASK.test(q)) return true;
+  if (GUARDIAN_EXPLICIT_LOOKUP.test(q)) return true;
   // Bare topic lookups ("school calendar") — no interrogative required.
   if (GUARDIAN_TOPIC_LOOKUP.test(q)) return true;
   if (GUARDIAN_WORLD.test(q) && GUARDIAN_ENTITY_ASK.test(q)) return true;

@@ -54,6 +54,10 @@ describe("Gideon helpers", () => {
     assert.match(GIDEON_SYSTEM, /YOUTUBE:/i);
     assert.match(GIDEON_SYSTEM, /CURRENT DATE AND TIME is provided/i);
     assert.match(GIDEON_SYSTEM, /never ask them to re-upload/i);
+    assert.match(GIDEON_SYSTEM, /Treat each message as part of one conversation/i);
+    assert.match(GIDEON_SYSTEM, /smallest complete answer/i);
+    assert.match(GIDEON_SYSTEM, /Never suggest creating a Daily Log unless/i);
+    assert.match(GIDEON_SYSTEM, /Never expose implementation language/i);
     assert.match(GIDEON_ATTACHED_DOCUMENT_NOTE, /Never ask the user to re-upload/i);
     assert.match(GIDEON_ATTACHED_DOCUMENT_NOTE, /FROM YOUR DOCUMENTS/);
     assert.match(GIDEON_ATTACHED_DOCUMENT_NOTE, /primary source/i);

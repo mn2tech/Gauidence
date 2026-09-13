@@ -206,6 +206,7 @@ export function shouldAttachSuggestedQuestions(ctx: {
     return false;
   }
   return (
+    /\bhow many churches\b/i.test(question) ||
     looksLikeRosterContext(question, answer) ||
     isBusinessDisclosureTurn(question, answer) ||
     isEntityOverviewQuestion(question) ||
@@ -249,6 +250,16 @@ export function buildSuggestedQuestions(
   const rosterContext = looksLikeRosterContext(question, answer);
   const businessTurn = isBusinessDisclosureTurn(question, answer);
   const overview = isEntityOverviewQuestion(question);
+
+  // --- Church directory follow-ups ---
+  if (/\bhow many churches\b/i.test(question)) {
+    if (!/^\s*\d+[.)]\s+\S/m.test(answer)) {
+      pushUnique(out, seen, "Show church names from my spaces", question);
+    }
+    pushUnique(out, seen, "Who are the church pastors in my spaces?", question);
+    pushUnique(out, seen, "Which church details are missing?", question);
+    return out.slice(0, MAX_SUGGESTIONS);
+  }
 
   // --- Roster / RSVP / contact cards ---
   if (rosterContext) {

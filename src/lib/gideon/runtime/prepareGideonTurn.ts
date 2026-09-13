@@ -14,7 +14,10 @@ import { inferActiveGoal } from "./inferActiveGoal";
 import { emptyConversationState } from "./loadConversationState";
 import { logRuntimeEvent } from "./log";
 import { resolveReferences } from "./resolveReferences";
-import { expandShortReplyFromHistory } from "./shortReplies";
+import {
+  expandKnowledgeFollowUpFromHistory,
+  expandShortReplyFromHistory,
+} from "./shortReplies";
 import { applyStatePatch } from "./updateConversationState";
 import type {
   ChatTurn,
@@ -36,6 +39,11 @@ function continuityFallbackContext(args: {
   lastAssistantMessage?: string | null;
   currentSpaceId?: string | null;
 }): GideonRuntimeContext {
+  const knowledgeExpanded = expandKnowledgeFollowUpFromHistory(
+    args.message,
+    args.recentMessages,
+    args.lastAssistantMessage
+  );
   const shortExpanded = expandShortReplyFromHistory(
     args.message,
     args.recentMessages,
@@ -43,7 +51,7 @@ function continuityFallbackContext(args: {
   );
   return {
     userMessage: args.message,
-    resolvedMessage: shortExpanded ?? args.message,
+    resolvedMessage: knowledgeExpanded ?? shortExpanded ?? args.message,
     activeGoal: null,
     activeEntities: [],
     conversationSummary: null,
@@ -52,7 +60,7 @@ function continuityFallbackContext(args: {
     lastIntent: null,
     needsClarification: false,
     clarificationPrompt: null,
-    preferConversationContinuity: Boolean(shortExpanded),
+    preferConversationContinuity: Boolean(shortExpanded && !knowledgeExpanded),
   };
 }
 
