@@ -62,8 +62,8 @@ export default function GideonWelcome({
     );
   }
 
-  function handleYes() {
-    const href = view.openingYesHref?.trim();
+  function handleYes(openingYesHref?: string) {
+    const href = openingYesHref?.trim();
     if (href) {
       router.push(href);
       return;
@@ -94,7 +94,7 @@ export default function GideonWelcome({
         <div className="flex flex-wrap gap-2 pl-[50px]">
           <button
             type="button"
-            onClick={handleYes}
+            onClick={() => handleYes(view.openingYesHref)}
             className="inline-flex min-h-11 items-center rounded-full border border-brand bg-brand px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
           >
             Yes
