@@ -140,6 +140,16 @@ describe("leads Gideon query", () => {
     );
   });
 
+  it("recognizes base-form business-card verbs after did I", () => {
+    for (const question of [
+      "Which business cards did I scan yesterday?",
+      "What business cards did I upload today?",
+      "Which business cards did I save on Monday?",
+    ]) {
+      assert.equal(parseLeadsGideonQuery(question).intent, "business_cards");
+    }
+  });
+
   it("resolves yesterday and last weekday references deterministically", () => {
     assert.equal(
       resolveBusinessCardCalendarDate("yesterday", "2026-09-12"),
