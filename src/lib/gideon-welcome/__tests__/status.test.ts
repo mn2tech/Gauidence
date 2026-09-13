@@ -28,6 +28,8 @@ describe("gideon welcome status", () => {
     assert.equal(view.isEmptySpace, false);
     assert.ok(view.statusItems.some((item) => item.text.includes("follow-up")));
     assert.ok(view.statusItems.some((item) => item.text.includes("awaiting")));
+    assert.match(view.openingMessage, /I checked NM2TECH/i);
+    assert.match(view.openingMessage, /follow-up/i);
     assert.equal(view.actions.length, 4);
     assert.ok(view.actions.some((a) => a.label === "What needs my attention?"));
   });
@@ -128,6 +130,7 @@ describe("gideon welcome status", () => {
 
     assert.equal(view.isEmptySpace, true);
     assert.equal(view.statusItems.length, 0);
+    assert.match(view.openingMessage, /one thing you don't want to forget/i);
     assert.ok(view.actions.some((a) => a.label === "Upload a document"));
   });
 
@@ -142,5 +145,6 @@ describe("gideon welcome status", () => {
 
     assert.equal(view.statusUnavailable, true);
     assert.equal(view.statusItems.length, 0);
+    assert.match(view.openingMessage, /I'm ready to help/i);
   });
 });

@@ -4,7 +4,7 @@ import type { GideonWelcomeViewModel } from "@/lib/gideon-welcome/types";
 
 type SpaceStatusProps = {
   view: GideonWelcomeViewModel;
-  mode?: "default" | "ask";
+  mode?: "default" | "today" | "ask";
 };
 
 export default function SpaceStatus({ view, mode = "default" }: SpaceStatusProps) {
@@ -43,9 +43,11 @@ export default function SpaceStatus({ view, mode = "default" }: SpaceStatusProps
   const title =
     mode === "ask"
       ? "Here's what's on your plate:"
-      : spaceName
-        ? `Snapshot from ${spaceName}:`
-        : "Here's what's happening:";
+      : mode === "today"
+        ? "Here's what I found:"
+        : spaceName
+          ? `Snapshot from ${spaceName}:`
+          : "Here's what's happening:";
 
   return (
     <div className="space-y-2">

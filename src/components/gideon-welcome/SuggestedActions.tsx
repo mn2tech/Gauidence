@@ -7,11 +7,13 @@ import { ASK_GIDEON_PATH } from "@/lib/simple-home/routing";
 type SuggestedActionsProps = {
   actions: GideonWelcomeAction[];
   showPrompt?: boolean;
+  emphasizeFirst?: boolean;
 };
 
 export default function SuggestedActions({
   actions,
   showPrompt = true,
+  emphasizeFirst = false,
 }: SuggestedActionsProps) {
   const router = useRouter();
 
@@ -42,7 +44,11 @@ export default function SuggestedActions({
             key={action.id}
             type="button"
             onClick={() => handleAction(action)}
-            className="welcome-chip inline-flex min-h-11 items-center rounded-full border border-border-subtle bg-surface px-4 py-2 text-left text-sm font-semibold text-foreground shadow-sm transition hover:border-brand hover:bg-brand-light/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+            className={`welcome-chip inline-flex min-h-11 items-center rounded-full border px-4 py-2 text-left text-sm font-semibold shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 ${
+              emphasizeFirst && index === 0
+                ? "border-brand bg-brand text-white hover:bg-brand-dark"
+                : "border-border-subtle bg-surface text-foreground hover:border-brand hover:bg-brand-light/40"
+            }`}
             style={{ animationDelay: `${0.04 * index}s` }}
           >
             {action.label}

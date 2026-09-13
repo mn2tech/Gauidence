@@ -3,6 +3,7 @@
 import { MessageCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import GideonAvatar from "@/components/GideonAvatar";
 import GreetingHeader from "@/components/gideon-welcome/GreetingHeader";
 import SpaceStatus from "@/components/gideon-welcome/SpaceStatus";
 import SuggestedActions from "@/components/gideon-welcome/SuggestedActions";
@@ -56,8 +57,6 @@ export default function GideonWelcome({
     );
   }
 
-  const showStatus = mode === "default" || mode === "ask";
-  const showActions = mode === "default" || mode === "ask";
   const showActionPrompt =
     !view.isEmptySpace && view.statusItems.length > 0 && !view.statusUnavailable;
 
@@ -71,10 +70,18 @@ export default function GideonWelcome({
         mode={mode}
         searchScope={searchScope}
       />
-      {showStatus ? <SpaceStatus view={view} mode={mode} /> : null}
-      {showActions ? (
-        <SuggestedActions actions={view.actions} showPrompt={showActionPrompt} />
-      ) : null}
+      <div className="flex items-start gap-3" aria-label="Gideon's check-in">
+        <GideonAvatar size={38} className="mt-0.5 shrink-0" />
+        <p className="rounded-2xl rounded-tl-md border border-border-subtle bg-surface px-4 py-3 text-sm leading-relaxed text-foreground shadow-sm">
+          {view.openingMessage}
+        </p>
+      </div>
+      <SpaceStatus view={view} mode={mode} />
+      <SuggestedActions
+        actions={view.actions}
+        showPrompt={showActionPrompt}
+        emphasizeFirst={mode === "today"}
+      />
 
       {showAskForm ? (
       <form
