@@ -48,7 +48,7 @@ import { recordChatEvent } from "@/lib/billing/quota";
 import { refreshUserAwards } from "@/lib/awards/grant";
 import { formatVaultChatError, buildGideonEmptyAnswerFallback } from "@/lib/vault/vaultChatErrors";
 import { shouldPreferContinuityEmptyFallback } from "@/lib/gideon/runtime/shortReplies";
-import { enforceConversationPolicy } from "@/lib/gideon/conversationPolicy";
+import { enforceConversationPolicy, ensureConversationalContinuation } from "@/lib/gideon/conversationPolicy";
 import { repairDailyLogCaptureAnswer } from "@/lib/logs/propose";
 import { buildListAnswerFromChunks, preferFullerListAnswer, wantsTranscription, wantsPeopleRoster, countNumberedListItems, looksLikePersonListItem } from "@/lib/vault/gideon";
 import { buildOntologyAnswerFallback } from "@/lib/ontology/formatForGideon";
@@ -388,6 +388,16 @@ export function createVaultChatStreamResponse(
             .map((c) => c.content ?? "")
             .filter(Boolean),
         });
+
+        const continuedAnswer = ensureConversationalContinuation({
+          answer,
+          userQuestion: args.originalUserQuestion ?? args.question,
+          suggestedQuestions,
+        });
+        if (continuedAnswer !== answer) {
+          write({ type: "replace", text: continuedAnswer });
+          answer = continuedAnswer;
+        }
 
         const resolvedWriteVault = resolveGideonWriteVault({
           question: args.question,

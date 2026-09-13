@@ -55,6 +55,19 @@ describe("buildSuggestedQuestions", () => {
     assert.ok(qs.every((q) => !/Daily Log/i.test(q)));
   });
 
+  it("continues a pastor-directory knowledge gap with relevant choices", () => {
+    const qs = buildSuggestedQuestions({
+      question: "pastor names",
+      answer:
+        "The churches page does not list a current pastor for each of the 12 churches.",
+      availableDocumentLabels: ["CHURCHES.txt", "ABOUT.txt"],
+    });
+
+    assert.ok(qs.length >= 2);
+    assert.ok(qs.some((q) => /missing pastor names/i.test(q)));
+    assert.ok(qs.some((q) => /complete church directory/i.test(q)));
+  });
+
   it("returns contextual chips without repeating the original question", () => {
     const qs = buildSuggestedQuestions({
       question: "What do we know about Kendall Capital?",
