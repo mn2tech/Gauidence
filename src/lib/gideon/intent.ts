@@ -65,6 +65,9 @@ const KNOWLEDGE_SUMMARIZE =
 const KNOWLEDGE_ATTENTION =
   /\b(what(?:\s+\w+){0,2}\s+needs (my )?attention|which (invoices?|contracts?) (are |need )|how many (employees|clients) are linked)\b/i;
 
+const KNOWLEDGE_COUNT =
+  /\bhow many\s+(?:(?:total|active|current|saved|uploaded|connected|linked|registered|upcoming|past|new)\s+)?(?:church(?:es)?|organizations?|companies|businesses|people|contacts?|employees?|contractors?|clients?|customers?|partners?|members?|locations?|offices?|schools?|children|students?|documents?|files?|notes?|events?|meetings?|appointments?|projects?|proposals?|contracts?|invoices?|commitments?|tasks?|reminders?|leads?)\b/i;
+
 const KNOWLEDGE_FIND =
   /\b(find|search|look\s+for|where\s+is|show\s+me|locate)\b.{0,40}\b(my|the|our)\b/i;
 
@@ -211,6 +214,7 @@ function isKnowledgeQuestion(q: string): boolean {
     KNOWLEDGE_SAY.test(q) ||
     KNOWLEDGE_SUMMARIZE.test(q) ||
     KNOWLEDGE_ATTENTION.test(q) ||
+    KNOWLEDGE_COUNT.test(q) ||
     KNOWLEDGE_FIND.test(q) ||
     KNOWLEDGE_SOURCE.test(q) ||
     KNOWLEDGE_MUSIC.test(q) ||
