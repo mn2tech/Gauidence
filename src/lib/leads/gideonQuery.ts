@@ -41,6 +41,7 @@ export type LeadsGideonParseResult = {
   email?: string;
   phone?: string;
   notes?: string;
+  dateReference?: string;
   confirmed?: boolean;
   requiresConfirmation: boolean;
   confirmationMessage?: string;
@@ -65,7 +66,45 @@ const TODAY =
   /\b(which leads should i contact today|contact today|today'?s actions?|who should i contact today)\b/i;
 
 const BUSINESS_CARDS_ADDED =
-  /\bbusiness cards?\b.{0,80}\b(added|scanned|uploaded|created|saved)\b.{0,30}\btoday\b|\btoday'?s?\b.{0,50}\bbusiness cards?\b/i;
+  /\bbusiness cards?\b.{0,100}\b(added|scanned|uploaded|created|saved)\b|\b(added|scanned|uploaded|created|saved)\b.{0,100}\bbusiness cards?\b/i;
+
+const DATE_REFERENCE =
+  /\b(today|yesterday|(?:last\s+|this\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)|\d{4}-\d{2}-\d{2})\b/i;
+
+const WEEKDAY_INDEX: Record<string, number> = {
+  sunday: 0,
+  monday: 1,
+  tuesday: 2,
+  wednesday: 3,
+  thursday: 4,
+  friday: 5,
+  saturday: 6,
+};
+
+function shiftCalendarDate(calendarDate: string, days: number): string {
+  const date = new Date(`${calendarDate}T12:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+/** Resolve relative business-card activity dates against the user's local day. */
+export function resolveBusinessCardCalendarDate(
+  dateReference: string | undefined,
+  today: string
+): string {
+  const reference = dateReference?.trim().toLowerCase();
+  if (!reference || reference === "today") return today;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(reference)) return reference;
+  if (reference === "yesterday") return shiftCalendarDate(today, -1);
+
+  const weekday = reference.replace(/^(last|this)\s+/, "");
+  const target = WEEKDAY_INDEX[weekday];
+  if (target === undefined) return today;
+  const todayDate = new Date(`${today}T12:00:00.000Z`);
+  let daysBack = (todayDate.getUTCDay() - target + 7) % 7;
+  if (reference.startsWith("last ") && daysBack === 0) daysBack = 7;
+  return shiftCalendarDate(today, -daysBack);
+}
 
 const FEDERAL =
   /\bfederal partners?\b|\bteaming partners?\b|\bfederal (small )?business/i;
@@ -246,7 +285,11 @@ export function parseLeadsGideonQuery(query: string): LeadsGideonParseResult {
   }
 
   if (BUSINESS_CARDS_ADDED.test(q)) {
-    return { intent: "business_cards", requiresConfirmation: false };
+    return {
+      intent: "business_cards",
+      dateReference: q.match(DATE_REFERENCE)?.[1]?.toLowerCase(),
+      requiresConfirmation: false,
+    };
   }
 
   if (TODAY.test(q)) {
@@ -367,8 +410,16 @@ export function formatBusinessCardsAddedOn(
     return `I don't see any business cards saved to Leads on ${calendarDate}.\n\n→ /leads`;
   }
 
+  const dateLabel = new Intl.DateTimeFormat("en-US", {
+    timeZone: "UTC",
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  }).format(new Date(`${calendarDate}T12:00:00.000Z`));
+
   return [
-    `Business cards added today (${cards.length}):`,
+    `Business cards added ${dateLabel} (${cards.length}):`,
     ...cards.slice(0, 20).map((lead) => {
       const name = lead.contact_name?.trim() || "Contact name not captured";
       const company = lead.company_name?.trim();
