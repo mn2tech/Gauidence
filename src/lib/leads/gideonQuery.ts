@@ -66,7 +66,7 @@ const TODAY =
   /\b(which leads should i contact today|contact today|today'?s actions?|who should i contact today)\b/i;
 
 const BUSINESS_CARDS_ADDED =
-  /\bbusiness cards?\b.{0,100}\b(added|scanned|uploaded|created|saved)\b|\b(added|scanned|uploaded|created|saved)\b.{0,100}\bbusiness cards?\b/i;
+  /\bbusiness cards?\b.{0,100}\b(add|added|scan|scanned|upload|uploaded|create|created|save|saved)\b|\b(add|added|scan|scanned|upload|uploaded|create|created|save|saved)\b.{0,100}\bbusiness cards?\b/i;
 
 const DATE_REFERENCE =
   /\b(today|yesterday|(?:last\s+|this\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)|\d{4}-\d{2}-\d{2})\b/i;
