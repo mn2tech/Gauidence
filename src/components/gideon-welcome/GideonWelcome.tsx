@@ -2,7 +2,7 @@
 
 import { MessageCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import GideonAvatar from "@/components/GideonAvatar";
 import GreetingHeader from "@/components/gideon-welcome/GreetingHeader";
 import SpaceStatus from "@/components/gideon-welcome/SpaceStatus";
@@ -28,7 +28,12 @@ export default function GideonWelcome({
   const { active } = useActiveProfile();
   const { view, loading } = useGideonWelcomeData();
   const [question, setQuestion] = useState("");
+  const [showAlternatives, setShowAlternatives] = useState(false);
   const greeting = timeOfDayGreeting();
+
+  useEffect(() => {
+    setShowAlternatives(false);
+  }, [active?.id]);
 
   if (loading || !view) {
     return (
@@ -57,6 +62,15 @@ export default function GideonWelcome({
     );
   }
 
+  function handleYes(openingYesHref?: string) {
+    const href = openingYesHref?.trim();
+    if (href) {
+      router.push(href);
+      return;
+    }
+    setShowAlternatives(true);
+  }
+
   const showActionPrompt =
     !view.isEmptySpace && view.statusItems.length > 0 && !view.statusUnavailable;
 
@@ -76,12 +90,33 @@ export default function GideonWelcome({
           {view.openingMessage}
         </p>
       </div>
-      <SpaceStatus view={view} mode={mode} />
-      <SuggestedActions
-        actions={view.actions}
-        showPrompt={showActionPrompt}
-        emphasizeFirst={mode === "today"}
-      />
+      {view.openingResponse === "yes_no" && !showAlternatives ? (
+        <div className="flex flex-wrap gap-2 pl-[50px]">
+          <button
+            type="button"
+            onClick={() => handleYes(view.openingYesHref)}
+            className="inline-flex min-h-11 items-center rounded-full border border-brand bg-brand px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+          >
+            Yes
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowAlternatives(true)}
+            className="inline-flex min-h-11 items-center rounded-full border border-border-subtle bg-surface px-5 py-2 text-sm font-semibold text-foreground shadow-sm transition hover:border-brand hover:bg-brand-light/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+          >
+            No, show other options
+          </button>
+        </div>
+      ) : (
+        <>
+          <SpaceStatus view={view} mode={mode} />
+          <SuggestedActions
+            actions={view.actions}
+            showPrompt={showActionPrompt}
+            emphasizeFirst={mode === "today"}
+          />
+        </>
+      )}
 
       {showAskForm ? (
       <form
