@@ -14,6 +14,9 @@ const SHORT_METRIC =
 const LOOKUP_VERBS =
   /\b(find|search|look up|who is|what does|tell me about|summarize|summarise|BPM|solicitation)\b/i;
 
+const SHORT_KNOWLEDGE_FOLLOW_UP =
+  /\b(?:names?|details?|contact(?: information| info)?|phone(?: numbers?)?|emails?|addresses?|deadlines?|dates?|costs?|prices?|fees?|requirements?|owners?|leaders?|pastors?|members?|locations?|sources?)\??$/i;
+
 export function isShortConversationalReply(message: string): boolean {
   const q = message.trim();
   if (!q || q.length > 48) return false;
@@ -30,6 +33,54 @@ export function isShortConversationalReply(message: string): boolean {
     return true;
   }
   return false;
+}
+
+function lastAssistantWithContent(
+  recentMessages: ChatTurn[],
+  fallbackAssistantContent?: string | null
+): ChatTurn | null {
+  const fromHistory = [...recentMessages]
+    .reverse()
+    .find((m) => m.role === "assistant" && m.content.trim());
+  if (fromHistory) return fromHistory;
+  const fallback = fallbackAssistantContent?.trim();
+  return fallback ? { role: "assistant", content: fallback } : null;
+}
+
+/**
+ * Expand a terse field follow-up ("pastor names", "phone numbers") into an
+ * explicit Guardian lookup while preserving the subject of the prior answer.
+ */
+export function expandKnowledgeFollowUpFromHistory(
+  message: string,
+  recentMessages: ChatTurn[],
+  fallbackAssistantContent?: string | null
+): string | null {
+  const topic = message.trim();
+  if (
+    !topic ||
+    topic.length > 56 ||
+    topic.split(/\s+/).length > 7 ||
+    !SHORT_KNOWLEDGE_FOLLOW_UP.test(topic) ||
+    SHORT_AFFIRM.test(topic) ||
+    SHORT_METRIC.test(topic)
+  ) {
+    return null;
+  }
+
+  const lastAssistant = lastAssistantWithContent(
+    recentMessages,
+    fallbackAssistantContent
+  );
+  if (!lastAssistant) return null;
+
+  const prior = compactAssistantContext(lastAssistant.content, 520);
+  return [
+    `What are the ${topic.replace(/[?]+$/g, "")} for the people, organizations, or items discussed in the previous answer?`,
+    "Search my Guardian spaces and documents automatically before answering.",
+    `Previous answer context: ${prior}`,
+    "Answer the follow-up directly and do not ask me to repeat or authorize the search.",
+  ].join(" ");
 }
 
 export function assistantInvitedReply(content: string): boolean {
