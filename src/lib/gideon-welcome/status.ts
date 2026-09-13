@@ -302,6 +302,26 @@ function buildGeneralActions(
   return actions.slice(0, 4);
 }
 
+function buildOpeningMessage(args: {
+  isEmptySpace: boolean;
+  isNewUser: boolean;
+  statusUnavailable: boolean;
+  statusItems: GideonWelcomeStatusItem[];
+  spaceName: string | null;
+}): string {
+  if (args.isEmptySpace || args.isNewUser) {
+    return "Let's start with one thing you don't want to forget. Tell me in your own words, add a note, or upload something you already have.";
+  }
+  if (args.statusUnavailable) {
+    return "I'm ready to help. Tell me what you're working on, and I'll guide you to the next step.";
+  }
+  const first = args.statusItems[0];
+  if (first) {
+    return `I checked ${args.spaceName?.trim() || "your Guardian"}. ${first.text}. Let's start there.`;
+  }
+  return "I checked your Guardian. Nothing urgent is waiting right now. What would you like to move forward today?";
+}
+
 export function buildGideonWelcomeView(args: {
   greetName: string | null;
   spaceName: string | null;
@@ -337,6 +357,13 @@ export function buildGideonWelcomeView(args: {
   return {
     greetName,
     spaceName,
+    openingMessage: buildOpeningMessage({
+      isEmptySpace,
+      isNewUser,
+      statusUnavailable,
+      statusItems,
+      spaceName,
+    }),
     isNewUser,
     isEmptySpace,
     statusItems,
