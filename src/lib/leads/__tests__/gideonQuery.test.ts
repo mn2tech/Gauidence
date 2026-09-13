@@ -4,6 +4,7 @@ import {
   formatLeadFollowUps,
   formatLeadPipeline,
   formatBusinessCardsAddedOn,
+  formatUploadedBusinessCardsAddedOn,
   parseLeadsGideonQuery,
   resolveBusinessCardCalendarDate,
   wantsLeadsQuery,
@@ -211,6 +212,41 @@ describe("leads Gideon query", () => {
 
     assert.match(text, /Dennis/);
     assert.match(text, /Amor Studio Salons/);
+  });
+
+  it("finds business cards uploaded as regular Guardian documents", () => {
+    const text = formatUploadedBusinessCardsAddedOn(
+      [
+        {
+          id: "document-2",
+          file_name: "IMG_2042.jpg",
+          mime_type: "image/jpeg",
+          created_at: "2026-09-11T22:30:00.000Z",
+          title: "Larry Smith business card",
+          summary: "Business card for Larry Smith at Example Co.",
+          document_type: "general",
+          facts: [
+            { label: "Contact name", value: "Larry Smith" },
+            { label: "Company", value: "Example Co" },
+          ],
+        },
+        {
+          id: "document-3",
+          file_name: "family-photo.jpg",
+          mime_type: "image/jpeg",
+          created_at: "2026-09-11T23:00:00.000Z",
+          title: "Family photo",
+          summary: "A family photograph.",
+          document_type: "general",
+        },
+      ],
+      "2026-09-11",
+      "America/New_York"
+    );
+
+    assert.match(text ?? "", /Larry Smith/);
+    assert.match(text ?? "", /Example Co/);
+    assert.doesNotMatch(text ?? "", /family-photo/);
   });
 
   it("formats a pipeline summary", () => {

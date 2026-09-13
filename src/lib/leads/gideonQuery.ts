@@ -1,3 +1,4 @@
+import { calendarDateInUserZone } from "@/lib/timezone";
 import {
   LEAD_STATUS_LABELS,
   LEAD_STATUSES,
@@ -455,6 +456,80 @@ export function formatBusinessCardsAddedOn(
     }),
     "",
     "→ /leads",
+  ].join("\n");
+}
+
+export type UploadedBusinessCardDocument = {
+  id: string;
+  file_name: string;
+  mime_type: string;
+  created_at: string;
+  title?: string | null;
+  summary?: string | null;
+  document_type?: string | null;
+  facts?: unknown;
+  specialist?: unknown;
+};
+
+function uploadedDocumentIsBusinessCard(document: UploadedBusinessCardDocument): boolean {
+  if (!document.mime_type.startsWith("image/")) return false;
+  const analysisText = [
+    document.file_name,
+    document.title,
+    document.summary,
+    document.document_type,
+    JSON.stringify(document.specialist ?? ""),
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return /\bbusiness[\s_-]*card\b/i.test(analysisText);
+}
+
+function uploadedCardDetails(facts: unknown): string[] {
+  if (!Array.isArray(facts)) return [];
+  const useful = /^(name|contact|contact name|company|organization|job title|title|email|phone|website)$/i;
+  return facts
+    .flatMap((fact) => {
+      if (!fact || typeof fact !== "object") return [];
+      const row = fact as Record<string, unknown>;
+      const label = typeof row.label === "string" ? row.label.trim() : "";
+      const value = typeof row.value === "string" ? row.value.trim() : "";
+      return label && value && useful.test(label) ? [`${label}: ${value}`] : [];
+    })
+    .slice(0, 4);
+}
+
+/** Format business cards uploaded through Guardian's regular document flow. */
+export function formatUploadedBusinessCardsAddedOn(
+  documents: UploadedBusinessCardDocument[],
+  calendarDate: string,
+  timeZone = "UTC"
+): string | null {
+  const cards = documents.filter((document) => {
+    if (!uploadedDocumentIsBusinessCard(document)) return false;
+    const created = new Date(document.created_at);
+    if (Number.isNaN(created.getTime())) return false;
+    return calendarDateInUserZone(created, timeZone) === calendarDate;
+  });
+  if (!cards.length) return null;
+
+  const dateLabel = new Intl.DateTimeFormat("en-US", {
+    timeZone: "UTC",
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  }).format(new Date(`${calendarDate}T12:00:00.000Z`));
+
+  return [
+    `Business cards uploaded ${dateLabel} (${cards.length}):`,
+    ...cards.map((document) => {
+      const heading = document.title?.trim() || document.file_name;
+      const details = uploadedCardDetails(document.facts);
+      return [`• ${heading}`, ...details.map((detail) => `  ${detail}`)].join("\n");
+    }),
+    "",
+    "From your Guardian documents",
   ].join("\n");
 }
 

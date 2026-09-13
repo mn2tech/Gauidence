@@ -20,6 +20,7 @@ import {
 import {
   formatFederalPartners,
   formatBusinessCardsAddedOn,
+  formatUploadedBusinessCardsAddedOn,
   formatLeadDetail,
   formatLeadFollowUps,
   formatLeadLine,
@@ -303,6 +304,37 @@ export async function answerLeadsGideonQuery(
       parsed.dateReference,
       today
     );
+    const { data: uploadedRows } = await supabase
+      .from("documents")
+      .select("id,file_name,mime_type,created_at")
+      .eq("profile_id", args.profileId)
+      .order("created_at", { ascending: false })
+      .limit(500);
+    const uploadedIds = (uploadedRows ?? []).map((document) => document.id);
+    const { data: analyses } = uploadedIds.length
+      ? await supabase
+          .from("extracted_data")
+          .select("document_id,title,summary,document_type,facts,specialist")
+          .in("document_id", uploadedIds)
+      : { data: [] };
+    const analysesByDocument = new Map(
+      (analyses ?? []).map((analysis) => [analysis.document_id, analysis])
+    );
+    const uploadedAnswer = formatUploadedBusinessCardsAddedOn(
+      (uploadedRows ?? []).map((document) => ({
+        ...document,
+        ...analysesByDocument.get(document.id),
+      })),
+      requestedDate,
+      timeZone
+    );
+    if (uploadedAnswer) {
+      return {
+        message: uploadedAnswer,
+        intent: "business_cards",
+        href: "/home",
+      };
+    }
     const documentIds = leads
       .map((lead) => lead.document_id)
       .filter((id): id is string => Boolean(id));
