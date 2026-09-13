@@ -28,6 +28,7 @@ import {
   formatStaleLeads,
   formatTodaysActions,
   parseLeadsGideonQuery,
+  resolveBusinessCardCalendarDate,
   wantsLeadsQuery,
   type LeadsGideonIntent,
 } from "./gideonQuery";
@@ -298,8 +299,12 @@ export async function answerLeadsGideonQuery(
   if (parsed.intent === "business_cards") {
     const timeZone = await getUserTimeZone(supabase, args.userId);
     const today = calendarDateInUserZone(new Date(), timeZone);
+    const requestedDate = resolveBusinessCardCalendarDate(
+      parsed.dateReference,
+      today
+    );
     return {
-      message: formatBusinessCardsAddedOn(leads, today, timeZone),
+      message: formatBusinessCardsAddedOn(leads, requestedDate, timeZone),
       intent: "business_cards",
       href,
     };
