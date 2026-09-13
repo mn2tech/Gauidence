@@ -55,4 +55,27 @@ describe("resolveGideonLoadWithOrchestration", () => {
     });
     assert.equal(load.documents, true);
   });
+
+  it("loads Guardian evidence for a short all-spaces entity count", () => {
+    const question = "how many churches?";
+    const orchestration = routeGideonOrchestration({
+      question,
+      spaceId: "my-business",
+      spaceName: "My Business",
+      globalView: true,
+    });
+    const capabilityRoute = classifyGideonIntent({
+      question,
+      forceKnowledge: orchestration.guardianKnowledgeRequired,
+    });
+    const load = resolveGideonLoadWithOrchestration({
+      capabilityRoute,
+      orchestration,
+    });
+
+    assert.equal(orchestration.guardianKnowledgeRequired, true);
+    assert.equal(capabilityRoute.capabilities.guardianKnowledge, true);
+    assert.equal(load.documents, true);
+    assert.equal(load.vaultMap, true);
+  });
 });
