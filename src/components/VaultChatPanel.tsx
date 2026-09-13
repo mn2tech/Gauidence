@@ -103,6 +103,7 @@ import {
   GIDEON_QUICK_ACTIONS,
   type GideonQuickAction,
 } from "@/lib/gideon/chiefOfStaff";
+import { hasBinaryFollowUp } from "@/lib/gideon/binaryFollowUp";
 import GideonFocusCountdown from "@/components/GideonFocusCountdown";
 import {
   latestFocusBlockFromMessages,
@@ -3386,6 +3387,7 @@ export default function VaultChatPanel({
       userMessage?: VaultMessage;
       isStreaming?: boolean;
       showSuggestedQuestions?: boolean;
+      showBinaryChoices?: boolean;
     }
   ) => {
     const proposedReminder = parseProposedReminder(m.content, Date.now(), timeZone);
@@ -3550,6 +3552,10 @@ export default function VaultChatPanel({
     const speechText = formatAssistantMessageSpeechText(m.content);
     const showActions =
       !options?.isStreaming && Boolean(plainText.trim() || m.content.trim());
+    const showBinaryChoices =
+      !options?.isStreaming &&
+      options?.showBinaryChoices &&
+      hasBinaryFollowUp(displayContent || m.content);
 
     return (
       <div className="min-w-0 flex-1 space-y-2">
@@ -4133,6 +4139,26 @@ export default function VaultChatPanel({
                 </button>
               </div>
             ))}
+          </div>
+        ) : null}
+        {showBinaryChoices ? (
+          <div className="flex flex-wrap gap-2 pt-1" aria-label="Answer yes or no">
+            <button
+              type="button"
+              disabled={sending || vaultBusy || Boolean(streamingAssistantId)}
+              onClick={() => void sendQuestion("Yes, do that.")}
+              className="min-h-10 rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark disabled:opacity-50 sm:min-h-0 sm:rounded-full sm:py-1.5"
+            >
+              Yes
+            </button>
+            <button
+              type="button"
+              disabled={sending || vaultBusy || Boolean(streamingAssistantId)}
+              onClick={() => void sendQuestion("No, not now.")}
+              className="min-h-10 rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-foreground transition hover:border-brand hover:bg-brand-light/40 disabled:opacity-50 sm:min-h-0 sm:rounded-full sm:py-1.5"
+            >
+              No
+            </button>
           </div>
         ) : null}
         {!options?.isStreaming &&
@@ -4827,6 +4853,13 @@ export default function VaultChatPanel({
                       : undefined,
                   isStreaming: streamingAssistantId === m.id,
                   showSuggestedQuestions:
+                    !streamingAssistantId &&
+                    index ===
+                      messages.reduce(
+                        (last, msg, i) => (msg.role === "assistant" ? i : last),
+                        -1
+                      ),
+                  showBinaryChoices:
                     !streamingAssistantId &&
                     index ===
                       messages.reduce(
