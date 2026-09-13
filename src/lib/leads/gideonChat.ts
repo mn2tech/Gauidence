@@ -303,8 +303,23 @@ export async function answerLeadsGideonQuery(
       parsed.dateReference,
       today
     );
+    const documentIds = leads
+      .map((lead) => lead.document_id)
+      .filter((id): id is string => Boolean(id));
+    const linkedDocuments = documentIds.length
+      ? await supabase
+          .from("documents")
+          .select("id,mime_type,created_at")
+          .in("id", documentIds)
+          .then(({ data }) => data ?? [])
+      : [];
     return {
-      message: formatBusinessCardsAddedOn(leads, requestedDate, timeZone),
+      message: formatBusinessCardsAddedOn(
+        leads,
+        requestedDate,
+        timeZone,
+        linkedDocuments
+      ),
       intent: "business_cards",
       href,
     };
