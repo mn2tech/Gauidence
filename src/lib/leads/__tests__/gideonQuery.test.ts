@@ -5,6 +5,7 @@ import {
   formatLeadPipeline,
   formatBusinessCardsAddedOn,
   parseLeadsGideonQuery,
+  resolveBusinessCardCalendarDate,
   wantsLeadsQuery,
 } from "../gideonQuery";
 import type { BusinessLead } from "../types";
@@ -127,6 +128,29 @@ describe("leads Gideon query", () => {
     );
   });
 
+  it("treats cards added on Friday as dated business-card activity", () => {
+    const parsed = parseLeadsGideonQuery(
+      "What business cards did I add on Friday?"
+    );
+    assert.equal(parsed.intent, "business_cards");
+    assert.equal(parsed.dateReference, "friday");
+    assert.equal(
+      resolveBusinessCardCalendarDate(parsed.dateReference, "2026-09-12"),
+      "2026-09-11"
+    );
+  });
+
+  it("resolves yesterday and last weekday references deterministically", () => {
+    assert.equal(
+      resolveBusinessCardCalendarDate("yesterday", "2026-09-12"),
+      "2026-09-11"
+    );
+    assert.equal(
+      resolveBusinessCardCalendarDate("last friday", "2026-09-11"),
+      "2026-09-04"
+    );
+  });
+
   it("lists only business-card leads created on the requested local day", () => {
     const text = formatBusinessCardsAddedOn(
       [
@@ -148,6 +172,7 @@ describe("leads Gideon query", () => {
       "America/New_York"
     );
     assert.match(text, /Larry Smith/);
+    assert.match(text, /Friday, September 11, 2026/);
     assert.doesNotMatch(text, /Washington Christian Academy/);
   });
 
