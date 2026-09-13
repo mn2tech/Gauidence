@@ -187,6 +187,11 @@ function isUnknownOrRefusal(answer: string): boolean {
   );
 }
 
+function isChurchDirectoryTurn(question: string, answer: string): boolean {
+  const blob = `${question}\n${answer}`;
+  return /\bchurch(?:es)?\b/i.test(blob) && /\bpastor(?:s|'s)?\b/i.test(blob);
+}
+
 /**
  * True only when follow-up chips are likely useful for this turn.
  * Keeps the bottom of the chat free of noise.
@@ -199,7 +204,11 @@ export function shouldAttachSuggestedQuestions(ctx: {
   const answer = ctx.answer.trim();
   if (!question || !answer) return false;
   if (countWords(answer) < 6) return false;
-  if (isUnknownOrRefusal(answer)) return false;
+  // A real Guardian knowledge gap should continue the conversation instead of
+  // ending it. Church/pastor directory gaps are a common example.
+  if (isUnknownOrRefusal(answer) && !isChurchDirectoryTurn(question, answer)) {
+    return false;
+  }
   if (/^(hi|hey|hello|thanks|thank you)\b/i.test(question)) return false;
   // Pure general definitions rarely need Guardian follow-ups.
   if (/^what is (a|an)\b/i.test(question) && !/\b(my|our|space|document)\b/i.test(question)) {
@@ -207,6 +216,7 @@ export function shouldAttachSuggestedQuestions(ctx: {
   }
   return (
     /\bhow many churches\b/i.test(question) ||
+    isChurchDirectoryTurn(question, answer) ||
     looksLikeRosterContext(question, answer) ||
     isBusinessDisclosureTurn(question, answer) ||
     isEntityOverviewQuestion(question) ||
@@ -258,6 +268,23 @@ export function buildSuggestedQuestions(
     }
     pushUnique(out, seen, "Who are the church pastors in my spaces?", question);
     pushUnique(out, seen, "Which church details are missing?", question);
+    return out.slice(0, MAX_SUGGESTIONS);
+  }
+
+  if (isChurchDirectoryTurn(question, answer)) {
+    const pastorGap =
+      /\b(no current|not (?:listed|available|assigned)|missing|could not find|does not (?:list|show)|doesn'?t (?:list|show))\b/i.test(
+        answer
+      );
+    if (pastorGap) {
+      pushUnique(out, seen, "Which churches are missing pastor names?", question);
+      pushUnique(out, seen, "What pastor information should I add?", question);
+      pushUnique(out, seen, "Show the complete church directory", question);
+    } else {
+      pushUnique(out, seen, "Show each pastor's church", question);
+      pushUnique(out, seen, "Which churches lack pastor details?", question);
+      pushUnique(out, seen, "Show the complete church directory", question);
+    }
     return out.slice(0, MAX_SUGGESTIONS);
   }
 
