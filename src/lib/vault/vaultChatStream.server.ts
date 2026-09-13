@@ -48,6 +48,7 @@ import { recordChatEvent } from "@/lib/billing/quota";
 import { refreshUserAwards } from "@/lib/awards/grant";
 import { formatVaultChatError, buildGideonEmptyAnswerFallback } from "@/lib/vault/vaultChatErrors";
 import { shouldPreferContinuityEmptyFallback } from "@/lib/gideon/runtime/shortReplies";
+import { enforceConversationPolicy } from "@/lib/gideon/conversationPolicy";
 import { repairDailyLogCaptureAnswer } from "@/lib/logs/propose";
 import { buildListAnswerFromChunks, preferFullerListAnswer, wantsTranscription, wantsPeopleRoster, countNumberedListItems, looksLikePersonListItem } from "@/lib/vault/gideon";
 import { buildOntologyAnswerFallback } from "@/lib/ontology/formatForGideon";
@@ -277,6 +278,15 @@ export function createVaultChatStreamResponse(
             write({ type: "replace", text: repaired });
             answer = repaired;
           }
+        }
+
+        const conversationalAnswer = enforceConversationPolicy(
+          answer,
+          args.originalUserQuestion ?? args.question
+        );
+        if (conversationalAnswer !== answer) {
+          write({ type: "replace", text: conversationalAnswer });
+          answer = conversationalAnswer;
         }
 
         if (args.youtubeUrls?.length) {
