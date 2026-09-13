@@ -390,11 +390,29 @@ export function formatLeadPipeline(
 export function formatBusinessCardsAddedOn(
   leads: BusinessLead[],
   calendarDate: string,
-  timeZone = "UTC"
+  timeZone = "UTC",
+  linkedDocuments: Array<{
+    id: string;
+    mime_type: string | null;
+    created_at: string;
+  }> = []
 ): string {
+  const documentsById = new Map(linkedDocuments.map((document) => [document.id, document]));
   const cards = leads.filter((lead) => {
-    if (!/^business card$/i.test(lead.source?.trim() ?? "")) return false;
-    const created = new Date(lead.created_at);
+    const linkedDocument = lead.document_id
+      ? documentsById.get(lead.document_id)
+      : undefined;
+    const hasBusinessCardSource = /business[\s_-]*card/i.test(
+      lead.source?.trim() ?? ""
+    );
+    const hasCardImage =
+      Boolean(linkedDocument?.mime_type?.startsWith("image/")) &&
+      !lead.proposal_id;
+    if (!hasBusinessCardSource && !hasCardImage) return false;
+
+    // A scanned card is uploaded before its lead is confirmed. Use the original
+    // upload time when available so "cards I added Friday" matches user intent.
+    const created = new Date(linkedDocument?.created_at ?? lead.created_at);
     if (Number.isNaN(created.getTime())) return false;
     const parts = new Intl.DateTimeFormat("en-CA", {
       timeZone,
