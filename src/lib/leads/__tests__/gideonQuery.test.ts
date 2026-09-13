@@ -186,6 +186,33 @@ describe("leads Gideon query", () => {
     assert.doesNotMatch(text, /Washington Christian Academy/);
   });
 
+  it("uses linked card upload metadata when the lead source or date changed", () => {
+    const text = formatBusinessCardsAddedOn(
+      [
+        lead({
+          id: "card-2",
+          contact_name: "Dennis",
+          company_name: "Amor Studio Salons",
+          source: "Networking Event",
+          document_id: "document-1",
+          created_at: "2026-09-12T02:00:00.000Z",
+        }),
+      ],
+      "2026-09-11",
+      "America/New_York",
+      [
+        {
+          id: "document-1",
+          mime_type: "image/jpeg",
+          created_at: "2026-09-11T22:30:00.000Z",
+        },
+      ]
+    );
+
+    assert.match(text, /Dennis/);
+    assert.match(text, /Amor Studio Salons/);
+  });
+
   it("formats a pipeline summary", () => {
     const text = formatLeadPipeline([
       lead(),
