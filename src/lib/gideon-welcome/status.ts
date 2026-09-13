@@ -317,7 +317,7 @@ function buildOpeningMessage(args: {
   }
   const first = args.statusItems[0];
   if (first) {
-    return `I checked ${args.spaceName?.trim() || "your Guardian"}. ${first.text}. Let's start there.`;
+    return `I checked ${args.spaceName?.trim() || "your Guardian"}. ${first.text}. Would you like to handle that first?`;
   }
   return "I checked your Guardian. Nothing urgent is waiting right now. What would you like to move forward today?";
 }
@@ -364,6 +364,14 @@ export function buildGideonWelcomeView(args: {
       statusItems,
       spaceName,
     }),
+    openingResponse:
+      !statusUnavailable && !isEmptySpace && !isNewUser && statusItems[0]?.href
+        ? "yes_no"
+        : "open",
+    openingYesHref:
+      !statusUnavailable && !isEmptySpace && !isNewUser
+        ? statusItems[0]?.href
+        : undefined,
     isNewUser,
     isEmptySpace,
     statusItems,
