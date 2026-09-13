@@ -7,11 +7,11 @@ import {
   GraduationCap,
   Home,
   Loader2,
-  MessageSquarePlus,
   NotebookPen,
   Sparkles,
   Users,
 } from "lucide-react";
+import GideonAvatar from "@/components/GideonAvatar";
 import GuardianLogo from "@/components/brand/GuardianLogo";
 import { useActiveProfile } from "@/components/ProfileProvider";
 import { createClient } from "@/lib/supabase/client";
@@ -46,10 +46,7 @@ import { kickDocumentProcessingJobs } from "@/lib/documents/clientProcessing";
 import type { Fact } from "@/lib/analysis/types";
 import { ASK_GIDEON_PATH } from "@/lib/simple-home/routing";
 import {
-  FIRST_MINUTE_CHIPS,
   FIRST_MINUTE_HOLDING,
-  FIRST_MINUTE_PROMISE,
-  FIRST_MINUTE_SUPPORT,
 } from "@/lib/guardian-today/firstMinute";
 
 type Props = {
@@ -216,54 +213,10 @@ export default function ActivationFlow({ onComplete }: Props) {
         await refresh();
         await switchProfile(profileId);
       }
+      setKnowledgeMode("note");
       setStep("add_knowledge");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't save your choice.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  /**
-   * First-60s path: skip category paralysis — bootstrap Personal Space and
-   * land on capture (note or upload).
-   */
-  async function bootstrapCapture(args: {
-    mode: KnowledgeMode;
-    draft?: string;
-    openFilePicker?: boolean;
-  }) {
-    if (saving) return;
-    setSaving(true);
-    setError(null);
-    try {
-      const id: OnboardingIntent = "personal";
-      await patch({ action: "select_category", intent: id });
-      const name = DEFAULT_SPACE_NAMES[id] ?? "My Personal";
-      setIntent(id);
-      setSpaceName(name);
-      const created = await patch({
-        action: "create_space",
-        intent: id,
-        workspaceName: name,
-      });
-      const profileId =
-        created.activeProfileId ?? created.createdProfileId ?? null;
-      if (profileId) {
-        setActiveProfileId(profileId);
-        await refresh();
-        await switchProfile(profileId);
-      }
-      if (args.draft?.trim()) setNoteText(args.draft.trim());
-      setKnowledgeMode(args.mode);
-      setStep("add_knowledge");
-      if (args.openFilePicker) {
-        window.setTimeout(() => fileRef.current?.click(), 80);
-      }
-    } catch (e) {
-      setError(
-        e instanceof Error ? e.message : "Couldn't start — try again."
-      );
     } finally {
       setSaving(false);
     }
@@ -302,6 +255,7 @@ export default function ActivationFlow({ onComplete }: Props) {
         await refresh();
         await switchProfile(profileId);
       }
+      setKnowledgeMode("note");
       setStep("add_knowledge");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't save your choice.");
@@ -328,6 +282,7 @@ export default function ActivationFlow({ onComplete }: Props) {
         await refresh();
         await switchProfile(profileId);
       }
+      setKnowledgeMode("note");
       setStep("add_knowledge");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't create your Space.");
@@ -540,116 +495,64 @@ export default function ActivationFlow({ onComplete }: Props) {
             <div className="space-y-5">
               <div>
                 <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-                  {greeting}
-                  {greetName ? `, ${greetName}` : ""}.
+                  Meet Gideon
                 </h1>
-                <p className="mt-2 text-lg font-semibold text-brand-dark">
-                  {FIRST_MINUTE_PROMISE}
-                </p>
-                <p className="mt-3 text-sm leading-relaxed text-ink-muted">
-                  {FIRST_MINUTE_SUPPORT}
+                <p className="mt-2 text-sm text-ink-muted">
+                  Your Guardian starts with a short conversation—not an empty
+                  dashboard.
                 </p>
               </div>
 
-              <div className="flex flex-wrap gap-2">
-                {FIRST_MINUTE_CHIPS.map((chip) => (
-                  <button
-                    key={chip.id}
-                    type="button"
-                    disabled={saving}
-                    onClick={() =>
-                      void bootstrapCapture({
-                        mode: "note",
-                        draft: chip.draft,
-                      })
-                    }
-                    className="rounded-full border border-border-subtle bg-white px-3 py-1.5 text-xs font-semibold text-foreground transition hover:border-brand/40 hover:bg-brand-light/40 disabled:opacity-60"
-                  >
-                    {chip.label}
-                  </button>
-                ))}
+              <div className="flex items-start gap-3">
+                <GideonAvatar size={40} className="mt-1 shrink-0" />
+                <div className="rounded-2xl rounded-tl-md border border-stone-200 bg-white px-4 py-3 shadow-sm">
+                  <p className="text-sm leading-relaxed text-foreground">
+                    {greeting}
+                    {greetName ? `, ${greetName}` : ""}. I&apos;ll help you
+                    remember what matters and bring it back when you need it.
+                  </p>
+                  <p className="mt-2 text-sm font-semibold text-foreground">
+                    First, what part of your life needs help staying organized?
+                  </p>
+                </div>
               </div>
 
-              <div className="grid gap-3">
-                <button
-                  type="button"
-                  disabled={saving}
-                  onClick={() => void bootstrapCapture({ mode: "note" })}
-                  className="flex w-full flex-col gap-1 rounded-2xl border border-brand/30 bg-brand-light/50 p-4 text-left shadow-sm transition hover:border-brand hover:bg-brand-light/70 disabled:opacity-60"
-                >
-                  <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                    {saving ? (
-                      <Loader2 className="h-5 w-5 animate-spin text-brand" />
-                    ) : (
-                      <MessageSquarePlus className="h-5 w-5 text-brand" aria-hidden />
-                    )}
-                    Tell Guardian one thing
-                  </span>
-                  <span className="pl-7 text-xs text-ink-muted">
-                    A deadline, promise, or note you&apos;d otherwise keep in
-                    your head
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  disabled={saving}
-                  onClick={() =>
-                    void bootstrapCapture({
-                      mode: "choose",
-                      openFilePicker: true,
-                    })
-                  }
-                  className="flex w-full flex-col gap-1 rounded-2xl border border-stone-200 bg-white p-4 text-left transition hover:border-brand hover:bg-brand-light/30 disabled:opacity-60"
-                >
-                  <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                    <FileUp className="h-5 w-5 text-brand" aria-hidden />
-                    Add a document
-                  </span>
-                  <span className="pl-7 text-xs text-ink-muted">
-                    Upload a form, receipt, or photo — Guardian watches for dates
-                  </span>
-                </button>
-              </div>
+              <ul className="grid gap-2 sm:grid-cols-2">
+                {INTENT_OPTIONS.map((opt) => {
+                  const Icon = CATEGORY_ICONS[opt.id] ?? Sparkles;
+                  return (
+                    <li key={opt.id}>
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() => void selectCategory(opt.id)}
+                        className="flex h-full w-full items-start gap-3 rounded-2xl border border-stone-200 bg-white px-4 py-3 text-left transition hover:border-brand hover:bg-brand-light/30 disabled:opacity-60"
+                      >
+                        {saving ? (
+                          <Loader2 className="mt-0.5 h-5 w-5 shrink-0 animate-spin text-brand" />
+                        ) : (
+                          <Icon
+                            className="mt-0.5 h-5 w-5 shrink-0 text-brand"
+                            aria-hidden
+                          />
+                        )}
+                        <span>
+                          <span className="block text-sm font-semibold text-foreground">
+                            {opt.label}
+                          </span>
+                          <span className="mt-0.5 block text-xs text-ink-muted">
+                            {opt.description}
+                          </span>
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
 
-              <details className="rounded-xl border border-border-subtle bg-white/80 px-4 py-3">
-                <summary className="cursor-pointer text-sm font-semibold text-ink-muted hover:text-foreground">
-                  Or pick a focus (optional)
-                </summary>
-                <p className="mt-2 text-xs text-ink-muted">
-                  Spaces help when you share or keep work and life separate.
-                  You can do this later.
-                </p>
-                <ul className="mt-3 grid gap-2">
-                  {INTENT_OPTIONS.filter((o) => o.id !== "personal").map(
-                    (opt) => {
-                      const Icon = CATEGORY_ICONS[opt.id] ?? Sparkles;
-                      return (
-                        <li key={opt.id}>
-                          <button
-                            type="button"
-                            disabled={saving}
-                            onClick={() => void selectCategory(opt.id)}
-                            className="flex w-full items-start gap-3 rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-left transition hover:border-brand hover:bg-brand-light/30 disabled:opacity-60"
-                          >
-                            <Icon
-                              className="mt-0.5 h-4 w-4 shrink-0 text-brand"
-                              aria-hidden
-                            />
-                            <span>
-                              <span className="block text-sm font-semibold text-foreground">
-                                {opt.label}
-                              </span>
-                              <span className="mt-0.5 block text-xs text-ink-muted">
-                                {opt.description}
-                              </span>
-                            </span>
-                          </button>
-                        </li>
-                      );
-                    }
-                  )}
-                </ul>
-              </details>
+              <p className="text-center text-xs text-ink-muted">
+                No documents are required to start.
+              </p>
             </div>
           ) : null}
 
@@ -663,9 +566,15 @@ export default function ActivationFlow({ onComplete }: Props) {
               >
                 ← Back
               </button>
-              <h1 className="text-2xl font-bold tracking-tight">
-                School — which fits best?
-              </h1>
+              <div className="flex items-start gap-3">
+                <GideonAvatar size={40} className="mt-1 shrink-0" />
+                <div className="rounded-2xl rounded-tl-md border border-stone-200 bg-white px-4 py-3 shadow-sm">
+                  <p className="text-sm font-semibold text-foreground">
+                    Great—are you organizing school information as a teacher,
+                    student, or parent?
+                  </p>
+                </div>
+              </div>
               <ul className="grid gap-2.5">
                 {SCHOOL_INTENT_OPTIONS.map((opt) => (
                   <li key={opt.id}>
@@ -748,13 +657,17 @@ export default function ActivationFlow({ onComplete }: Props) {
           {/* ── Add Knowledge ─────────────────────────────────────── */}
           {step === "add_knowledge" ? (
             <div className="space-y-5">
-              <div>
-                <h1 className="text-2xl font-bold tracking-tight">
-                  {knowledgeCopy.headline}
-                </h1>
-                <p className="mt-2 text-sm text-ink-muted">
-                  {knowledgeCopy.subcopy}
-                </p>
+              <div className="flex items-start gap-3">
+                <GideonAvatar size={40} className="mt-1 shrink-0" />
+                <div className="rounded-2xl rounded-tl-md border border-stone-200 bg-white px-4 py-3 shadow-sm">
+                  <p className="text-sm font-semibold text-foreground">
+                    {knowledgeCopy.headline}
+                  </p>
+                  <p className="mt-2 text-sm leading-relaxed text-ink-muted">
+                    Tell me in your own words, or add something you already
+                    have. {knowledgeCopy.subcopy}
+                  </p>
+                </div>
               </div>
 
               {knowledgeMode === "choose" ? (
@@ -826,16 +739,6 @@ export default function ActivationFlow({ onComplete }: Props) {
 
               {knowledgeMode === "note" ? (
                 <div className="space-y-3">
-                  <button
-                    type="button"
-                    className="text-sm font-medium text-brand"
-                    onClick={() => {
-                      setKnowledgeMode("choose");
-                      setNoteText("");
-                    }}
-                  >
-                    ← Back
-                  </button>
                   <div className="flex flex-wrap gap-2">
                     {knowledgeCopy.starters.map((starter) => (
                       <button
@@ -877,6 +780,41 @@ export default function ActivationFlow({ onComplete }: Props) {
                     )}
                     Save for Guardian
                   </button>
+
+                  <div className="flex items-center gap-3 py-1" aria-hidden>
+                    <span className="h-px flex-1 bg-stone-200" />
+                    <span className="text-xs font-medium text-ink-muted">or</span>
+                    <span className="h-px flex-1 bg-stone-200" />
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={() => fileRef.current?.click()}
+                    className="flex w-full items-center gap-3 rounded-2xl border border-stone-200 bg-white px-4 py-3 text-left transition hover:border-brand hover:bg-brand-light/30 disabled:opacity-60"
+                  >
+                    <FileUp className="h-5 w-5 shrink-0 text-brand" aria-hidden />
+                    <span>
+                      <span className="block text-sm font-semibold text-foreground">
+                        {knowledgeCopy.uploadLabel}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-ink-muted">
+                        Guardian will look for dates, people, amounts, and
+                        follow-ups.
+                      </span>
+                    </span>
+                  </button>
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept={VAULT_FILE_ACCEPT}
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0] ?? null;
+                      e.target.value = "";
+                      void handleFile(f);
+                    }}
+                  />
                 </div>
               ) : null}
 
