@@ -447,6 +447,27 @@ describe("Conversation Runtime — scenarios", () => {
 });
 
 describe("resolveReferences — unit", () => {
+  it("pastor names continues the church subject and keeps Guardian search on", () => {
+    const r = resolveReferences({
+      message: "pastor names",
+      activeEntities: [],
+      recentMessages: [
+        {
+          role: "assistant",
+          content:
+            "Word Ministries of India has 12 churches. Would you like their names or pastor details?",
+        },
+      ],
+    });
+
+    assert.equal(r.success, true);
+    assert.equal(r.conversationContinuity, false);
+    assert.match(r.resolvedMessage, /pastor names/i);
+    assert.match(r.resolvedMessage, /12 churches/i);
+    assert.match(r.resolvedMessage, /Search my Guardian spaces/i);
+    assert.doesNotMatch(r.resolvedMessage, /Do not search Spaces/i);
+  });
+
   it("short reply 20% continues assistant battery question (not a Space search)", () => {
     const history = [
       {
