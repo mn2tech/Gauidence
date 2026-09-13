@@ -116,6 +116,7 @@ import {
   routeGideonRequest,
 } from "@/lib/gideon/orchestrator";
 import { composeGideonResponse } from "@/lib/gideon/response-composer";
+import { buildDailyRecap, wantsDailyRecap } from "@/lib/gideon/dailyRecap";
 import { resolveGuardianKnowledge } from "@/lib/gideon/knowledge-resolver";
 import type { RetrievalEvidence } from "@/lib/gideon/orchestration-types";
 import {
@@ -1547,6 +1548,18 @@ export async function POST(request: Request) {
             : null,
       }),
     });
+  } else if (
+    wantsDailyRecap(userQuestion) &&
+    !attachmentDocumentId
+  ) {
+    answer =
+      (await buildDailyRecap(supabase, {
+        question: userQuestion,
+        userId: user.id,
+        profileIds: allSearchIds,
+        profileNames,
+        timeZone: userTz,
+      })) ?? undefined;
   } else if (!attachmentDocumentId) {
     const directAnswer = await runDirectAction(actionCtx);
     if (directAnswer) {
