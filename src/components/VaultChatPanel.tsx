@@ -3556,9 +3556,30 @@ export default function VaultChatPanel({
       !options?.isStreaming &&
       options?.showBinaryChoices &&
       hasBinaryFollowUp(displayContent || m.content);
+    const isWaitingForFirstAnswerToken =
+      options?.isStreaming && !m.content.trim();
+    const isReviewingAttachment =
+      isWaitingForFirstAnswerToken &&
+      Boolean(
+        options?.userMessage && messageAttachments(options.userMessage).length
+      );
 
     return (
       <div className="min-w-0 flex-1 space-y-2">
+        {isWaitingForFirstAnswerToken ? (
+          <div
+            className="flex items-center gap-2 py-2 text-sm text-ink-muted"
+            role="status"
+            aria-live="polite"
+          >
+            <Loader2 className="h-4 w-4 animate-spin text-brand" aria-hidden />
+            <span>
+              {isReviewingAttachment
+                ? "Reviewing your document…"
+                : "Thinking through your question…"}
+            </span>
+          </div>
+        ) : null}
         {previewCitations.length > 0 || youtubeLinks.length > 0 ? (
           <div className="flex flex-wrap gap-2">
             {previewCitations.map((c) => (
