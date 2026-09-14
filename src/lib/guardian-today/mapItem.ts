@@ -66,6 +66,8 @@ export function mapSourceType(raw: string): IntelligenceSourceType {
       return "reminder";
     case "knowledge":
       return "knowledge";
+    case "gmail":
+      return "other";
     default:
       return "other";
   }

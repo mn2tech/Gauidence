@@ -15,6 +15,12 @@ import {
   suggestSpaceForBucket,
   type InboxSpaceHint,
 } from "./classify";
+import {
+  analyzeMoneyEmail,
+  compareWithPreviousCharge,
+  moneySignalToGuardianItem,
+} from "./moneySignals";
+import { persistExtractedGuardianItem } from "@/lib/guardian-items/persist";
 
 const SYNC_BATCH = 40;
 const FETCH_CONCURRENCY = 5;
@@ -23,6 +29,8 @@ export type GmailSyncResult = {
   upserted: number;
   listed: number;
   sourceId: string;
+  moneySignals: number;
+  watchItems: number;
 };
 
 async function mapPool<T, R>(
@@ -70,9 +78,32 @@ export async function syncGmailInbox(args: {
     }
   });
 
-  const rows = metas
-    .filter((m): m is NonNullable<typeof m> => m != null)
-    .map((m) => {
+  const messages = metas.filter((m): m is NonNullable<typeof m> => m != null);
+  const baseSignals = messages.map((m) =>
+    analyzeMoneyEmail({
+      fromEmail: m.fromEmail,
+      fromName: m.fromName,
+      subject: m.subject,
+      preview: m.snippet,
+      receivedAt: m.receivedAt,
+    })
+  );
+  const moneySignals = baseSignals.map((signal, index) => {
+    if (!signal) return null;
+    const current = messages[index]!;
+    const previousIndex = messages.findIndex(
+      (candidate, candidateIndex) =>
+        candidateIndex > index &&
+        candidate.fromEmail.toLowerCase() === current.fromEmail.toLowerCase() &&
+        baseSignals[candidateIndex]?.amountCents != null
+    );
+    return compareWithPreviousCharge(
+      signal,
+      previousIndex >= 0 ? baseSignals[previousIndex] : null
+    );
+  });
+
+  const rows = messages.map((m, index) => {
       const bucket = classifyInboxBucket({
         fromEmail: m.fromEmail,
         fromName: m.fromName,
@@ -94,10 +125,17 @@ export async function syncGmailInbox(args: {
         assigned_space_id: null as string | null,
         suggested_space_id: suggested,
         label_ids: m.labelIds,
-        metadata: { historyId: m.historyId ?? null },
+        metadata: {
+          historyId: m.historyId ?? null,
+          ...(moneySignals[index]
+            ? { money_guardian: moneySignals[index] }
+            : {}),
+        },
         updated_at: new Date().toISOString(),
       };
     });
+
+  let createdWatchItems = 0;
 
   if (rows.length > 0) {
     const { data: priorRows } = await args.supabase
@@ -119,10 +157,46 @@ export async function syncGmailInbox(args: {
       if (prior) row.assigned_space_id = prior;
     }
 
-    const { error } = await args.supabase.from("inbox_messages").upsert(rows, {
-      onConflict: "source_id,external_id",
-    });
+    const { data: savedRows, error } = await args.supabase
+      .from("inbox_messages")
+      .upsert(rows, { onConflict: "source_id,external_id" })
+      .select("id, external_id");
     if (error) throw error;
+
+    const inboxIdByExternal = new Map(
+      (savedRows ?? []).map((row) => [String(row.external_id), String(row.id)])
+    );
+    const today = new Date().toISOString().slice(0, 10);
+    for (let index = 0; index < rows.length; index += 1) {
+      const row = rows[index]!;
+      const signal = moneySignals[index];
+      const spaceId = row.assigned_space_id ?? row.suggested_space_id;
+      const inboxMessageId = inboxIdByExternal.get(row.external_id);
+      if (!signal || !spaceId || !inboxMessageId) continue;
+      const item = moneySignalToGuardianItem(
+        signal,
+        `${row.subject}\n${row.preview}`
+      );
+      if (!item) continue;
+      const result = await persistExtractedGuardianItem({
+        supabase: args.supabase,
+        association: {
+          userId: args.userId,
+          spaceId,
+          childId: null,
+          schoolContextId: null,
+        },
+        item,
+        sourceDocumentId: null,
+        sourceType: "gmail",
+        sourceId: inboxMessageId,
+        sourceDocumentTitle: row.subject,
+        today,
+      });
+      if (result.outcome === "created" || result.outcome === "superseded") {
+        createdWatchItems += 1;
+      }
+    }
   }
 
   await updateConnectedSource(args.supabase, args.userId, args.source.id, {
@@ -133,5 +207,7 @@ export async function syncGmailInbox(args: {
     upserted: rows.length,
     listed: listed.length,
     sourceId: args.source.id,
+    moneySignals: moneySignals.filter(Boolean).length,
+    watchItems: createdWatchItems,
   };
 }

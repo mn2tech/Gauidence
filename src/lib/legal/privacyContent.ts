@@ -70,7 +70,7 @@ export const PRIVACY_SECTIONS: LegalSection[] = [
       "Maintain security, prevent abuse, and troubleshoot problems",
       "Manage subscriptions and billing when you choose a paid plan",
       "Send service-related communications you enable (for example deadline reminders, optional tips, or push notifications)",
-      "When you connect Gmail, sync limited message metadata into Inbox so you can triage bills, school mail, and follow-ups, file items into Spaces, and discuss them with Gideon",
+      "When you connect Gmail, sync limited message metadata into Inbox so you can triage bills, school mail, and follow-ups, file items into Spaces, discuss them with Gideon, and optionally detect financial signals such as amounts, due dates, renewals, return deadlines, recurring charges, and price changes",
       "Improve product functionality and understand how features are used",
     ],
     paragraphsAfter: [
@@ -86,7 +86,7 @@ export const PRIVACY_SECTIONS: LegalSection[] = [
     list: [
       "Google sign-in — if you choose to sign in with Google, we receive basic account identifiers such as your email address and profile name from Google to create or authenticate your Guardian account.",
       "Google Drive (optional) — if you connect Drive, Guardian requests access needed to list and sync files from folders you select so those materials can be stored and used in your Spaces. You control which folders you authorize.",
-      "Gmail (optional) — if you choose Connect Gmail, Guardian requests read-only access to Gmail (Google scope gmail.readonly). We use that access only to sync recent message metadata into your Guardian Inbox—typically sender name and email, subject, a short preview/snippet, labels, and received time—so you can triage items (for example bills, school mail, and follow-ups), file them into Spaces, and ask Gideon about a message. We do not use Gmail access to send, delete, or permanently alter your email. OAuth tokens are stored for your account so Guardian can sync on your behalf until you disconnect. Disconnecting Gmail in Inbox or Settings → Connections removes stored Gmail credentials for that connection and clears synced Inbox message rows for that connection. You may also revoke Guardian’s access in your Google Account permissions.",
+      "Gmail (optional) — if you choose Connect Gmail, Guardian requests read-only access to Gmail (Google scope gmail.readonly). We use that access to sync recent message metadata into your Guardian Inbox—typically sender name and email, subject, a short preview/snippet, labels, and received time—so you can triage items (for example bills, school mail, and follow-ups), file them into Spaces, and ask Gideon about a message. Money Guardian may analyze that metadata to identify financial signals such as amounts, due dates, renewals, return deadlines, recurring charges, and price changes, and may create actionable items in Guardian Today. We do not use Gmail access to send, delete, or permanently alter your email. OAuth tokens are stored for your account so Guardian can sync on your behalf until you disconnect. Disconnecting Gmail in Inbox or Settings → Connections removes stored Gmail credentials for that connection and clears synced Inbox message rows for that connection. You may also revoke Guardian’s access in your Google Account permissions.",
     ],
     paragraphsAfter: [
       "Google’s handling of information is governed by Google’s Privacy Policy and your Google Account settings.",

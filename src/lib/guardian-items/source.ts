@@ -31,18 +31,24 @@ export async function getGuardianItemSource(
   if (error || !item) return null;
 
   if (!item.source_document_id) {
+    const fromGmail = item.source_type === "gmail";
     return {
       itemId: item.id,
       title: item.title,
       documentId: null,
       documentTitle: null,
-      excerpt: item.source_type === "daily_log" ? item.source_excerpt : null,
+      excerpt:
+        item.source_type === "daily_log" || fromGmail
+          ? item.source_excerpt
+          : null,
       accessible: true,
       message:
         item.source_type === "user"
           ? "You added this reminder yourself."
           : item.source_type === "daily_log"
             ? "Guardian found this in a Daily Log."
+            : fromGmail
+              ? "Money Guardian found this in your connected Gmail."
             : "Guardian saved this without a linked document.",
     };
   }

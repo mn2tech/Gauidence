@@ -271,10 +271,14 @@ export default function InboxScreen() {
           const body = (await res.json().catch(() => ({}))) as {
             error?: string;
             upserted?: number;
+            moneySignals?: number;
+            watchItems?: number;
           };
           if (!res.ok) throw new Error(body.error ?? "Sync failed.");
           setBanner(
-            `Synced ${body.upserted ?? 0} recent messages from Gmail.`
+            body.moneySignals
+              ? `Synced ${body.upserted ?? 0} messages. Money Guardian found ${body.moneySignals} financial ${body.moneySignals === 1 ? "signal" : "signals"}${body.watchItems ? ` and added ${body.watchItems} to Today` : ""}.`
+              : `Synced ${body.upserted ?? 0} recent messages from Gmail.`
           );
           await loadMessages();
         } catch (err) {
@@ -323,12 +327,18 @@ export default function InboxScreen() {
       const body = (await res.json().catch(() => ({}))) as {
         error?: string;
         upserted?: number;
+        moneySignals?: number;
+        watchItems?: number;
         code?: string;
       };
       if (!res.ok) {
         throw new Error(body.error ?? "Sync failed.");
       }
-      setBanner(`Synced ${body.upserted ?? 0} recent messages.`);
+      setBanner(
+        body.moneySignals
+          ? `Synced ${body.upserted ?? 0} messages. Money Guardian found ${body.moneySignals} financial ${body.moneySignals === 1 ? "signal" : "signals"}${body.watchItems ? ` and added ${body.watchItems} to Today` : ""}.`
+          : `Synced ${body.upserted ?? 0} recent messages.`
+      );
       await loadMessages();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sync failed.");
