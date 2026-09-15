@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 52358)
-Total output lines: 5894
-
 "use client";
 
 import {
@@ -1878,7 +1875,2535 @@ export default function VaultChatPanel({
       setError("I couldn't open that source document.");
       return;
     }
-    const { data, error: signedError } = await…22358 tokens truncated…</div>
+    const { data, error: signedError } = await supabase.storage
+      .from("documents")
+      .createSignedUrl(doc.file_path, 60);
+    if (signedError || !data?.signedUrl) {
+      setError("I couldn't open that source document.");
+      return;
+    }
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    void fileName;
+  };
+
+  const pushLocalNote = (content: string) => {
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `note-${Date.now()}`,
+        role: "assistant",
+        content,
+        created_at: new Date().toISOString(),
+      },
+    ]);
+  };
+
+  const uploadVaultFile = async (file: File) => {
+    if (!profileId) {
+      throw new Error("Choose a space before uploading.");
+    }
+    setError(null);
+    setVaultBusy(true);
+    setVaultStatus("Uploading to your space…");
+
+    try {
+      const supabase = createClient();
+      if (!supabase) {
+        throw new Error("Sign-in isn't available. Refresh and try again.");
+      }
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("You need to be signed in.");
+
+      const result = await uploadAndAnalyzeToVault({
+        userId: user.id,
+        profileId,
+        ownerUserId: active?.owner_user_id,
+        file,
+        onStatus: setVaultStatus,
+      });
+
+      await loadMetaAndChats().catch(() => undefined);
+      return result;
+    } finally {
+      setVaultBusy(false);
+      setVaultStatus(null);
+    }
+  };
+
+  const continueUploadChat = async (args: {
+    result: VaultUploadResult;
+    file: File;
+    attachmentPreview?: string | null;
+    userMsgId?: string;
+    question?: string;
+    userDisplayContent?: string;
+  }) => {
+    const finalQuestion =
+      args.question?.trim() ||
+      autoQuestionForUpload({
+        kind: active?.profile_type,
+        fileName: args.result.fileName,
+        isImage: isImageUpload(args.file),
+      });
+    await sendQuestion(finalQuestion, {
+      attachment: {
+        documentId: args.result.documentId,
+        fileName: args.result.fileName,
+        kind: isImageUpload(args.file) ? "image" : "document",
+        previewUrl: args.attachmentPreview ?? null,
+      },
+      userDisplayContent: args.userDisplayContent,
+      replaceUserMessageId: args.userMsgId,
+    });
+  };
+
+  const handleAnalyzedUpload = async (args: {
+    result: VaultUploadResult;
+    file: File;
+    attachmentPreview?: string | null;
+    userMsgId?: string;
+    question?: string;
+    userDisplayContent?: string;
+    wasEmpty: boolean;
+  }) => {
+    void recordClientActionEvent({
+      actionId: "upload_document",
+      label: "Uploaded document",
+      phase: "executed",
+      profileId,
+      message: args.result.fileName,
+    });
+
+    maybeShowFirstWin({
+      wasEmpty: args.wasEmpty,
+      fileName: args.result.fileName,
+      summary: args.result.summary,
+      facts: args.result.facts,
+    });
+
+    if (
+      args.result.organizationAutoApplied &&
+      args.result.organizationSuggestion?.profilePath
+    ) {
+      pushLocalNote(
+        `Guardian filed "${args.result.fileName}" in ${args.result.organizationSuggestion.profilePath}.`
+      );
+    }
+
+    if (profileId && shouldPromptSmartUpload(args.result, profileId)) {
+      setPendingSmartUpload(args);
+      return;
+    }
+
+    await continueUploadChat(args);
+    void refreshOnboarding();
+  };
+
+  const maybeShowFirstWin = (args: {
+    wasEmpty: boolean;
+    fileName: string;
+    summary?: string | null;
+    facts?: FirstWinFactInput[] | null;
+  }) => {
+    if (!args.wasEmpty || readFirstWinSeen()) return;
+    const highlights = pickFirstWinHighlights(args.facts ?? [], 3);
+    writeFirstWinSeen(true);
+    trackOnboardingEvent("first_document_uploaded", {
+      profileKind: active?.profile_type ?? null,
+      source: args.fileName.toLowerCase().includes("sample")
+        ? "sample"
+        : "upload",
+    });
+    trackOnboardingEvent("first_win_shown", {
+      profileKind: active?.profile_type ?? null,
+    });
+    setFirstWin({
+      fileName: args.fileName,
+      summary: args.summary ?? null,
+      highlights,
+    });
+  };
+
+  const runSampleDocument = async () => {
+    if (!profileId || !canEditVault || vaultBusy || sending) return;
+    trackOnboardingEvent("sample_started", {
+      profileKind: active?.profile_type ?? null,
+    });
+    const wasEmpty =
+      !onboardingProgress.hasDocument &&
+      (meta?.documentCount ?? 0) + (meta?.photoCount ?? 0) === 0;
+    const file = buildSampleDocumentFile(active?.profile_type);
+    setInput("");
+    clearPendingAttachment();
+
+    const userMsgId = `local-sample-${Date.now()}`;
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: userMsgId,
+        role: "user",
+        content: "Try this sample document",
+        attachment: {
+          documentId: userMsgId,
+          fileName: file.name,
+          kind: "document",
+          previewUrl: null,
+        },
+        created_at: new Date().toISOString(),
+      },
+    ]);
+
+    try {
+      const result = await uploadVaultFile(file);
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === userMsgId && m.attachment
+            ? {
+                ...m,
+                attachment: {
+                  ...m.attachment,
+                  documentId: result.documentId,
+                  fileName: result.fileName,
+                },
+              }
+            : m
+        )
+      );
+
+      if (!result.analyzed) {
+        pushLocalNote(
+          `I added "${result.fileName}" to your space, but analysis didn't finish${
+            result.analysisError ? `: ${result.analysisError}` : "."
+          }`
+        );
+        void refreshOnboarding();
+        return;
+      }
+
+      await handleAnalyzedUpload({
+        result,
+        file,
+        attachmentPreview: null,
+        userMsgId,
+        userDisplayContent: "Try this sample document",
+        wasEmpty,
+      });
+    } catch (err) {
+      setMessages((prev) => prev.filter((m) => m.id !== userMsgId));
+      setError(
+        err instanceof Error ? err.message : "Sample upload failed. Please try again."
+      );
+    }
+  };
+
+  const openCamera = () => {
+    setPlusOpen(false);
+    if (
+      typeof navigator !== "undefined" &&
+      typeof navigator.mediaDevices?.getUserMedia === "function"
+    ) {
+      setCameraOpen(true);
+      return;
+    }
+    fileInputRef.current?.click();
+  };
+
+  const openFilePicker = () => {
+    setPlusOpen(false);
+    fileInputRef.current?.click();
+  };
+
+  const openLogForm = () => {
+    setPlusOpen(false);
+    pendingDailyLogMessageIdRef.current = null;
+    setLogTitle("");
+    setLogContent("");
+    setLogOpen(true);
+  };
+
+  const openReminderForm = () => {
+    setPlusOpen(false);
+    const defaults = defaultReminderDateTime(timeZone);
+    setReminderTitle("");
+    setReminderDate(defaults.date);
+    setReminderTime(defaults.time);
+    setReminderTargetProfileId(null);
+    setReminderOpen(true);
+  };
+
+  const dismissVaultScope = async (messageId: string) => {
+    setDismissedVaultScopeIds((prev) => new Set(prev).add(messageId));
+    if (!activeChatId) return;
+    try {
+      await fetch("/api/documents/vault-chat", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          withVaultChatProfileId(
+            {
+              chatId: activeChatId,
+              clearScopedProfile: true,
+            },
+            vaultProfileId
+          )
+        ),
+      });
+      setMeta((prev) =>
+        prev ? { ...prev, chatScopedProfile: null } : prev
+      );
+    } catch {
+      /* non-blocking */
+    }
+  };
+
+  const setChatSearchScope = async (scope: SearchScopeMode) => {
+    setMeta((prev) =>
+      prev
+        ? {
+            ...prev,
+            searchScope: scope,
+          }
+        : prev
+    );
+    if (!activeChatId) return;
+    try {
+      const res = await fetch("/api/documents/vault-chat", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          withVaultChatProfileId(
+            {
+              chatId: activeChatId,
+              setSearchScope: scope,
+            },
+            vaultProfileId
+          )
+        ),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        searchScope?: SearchScopeMode;
+        vaultScopeNote?: string;
+      };
+      if (!res.ok) {
+        setError(body.error ?? "Couldn't update search scope.");
+        return;
+      }
+      setMeta((prev) =>
+        prev
+          ? {
+              ...prev,
+              searchScope: body.searchScope ?? scope,
+              vaultScopeNote: body.vaultScopeNote ?? prev.vaultScopeNote,
+            }
+          : prev
+      );
+    } catch {
+      setError("Couldn't update search scope. Try again.");
+    }
+  };
+
+  const clearChatScopedProfile = async () => {
+    if (!activeChatId) {
+      setMeta((prev) =>
+        prev ? { ...prev, chatScopedProfile: null } : prev
+      );
+      return;
+    }
+    try {
+      await fetch("/api/documents/vault-chat", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          withVaultChatProfileId(
+            {
+              chatId: activeChatId,
+              clearScopedProfile: true,
+            },
+            vaultProfileId
+          )
+        ),
+      });
+      setMeta((prev) =>
+        prev ? { ...prev, chatScopedProfile: null } : prev
+      );
+      void loadThread(activeChatId, { refresh: true, silent: true });
+    } catch {
+      setError("Couldn't return to your workspace. Try again.");
+    }
+  };
+
+  const openSideVault = (profileId: string, profileName: string, messageId: string) => {
+    setSideVault({ profileId, profileName });
+    setDismissedVaultScopeIds((prev) => new Set(prev).add(messageId));
+  };
+
+  const continueInScopedVault = async (
+    profileId: string,
+    profileName: string,
+    messageId: string
+  ) => {
+    if (!activeChatId) return;
+    setSwitchingVaultScopeId(messageId);
+    try {
+      const res = await fetch("/api/documents/vault-chat", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          withVaultChatProfileId(
+            {
+              chatId: activeChatId,
+              setScopedProfile: profileId,
+            },
+            vaultProfileId
+          )
+        ),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        chatScopedProfile?: Meta["chatScopedProfile"];
+      };
+      if (!res.ok) {
+        setError(body.error ?? "Couldn't update chat scope.");
+        return;
+      }
+      setDismissedVaultScopeIds((prev) => new Set(prev).add(messageId));
+      setMeta((prev) =>
+        prev
+          ? {
+              ...prev,
+              chatScopedProfile:
+                body.chatScopedProfile ??
+                (profileId !== (effectiveProfile?.id ?? profileId)
+                  ? { profileId, profileName }
+                  : null),
+            }
+          : prev
+      );
+      void loadThread(activeChatId, { refresh: true, silent: true });
+    } catch {
+      setError("Couldn't update chat scope. Check your connection and try again.");
+    } finally {
+      setSwitchingVaultScopeId(null);
+    }
+  };
+
+  const saveInlineReminder = async (e: FormEvent) => {
+    e.preventDefault();
+    if (
+      !reminderSaveProfileId ||
+      !reminderTitle.trim() ||
+      savingReminder ||
+      vaultBusy ||
+      sending
+    ) {
+      return;
+    }
+    setSavingReminder(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/reminders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          profileId: reminderSaveProfileId,
+          title: reminderTitle.trim(),
+          date: reminderDate,
+          time: reminderTime,
+        }),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        whenLabel?: string;
+        reminder?: { title: string };
+      };
+      if (!res.ok) {
+        setError(body.error ?? "Couldn't save reminder.");
+        return;
+      }
+      const title = body.reminder?.title ?? reminderTitle.trim();
+      const when = body.whenLabel ?? `${reminderDate} ${reminderTime}`;
+      setReminderOpen(false);
+      setReminderTitle("");
+      setReminderTargetProfileId(null);
+      window.dispatchEvent(new Event("guardian:alerts-updated"));
+      pushLocalNote(
+        `Reminder set: "${title}" — ${when}. You'll see it under Attention on the dashboard.`
+      );
+    } catch {
+      setError("Couldn't save reminder. Check your connection and try again.");
+    } finally {
+      setSavingReminder(false);
+    }
+  };
+
+  const confirmProposedReminder = async (
+    messageId: string,
+    proposal: ProposedReminder,
+    targetProfileId?: string | null
+  ) => {
+    const saveProfileId = targetProfileId ?? profileId;
+    if (!saveProfileId || confirmingReminderId || savingReminder || vaultBusy || sending) {
+      return;
+    }
+    setConfirmingReminderId(messageId);
+    setError(null);
+    try {
+      const res = await fetch("/api/reminders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          profileId: saveProfileId,
+          title: proposal.title,
+          date: proposal.date,
+          time: proposal.time,
+        }),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        whenLabel?: string;
+        replaced?: boolean;
+        reminder?: { title: string };
+      };
+      if (!res.ok) {
+        setError(body.error ?? "Couldn't save reminder.");
+        return;
+      }
+      setConfirmedReminderIds((prev) => new Set(prev).add(messageId));
+      window.dispatchEvent(new Event("guardian:alerts-updated"));
+      const title = body.reminder?.title ?? proposal.title;
+      const when =
+        body.whenLabel ?? proposedReminderWhenLabel(proposal, timeZone);
+      pushLocalNote(
+        body.replaced
+          ? `Updated reminder: "${title}" — now ${when}. Open Today to see the new time.`
+          : `Reminder set: "${title}" — ${when}. You'll see it under Attention on Today.`
+      );
+    } catch {
+      setError("Couldn't save reminder. Check your connection and try again.");
+    } finally {
+      setConfirmingReminderId(null);
+    }
+  };
+
+  const addAnswerToToday = async (_messageId: string, plainText: string) => {
+    if (!profileId) {
+      setError("Pick a Space first, then add this to Today.");
+      throw new Error("no_profile");
+    }
+    const title = titleFromAssistantPlainText(plainText, 120);
+    const description = snippetFromAssistantPlainText(plainText, title);
+    const res = await fetch("/api/guardian/items", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        profileId,
+        title,
+        description: description ?? undefined,
+      }),
+    });
+    const body = (await res.json().catch(() => ({}))) as { error?: string };
+    if (!res.ok) {
+      setError(body.error ?? "Couldn't add that to Today.");
+      throw new Error("add_today_failed");
+    }
+    window.dispatchEvent(new Event("guardian:alerts-updated"));
+    pushLocalNote(
+      `Added to Today: "${title}". Tap Today in the bar below to review or mark it done.`
+    );
+  };
+
+  const remindFromAnswer = async (_messageId: string, plainText: string) => {
+    if (!profileId) {
+      setError("Pick a Space first, then set a reminder.");
+      throw new Error("no_profile");
+    }
+    const title = titleFromAssistantPlainText(plainText, 120);
+    const defaults = defaultReminderDateTime(timeZone);
+    const res = await fetch("/api/reminders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        profileId,
+        title,
+        date: defaults.date,
+        time: defaults.time,
+      }),
+    });
+    const body = (await res.json().catch(() => ({}))) as {
+      error?: string;
+      whenLabel?: string;
+    };
+    if (!res.ok) {
+      setError(body.error ?? "Couldn't save reminder.");
+      throw new Error("remind_failed");
+    }
+    window.dispatchEvent(new Event("guardian:alerts-updated"));
+    pushLocalNote(
+      `Reminder set: "${title}" — ${body.whenLabel ?? "in about an hour"}. You'll see it under Attention.`
+    );
+  };
+
+  const confirmProposedDailyLog = async (
+    messageId: string,
+    proposal: ProposedDailyLog,
+    targetProfileId?: string | null
+  ) => {
+    const saveProfileId = targetProfileId ?? profileId;
+    if (
+      !saveProfileId ||
+      confirmingDailyLogId ||
+      savingLog ||
+      vaultBusy ||
+      sending
+    ) {
+      return;
+    }
+    setConfirmingDailyLogId(messageId);
+    setError(null);
+    try {
+      const res = await fetch("/api/logs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          profileId: saveProfileId,
+          content: proposal.content,
+          title: proposal.title?.trim() || undefined,
+          quick: true,
+          logDate: proposal.logDate,
+        }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setError(body.error ?? "Couldn't save Daily Log.");
+        return;
+      }
+      markDailyLogConfirmed(messageId);
+      window.dispatchEvent(new Event("guardian:logs-updated"));
+      pushLocalNote(
+        `${FIRST_MINUTE_HOLDING} Open Today to review it, or History to see the note.`
+      );
+    } catch {
+      setError("Couldn't save Daily Log. Check your connection and try again.");
+    } finally {
+      setConfirmingDailyLogId(null);
+    }
+  };
+
+  const confirmProposedWorkMemoryUpdate = async (
+    messageId: string,
+    proposal: ProposedWorkMemoryUpdate
+  ) => {
+    if (
+      confirmingWorkMemoryId ||
+      savingWorkMemory ||
+      vaultBusy ||
+      sending
+    ) {
+      return;
+    }
+    setConfirmingWorkMemoryId(messageId);
+    setError(null);
+    try {
+      const patch: Record<string, string> = {};
+      if (proposal.status) patch.status = proposal.status;
+      if (proposal.mission) patch.mission = proposal.mission;
+      if (proposal.currentStep) patch.currentStep = proposal.currentStep;
+      if (proposal.nextAction) patch.nextAction = proposal.nextAction;
+      if (proposal.blockers) patch.blockers = proposal.blockers;
+
+      const res = await fetch(
+        `/api/work-memory/projects/${encodeURIComponent(proposal.projectId)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(patch),
+        }
+      );
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        project?: { id: string; name: string };
+      };
+      if (!res.ok) {
+        setError(body.error ?? "Couldn't update Work Memory.");
+        return;
+      }
+      setConfirmedWorkMemoryIds((prev) => new Set(prev).add(messageId));
+      if (body.project && workProject?.id === body.project.id) {
+        setWorkProject(body.project as WorkProject);
+      }
+      const label =
+        proposedWorkMemoryUpdateSummary(
+          proposal,
+          body.project?.name ?? workProject?.name
+        ) || body.project?.name || "project";
+      pushLocalNote(`Work Memory updated: ${label}.`);
+    } catch {
+      setError("Couldn't update Work Memory. Check your connection and try again.");
+    } finally {
+      setConfirmingWorkMemoryId(null);
+    }
+  };
+
+  const confirmProposedClientRequestReply = async (
+    messageId: string,
+    proposal: ProposedClientRequestReply,
+    requestTitle?: string | null
+  ) => {
+    if (
+      confirmingClientRequestId ||
+      savingClientRequestReply ||
+      vaultBusy ||
+      sending
+    ) {
+      return;
+    }
+    setConfirmingClientRequestId(messageId);
+    setError(null);
+    try {
+      const commentRes = await fetch(
+        `/api/client-requests/${encodeURIComponent(proposal.requestId)}/comments`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: proposal.content }),
+        }
+      );
+      const commentBody = (await commentRes.json().catch(() => ({}))) as {
+        error?: string;
+      };
+      if (!commentRes.ok) {
+        setError(commentBody.error ?? "Couldn't post reply on request.");
+        return;
+      }
+
+      if (proposal.status) {
+        const statusRes = await fetch(
+          `/api/client-requests/${encodeURIComponent(proposal.requestId)}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: proposal.status }),
+          }
+        );
+        const statusBody = (await statusRes.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        if (!statusRes.ok) {
+          setError(
+            statusBody.error ?? "Reply posted but status couldn't be updated."
+          );
+          return;
+        }
+      }
+
+      setConfirmedClientRequestIds((prev) => new Set(prev).add(messageId));
+      pushLocalNote(
+        `Reply posted on client request: ${proposedClientRequestReplySummary(
+          proposal,
+          requestTitle
+        )}`
+      );
+    } catch {
+      setError(
+        "Couldn't post reply. Check your connection and try again."
+      );
+    } finally {
+      setConfirmingClientRequestId(null);
+    }
+  };
+
+  const resolveAssigneeUserId = async (
+    clientProfileId: string,
+    assigneeName: string
+  ): Promise<string | null> => {
+    const clientProfile = profiles.find((p) => p.id === clientProfileId);
+    const businessId = clientProfile?.parent_profile_id;
+    if (!businessId) return null;
+    const res = await fetch(
+      `/api/client-requests/assignees?profileId=${encodeURIComponent(businessId)}`
+    );
+    const body = (await res.json().catch(() => ({}))) as {
+      assignees?: { userId: string; name: string }[];
+    };
+    if (!res.ok) return null;
+    const needle = assigneeName.trim().toLowerCase();
+    const hit = (body.assignees ?? []).find((a) =>
+      a.name.trim().toLowerCase().includes(needle)
+    );
+    return hit?.userId ?? null;
+  };
+
+  const confirmProposedClientRequestCreate = async (
+    messageId: string,
+    proposal: ProposedClientRequestCreate
+  ) => {
+    if (
+      confirmingClientRequestCreateId ||
+      savingClientRequestCreate ||
+      vaultBusy ||
+      sending
+    ) {
+      return;
+    }
+    setConfirmingClientRequestCreateId(messageId);
+    setError(null);
+    try {
+      const createRes = await fetch("/api/client-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          profileId: proposal.profileId,
+          title: proposal.title,
+          description: proposal.description,
+        }),
+      });
+      const createBody = (await createRes.json().catch(() => ({}))) as {
+        error?: string;
+        request?: { id: string };
+      };
+      if (!createRes.ok || !createBody.request?.id) {
+        setError(createBody.error ?? "Couldn't create client request.");
+        return;
+      }
+      const requestId = createBody.request.id;
+
+      const threadMessage =
+        proposal.initialMessage?.trim() || proposal.description.trim();
+      if (threadMessage) {
+        const commentRes = await fetch(
+          `/api/client-requests/${encodeURIComponent(requestId)}/comments`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ content: threadMessage }),
+          }
+        );
+        const commentBody = (await commentRes.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        if (!commentRes.ok) {
+          setError(
+            commentBody.error ??
+              "Request created but the first message couldn't be posted."
+          );
+          return;
+        }
+      }
+
+      if (proposal.assignedToName) {
+        const assigneeUserId = await resolveAssigneeUserId(
+          proposal.profileId,
+          proposal.assignedToName
+        );
+        if (!assigneeUserId) {
+          setError(
+            `Request created, but couldn't find employee "${proposal.assignedToName}" to assign. Assign them from Requests.`
+          );
+          setConfirmedClientRequestCreateIds((prev) => new Set(prev).add(messageId));
+          setCreatedClientRequestIds((prev) =>
+            new Map(prev).set(messageId, requestId)
+          );
+          pushLocalNote(
+            `Client request created: ${proposedClientRequestCreateSummary(
+              proposal,
+              profiles.find((p) => p.id === proposal.profileId)?.display_name
+            )}`
+          );
+          return;
+        }
+        const assignRes = await fetch(
+          `/api/client-requests/${encodeURIComponent(requestId)}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ assignedToUserId: assigneeUserId }),
+          }
+        );
+        const assignBody = (await assignRes.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        if (!assignRes.ok) {
+          setError(
+            assignBody.error ??
+              "Request created but assignee couldn't be updated."
+          );
+          return;
+        }
+      }
+
+      setConfirmedClientRequestCreateIds((prev) => new Set(prev).add(messageId));
+      setCreatedClientRequestIds((prev) =>
+        new Map(prev).set(messageId, requestId)
+      );
+      pushLocalNote(
+        `Client request created: ${proposedClientRequestCreateSummary(
+          proposal,
+          profiles.find((p) => p.id === proposal.profileId)?.display_name
+        )}`
+      );
+    } catch {
+      setError("Couldn't create request. Check your connection and try again.");
+    } finally {
+      setConfirmingClientRequestCreateId(null);
+    }
+  };
+
+  const confirmProposedSpaceCreate = async (
+    messageId: string,
+    proposal: ProposedSpaceCreate,
+    parentProfileId: string | null
+  ) => {
+    if (
+      confirmingSpaceCreateId ||
+      savingSpaceCreate ||
+      vaultBusy ||
+      sending
+    ) {
+      return;
+    }
+    if (
+      profileTypeRequiresParent(proposal.profileType) &&
+      !parentProfileId
+    ) {
+      setError("Choose a parent space for this type.");
+      return;
+    }
+    setConfirmingSpaceCreateId(messageId);
+    setError(null);
+    try {
+      const res = await fetch("/api/profiles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          optionId: proposal.optionId,
+          profileType: proposal.profileType,
+          displayName: proposal.displayName,
+          parentProfileId: parentProfileId ?? undefined,
+          switchTo: true,
+        }),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        profile?: { id?: string };
+      };
+      if (!res.ok || !body.profile?.id) {
+        setError(body.error ?? "Couldn't create space.");
+        return;
+      }
+      dispatchAwardsFromResponse(body);
+      await refresh();
+      window.dispatchEvent(new CustomEvent("guardian:profile-changed"));
+      setConfirmedSpaceCreateIds((prev) => new Set(prev).add(messageId));
+      setCreatedSpaceProfileIds((prev) =>
+        new Map(prev).set(messageId, body.profile!.id!)
+      );
+      const parentName = parentProfileId
+        ? profiles.find((p) => p.id === parentProfileId)?.display_name
+        : null;
+      pushLocalNote(
+        `Space created: ${proposedSpaceCreateSummary(proposal, parentName)}`
+      );
+    } catch {
+      setError("Couldn't create space. Check your connection and try again.");
+    } finally {
+      setConfirmingSpaceCreateId(null);
+    }
+  };
+
+  const saveInlineLog = async (e: FormEvent) => {
+    e.preventDefault();
+    const saveProfileId = profileId ?? lastWriteProfileIdRef.current;
+    if (!saveProfileId || !logContent.trim() || savingLog || vaultBusy || sending) {
+      return;
+    }
+    setSavingLog(true);
+    setError(null);
+    const title = logTitle.trim().slice(0, 200);
+    try {
+      const res = await fetch("/api/logs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          profileId: saveProfileId,
+          content: logContent.trim(),
+          title: title || undefined,
+          quick: true,
+          logDate: todayLogDate(),
+        }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setError(body.error ?? "Couldn't save Daily Log.");
+        return;
+      }
+      const saved = logContent.trim();
+      const proposalMessageId = pendingDailyLogMessageIdRef.current;
+      pendingDailyLogMessageIdRef.current = null;
+      setLogOpen(false);
+      setLogTitle("");
+      setLogContent("");
+      window.dispatchEvent(new Event("guardian:logs-updated"));
+      if (proposalMessageId) {
+        markDailyLogConfirmed(proposalMessageId);
+        pushLocalNote(
+          `Daily Log saved${title ? `: "${title}"` : ""}. You decide what happens next.`
+        );
+        return;
+      }
+      await loadMetaAndChats().catch(() => undefined);
+      await sendQuestion(
+        `I just saved this Daily Log${title ? ` ("${title}")` : ""}: "${saved.slice(0, 200)}". What stands out?`
+      );
+    } catch {
+      setError("Couldn't save Daily Log. Check your connection and try again.");
+    } finally {
+      setSavingLog(false);
+    }
+  };
+
+  const sendQuestion = async (
+    questionRaw: string,
+    options?: {
+      attachment?: VaultMessageAttachment;
+      userDisplayContent?: string;
+      replaceUserMessageId?: string;
+      regenerateAssistantId?: string;
+    }
+  ) => {
+    const question = questionRaw.trim();
+    if (!question || sending || vaultBusy) return;
+
+    if (!onboardingProgress.hasAskedGideon) {
+      trackOnboardingEvent("first_gideon_ask", {
+        profileKind: active?.profile_type ?? null,
+      });
+      trackOnboardingEvent("first_gideon_question", {
+        profileKind: active?.profile_type ?? null,
+      });
+    }
+
+    markGideonWelcomeSeen();
+    stopAssistantSpeech();
+    setSending(true);
+    setError(null);
+    setInput("");
+    setThinkingSteps([]);
+    setThinkingActiveIndex(0);
+
+    const lastAssistant = [...messages]
+      .reverse()
+      .find((m) => m.role === "assistant")?.content;
+    const startedBlock = parseFocusBlockStart(
+      question,
+      new Date(),
+      timeZone,
+      lastAssistant
+    );
+    if (startedBlock) {
+      dismissedFocusEndsAtRef.current = null;
+      setFocusBlock(startedBlock);
+    }
+    const blockForRequest = startedBlock ?? focusBlock;
+
+    const isRegenerate = Boolean(options?.regenerateAssistantId);
+    const optimisticId = `local-${Date.now()}`;
+    const userContent = options?.userDisplayContent?.trim() ?? question;
+    if (!options?.replaceUserMessageId && !isRegenerate) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: optimisticId,
+          role: "user",
+          content: userContent,
+          attachment: options?.attachment ?? null,
+          created_at: new Date().toISOString(),
+        },
+      ]);
+    }
+
+    try {
+      let chatIdForSend = activeChatIdRef.current ?? activeChatId;
+
+      const postBody = withVaultChatProfileId(
+        {
+          question,
+          chatId: chatIdForSend,
+          ...(options?.regenerateAssistantId
+            ? { regenerateAssistantId: options.regenerateAssistantId }
+            : {}),
+            ...(options?.attachment?.documentId &&
+            !isPendingAttachmentId(options.attachment.documentId)
+              ? { attachmentDocumentId: options.attachment.documentId }
+              : {}),
+          ...(requestedWorkProjectId
+            ? { workProjectId: requestedWorkProjectId }
+            : {}),
+          ...(agentModeEnabled ? { agentMode: true } : {}),
+          searchScope: meta?.searchScope ?? DEFAULT_SEARCH_SCOPE,
+          ...(blockForRequest ? { focusBlock: blockForRequest } : {}),
+          ...(worldEntityIdForSendRef.current
+            ? { worldEntityId: worldEntityIdForSendRef.current }
+            : {}),
+        },
+        vaultProfileId ?? profileId
+      );
+
+      const postOnce = () =>
+        fetch("/api/documents/vault-chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(postBody),
+        });
+
+      const readErrorBody = async (response: Response) => {
+        const fallbackForStatus = (status: number) => {
+          if (status === 429) {
+            return {
+              error:
+                "Rate limit reached. Wait about a minute, or set DEEPSEEK_CHAT_PRIMARY=true on Vercel to use DeepSeek for chat.",
+              code: "rate_limit",
+            };
+          }
+          if (status === 503) {
+            return {
+              error: "AI chat is temporarily unavailable. Please try again.",
+              code: "overloaded",
+            };
+          }
+          return {};
+        };
+
+        try {
+          const body = (await response.clone().json()) as {
+            error?: string;
+            code?: string;
+          };
+          if (body.error) return body;
+        } catch {
+          /* not JSON */
+        }
+        return fallbackForStatus(response.status);
+      };
+
+      const rollbackOptimistic = () => {
+        if (options?.replaceUserMessageId) {
+          setMessages((prev) =>
+            prev.filter((m) => m.id !== options.replaceUserMessageId)
+          );
+        } else {
+          setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+        }
+      };
+
+      let assistantStreamId: string | null = null;
+
+      const applyVaultChatTurn = (body: {
+        messages?: VaultMessage[];
+        chatId?: string;
+        chats?: ChatSummary[];
+        chatScopedProfile?: Meta["chatScopedProfile"];
+        searchScope?: SearchScopeMode;
+        vaultScopeNote?: string;
+        writeProfile?: { profileId: string; profileName: string };
+        actionTimeline?: ActionTimelineItem[];
+      }) => {
+        if (body.chats) setChats(body.chats);
+        const resolvedChatId = body.chatId ?? activeChatIdRef.current;
+        if (resolvedChatId) {
+          setActiveChatId(resolvedChatId);
+          syncAskUrlRef.current(resolvedChatId);
+          rememberVaultChat(vaultProfileId ?? profileId, resolvedChatId);
+        }
+        if (body.chatScopedProfile !== undefined) {
+          setMeta((prev) =>
+            prev
+              ? { ...prev, chatScopedProfile: body.chatScopedProfile ?? null }
+              : prev
+          );
+        }
+        if (body.searchScope) {
+          setMeta((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  searchScope: body.searchScope,
+                  vaultScopeNote: body.vaultScopeNote ?? prev.vaultScopeNote,
+                }
+              : prev
+          );
+        }
+        if (body.writeProfile?.profileId) {
+          lastWriteProfileIdRef.current = body.writeProfile.profileId;
+        }
+        if (body.actionTimeline) {
+          setMeta((prev) =>
+            prev
+              ? { ...prev, actionTimeline: body.actionTimeline }
+              : prev
+          );
+        }
+        const turn = hydrateVaultChatMessages(body.messages ?? []);
+        const optimisticAttachment = options?.attachment;
+        const mergedTurn = turn.map((m, index) => {
+          if (index === 0 && m.role === "user") {
+            return overlayOptimisticAttachment(
+              m,
+              optimisticAttachment,
+              userContent
+            );
+          }
+          return m;
+        });
+        setMessages((prev) => [
+          ...prev.filter(
+            (m) =>
+              m.id !== optimisticId &&
+              m.id !== options?.replaceUserMessageId &&
+              m.id !== options?.regenerateAssistantId &&
+              m.id !== assistantStreamId
+          ),
+          ...mergedTurn,
+        ]);
+        dispatchAwardsFromResponse(body);
+        if (resolvedChatId) {
+          void loadThread(resolvedChatId, { refresh: true, silent: true });
+        } else {
+          void loadMetaAndChats();
+        }
+      };
+
+      let res = await postOnce();
+
+      if (!res.ok && res.status === 404 && postBody.chatId) {
+        const errBody = await readErrorBody(res);
+        if (
+          errBody.error === "Chat not found." ||
+          isChatNotFoundError(errBody.error ?? "")
+        ) {
+          setActiveChatId(null);
+          const retryBody = { ...postBody, chatId: null };
+          res = await fetch("/api/documents/vault-chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(retryBody),
+          });
+        }
+      }
+
+      if (!res.ok) {
+        const errBody = await readErrorBody(res);
+        rollbackOptimistic();
+        if (isRegenerate && activeChatIdRef.current) {
+          void loadThread(activeChatIdRef.current, {
+            refresh: true,
+            silent: true,
+          });
+        }
+        setInput(question);
+        setError(
+          friendlyGideonError(
+            errBody.error ??
+              "I couldn't complete that request right now. Please try again.",
+            errBody.code
+          ),
+          errBody.code
+        );
+        return;
+      }
+
+      if (isVaultChatStreamResponse(res)) {
+        const streamId = `stream-${Date.now()}`;
+        assistantStreamId = streamId;
+        const optimisticAttachment = options?.attachment;
+
+        await consumeVaultChatStream(res, {
+          onMeta: (event) => {
+            setStreamingAssistantId(streamId);
+            if (event.thinkingSteps?.length) {
+              setThinkingSteps(event.thinkingSteps);
+              setThinkingActiveIndex(0);
+            }
+            if (event.chatId) {
+              setActiveChatId(event.chatId);
+              syncAskUrlRef.current(event.chatId);
+              rememberVaultChat(vaultProfileId ?? profileId, event.chatId);
+            }
+            setMessages((prev) => {
+              const withoutStale = prev.filter(
+                (m) =>
+                  m.id !== optimisticId &&
+                  m.id !== options?.replaceUserMessageId &&
+                  m.id !== options?.regenerateAssistantId &&
+                  m.id !== streamId
+              );
+              if (isRegenerate) {
+                return [
+                  ...withoutStale,
+                  {
+                    id: streamId,
+                    role: "assistant",
+                    content: "",
+                    created_at: new Date().toISOString(),
+                  },
+                ];
+              }
+              const userFromServer: VaultMessage = overlayOptimisticAttachment(
+                event.userMsg as VaultMessage,
+                optimisticAttachment,
+                userContent
+              );
+              return [
+                ...withoutStale,
+                userFromServer,
+                {
+                  id: streamId,
+                  role: "assistant",
+                  content: "",
+                  created_at: new Date().toISOString(),
+                },
+              ];
+            });
+          },
+          onThinking: (event) => {
+            setThinkingSteps(event.steps);
+            setThinkingActiveIndex(event.activeIndex);
+          },
+          onDelta: (text) => {
+            setThinkingSteps([]);
+            setThinkingActiveIndex(0);
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === streamId
+                  ? { ...m, content: m.content + text }
+                  : m
+              )
+            );
+          },
+          onReplace: (text) => {
+            setThinkingSteps([]);
+            setThinkingActiveIndex(0);
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === streamId ? { ...m, content: text } : m
+              )
+            );
+          },
+          onDone: (event) => {
+            applyVaultChatTurn(event);
+            setStreamingAssistantId(null);
+            setThinkingSteps([]);
+            setThinkingActiveIndex(0);
+          },
+          onError: (message, code) => {
+            setStreamingAssistantId(null);
+            setThinkingSteps([]);
+            setThinkingActiveIndex(0);
+            setMessages((prev) =>
+              prev.filter(
+                (m) =>
+                  m.id !== optimisticId &&
+                  m.id !== options?.replaceUserMessageId &&
+                  m.id !== options?.regenerateAssistantId &&
+                  m.id !== streamId
+              )
+            );
+            if (isRegenerate && activeChatIdRef.current) {
+              void loadThread(activeChatIdRef.current, {
+                refresh: true,
+                silent: true,
+              });
+            }
+            setInput(question);
+            setError(friendlyGideonError(message, code), code);
+          },
+        });
+        return;
+      }
+
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        code?: string;
+        messages?: VaultMessage[];
+        chatId?: string;
+        chats?: ChatSummary[];
+        vaultScope?: VaultMessage["vaultScope"];
+        chatScopedProfile?: Meta["chatScopedProfile"];
+        writeProfile?: { profileId: string; profileName: string };
+      };
+      applyVaultChatTurn(body);
+    } catch (err) {
+      if (options?.replaceUserMessageId) {
+        setMessages((prev) =>
+          prev.filter((m) => m.id !== options.replaceUserMessageId)
+        );
+      } else {
+        setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+      }
+      setInput(question);
+      setError(
+        friendlyGideonError(
+          err instanceof Error && err.message.trim()
+            ? err.message
+            : GIDEON_GENERIC_REQUEST_ERROR
+        )
+      );
+    } finally {
+      setSending(false);
+      setStreamingAssistantId(null);
+      setThinkingSteps([]);
+      setThinkingActiveIndex(0);
+    }
+  };
+  sendQuestionRef.current = sendQuestion;
+
+  useEffect(() => {
+    if (sending) stopVoice();
+  }, [sending, stopVoice]);
+
+  const send = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const question = input.trim();
+    const attachment = pendingAttachment;
+    if ((!question && !attachment) || sending || vaultBusy || loadingHistory) return;
+
+    if (attachment) {
+      const { file, previewUrl: stagedPreviewUrl } = attachment;
+      const attachmentPreview = isImageUpload(file)
+        ? URL.createObjectURL(file)
+        : stagedPreviewUrl;
+      clearPendingAttachment();
+      setInput("");
+
+      const userMsgId = `local-upload-${Date.now()}`;
+      const userContent = question;
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: userMsgId,
+          role: "user",
+          content: userContent,
+          attachment: {
+            documentId: userMsgId,
+            fileName: file.name,
+            kind: isImageUpload(file) ? "image" : "document",
+            previewUrl: attachmentPreview,
+          },
+          created_at: new Date().toISOString(),
+        },
+      ]);
+
+      try {
+        const result = await uploadVaultFile(file);
+
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === userMsgId && m.attachment
+              ? {
+                  ...m,
+                  attachment: {
+                    ...m.attachment,
+                    documentId: result.documentId,
+                    fileName: result.fileName,
+                  },
+                }
+              : m
+          )
+        );
+
+        if (!result.analyzed) {
+          pushLocalNote(
+            `I added "${result.fileName}" to your space, but analysis didn't finish${
+              result.analysisError ? `: ${result.analysisError}` : "."
+            }`
+          );
+          void refreshOnboarding();
+          return;
+        }
+
+        await handleAnalyzedUpload({
+          result,
+          file,
+          attachmentPreview,
+          userMsgId,
+          question,
+          userDisplayContent: question,
+          wasEmpty:
+            !onboardingProgress.hasDocument &&
+            (meta?.documentCount ?? 0) + (meta?.photoCount ?? 0) === 0,
+        });
+      } catch (err) {
+        setMessages((prev) => prev.filter((m) => m.id !== userMsgId));
+        stageVaultFile(file);
+        if (question) setInput(question);
+        setError(
+          err instanceof Error ? err.message : "Upload failed. Please try again."
+        );
+      }
+      return;
+    }
+
+    await sendQuestion(question);
+  };
+
+  const regenerateAssistantReply = (
+    assistantMessage: VaultMessage,
+    userMessage: VaultMessage
+  ) => {
+    setMessages((prev) => prev.filter((m) => m.id !== assistantMessage.id));
+    setConfirmedReminderIds((prev) => {
+      const next = new Set(prev);
+      next.delete(assistantMessage.id);
+      return next;
+    });
+    setConfirmedWorkMemoryIds((prev) => {
+      const next = new Set(prev);
+      next.delete(assistantMessage.id);
+      return next;
+    });
+    setConfirmedDailyLogIds((prev) => {
+      const next = new Set(prev);
+      next.delete(assistantMessage.id);
+      return next;
+    });
+    setDismissedVaultScopeIds((prev) => {
+      const next = new Set(prev);
+      next.delete(assistantMessage.id);
+      return next;
+    });
+    void sendQuestion(userMessage.content, {
+      regenerateAssistantId: assistantMessage.id,
+      attachment: messageAttachments(userMessage)[0],
+    });
+  };
+
+  const renderAssistantContent = (
+    m: VaultMessage,
+    options?: {
+      hideCitationPreviews?: boolean;
+      userMessage?: VaultMessage;
+      isStreaming?: boolean;
+      showSuggestedQuestions?: boolean;
+      showBinaryChoices?: boolean;
+    }
+  ) => {
+    const proposedReminder = parseProposedReminder(m.content, Date.now(), timeZone);
+    const proposedDailyLog = parseProposedDailyLog(m.content, todayLogDate(timeZone));
+    const proposedWorkMemory = parseProposedWorkMemoryUpdate(
+      m.content,
+      requestedWorkProjectId ?? workProject?.id
+    );
+    const proposedClientRequest = parseProposedClientRequestReply(
+      m.content,
+      requestedRequestId
+    );
+    const proposedClientRequestCreate = parseProposedClientRequestCreate(
+      m.content,
+      active?.profile_type === "client" ? active.id : null
+    );
+    const proposedSpaceCreate = parseProposedSpaceCreate(m.content);
+    const displayContent = stripFocusBlockSection(
+      stripProposedSpaceCreateSection(
+        stripProposedDailyLogSection(
+          stripProposedClientRequestCreateSection(
+            stripProposedClientRequestReplySection(
+              stripProposedWorkMemoryUpdateSection(
+                stripProposedReminderSection(m.content)
+              )
+            )
+          )
+        )
+      )
+    );
+    const sections = parseGideonSections(
+      displayContent ||
+        (proposedReminder ||
+        proposedDailyLog ||
+        proposedWorkMemory ||
+        proposedClientRequest ||
+        proposedClientRequestCreate ||
+        proposedSpaceCreate
+          ? ""
+          : m.content)
+    );
+    const citations = Array.isArray(m.citations) ? m.citations : [];
+    const uniqueCitations = [
+      ...new Map(citations.map((c) => [c.documentId, c])).values(),
+    ];
+    const imageCitations = [
+      ...new Map(
+        uniqueCitations
+          .filter((c) => c.isImage || isImageFileName(c.fileName))
+          .map((c) => [c.fileName.trim().toLowerCase(), c])
+      ).values(),
+    ];
+    const youtubeLinks = extractYouTubeUrls(m.content ?? "");
+    const answerText = m.content ?? "";
+    const sourceNamedInAnswer = (c: Citation) =>
+      citationNamedInText(
+        {
+          fileName: c.fileName,
+          profileName: c.profileName,
+          cardName: c.cardName,
+        },
+        answerText
+      );
+    // Vault images/PDFs only when the answer names them (no stray party invites).
+    const vaultImages = imageCitations
+      .filter((c) => c.kind !== "connector")
+      .filter((c) => sourceNamedInAnswer(c));
+    // Trust server-picked connector citations only when the answer names them.
+    // preferChartsMatchingKeyInText alone can return the first 2 unnamed PDFs.
+    const connectorImages = preferChartsMatchingKeyInText(
+      imageCitations.filter((c) => c.kind === "connector"),
+      answerText,
+      2
+    ).filter((c) => sourceNamedInAnswer(c));
+    // Connector PDFs: same — must be named in the answer.
+    const connectorPdfs = preferChartsMatchingKeyInText(
+      uniqueCitations.filter(
+        (c) =>
+          c.kind === "connector" &&
+          !c.isImage &&
+          !isImageFileName(c.fileName) &&
+          (/\.pdf$/i.test(c.fileName) ||
+            Boolean(c.mimeType?.includes("pdf")))
+      ),
+      answerText,
+      2
+    ).filter((c) => sourceNamedInAnswer(c));
+    // Non-image vault Sources must also be named in the answer.
+    const sourceCitations = uniqueCitations.filter((c) => {
+      if (c.isImage || isImageFileName(c.fileName)) return false;
+      if (c.kind === "connector") {
+        // Shown as preview cards above; keep link-only for non-PDF docs.
+        if (/\.pdf$/i.test(c.fileName) || c.mimeType?.includes("pdf")) {
+          return false;
+        }
+        return sourceNamedInAnswer(c);
+      }
+      return sourceNamedInAnswer(c);
+    });
+    // Prefer files listed on Source: lines when present.
+    const explicitSourceNames = extractExplicitSourceFileNames(answerText).map(
+      (n) => n.toLowerCase()
+    );
+    const matchesExplicit = (c: Citation) =>
+      explicitSourceNames.length === 0 ||
+      explicitSourceNames.some(
+        (n) =>
+          c.fileName.toLowerCase() === n ||
+          c.fileName.toLowerCase().includes(n.replace(/\.[^.]+$/, ""))
+      );
+    // Preview cards only for images + connector chart PDFs. Vault docs (JSON,
+    // notes, etc.) stay as Source links — no file thumbnail above the answer.
+    const vaultPreviewCitations = [
+      ...vaultImages,
+      ...connectorImages,
+      ...connectorPdfs,
+    ].filter(matchesExplicit);
+    const previewCitations = options?.hideCitationPreviews
+      ? []
+      : vaultPreviewCitations;
+    const linkOnlyCitations = options?.hideCitationPreviews
+      ? []
+      : sourceCitations;
+
+    const alreadySetReminder = confirmedReminderIds.has(m.id);
+    const confirmingReminder = confirmingReminderId === m.id;
+    const alreadySavedDailyLog = confirmedDailyLogIds.has(m.id);
+    const confirmingDailyLog = confirmingDailyLogId === m.id;
+    const alreadySetWorkMemory = confirmedWorkMemoryIds.has(m.id);
+    const confirmingWorkMemory = confirmingWorkMemoryId === m.id;
+    const alreadyPostedClientRequest = confirmedClientRequestIds.has(m.id);
+    const confirmingClientRequest = confirmingClientRequestId === m.id;
+    const alreadyCreatedClientRequest = confirmedClientRequestCreateIds.has(m.id);
+    const confirmingClientRequestCreate =
+      confirmingClientRequestCreateId === m.id;
+    const clientVaultName = proposedClientRequestCreate
+      ? profiles.find((p) => p.id === proposedClientRequestCreate.profileId)
+          ?.display_name
+      : null;
+    const alreadyCreatedSpace = confirmedSpaceCreateIds.has(m.id);
+    const confirmingSpaceCreate = confirmingSpaceCreateId === m.id;
+    const spaceCreateParentChoice = proposedSpaceCreate
+      ? (spaceCreateParentChoices.get(m.id) ??
+        defaultParentChoice(proposedSpaceCreate, profiles, profileId))
+      : null;
+    const spaceCreateValidParents = proposedSpaceCreate
+      ? validParentProfilesForChild(profiles, proposedSpaceCreate.profileType)
+      : [];
+    const spaceCreateAllowsTopLevel = proposedSpaceCreate
+      ? !profileTypeRequiresParent(proposedSpaceCreate.profileType)
+      : false;
+    const spaceCreateNeedsPicker = proposedSpaceCreate
+      ? spaceCreateNeedsPlacementPicker(proposedSpaceCreate, profiles)
+      : false;
+    const vaultScope = m.vaultScope;
+    const showVaultScopeCard =
+      vaultScope &&
+      !dismissedVaultScopeIds.has(m.id) &&
+      vaultScope.profileId !== effectiveProfile?.id;
+    const switchingVault = switchingVaultScopeId === m.id;
+    const plainText = formatAssistantMessagePlainText(m.content);
+    const speechText = formatAssistantMessageSpeechText(m.content);
+    const showActions =
+      !options?.isStreaming && Boolean(plainText.trim() || m.content.trim());
+    const showBinaryChoices =
+      !options?.isStreaming &&
+      options?.showBinaryChoices &&
+      hasBinaryFollowUp(displayContent || m.content);
+    const isWaitingForFirstAnswerToken =
+      options?.isStreaming && !m.content.trim();
+    const isReviewingAttachment =
+      isWaitingForFirstAnswerToken &&
+      Boolean(
+        options?.userMessage && messageAttachments(options.userMessage).length
+      );
+
+    return (
+      <div className="min-w-0 flex-1 space-y-2">
+        {isWaitingForFirstAnswerToken ? (
+          <div
+            className="flex items-center gap-2 py-2 text-sm text-ink-muted"
+            role="status"
+            aria-live="polite"
+          >
+            <Loader2 className="h-4 w-4 animate-spin text-brand" aria-hidden />
+            <span>
+              {isReviewingAttachment
+                ? "Reviewing your document…"
+                : "Thinking through your question…"}
+            </span>
+          </div>
+        ) : null}
+        {previewCitations.length > 0 || youtubeLinks.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {previewCitations.map((c) => (
+              <VaultAttachmentCard
+                key={`att-${c.documentId}`}
+                documentId={c.documentId}
+                fileName={c.fileName}
+                displayName={c.cardName?.trim() || c.fileName}
+                kind={
+                  c.isImage || isImageFileName(c.fileName) ? "image" : "document"
+                }
+                citationKind={c.kind}
+                sourceId={c.sourceId}
+                itemId={c.itemId}
+              />
+            ))}
+            {youtubeLinks.map((url) => (
+              <a
+                key={url}
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex max-w-[11rem] flex-col items-start justify-center gap-1 rounded-xl border border-stone-200 bg-white px-3 py-2 text-left shadow-sm transition hover:bg-stone-50"
+                title={url}
+              >
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-muted">
+                  YouTube
+                </span>
+                <span className="text-xs font-semibold text-brand">
+                  Watch on YouTube
+                </span>
+              </a>
+            ))}
+          </div>
+        ) : null}
+        {sections.map((sec, i) => (
+          <div
+            key={`${m.id}-${i}`}
+            className={`rounded-xl border px-3 py-2 text-sm leading-relaxed ${SECTION_STYLES[sec.kind] ?? SECTION_STYLES.body}`}
+          >
+            {sec.title && (
+              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
+                {sec.title}
+              </p>
+            )}
+            <GideonCompactAnswer
+              content={sec.content}
+              forceFull={Boolean(options?.isStreaming)}
+            />
+          </div>
+        ))}
+        {proposedReminder ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50/90 px-3 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-900/70">
+              Proposed reminder
+            </p>
+            <p className="mt-1 text-sm font-medium text-foreground">
+              {proposedReminder.title}
+            </p>
+            <p className="mt-0.5 text-xs text-ink-muted">
+              {proposedReminderWhenLabel(proposedReminder, timeZone)}
+            </p>
+            {m.vaultScope ? (
+              <p className="mt-1 text-xs text-amber-900/80">
+                Will save to {m.vaultScope.profileName}&apos;s vault
+              </p>
+            ) : null}
+            {alreadySetReminder ? (
+              <div className="mt-3 space-y-3 rounded-lg border border-emerald-200 bg-emerald-50/90 px-3 py-3">
+                <div className="flex items-start gap-2">
+                  <Check
+                    className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700"
+                    aria-hidden
+                  />
+                  <div>
+                    <p className="text-sm font-semibold text-emerald-900">
+                      Reminder saved
+                    </p>
+                    <p className="mt-1 text-xs leading-relaxed text-emerald-900/80">
+                      Next: open Today when it&apos;s due, or keep chatting.
+                    </p>
+                  </div>
+                </div>
+                <Link
+                  href={SIMPLE_HOME_PATH}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-dark"
+                >
+                  <GuardianIcon size={14} alt="" />
+                  Go to Today
+                </Link>
+              </div>
+            ) : (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={
+                    confirmingReminder || savingReminder || sending || vaultBusy
+                  }
+                  onClick={() =>
+                    void confirmProposedReminder(
+                      m.id,
+                      proposedReminder,
+                      m.vaultScope?.profileId
+                    )
+                  }
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand/90 disabled:opacity-60"
+                >
+                  {confirmingReminder ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Bell className="h-3.5 w-3.5" />
+                  )}
+                  Create reminder
+                </button>
+                <button
+                  type="button"
+                  disabled={confirmingReminder || savingReminder}
+                  onClick={() => {
+                    setReminderTargetProfileId(m.vaultScope?.profileId ?? null);
+                    setReminderTitle(proposedReminder.title);
+                    setReminderDate(proposedReminder.date);
+                    setReminderTime(proposedReminder.time);
+                    setReminderOpen(true);
+                  }}
+                  className="inline-flex items-center rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50"
+                >
+                  Edit first
+                </button>
+              </div>
+            )}
+          </div>
+        ) : null}
+        {proposedDailyLog ? (
+          <div className="rounded-xl border border-violet-200 bg-violet-50/90 px-3 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-violet-900/70">
+              Proposed Daily Log
+            </p>
+            <p className="mt-1 text-sm text-foreground">
+              {proposedDailyLogSummary(proposedDailyLog, timeZone)}
+            </p>
+            {m.vaultScope ? (
+              <p className="mt-1 text-xs text-violet-900/80">
+                Will save to {m.vaultScope.profileName}&apos;s vault
+              </p>
+            ) : null}
+            {alreadySavedDailyLog ? (
+              <div className="mt-3 space-y-3 rounded-lg border border-emerald-200 bg-emerald-50/90 px-3 py-3">
+                <div className="flex items-start gap-2">
+                  <Check
+                    className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700"
+                    aria-hidden
+                  />
+                  <div>
+                    <p className="text-sm font-semibold text-emerald-900">
+                      Saved — {FIRST_MINUTE_HOLDING}
+                    </p>
+                    <p className="mt-1 text-xs leading-relaxed text-emerald-900/80">
+                      Next: open Today to see what needs you, or History to
+                      review this note.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Link
+                    href={SIMPLE_HOME_PATH}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-dark"
+                  >
+                    <GuardianIcon size={14} alt="" />
+                    Go to Today
+                  </Link>
+                  <Link
+                    href={HISTORY_PATH}
+                    className="inline-flex items-center rounded-lg border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-950 transition hover:bg-emerald-50"
+                  >
+                    Open History
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={
+                    confirmingDailyLog || savingLog || sending || vaultBusy
+                  }
+                  onClick={() =>
+                    void confirmProposedDailyLog(
+                      m.id,
+                      proposedDailyLog,
+                      m.vaultScope?.profileId
+                    )
+                  }
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand/90 disabled:opacity-60"
+                >
+                  {confirmingDailyLog ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <NotebookPen className="h-3.5 w-3.5" />
+                  )}
+                  Save to space
+                </button>
+                <button
+                  type="button"
+                  disabled={confirmingDailyLog || savingLog}
+                  onClick={() => {
+                    pendingDailyLogMessageIdRef.current = m.id;
+                    setLogTitle(proposedDailyLog.title ?? "");
+                    setLogContent(proposedDailyLog.content);
+                    setLogOpen(true);
+                  }}
+                  className="inline-flex items-center rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50"
+                >
+                  Edit first
+                </button>
+              </div>
+            )}
+          </div>
+        ) : null}
+        {proposedWorkMemory ? (
+          <div className="rounded-xl border border-indigo-200 bg-indigo-50/90 px-3 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-900/70">
+              Proposed Work Memory update
+            </p>
+            <p className="mt-1 text-sm text-foreground">
+              {proposedWorkMemoryUpdateSummary(
+                proposedWorkMemory,
+                workProject?.id === proposedWorkMemory.projectId
+                  ? workProject.name
+                  : null
+              )}
+            </p>
+            {alreadySetWorkMemory ? (
+              <p className="mt-2 text-xs font-medium text-emerald-800">
+                Project updated in Work Memory.
+              </p>
+            ) : (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={
+                    confirmingWorkMemory ||
+                    savingWorkMemory ||
+                    sending ||
+                    vaultBusy
+                  }
+                  onClick={() =>
+                    void confirmProposedWorkMemoryUpdate(m.id, proposedWorkMemory)
+                  }
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand/90 disabled:opacity-60"
+                >
+                  {confirmingWorkMemory ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Brain className="h-3.5 w-3.5" />
+                  )}
+                  Update project
+                </button>
+                <Link
+                  href={`/work-memory/${proposedWorkMemory.projectId}`}
+                  className="inline-flex items-center rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50"
+                >
+                  Open in Work Memory
+                </Link>
+              </div>
+            )}
+          </div>
+        ) : null}
+        {proposedClientRequestCreate ? (
+          <div className="rounded-xl border border-teal-200 bg-teal-50/90 px-3 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-teal-900/70">
+              Proposed client request
+            </p>
+            <p className="mt-1 text-sm font-medium text-foreground">
+              {proposedClientRequestCreate.title}
+            </p>
+            {clientVaultName ? (
+              <p className="mt-0.5 text-xs text-ink-muted">
+                Client vault: {clientVaultName}
+              </p>
+            ) : null}
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
+              {proposedClientRequestCreate.description}
+            </p>
+            {proposedClientRequestCreate.initialMessage &&
+            proposedClientRequestCreate.initialMessage !==
+              proposedClientRequestCreate.description ? (
+              <p className="mt-2 text-xs text-ink-muted">
+                First message: {proposedClientRequestCreate.initialMessage}
+              </p>
+            ) : null}
+            {proposedClientRequestCreate.assignedToName ? (
+              <p className="mt-1 text-xs text-ink-muted">
+                Assign to teammate: {proposedClientRequestCreate.assignedToName}
+              </p>
+            ) : null}
+            {alreadyCreatedClientRequest ? (
+              <div className="mt-2 space-y-2">
+                <p className="text-xs font-medium text-emerald-800">
+                  Client request created.
+                </p>
+                {createdClientRequestIds.get(m.id) ? (
+                  <Link
+                    href={`/requests?id=${createdClientRequestIds.get(m.id)}`}
+                    className="inline-flex items-center rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50"
+                  >
+                    Open request
+                  </Link>
+                ) : null}
+              </div>
+            ) : (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={
+                    confirmingClientRequestCreate ||
+                    savingClientRequestCreate ||
+                    sending ||
+                    vaultBusy
+                  }
+                  onClick={() =>
+                    void confirmProposedClientRequestCreate(
+                      m.id,
+                      proposedClientRequestCreate
+                    )
+                  }
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand/90 disabled:opacity-60"
+                >
+                  {confirmingClientRequestCreate ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <MessageCircle className="h-3.5 w-3.5" />
+                  )}
+                  Create request
+                </button>
+                <Link
+                  href="/requests"
+                  className="inline-flex items-center rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50"
+                >
+                  Open Requests
+                </Link>
+              </div>
+            )}
+          </div>
+        ) : null}
+        {proposedSpaceCreate ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50/90 px-3 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-900/70">
+              Proposed {getContainerLabel(proposedSpaceCreate.profileType)}
+            </p>
+            <p className="mt-1 text-sm font-medium text-foreground">
+              {proposedSpaceCreate.displayName}
+            </p>
+            <p className="mt-1 text-xs text-ink-muted">
+              {spaceCreatePlacementLabel(
+                proposedSpaceCreate,
+                spaceCreateParentChoice,
+                profiles
+              )}
+            </p>
+            {alreadyCreatedSpace ? (
+              <div className="mt-2 space-y-2">
+                <p className="text-xs font-medium text-emerald-800">
+                  Space created and switched.
+                </p>
+                {createdSpaceProfileIds.get(m.id) ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void switchProfile(createdSpaceProfileIds.get(m.id)!)
+                    }
+                    className="inline-flex items-center rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50"
+                  >
+                    Open space
+                  </button>
+                ) : null}
+              </div>
+            ) : (
+              <div className="mt-3 space-y-2">
+                {spaceCreateNeedsPicker ? (
+                  <>
+                    <label className="block text-xs font-semibold text-amber-900/80">
+                      Where should this live?
+                    </label>
+                    <select
+                      value={
+                        spaceCreateParentChoice === null &&
+                        spaceCreateAllowsTopLevel
+                          ? "__top__"
+                          : spaceCreateParentChoice ?? ""
+                      }
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setSpaceCreateParentChoices((prev) =>
+                          new Map(prev).set(
+                            m.id,
+                            value === "__top__" ? null : value
+                          )
+                        );
+                      }}
+                      className="w-full rounded-lg border border-stone-300 bg-white px-2.5 py-2 text-sm text-foreground"
+                    >
+                      {spaceCreateAllowsTopLevel ? (
+                        <option value="__top__">
+                          Top level (independent space)
+                        </option>
+                      ) : null}
+                      {spaceCreateValidParents.map((parent) => (
+                        <option key={parent.id} value={parent.id}>
+                          Under {parent.display_name} (
+                          {getContainerLabel(parent.profile_type).toLowerCase()})
+                        </option>
+                      ))}
+                    </select>
+                  </>
+                ) : null}
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <button
+                    type="button"
+                    disabled={
+                      confirmingSpaceCreate ||
+                      savingSpaceCreate ||
+                      sending ||
+                      vaultBusy ||
+                      (profileTypeRequiresParent(proposedSpaceCreate.profileType) &&
+                        !spaceCreateParentChoice)
+                    }
+                    onClick={() =>
+                      void confirmProposedSpaceCreate(
+                        m.id,
+                        proposedSpaceCreate,
+                        spaceCreateParentChoice
+                      )
+                    }
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand/90 disabled:opacity-60"
+                  >
+                    {confirmingSpaceCreate ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <FolderOpen className="h-3.5 w-3.5" />
+                    )}
+                    Create space
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : null}
+        {proposedClientRequest ? (
+          <div className="rounded-xl border border-teal-200 bg-teal-50/90 px-3 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-teal-900/70">
+              Proposed client request reply
+            </p>
+            <p className="mt-1 text-sm text-foreground">
+              {proposedClientRequestReplySummary(proposedClientRequest)}
+            </p>
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
+              {proposedClientRequest.content}
+            </p>
+            {alreadyPostedClientRequest ? (
+              <p className="mt-2 text-xs font-medium text-emerald-800">
+                Reply posted on the request thread.
+              </p>
+            ) : (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={
+                    confirmingClientRequest ||
+                    savingClientRequestReply ||
+                    sending ||
+                    vaultBusy
+                  }
+                  onClick={() =>
+                    void confirmProposedClientRequestReply(
+                      m.id,
+                      proposedClientRequest
+                    )
+                  }
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand/90 disabled:opacity-60"
+                >
+                  {confirmingClientRequest ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <MessageCircle className="h-3.5 w-3.5" />
+                  )}
+                  Post reply
+                </button>
+                <Link
+                  href={`/requests?id=${proposedClientRequest.requestId}`}
+                  className="inline-flex items-center rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50"
+                >
+                  Open request
+                </Link>
+              </div>
+            )}
+          </div>
+        ) : null}
+        {showVaultScopeCard ? (
+          <div className="rounded-xl border border-sky-200 bg-sky-50/90 px-3 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-sky-900/70">
+              Answered from another space
+            </p>
+            <p className="mt-1 text-sm text-foreground">
+              This came from <span className="font-medium">{vaultScope.profileName}</span>
+              &apos;s space. You&apos;re still in{" "}
+              <span className="font-medium">{vaultScope.activeProfileName}</span>.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {!scopedProfileId && !isDrawer ? (
+                <button
+                  type="button"
+                  disabled={switchingVault || sending || vaultBusy}
+                  onClick={() =>
+                    openSideVault(
+                      vaultScope.profileId,
+                      vaultScope.profileName,
+                      m.id
+                    )
+                  }
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-sky-300 bg-white px-3 py-1.5 text-xs font-semibold text-sky-900 transition hover:bg-sky-50 disabled:opacity-60"
+                >
+                  <PanelRightOpen className="h-3.5 w-3.5" />
+                  Open {vaultScope.profileName}&apos;s space here
+                </button>
+              ) : null}
+              <button
+                type="button"
+                disabled={switchingVault || sending || vaultBusy}
+                onClick={() =>
+                  void continueInScopedVault(
+                    vaultScope.profileId,
+                    vaultScope.profileName,
+                    m.id
+                  )
+                }
+                className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand/90 disabled:opacity-60"
+              >
+                {switchingVault ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <ArrowRightLeft className="h-3.5 w-3.5" />
+                )}
+                Continue in {vaultScope.profileName}&apos;s space
+              </button>
+              <button
+                type="button"
+                disabled={switchingVault}
+                onClick={() => void dismissVaultScope(m.id)}
+                className="inline-flex items-center rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-foreground transition hover:bg-stone-50"
+              >
+                Stay in {vaultScope.activeProfileName}
+              </button>
+            </div>
+          </div>
+        ) : null}
+        {linkOnlyCitations.length > 0 ? (
+          <div className="space-y-2 pt-1">
+            {linkOnlyCitations.map((c) => (
+              <div
+                key={c.documentId}
+                className="flex flex-wrap items-center gap-2 text-[11px] text-ink-muted"
+              >
+                <span>
+                  Source:{" "}
+                  <span className="font-medium text-foreground">
+                    {c.profileName
+                      ? `${c.profileName} · ${c.cardName?.trim() || c.fileName}`
+                      : c.cardName?.trim() || c.fileName}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void viewSource(c)}
+                  className="inline-flex items-center gap-1 rounded-full border border-stone-300 bg-white px-2.5 py-1 font-semibold text-brand transition hover:bg-stone-50"
+                >
+                  {c.kind === "connector" ? "Open file" : "View source"}
+                  <ExternalLink className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        {showBinaryChoices ? (
+          <div className="flex flex-wrap gap-2 pt-1" aria-label="Answer yes or no">
+            <button
+              type="button"
+              disabled={sending || vaultBusy || Boolean(streamingAssistantId)}
+              onClick={() => void sendQuestion("Yes, do that.")}
+              className="min-h-10 rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark disabled:opacity-50 sm:min-h-0 sm:rounded-full sm:py-1.5"
+            >
+              Yes
+            </button>
+            <button
+              type="button"
+              disabled={sending || vaultBusy || Boolean(streamingAssistantId)}
+              onClick={() => void sendQuestion("No, not now.")}
+              className="min-h-10 rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-foreground transition hover:border-brand hover:bg-brand-light/40 disabled:opacity-50 sm:min-h-0 sm:rounded-full sm:py-1.5"
+            >
+              No
+            </button>
+          </div>
+        ) : null}
+        {!options?.isStreaming &&
+        options?.showSuggestedQuestions &&
+        m.role === "assistant" &&
+        Array.isArray(m.suggestedQuestions) &&
+        m.suggestedQuestions.length > 0 ? (
+          <div className="space-y-2 pt-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
+              You might also ask
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {m.suggestedQuestions.slice(0, 3).map((q) => (
+                <button
+                  key={q}
+                  type="button"
+                  disabled={sending || vaultBusy || Boolean(streamingAssistantId)}
+                  onClick={() => void sendQuestion(q)}
+                  className="min-h-10 max-w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-left text-xs font-medium leading-snug text-foreground transition hover:border-brand hover:bg-brand-light/40 disabled:opacity-50 sm:min-h-0 sm:rounded-full sm:py-1.5"
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+        {showActions ? (
+          <GideonAssistantActions
+            messageId={m.id}
+            plainText={plainText}
+            speechText={speechText}
+            speaking={speakingMessageId === m.id}
+            speechSupported={speechOutputSupported}
+            disabled={sending || vaultBusy || Boolean(streamingAssistantId)}
+            canRegenerate={Boolean(options?.userMessage && activeChatId)}
+            canAddToToday={
+              Boolean(profileId) && !alreadySavedDailyLog && !alreadySetReminder
+            }
+            canRemind={
+              Boolean(profileId) && !alreadySavedDailyLog && !alreadySetReminder
+            }
+            onSpeak={speakAssistant}
+            onAddToToday={addAnswerToToday}
+            onRemindMe={remindFromAnswer}
+            onRegenerate={
+              options?.userMessage
+                ? () =>
+                    regenerateAssistantReply(m, options.userMessage!)
+                : undefined
+            }
+          />
+        ) : null}
+      </div>
+    );
+  };
+
+  const welcome = !loadingHistory && messages.length === 0 && !sending;
+  const docCount = meta?.documentCount ?? 0;
+  const photoCount = meta?.photoCount ?? 0;
+  const logCount = meta?.logCount ?? 0;
+  const connectedCount = meta?.connectedItemCount ?? 0;
+  const fileCount = docCount + photoCount;
+  const emptyVault = fileCount === 0 && logCount === 0 && connectedCount === 0;
+  const quickActions = meta?.quickActions?.length
+    ? meta.quickActions
+    : GIDEON_QUICK_ACTIONS;
+  const showExpandedWelcome = emptyVault && !gideonWelcomeSeen;
+  const showMinimalWelcome = !showExpandedWelcome;
+  const logsOnly = fileCount === 0 && logCount > 0;
+  const greetName = meta?.firstName;
+  const hasOtherSpaces = topLevelProfiles(profiles).length > 1;
+  const showCreateSpaceShortcuts = showExpandedWelcome || hasOtherSpaces;
+  const exampleUploads = (
+    meta?.guidance?.suggestedUploads?.length
+      ? meta.guidance.suggestedUploads
+      : [...TRY_GUARDIAN_EXAMPLES]
+  ).slice(0, 4);
+
+  const countBits: string[] = [];
+  if (meta?.practiceStatsLine) {
+    countBits.push(meta.practiceStatsLine);
+  }
+  if (docCount > 0) {
+    countBits.push(
+      meta?.practiceStatsLine
+        ? `${docCount} uploaded doc${docCount === 1 ? "" : "s"}`
+        : `${docCount} document${docCount === 1 ? "" : "s"}`
+    );
+  }
+  if (photoCount > 0) {
+    countBits.push(
+      meta?.practiceStatsLine
+        ? `${photoCount} uploaded photo${photoCount === 1 ? "" : "s"}`
+        : `${photoCount} photo${photoCount === 1 ? "" : "s"}`
+    );
+  }
+  if (logCount > 0) {
+    countBits.push(`${logCount} Daily Log${logCount === 1 ? "" : "s"}`);
+  }
+
+  const practiceStats = meta?.practiceStats ?? null;
+  const showPracticeStats = Boolean(meta?.practiceStatsLine);
+
+  const templateBadge =
+    meta?.guidance?.badge ?? meta?.templateBadge ?? null;
+
+  const runFirstMemoryAction = (id: FirstMemoryActionId) => {
+    if (id === "document") openFilePicker();
+    else if (id === "daily_log" || id === "meeting_notes") openLogForm();
+    else if (id === "photo") openCamera();
+    else if (id === "schedule") openReminderForm();
+  };
+
+  const welcomeBlock = welcome && (
+    isPage && showMinimalWelcome && !emptyVault ? (
+      <div className="mx-auto max-w-xl space-y-3 px-1 py-4 sm:py-6">
+        <GideonWelcome
+          showAskForm={false}
+          mode="ask"
+          searchScope={meta?.searchScope ?? DEFAULT_SEARCH_SCOPE}
+        />
+        <EmptyAskGuidanceChips
+          onTell={() => composerInputRef.current?.focus()}
+          onUpload={openFilePicker}
+          onAddToToday={openReminderForm}
+          disabled={vaultBusy || sending || !profileId || !canEditVault}
+        />
+      </div>
+    ) : (
+    <div
+      className={
+        showMinimalWelcome && !emptyVault
+          ? "mx-auto max-w-xl px-1 py-2"
+          : "mx-auto max-w-xl space-y-4 px-1 py-4 sm:py-6"
+      }
+    >
+      {!showMinimalWelcome && isPage ? <OnboardingProgressChip /> : null}
+      {!showMinimalWelcome && meta?.actionTimeline && meta.actionTimeline.length > 0 ? (
+        <GideonActionTimeline events={meta.actionTimeline} />
+      ) : null}
+      {!showMinimalWelcome &&
+      meta?.proactiveSuggestions &&
+      meta.proactiveSuggestions.length > 0 ? (
+        <GideonProactiveSuggestions suggestions={meta.proactiveSuggestions} />
+      ) : null}
+      {!showMinimalWelcome &&
+      meta?.workspaceTimeline &&
+      meta.workspaceTimeline.length > 0 ? (
+        <GideonWorkspaceTimeline events={meta.workspaceTimeline} />
+      ) : null}
+      <div className="flex items-start gap-3">
+        <GideonAvatar size={showMinimalWelcome && !emptyVault ? 40 : 44} />
+        <div className="min-w-0 space-y-3">
+          {showMinimalWelcome && !emptyVault ? (
+            <>
+              <p className="text-sm leading-relaxed text-ink-muted">
+                {GIDEON_RETURNING_PROMPT}
+              </p>
+              <EmptyAskGuidanceChips
+                onTell={() => composerInputRef.current?.focus()}
+                onUpload={openFilePicker}
+                onAddToToday={openReminderForm}
+                disabled={
+                  vaultBusy || sending || !profileId || !canEditVault
+                }
+              />
+              {showPracticeStats ? (
+                <div className="rounded-xl border border-stone-200 bg-stone-50/80 px-3 py-2.5">
+                  <button
+                    type="button"
+                    disabled={sending || loadingHistory}
+                    onClick={() =>
+                      void sendQuestion(
+                        practiceStatsListPrompt("songs", meta?.boardName)
+                      )
+                    }
+                    className="text-left text-xs font-semibold text-foreground transition hover:text-brand disabled:opacity-50"
+                    title="Show song list"
+                  >
+                    {meta?.practiceStatsLine}
+                  </button>
+                  {practiceStats ? (
+                    <PracticeStatsChips
+                      stats={practiceStats}
+                      boardName={meta?.boardName}
+                      disabled={sending || loadingHistory}
+                      onAsk={(prompt) => void sendQuestion(prompt)}
+                    />
+                  ) : null}
+                  <p className="mt-1.5 text-[10px] text-ink-muted">
+                    Tap a count to open the list
+                  </p>
+                </div>
+              ) : null}
+              <p className="text-[11px] font-medium text-ink-muted">
+                {GIDEON_CHIEF_OF_STAFF_TAGLINE}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {quickActions.map((action) => (
+                  <button
+                    key={action.id}
+                    type="button"
+                    disabled={sending || loadingHistory}
+                    onClick={() => void sendQuestion(action.prompt)}
+                    className="rounded-full border border-stone-300 bg-white px-3 py-1.5 text-left text-xs font-medium text-foreground transition hover:border-brand hover:bg-brand-light/40 disabled:opacity-50"
+                  >
+                    {action.label}
+                  </button>
+                ))}
+              </div>
+              {!emptyVault && meta && meta.suggestions.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {meta.suggestions.map((q) => (
+                    <button
+                      key={q}
+                      type="button"
+                      disabled={sending || loadingHistory}
+                      onClick={() => void sendQuestion(q)}
+                      className="rounded-full border border-stone-300 bg-white px-3 py-1.5 text-left text-xs font-medium text-foreground transition hover:border-brand hover:bg-brand-light/40 disabled:opacity-50"
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
               ) : null}
             </>
           ) : (
