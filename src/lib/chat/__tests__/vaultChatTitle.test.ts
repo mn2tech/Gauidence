@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 import {
   DEFAULT_IMAGE_ATTACHMENT_QUESTION,
   isDefaultAttachmentPrompt,
@@ -9,58 +10,67 @@ import {
 
 describe("vaultChatTitle", () => {
   it("detects default attachment prompts", () => {
-    expect(isDefaultAttachmentPrompt(DEFAULT_IMAGE_ATTACHMENT_QUESTION)).toBe(
+    assert.equal(
+      isDefaultAttachmentPrompt(DEFAULT_IMAGE_ATTACHMENT_QUESTION),
       true
     );
-    expect(
-      isDefaultAttachmentPrompt("Summarize what matters in invoice.pdf.")
-    ).toBe(true);
-    expect(isDefaultAttachmentPrompt("When does my lease end?")).toBe(false);
+    assert.equal(
+      isDefaultAttachmentPrompt("Summarize what matters in invoice.pdf."),
+      true
+    );
+    assert.equal(isDefaultAttachmentPrompt("When does my lease end?"), false);
   });
 
   it("detects generic sidebar titles", () => {
-    expect(isGenericVaultChatTitle("New chat")).toBe(true);
-    expect(isGenericVaultChatTitle(DEFAULT_IMAGE_ATTACHMENT_QUESTION)).toBe(
+    assert.equal(isGenericVaultChatTitle("New chat"), true);
+    assert.equal(
+      isGenericVaultChatTitle(DEFAULT_IMAGE_ATTACHMENT_QUESTION),
       true
     );
-    expect(isGenericVaultChatTitle("Lease renewal date")).toBe(false);
+    assert.equal(isGenericVaultChatTitle("Lease renewal date"), false);
   });
 
   it("generates titles for first exchange when prompt is generic or long", () => {
-    expect(
+    assert.equal(
       shouldGenerateVaultChatTitle({
         isFirstExchange: true,
         question: DEFAULT_IMAGE_ATTACHMENT_QUESTION,
-      })
-    ).toBe(true);
-    expect(
+      }),
+      true
+    );
+    assert.equal(
       shouldGenerateVaultChatTitle({
         isFirstExchange: true,
         question:
           "Can you walk me through every deadline mentioned in these board minutes from last quarter?",
-      })
-    ).toBe(true);
-    expect(
+      }),
+      true
+    );
+    assert.equal(
       shouldGenerateVaultChatTitle({
         isFirstExchange: true,
         question: "When does my lease end?",
-      })
-    ).toBe(false);
-    expect(
+      }),
+      false
+    );
+    assert.equal(
       shouldGenerateVaultChatTitle({
         isFirstExchange: false,
         question: DEFAULT_IMAGE_ATTACHMENT_QUESTION,
-      })
-    ).toBe(false);
+      }),
+      false
+    );
   });
 
   it("sanitizes model output", () => {
-    expect(sanitizeGeneratedChatTitle('"Q3 grant deadline"')).toBe(
+    assert.equal(
+      sanitizeGeneratedChatTitle('"Q3 grant deadline"'),
       "Q3 grant deadline"
     );
-    expect(sanitizeGeneratedChatTitle("## Board minutes review.")).toBe(
+    assert.equal(
+      sanitizeGeneratedChatTitle("## Board minutes review."),
       "Board minutes review"
     );
-    expect(sanitizeGeneratedChatTitle("   ")).toBeNull();
+    assert.equal(sanitizeGeneratedChatTitle("   "), null);
   });
 });

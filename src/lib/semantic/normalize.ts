@@ -109,8 +109,46 @@ export function normalizeDateValue(raw: string): string | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
 
+  // Calendar dates are facts about a civil day, not an instant in the
+  // server's local timezone. Parse common date-only forms into UTC directly
+  // so a deployment in a positive offset cannot shift Sep 15 back to Sep 14.
+  const monthNames =
+    "January|February|March|April|May|June|July|August|September|October|November|December";
+  const namedDate = trimmed.match(
+    new RegExp(
+      `^(${monthNames})\\s+(\\d{1,2})(?:st|nd|rd|th)?,?\\s+(\\d{4})$`,
+      "i"
+    )
+  );
+  if (namedDate) {
+    const month = monthNames
+      .toLowerCase()
+      .split("|")
+      .indexOf(namedDate[1]!.toLowerCase());
+    const day = Number(namedDate[2]);
+    const year = Number(namedDate[3]);
+    const date = new Date(Date.UTC(year, month, day));
+    if (
+      date.getUTCFullYear() === year &&
+      date.getUTCMonth() === month &&
+      date.getUTCDate() === day
+    ) {
+      return date.toISOString();
+    }
+    return null;
+  }
+
   // Already ISO-ish
-  if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    const [year, month, day] = trimmed.split("-").map(Number);
+    const date = new Date(Date.UTC(year!, month! - 1, day!));
+    return date.getUTCFullYear() === year &&
+      date.getUTCMonth() === month! - 1 &&
+      date.getUTCDate() === day
+      ? date.toISOString()
+      : null;
+  }
+  if (/^\d{4}-\d{2}-\d{2}T/.test(trimmed)) {
     const d = new Date(trimmed);
     return Number.isFinite(d.getTime()) ? d.toISOString() : null;
   }

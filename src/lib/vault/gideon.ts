@@ -1175,9 +1175,9 @@ export const WELCOME_AI_MEMORY_BODY = GUARDIAN_PRODUCT_LINE;
 export const GIDEON_RETURNING_PROMPT =
   "Ask anything — we can talk it through, plan your day, or search Guardian when you need your files.";
 
-export const EMPTY_VAULT_HEADLINE = "Add something for Gideon to remember";
+export const EMPTY_VAULT_HEADLINE = "What should Gideon remember for you?";
 export const EMPTY_VAULT_BODY =
-  "Start with something simple—a receipt, flyer, note, or Daily Log—and discover how easy it is to ask Gideon instead of searching.";
+  "Tell Gideon something in your own words, add a date to Today, or share a document when you are ready.";
 
 export const FIRST_MEMORY_PROMPT =
   "What would you like Gideon to remember first?";
@@ -1203,7 +1203,7 @@ export const FIRST_MEMORY_ACTIONS: {
 
 export const TRY_GUARDIAN_TITLE = "Try Guardian in 60 seconds";
 export const TRY_GUARDIAN_SUBTITLE =
-  "Upload something simple and ask Gideon a question.";
+  "Tell Gideon one thing that matters—or try a sample without uploading anything.";
 
 /** Everyday, low-risk examples — never lead with IDs or government documents. */
 export const TRY_GUARDIAN_EXAMPLES = [

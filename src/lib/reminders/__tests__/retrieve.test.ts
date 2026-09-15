@@ -26,12 +26,12 @@ describe("schedule retrieval helpers", () => {
     assert.ok(specific > generic);
   });
 
-  it("formats alerts for Gideon with vault and due labels", () => {
+  it("formats alerts for Gideon with space and due labels", () => {
     const text = formatAlertsForGideon([sample], {
       profileNames: { p1: "Nolan" },
       timeZone: "America/New_York",
     });
-    assert.match(text, /\[Reminder \| vault: Nolan/);
+    assert.match(text, /\[Reminder \| space: Nolan/);
     assert.match(text, /Camp registration opens/);
     assert.match(text, /due:/i);
   });

@@ -986,6 +986,7 @@ export async function DELETE(request: Request) {
 
 /** Ask a question; pass chatId to continue a thread, or omit to start a new one. */
 export async function POST(request: Request) {
+  const requestStartedAt = Date.now();
   const auth = await requireUser();
   if (!isAuthed(auth)) return auth;
   const { supabase, user } = auth;
@@ -2074,6 +2075,7 @@ export async function POST(request: Request) {
             ? (chunks ?? []).filter((c) => budgetedChunkIds.has(c.id))
             : chunks;
         return createVaultChatStreamResponse({
+          requestStartedAt,
           supabase,
           userId: user.id,
           chatId,

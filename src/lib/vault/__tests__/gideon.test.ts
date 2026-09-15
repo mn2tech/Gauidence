@@ -231,8 +231,9 @@ describe("Gideon helpers", () => {
     );
     assert.ok(ORGANIZE_EXAMPLES.some((e) => /if you choose/i.test(e)));
     assert.ok(PRIVACY_CARD_POINTS.length >= 4);
-    assert.equal(EMPTY_VAULT_HEADLINE, "Add something for Gideon to remember");
-    assert.match(EMPTY_VAULT_BODY, /something simple/i);
+    assert.equal(EMPTY_VAULT_HEADLINE, "What should Gideon remember for you?");
+    assert.match(EMPTY_VAULT_BODY, /in your own words/i);
+    assert.match(EMPTY_VAULT_BODY, /when you are ready/i);
     assert.equal(gideonChatContextLabel("personal"), "You are chatting with Gideon Personal");
     assert.equal(
       gideonChatContextLabel("non_profit"),
@@ -262,7 +263,7 @@ describe("Gideon helpers", () => {
       buildVaultScopeNote({
         allVaultNames: ["Personal", "Business", "Nolan"],
       }),
-      "Searching all 3 spaces: Personal, Business, Nolan."
+      "Searching all your spaces: Personal, Business, Nolan."
     );
     assert.equal(
       buildVaultScopeNote({
@@ -280,7 +281,7 @@ describe("Gideon helpers", () => {
         ],
         chatScopedProfileName: "NM2TECH - Next Move",
       }),
-      "Answers may use all 4 spaces · Chat saved in NM2TECH - Next Move."
+      "Searching all 4 spaces · Chat saved in NM2TECH - Next Move."
     );
     assert.equal(
       buildVaultScopeNote({
@@ -301,7 +302,7 @@ describe("Gideon helpers", () => {
         searchVaultNames: ["crossroadconnect", "CROSSROADS"],
         chatScopedProfileName: "CROSSROADS",
       }),
-      "Searching 2 spaces for this chat: crossroadconnect, CROSSROADS (12 spaces available)."
+      "Searching 2 spaces for this chat: crossroadconnect, CROSSROADS (12 spaces and workspaces available)."
     );
     assert.equal(
       buildVaultScopeNote({

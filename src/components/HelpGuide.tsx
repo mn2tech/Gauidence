@@ -58,7 +58,7 @@ const HOW_TO = [
   {
     icon: Search,
     title: "Search",
-    body: "Tap Search (or Ctrl+K on desktop) to find people, logs, documents, and conversations across every vault you own.",
+    body: "Tap Search (or Ctrl+K on desktop) to find people, logs, documents, and conversations across every space you own.",
     href: DOCUMENTS_PATH,
     linkLabel: `Go to ${VAULT_NAV_LABEL.toLowerCase()}`,
   },
@@ -79,7 +79,7 @@ const HOW_TO = [
   {
     icon: BookOpen,
     title: "Research",
-    body: "Look up companies or people on the live web. Optionally connect results to vault context, then save a brief into a vault.",
+    body: "Look up companies or people on the live web. Optionally connect results to your context, then save a brief into a space.",
     href: "/research",
     linkLabel: "Open Research",
   },
@@ -265,7 +265,7 @@ export default function HelpGuide({ signedIn }: { signedIn: boolean }) {
         <ol className="mt-5 space-y-2 text-sm text-ink-muted">
           <li>
             <span className="font-semibold text-foreground">1.</span> Create a{" "}
-            <strong>Student</strong> vault and set your grade (choose 9th for the
+            <strong>Student</strong> space and set your grade (choose 9th for the
             freshman success package).
           </li>
           <li>
@@ -291,7 +291,7 @@ export default function HelpGuide({ signedIn }: { signedIn: boolean }) {
         </ol>
 
         <p className="mt-4 text-xs text-ink-muted">
-          Parents can also set up a Student vault under a family account. Free
+          Parents can also set up a Student space under a family account. Free
           tier has monthly limits — see{" "}
           <Link href="/pricing" className="font-semibold text-brand hover:text-brand-dark">
             Pricing
@@ -305,7 +305,7 @@ export default function HelpGuide({ signedIn }: { signedIn: boolean }) {
               href="/settings/profiles?add=1"
               className="inline-flex items-center gap-1.5 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark"
             >
-              Create student vault
+              Create student space
               <ArrowRight className="h-4 w-4" aria-hidden />
             </Link>
             <Link

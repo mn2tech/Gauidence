@@ -1,10 +1,11 @@
 "use client";
 
-import { CalendarPlus, FileUp } from "lucide-react";
+import { CalendarPlus, FileUp, MessageCircle } from "lucide-react";
 
 type Props = {
   onUpload: () => void;
   onAddToToday: () => void;
+  onTell?: () => void;
   disabled?: boolean;
   className?: string;
 };
@@ -16,20 +17,32 @@ type Props = {
 export default function EmptyAskGuidanceChips({
   onUpload,
   onAddToToday,
+  onTell,
   disabled = false,
   className = "",
 }: Props) {
   return (
     <div className={`space-y-2 ${className}`}>
       <p className="text-sm text-ink-muted">
-        Start with something Gideon can help with:
+        Start with one thing you don&apos;t want to forget:
       </p>
       <div className="flex flex-wrap gap-2">
+        {onTell ? (
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={onTell}
+            className="inline-flex items-center gap-1.5 rounded-full bg-brand px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-brand-dark disabled:opacity-50 sm:text-sm"
+          >
+            <MessageCircle className="h-3.5 w-3.5" aria-hidden />
+            Tell Gideon
+          </button>
+        ) : null}
         <button
           type="button"
           disabled={disabled}
           onClick={onUpload}
-          className="inline-flex items-center gap-1.5 rounded-full bg-brand px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-brand-dark disabled:opacity-50 sm:text-sm"
+          className="inline-flex items-center gap-1.5 rounded-full border border-border-subtle bg-surface px-3.5 py-2 text-xs font-semibold text-foreground transition hover:border-brand hover:bg-brand-light/40 disabled:opacity-50 sm:text-sm"
         >
           <FileUp className="h-3.5 w-3.5" aria-hidden />
           Upload a document

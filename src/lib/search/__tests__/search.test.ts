@@ -59,7 +59,7 @@ describe("universal vault search helpers", () => {
   it("builds deep-link hrefs", () => {
     assert.equal(
       hrefForResult({ kind: "profile", id: "p1", profileId: "p1" }),
-      "/dashboard?profileId=p1"
+      "/dashboard?docs=1&profileId=p1"
     );
     assert.match(
       hrefForResult({ kind: "daily_log", id: "l1", profileId: "p1" }),

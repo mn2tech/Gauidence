@@ -125,6 +125,8 @@ export type VaultChatStreamArgs = {
   originalUserQuestion?: string;
   /** When true, rewrite wrong Add Daily Log refusals into in-chat Save to space. */
   dailyLogCapture?: boolean;
+  /** Request start captured by the route, used to measure pre-stream work. */
+  requestStartedAt?: number;
 };
 
 export function createVaultChatStreamResponse(
@@ -134,7 +136,20 @@ export function createVaultChatStreamResponse(
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
+      const streamStartedAt = Date.now();
+      let firstDeltaAt: number | null = null;
+      let streamOutcome = "incomplete";
       const write = (payload: unknown) => {
+        if (payload && typeof payload === "object" && "type" in payload) {
+          const type = (payload as { type?: unknown }).type;
+          if (
+            (type === "delta" || type === "replace") &&
+            firstDeltaAt == null
+          ) {
+            firstDeltaAt = Date.now();
+          }
+          if (type === "done" || type === "error") streamOutcome = String(type);
+        }
         controller.enqueue(encoder.encode(`${JSON.stringify(payload)}\n`));
       };
 
@@ -633,6 +648,22 @@ export function createVaultChatStreamResponse(
         console.error("Vault chat stream failed:", error);
         write({ type: "error", error, code });
       } finally {
+        console.info(
+          JSON.stringify({
+            event: "gideon_stream_timing",
+            chatId: args.chatId,
+            outcome: streamOutcome,
+            firstTokenMs:
+              firstDeltaAt == null ? null : firstDeltaAt - streamStartedAt,
+            preStreamMs:
+              args.requestStartedAt == null
+                ? null
+                : streamStartedAt - args.requestStartedAt,
+            totalMs: Date.now() - streamStartedAt,
+            attachment: Boolean(args.attachedDoc),
+            retrievedChunkCount: args.chunks.length,
+          })
+        );
         controller.close();
       }
     },

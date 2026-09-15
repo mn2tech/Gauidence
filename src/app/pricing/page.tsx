@@ -63,11 +63,11 @@ export default async function PricingPage() {
               {GUARDIAN_BRAND_TAGLINE}
             </p>
             <h1 className="mt-8 text-3xl font-bold tracking-tight sm:text-5xl">
-              Simple pricing for every vault
+              Simple pricing for peace of mind
             </h1>
             <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-ink-muted sm:text-lg">
-              Start free. Upgrade when you need more vault storage, analyses, Ask
-              Gideon, and Research. Cancel anytime from Settings.
+              Start free. Upgrade when you want Guardian to watch more of life,
+              remember more context, and help you act sooner. Cancel anytime.
             </p>
           </div>
         </section>
@@ -82,7 +82,7 @@ export default async function PricingPage() {
                 plan === "free"
                   ? `${limits.spacesPerAccount} Space`
                   : `Up to ${limits.spacesPerAccount.toLocaleString("en-US")} Spaces`,
-                `${formatStorageBytes(limits.storageBytes)} vault storage`,
+                `${formatStorageBytes(limits.storageBytes)} secure storage`,
                 `${limits.analyzePerMonth} document analyses / month`,
                 `${limits.chatPerMonth.toLocaleString("en-US")} Ask Gideon questions / month`,
               ];

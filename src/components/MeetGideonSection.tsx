@@ -37,7 +37,7 @@ export default function MeetGideonSection() {
               Meet Gideon
             </p>
             <h2 className="mt-3 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-              Your guide to everything in your vault
+              Your guide to what matters across your spaces
             </h2>
             <p className="mt-4 text-lg leading-relaxed text-ink-muted">
               Ask about documents, dates, amounts, and what may need attention —
